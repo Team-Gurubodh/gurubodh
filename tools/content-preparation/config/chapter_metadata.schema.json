@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/chapter_metadata.schema.json",
+  "title": "Gurubodh Chapter Metadata",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "document",
+    "files",
+    "processing",
+    "conversion",
+    "content_stats",
+    "content",
+    "annotations"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.2.0"
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "category_code",
+        "subject_code",
+        "title_slug",
+        "chapter_number",
+        "version",
+        "language"
+      ],
+      "properties": {
+        "category_code": {
+          "type": "string",
+          "pattern": "^CAT[0-9]{3}$"
+        },
+        "subject_code": {
+          "type": "string",
+          "pattern": "^SUB[0-9]{3}$"
+        },
+        "title_slug": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$"
+        },
+        "chapter_number": {
+          "type": "string",
+          "pattern": "^[0-9]{3}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]{2}\\.[0-9]{2}$"
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "object",
+      "required": [
+        "metadata_filename",
+        "text_filename",
+        "msword_filename",
+        "original_source_relative_path"
+      ],
+      "properties": {
+        "metadata_filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text_filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "msword_filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_source_relative_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "processing": {
+      "type": "object",
+      "required": ["pipeline", "entry_point"],
+      "properties": {
+        "pipeline": {
+          "type": "string",
+          "enum": ["legacy-docx-to-unicode", "unicode-docx-ingest"]
+        },
+        "entry_point": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "conversion": {
+      "type": "object",
+      "required": [
+        "created_at",
+        "source_font_encoding",
+        "source_file_format",
+        "output_text_encoding",
+        "converter_counts"
+      ],
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_font_encoding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_file_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_text_encoding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "converter_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "content_stats": {
+      "type": "object",
+      "required": ["word_count", "character_count", "paragraph_count"],
+      "properties": {
+        "word_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "character_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "paragraph_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "content": {
+      "type": "object",
+      "required": ["title", "summary", "automated_tags", "scriptural_terms"],
+      "properties": {
+        "title": {
+          "type": ["string", "null"]
+        },
+        "summary": {
+          "type": ["string", "null"]
+        },
+        "automated_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "scriptural_terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "type": "object",
+      "required": ["expert_descriptors", "user_tags"],
+      "properties": {
+        "expert_descriptors": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "array", "object", "null"]
+          },
+          "default": {}
+        },
+        "user_tags": {
+          "type": "object",
+          "required": ["labels", "custom_notes"],
+          "properties": {
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "custom_notes": {
+              "type": ["string", "null"],
+              "default": null
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

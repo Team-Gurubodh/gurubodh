@@ -1,0 +1,36 @@
+# Local input/output directories
+input_word/
+converted_word/
+
+# macOS
+.DS_Store
+._*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.env
+venv/
+.venv/
+env/
+
+# JavaScript / Node
+node_modules/
+*.log
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temp / backup
+*.tmp
+*.bak

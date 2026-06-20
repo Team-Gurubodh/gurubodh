@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.2.0",
+  "pipeline": "legacy-docx-to-unicode",
+  "source": {
+    "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
+    "relative_path": "39_aacharan_shaastra/aps_fonts/ms_word/aacharanshstra.docx",
+    "font_encoding": "aps",
+    "file_format": "docx"
+  },
+  "destination": {
+    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
+    "subject_dir": "39_aacharan_shaastra"
+  },
+  "naming": {
+    "category_code": "CAT001",
+    "subject_code": "SUB001",
+    "title_slug": "aacharan-shastra",
+    "version": "01",
+    "subversion": "01"
+  },
+  "chapter_split": {
+    "enabled": true,
+    "pattern_type": "literal",
+    "pattern": "प्रबोधन क्र"
+  },
+  "metadata_defaults": {
+    "language": "hi-IN",
+    "source_script": "Devanagari",
+    "output_text_encoding": "UTF-8"
+  }
+}

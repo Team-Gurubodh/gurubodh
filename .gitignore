@@ -1,0 +1,57 @@
+# macOS
+.DS_Store
+._*
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+**/*.egg-info/
+**/.venv/
+**/venv/
+**/env/
+
+# Node
+**/node_modules/
+*.log
+
+# Build outputs
+**/dist/
+**/build/
+coverage/
+.tsbuildinfo
+.eslintcache
+
+# Strapi local/runtime state
+**/.tmp/
+**/.strapi/
+**/.strapi-updater.json
+**/.strapi-cloud.json
+apps/gurubodh-cms/.strapi/
+apps/gurubodh-cms/.strapi-updater.json
+apps/gurubodh-cms/.strapi-cloud.json
+apps/gurubodh-cms/exports/
+apps/gurubodh-cms/license.txt
+apps/gurubodh-cms/public/uploads/*
+!apps/gurubodh-cms/public/uploads/.gitkeep
+
+# Content preparation local input/output
+tools/content-preparation/input_word/
+tools/content-preparation/converted_word/
+
+# Temp / backup
+*.tmp
+*.bak
