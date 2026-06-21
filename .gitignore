@@ -55,3 +55,6 @@ tools/content-preparation/converted_word/
 # Temp / backup
 *.tmp
 *.bak
+
+# Agents and tasks
+.tasks/
