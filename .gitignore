@@ -55,6 +55,3 @@ tools/content-preparation/converted_word/
 # Temp / backup
 *.tmp
 *.bak
-
-# History of agent tasks created for vibe coding sessions
-.vibe-tasks/
