@@ -1,6 +1,6 @@
 # Localhost PostgreSQL Scripts
 
-This directory contains PostgreSQL scripts for a local, self-managed PostgreSQL server.
+This directory contains PostgreSQL scripts for a self-managed PostgreSQL server on localhost or self managed virtual machine on a cloud.
 
 Localhost scripts may use privileges that are appropriate for a developer-owned PostgreSQL instance, including local superuser-oriented setup. They should not be assumed to run unchanged on Amazon RDS.
 
