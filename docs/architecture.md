@@ -25,12 +25,12 @@ component, and should guide future decisions:
 1. **The CMS is the single source of truth for content and metadata.** No other
    component stores published content state; everything else either feeds the
    CMS or reads from it.
-2. **Ingestion and preprocessing are decoupled from each other and from the CMS.**
+2. **Preparation and ingestion are decoupled from each other and from the CMS.**
    Each stage hands off through a staging boundary so that a failure or slowdown
    in one stage does not corrupt or block another.
 3. **Consumption layers (web, mobile) are stateless clients of the CMS/RAG APIs.**
-   They never write to the CMS directly and never talk to ingestion or
-   preprocessing directly.
+   They never write to the CMS directly and never talk to preparation or
+   ingestion directly.
 4. **The RAG layer is derived, not authoritative.** Embeddings and vector data are
    always rebuildable from CMS content; the vector store is never a system of
    record.
@@ -47,9 +47,9 @@ flowchart LR
         SRC[External Content Sources]
     end
 
-    subgraph Ingestion & Preparation
-        ING[Ingestion Layer]
-        PRE[Preprocessing Layer]
+    subgraph Preparation & Ingestion
+        PRE[Content Preparation Layer]
+        ING[Content Ingestion Layer]
     end
 
     subgraph Core Platform
@@ -68,7 +68,7 @@ flowchart LR
         RAGAPI[RAG Query Service]
     end
 
-    SRC --> ING --> PRE --> CMS
+    SRC --> PRE --> ING --> CMS
     PRE --> MEDIA
     CMS --> WEB
     CMS --> MOBILE
@@ -81,32 +81,41 @@ flowchart LR
 
 ## 4. Components
 
-### 4.1 Ingestion Layer
+### 4.1 Content Ingestion Layer
 
-- **Responsibility**: Pull content and metadata from external sources and hand
-  it off in a normalized, staged form. Guarantee idempotent delivery (re-running
-  an ingestion job must not create duplicates).
-- **Collaborates with**: receives from External Sources; hands off to the
-  Preprocessing Layer via a staging boundary (storage/queue).
+- **Responsibility**: Import prepared content and metadata artifacts into the
+  CMS. Guarantee idempotent delivery so re-running an ingestion job does not
+  create duplicate CMS entries.
+- **Collaborates with**: consumes artifacts produced by the Content Preparation
+  Layer; writes finalized entries to the CMS via its API (never via direct
+  database access).
 - **Boundaries — does NOT**:
-  - Perform business-level validation, enrichment, or cleanup (Preprocessing's job).
-  - Write directly into the CMS's published content state.
-  - Know anything about how content is rendered or consumed downstream.
-- **Current implementation**: source-specific adapters on AWS (Lambda/ECS +
-  EventBridge/SQS). No ADR yet — implementation detail, not an architectural
-  decision point.
-
-### 4.2 Preprocessing & Preparation Layer
-
-- **Responsibility**: Clean, normalize, validate, enrich, and de-duplicate staged
-  content; produce CMS-ready entries.
-- **Collaborates with**: consumes staged output from Ingestion; writes finalized
-  entries to the CMS via its API (never via direct database access).
-- **Boundaries — does NOT**:
-  - Reach out to external sources directly (depends entirely on Ingestion's output).
-  - Render or serve content to end users.
+  - Reach out to external source material directly.
+  - Perform DOCX Unicode conversion, chapter splitting, or artifact generation.
   - Bypass the CMS's own validation/hooks by writing to its database directly.
-- **Current implementation**: orchestrated pipeline on AWS. See
+  - Know anything about how content is rendered or consumed downstream.
+- **Current implementation**: not implemented yet. `tools/content-ingestion/`
+  is a placeholder for future CMS ingestion tooling.
+- **Planned/recommended direction**: AWS-based ingestion workers or adapters may
+  be introduced later, but no ingestion ADR has been accepted yet.
+
+### 4.2 Content Preparation Layer
+
+- **Responsibility**: Prepare legacy source content before CMS ingestion. This
+  includes Unicode conversion, chapter splitting, local validation, metadata
+  artifact generation, and other transformations needed to produce
+  CMS-ingestion-ready artifacts.
+- **Collaborates with**: consumes source DOCX files and job configuration;
+  produces artifacts for the future Content Ingestion Layer.
+- **Boundaries — does NOT**:
+  - Write finalized entries directly into the CMS.
+  - Render or serve content to end users.
+  - Own the published content lifecycle.
+- **Current implementation**: local Python utility under
+  `tools/content-preparation/`, currently used for legacy DOCX Unicode
+  conversion and chapter splitting.
+- **Planned/recommended direction**: an AWS-orchestrated preprocessing pipeline
+  is proposed but not accepted. See
   [ADR-0006](./adr/0006-content-preprocessing-orchestration.md).
 
 ### 4.3 Headless CMS (System of Record)
@@ -114,9 +123,10 @@ flowchart LR
 - **Responsibility**: Store structured content and metadata, manage the
   publishing lifecycle (draft/published/archived), expose content via API, and
   reference media assets.
-- **Collaborates with**: receives writes from Preprocessing; serves reads to Web
-  and Mobile consumption layers; serves content to the Embedding Pipeline (RAG
-  layer); fires webhooks on publish/update/delete that other components react to.
+- **Collaborates with**: receives writes from Content Ingestion; serves reads to
+  Web and Mobile consumption layers; serves content to the Embedding Pipeline
+  (RAG layer); fires webhooks on publish/update/delete that other components
+  react to.
 - **Boundaries — does NOT**:
   - Perform source-specific ingestion logic.
   - Render UI or own presentation concerns.
@@ -131,11 +141,14 @@ flowchart LR
 
 - **Responsibility**: Durable storage for binary assets (images, documents,
   video, etc.) referenced from CMS entries.
-- **Collaborates with**: written to by Preprocessing (or CMS upload flows); read
-  by Web/Mobile consumption layers (often via a CDN in front of it).
+- **Collaborates with**: written to by Content Preparation, Content Ingestion,
+  or CMS upload flows; read by Web/Mobile consumption layers (often via a CDN in
+  front of it).
 - **Boundaries — does NOT**:
   - Own asset metadata (alt text, captions, relations) — that belongs to the CMS.
-- **Current implementation**: S3-backed storage provider for Strapi.
+- **Current implementation**: Strapi's local upload provider in development.
+- **Planned/recommended direction**: S3-backed storage provider for Strapi when
+  media needs durable cloud storage.
 
 ### 4.5 Web Consumption Layer
 
@@ -146,7 +159,8 @@ flowchart LR
 - **Boundaries — does NOT**:
   - Own content data — the CMS remains the source of truth even though the web
     layer may cache it.
-  - Implement content validation/business logic that belongs in Preprocessing.
+  - Implement content validation/business logic that belongs in Content
+    Preparation or Content Ingestion.
 - **Current implementation**: Next.js. See
   [ADR-0002](./adr/0002-use-nextjs-for-web-frontend.md). Hosting model: see
   [ADR-0007](./adr/0007-nextjs-hosting-model-on-aws.md).
@@ -207,10 +221,10 @@ flowchart LR
 
 | Component | Depends On | Depended On By | Must Not Do |
 |---|---|---|---|
-| Ingestion Layer | External Sources | Preprocessing Layer | Validate/enrich content; write to CMS directly |
-| Preprocessing Layer | Ingestion Layer (staged output) | CMS | Call external sources directly; bypass CMS API |
-| Headless CMS | Preprocessing Layer (writes) | Web, Mobile, Embedding Pipeline | Render UI; perform vector search |
-| Media Storage | Preprocessing Layer / CMS (writes) | Web, Mobile (via CDN) | Own asset metadata |
+| Content Preparation Layer | Source DOCX files, job configuration | Content Ingestion Layer | Write finalized entries directly to CMS |
+| Content Ingestion Layer | Prepared content artifacts | CMS | Convert DOCX; split chapters; bypass CMS API |
+| Headless CMS | Content Ingestion Layer (writes) | Web, Mobile, Embedding Pipeline | Render UI; perform vector search |
+| Media Storage | Content Preparation / Content Ingestion / CMS (writes) | Web, Mobile (via CDN) | Own asset metadata |
 | Web Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Own content data; implement content validation |
 | Embedding Pipeline | CMS (webhooks + reads) | Vector Store | Generate/own content; serve queries |
 | Vector Store | Embedding Pipeline (writes) | RAG Query Service | Act as a system of record |
@@ -221,10 +235,11 @@ flowchart LR
 
 ## 6. Data Flow Narrative
 
-1. **Ingestion** pulls raw content/metadata from external sources and stages it,
-   tagged with a stable external ID for idempotency.
-2. **Preprocessing** picks up staged content, cleans/validates/enriches it, and
-   writes finished entries to the **CMS** via its API.
+1. **Content Preparation** converts supported legacy DOCX content to Unicode,
+   splits subject-level documents into chapter-level artifacts, and emits
+   metadata artifacts for later ingestion.
+2. **Content Ingestion** picks up prepared artifacts, applies idempotency rules,
+   and writes finished entries to the **CMS** via its API.
 3. The **CMS** becomes the system of record; it serves the **Web** (and later
    **Mobile**) consumption layers directly via API, and stores media references
    pointing at **Media Storage**.
@@ -243,7 +258,8 @@ flowchart LR
 
 | Phase | Components Active |
 |---|---|
-| **Phase 1** | Ingestion, Preprocessing, Headless CMS, Media Storage |
+| **Current implemented foundation** | Local Content Preparation utility, Headless CMS scaffold, local PostgreSQL scripts |
+| **Phase 1 target** | Content Ingestion, Content Preparation, Headless CMS, Media Storage |
 | **Phase 2** | + Web Consumption Layer (production-hardened) |
 | **Phase 3** | + Embedding Pipeline, Vector Store, RAG Query Service |
 | **Phase 4** | + Mobile Consumption Layer |
@@ -266,8 +282,9 @@ the boundaries of earlier ones.
 - **Environment isolation**: dev/staging/production each get fully isolated
   infrastructure (no shared CMS database across environments).
 - **Observability**: every component that processes data asynchronously
-  (Ingestion, Preprocessing, Embedding Pipeline) must emit structured logs and
-  failure alerts, since these stages are the easiest places for silent data loss.
+  (Content Ingestion, Content Preparation, Embedding Pipeline) must emit
+  structured logs and failure alerts, since these stages are the easiest places
+  for silent data loss.
 
 ---
 

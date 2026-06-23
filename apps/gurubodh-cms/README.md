@@ -1,61 +1,88 @@
-# 🚀 Getting started with Strapi
+# Gurubodh CMS
 
-Strapi comes with a full featured [Command Line Interface](https://docs.strapi.io/dev-docs/cli) (CLI) which lets you scaffold and manage your project in seconds.
+Strapi 5 application for managing Gurubodh content and metadata.
 
-### `develop`
+The CMS is the system of record for published content. Any future tooling that
+writes content into the CMS must use the Strapi API instead of modifying the CMS
+database directly.
 
-Start your Strapi application with autoReload enabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-develop)
+## Setup
 
+Install dependencies from the monorepo root:
+
+```bash
+make cms-install
 ```
+
+Or run npm directly from this directory:
+
+```bash
+npm ci
+```
+
+Create a local environment file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Replace all placeholder secrets in `.env` before running the CMS. Do not commit
+real secret values.
+
+## Local Database
+
+The CMS is intended to use PostgreSQL. Local PostgreSQL bootstrap, role,
+privilege, and environment-specific scripts live outside the Strapi app at:
+
+```text
+database/postgres/gurubodh-cms/
+```
+
+Raw PostgreSQL infrastructure scripts must not be placed in
+`apps/gurubodh-cms/database/migrations/`. That directory is reserved for Strapi
+JS/TS migrations that run during application startup.
+
+## Common Commands
+
+From the monorepo root:
+
+```bash
+make cms-dev
+make cms-build
+```
+
+From this directory:
+
+```bash
 npm run develop
-# or
-yarn develop
-```
-
-### `start`
-
-Start your Strapi application with autoReload disabled. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-start)
-
-```
-npm run start
-# or
-yarn start
-```
-
-### `build`
-
-Build your admin panel. [Learn more](https://docs.strapi.io/dev-docs/cli#strapi-build)
-
-```
 npm run build
-# or
-yarn build
+npm run start
 ```
 
-## ⚙️ Deployment
+`npm run develop` starts Strapi with auto-reload for local development.
+`npm run build` builds the Strapi admin panel and is the preferred quick
+verification command for CMS changes.
+`npm run start` starts Strapi without auto-reload.
 
-Strapi gives you many possible deployment options for your project including [Strapi Cloud](https://cloud.strapi.io). Browse the [deployment section of the documentation](https://docs.strapi.io/dev-docs/deployment) to find the best solution for your use case.
+## Current Content Types
 
+The current CMS scaffold includes:
+
+- `category`
+- `subject`
+
+Content type schemas live under:
+
+```text
+src/api/**/content-types/**/schema.json
 ```
-yarn strapi deploy
-```
 
-## 📚 Learn more
+Update `docs/schemas.md` when schema locations or schema ownership rules
+change.
 
-- [Resource center](https://strapi.io/resource-center) - Strapi resource center.
-- [Strapi documentation](https://docs.strapi.io) - Official Strapi documentation.
-- [Strapi tutorials](https://strapi.io/tutorials) - List of tutorials made by the core team and the community.
-- [Strapi blog](https://strapi.io/blog) - Official Strapi blog containing articles made by the Strapi team and the community.
-- [Changelog](https://strapi.io/changelog) - Find out about the Strapi product updates, new features and general improvements.
+## Related Documentation
 
-Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/strapi). Your feedback and contributions are welcome!
-
-## ✨ Community
-
-- [Discord](https://discord.strapi.io) - Come chat with the Strapi community including the core team.
-- [Forum](https://forum.strapi.io/) - Place to discuss, ask questions and find answers, show your Strapi project and get feedback or just talk with other Community members.
-- [Awesome Strapi](https://github.com/strapi/awesome-strapi) - A curated list of awesome things related to Strapi.
-
----
-
-<sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
+- `../../README.md` - monorepo structure and common commands.
+- `../../docs/architecture.md` - system boundaries and data flow.
+- `../../docs/adr/0001-use-strapi-as-headless-cms.md` - Strapi decision record.
+- `../../database/postgres/gurubodh-cms/README.md` - PostgreSQL script layout.

@@ -19,10 +19,16 @@
 
 - There are over 7000 lectures on 'Sanatan Dharma' captured in audio format that is the starting source material for this project. All the lectures are in traditional Hindi language, not English.
 - People have been employed to convert the audio to MS Word using MS Word 2007. 60% to 70% of the content is already converted, but they use non-unicode encoding while saving the documents.
-- About 50% to 60% of the raw content is stored as MS Word 2007 documents in a legacy, non-unicode encoding/font called 'APS Prakash' or 'APS Priyanka' or the likes of it. These documents must converted to unicode compatible fonts. The ```gurubodh_utils``` python tool does this job well for the detected source fonts. However, we have not tested this conversion against all the source documents that carry the APS family of fonts.
-- About 10% of the raw content, that was stored in the more recent days uses another non-unicode font family called 'Shri-Lipi'. Character maps for converting this text to unicode compatible fonts was not found freely on the internet; so, presently the system is unable to process these documents.
-- The document are always stored as one document per subject involving about 50 lectures. However before ingesting the content in the CMS, we must to split the subject into chapters. However, while the chunking into chapters may be good enough for the initial phases, when we implement ChatBot / RAG service, we may need more granular chunking and much better metadata.
-- We will have to rely on AI and external vocabulary / glossary / concepts-list based on Indian Knowledge System to allow AI to understand the content and apply appropriate 'content-descriptor' metadata to the content chunks. Presently this is an area of exploration and we dont have technical expertise to guide us in the correct direction.
+- About 50% to 60% of the raw content is stored as MS Word 2007 documents in legacy, non-Unicode font encodings such as APS Prakash and APS Priyanka. These documents must be converted to Unicode-compatible text. The `gurubodh_utils` Python tool handles detected APS-family source fonts, but this conversion has not yet been tested against all source documents that use APS-family fonts.
+- About 10% of the raw content, stored in more recent documents, uses
+  Shri-Lipi-family legacy font encodings. Current Shri-Lipi conversion attempts
+  fail because the project does not yet have verified character mapping tables
+  from the source legacy encoding variants to Unicode. Until those mappings are
+  identified, validated, and integrated into the conversion workflow,
+  Shri-Lipi-source documents remain unsupported for reliable automated Unicode
+  conversion.
+- Source content is usually stored as one document per subject, with about 50 lectures per document. Before ingesting the content into the CMS, each subject document must be split into chapters. Chapter-level chunking may be sufficient for initial phases, but the later chatbot/RAG service may require more granular chunks and richer metadata.
+- We will have to rely on AI and external vocabulary, glossary, or concept lists based on the Indian Knowledge System to help AI systems understand the content and apply appropriate content-descriptor metadata to content chunks. This remains an exploration area, and the project does not yet have enough technical expertise to define the final approach.
 
 ## Risk Mitigations
 
