@@ -50,6 +50,8 @@ flowchart LR
     subgraph Preparation & Ingestion
         PRE[Content Preparation Layer]
         ING[Content Ingestion Layer]
+        METAGEN[Metadata Generation Layer]
+        METAING[Metadata Ingestion Layer]
     end
 
     subgraph Core Platform
@@ -68,10 +70,14 @@ flowchart LR
         RAGAPI[RAG Query Service]
     end
 
-    SRC --> PRE --> ING --> CMS
-    PRE --> MEDIA
+    SRC --> PRE
+    PRE --> ING --> CMS
+    PRE --> METAGEN --> METAING --> CMS
+    CMS --> MEDIA
     CMS --> WEB
     CMS --> MOBILE
+    MEDIA --> WEB
+    MEDIA --> MOBILE
     CMS --> EMBED --> VDB --> RAGAPI
     RAGAPI --> WEB
     RAGAPI --> MOBILE
@@ -137,7 +143,7 @@ flowchart LR
   - Does not create content entry into CMS. This is an update operation and therefore it should fail if the content is not already found in the CMS
   - Reach out to external source material directly.
   - Perform DOCX Unicode conversion, chapter splitting, or artifact generation.
-  - Does NOT update generated metadata for content already present in the CMS via its API
+  - Bypass the CMS API when updating generated metadata for content already present in the CMS.
   - Bypass the CMS's own validation/hooks by writing to its database directly.
   - Know anything about how content is rendered or consumed downstream.
 - **Current implementation**: not implemented yet. `tools/metadata-ingestion/` is a placeholder for future metadata ingestion tooling.
@@ -242,10 +248,12 @@ flowchart LR
 
 | Component | Depends On | Depended On By | Must Not Do |
 |---|---|---|---|
-| Content Preparation Layer | Source DOCX files, job configuration | Content Ingestion Layer | Write finalized entries directly to CMS |
+| Content Preparation Layer | Source DOCX files, job configuration, CMS seed-code references | Content Ingestion Layer, Metadata Generation Layer | Write finalized entries directly to CMS |
 | Content Ingestion Layer | Prepared content artifacts | CMS | Convert DOCX; split chapters; bypass CMS API |
-| Headless CMS | Content Ingestion Layer (writes) | Web, Mobile, Embedding Pipeline | Render UI; perform vector search |
-| Media Storage | Content Preparation / Content Ingestion / CMS (writes) | Web, Mobile (via CDN) | Own asset metadata |
+| Metadata Generation Layer | Prepared chapter-level artifacts | Metadata Ingestion Layer, future search/RAG workflows | Generate metadata for unsplit single-file subjects; update CMS directly; convert DOCX |
+| Metadata Ingestion Layer | Generated metadata artifacts, existing CMS entries | CMS | Generate metadata; create new CMS content entries; bypass CMS API |
+| Headless CMS | Content Ingestion Layer and Metadata Ingestion Layer writes | Web, Mobile, Embedding Pipeline | Render UI; perform vector search |
+| Media Storage | CMS / storage-provider integration | Web, Mobile (via CDN) | Own asset metadata |
 | Web Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Own content data; implement content validation |
 | Embedding Pipeline | CMS (webhooks + reads) | Vector Store | Generate/own content; serve queries |
 | Vector Store | Embedding Pipeline (writes) | RAG Query Service | Act as a system of record |
