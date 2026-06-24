@@ -81,9 +81,23 @@ flowchart LR
 
 ## 4. Components
 
-### 4.1 Content Ingestion Layer
+### 4.1 Content Preparation Layer
 
-- **Responsibility**: Import prepared content and metadata artifacts into the
+- **Responsibility**: Prepare legacy source content before CMS ingestion. This
+  includes Unicode conversion, chapter splitting, Assignment of Subject code and Subject Category code, basic metadata generation, and other transformations needed to produce CMS-ingestion-ready artifacts.
+- **Collaborates with**: consumes source in MS Word 2007 format obtained from external sources, manually obtains Subject code and Category code fom CMS system's seed data for the job configuration; produces artifacts for the future Content Ingestion Layer.
+- **Boundaries — does NOT**:
+  - Write finalized entries directly into the CMS.
+  - Render or serve content to end users.
+  - Own the published content lifecycle.
+- **Current implementation**: local Python utility under
+  `tools/content-preparation/`, currently used for legacy DOCX Unicode
+  conversion and chapter splitting.
+- **Planned/recommended direction**: Shri-Lipi font conversion was unsuccessful. As such newly created documents cannot be used by our system. We need to find a solution to this problem.
+
+### 4.2 Content Ingestion Layer
+
+- **Responsibility**: Import prepared content and basic metadata artifacts into the
   CMS. Guarantee idempotent delivery so re-running an ingestion job does not
   create duplicate CMS entries.
 - **Collaborates with**: consumes artifacts produced by the Content Preparation
@@ -99,32 +113,42 @@ flowchart LR
 - **Planned/recommended direction**: AWS-based ingestion workers or adapters may
   be introduced later, but no ingestion ADR has been accepted yet.
 
-### 4.2 Content Preparation Layer
+### 4.3 Metadata Generation Layer
 
-- **Responsibility**: Prepare legacy source content before CMS ingestion. This
-  includes Unicode conversion, chapter splitting, local validation, metadata
-  artifact generation, and other transformations needed to produce
-  CMS-ingestion-ready artifacts.
-- **Collaborates with**: consumes source DOCX files and job configuration;
-  produces artifacts for the future Content Ingestion Layer.
+- **Responsibility**: Generates content specific metadata such as 'tags' or 'content descriptors' for Subject content already split into chapters. The objective is to keep refining and updating 'tags' as well as 'content-descriptors' so that search function and the AI chatbot to be introduced later will be able to find relevant information quickly and correctly.
+- **Collaborates with**: Consumes artifacts produced by the Content Preparation
+  Layer
 - **Boundaries — does NOT**:
-  - Write finalized entries directly into the CMS.
-  - Render or serve content to end users.
-  - Own the published content lifecycle.
-- **Current implementation**: local Python utility under
-  `tools/content-preparation/`, currently used for legacy DOCX Unicode
-  conversion and chapter splitting.
-- **Planned/recommended direction**: an AWS-orchestrated preprocessing pipeline
-  is proposed but not accepted. See
-  [ADR-0006](./adr/0006-content-preprocessing-orchestration.md).
+  - Does not generate metadata for a subject stored entirely in a single file.
+  - Reach out to external source material directly.
+  - Perform DOCX Unicode conversion, chapter splitting, or artifact generation.
+  - Does NOT update generated metadata for content already present in the CMS via its API
+  - Bypass the CMS's own validation/hooks by writing to its database directly.
+  - Know anything about how content is rendered or consumed downstream.
+- **Current implementation**: not implemented yet. `tools/metadata-generation/` is a placeholder for future metadata generation tooling.
+- **Planned/recommended direction**: No metadata generation ADR has been accepted yet.
 
-### 4.3 Headless CMS (System of Record)
+### 4.4 Metadata Ingestion Layer
+
+- **Responsibility**: Updates prepared content-specific metadata such as 'tags' or 'content descriptors' for content already split into chapters into the CMS.  
+- **Collaborates with**: Consumes artifacts produced by the Metadata Generation Layer
+- **Boundaries — does NOT**:
+  - Does not generate metadata
+  - Does not create content entry into CMS. This is an update operation and therefore it should fail if the content is not already found in the CMS
+  - Reach out to external source material directly.
+  - Perform DOCX Unicode conversion, chapter splitting, or artifact generation.
+  - Does NOT update generated metadata for content already present in the CMS via its API
+  - Bypass the CMS's own validation/hooks by writing to its database directly.
+  - Know anything about how content is rendered or consumed downstream.
+- **Current implementation**: not implemented yet. `tools/metadata-ingestion/` is a placeholder for future metadata ingestion tooling.
+- **Planned/recommended direction**: No metadata ingestion ADR has been accepted yet.
+
+### 4.5 Headless CMS (System of Record)
 
 - **Responsibility**: Store structured content and metadata, manage the
   publishing lifecycle (draft/published/archived), expose content via API, and
   reference media assets.
-- **Collaborates with**: receives writes from Content Ingestion; serves reads to
-  Web and Mobile consumption layers; serves content to the Embedding Pipeline
+- **Collaborates with**: receives writes from Content Ingestion, Metadata Ingestion; serves reads to Web and Mobile consumption layers; serves content to the Embedding Pipeline
   (RAG layer); fires webhooks on publish/update/delete that other components
   react to.
 - **Boundaries — does NOT**:
@@ -137,20 +161,17 @@ flowchart LR
   [ADR-0004](./adr/0004-strapi-api-style.md). Admin access control: see
   [ADR-0005](./adr/0005-cms-admin-access-control.md).
 
-### 4.4 Media / Asset Storage
+### 4.6 Media / Asset Storage
 
-- **Responsibility**: Durable storage for binary assets (images, documents,
-  video, etc.) referenced from CMS entries.
-- **Collaborates with**: written to by Content Preparation, Content Ingestion,
-  or CMS upload flows; read by Web/Mobile consumption layers (often via a CDN in
-  front of it).
+- **Responsibility**: Durable, Cloud-based storage for binary assets (documents,
+  audio, etc.) referenced from CMS entries.
+- **Collaborates with**: Likely to be the CMS - the content management system as most such systems provide plugins to collaborate with cloud storages; may be read by Web/Mobile consumption layers, in the initial phases (often via a CDN in front of it).
 - **Boundaries — does NOT**:
   - Own asset metadata (alt text, captions, relations) — that belongs to the CMS.
-- **Current implementation**: Strapi's local upload provider in development.
-- **Planned/recommended direction**: S3-backed storage provider for Strapi when
-  media needs durable cloud storage.
+- **Current implementation**: None
+- **Planned/recommended direction**: S3-backed storage provider for Strapi.
 
-### 4.5 Web Consumption Layer
+### 4.7 Web Consumption Layer
 
 - **Responsibility**: Render content for end users on the web; query the CMS
   (and later the RAG Query Service) for data; manage caching/revalidation.
@@ -165,20 +186,20 @@ flowchart LR
   [ADR-0002](./adr/0002-use-nextjs-for-web-frontend.md). Hosting model: see
   [ADR-0007](./adr/0007-nextjs-hosting-model-on-aws.md).
 
-### 4.6 Embedding Pipeline — *Phase 3*
+### 4.8 Embedding Pipeline — *Phase 3*
 
 - **Responsibility**: React to CMS publish/update/unpublish events; generate
   embeddings for (chunked) content; keep the Vector Store in sync with the CMS.
 - **Collaborates with**: triggered by CMS webhooks; reads CMS content; writes to
-  the Vector Store.
+  the Vector Store. 
 - **Boundaries — does NOT**:
   - Generate or own content — it only derives vectors from what the CMS already
     holds.
   - Serve queries directly (that's the RAG Query Service).
-- **Current implementation**: not yet decided. See
+- **Current implementation**: not yet decided; we need to work on how the generated embeddings work with "content descriptors metadata" prepared by metadata-generation tool to make search effective and efficient. See
   [ADR-0009](./adr/0009-embedding-model-and-llm-provider.md).
 
-### 4.7 Vector Store — *Phase 3*
+### 4.9 Vector Store — *Phase 3*
 
 - **Responsibility**: Store and serve embeddings for similarity search.
 - **Collaborates with**: written to by the Embedding Pipeline; read by the RAG
@@ -186,10 +207,10 @@ flowchart LR
 - **Boundaries — does NOT**:
   - Act as a system of record for content. If lost, it must be fully rebuildable
     by re-running the Embedding Pipeline against the CMS.
-- **Current implementation**: not yet decided. See
+- **Current implementation**: likely to be pgvector extension for PostgreSQL See
   [ADR-0008](./adr/0008-vector-database-for-rag.md).
 
-### 4.8 RAG Query Service — *Phase 3*
+### 4.10 RAG Query Service — *Phase 3*
 
 - **Responsibility**: Accept a natural-language question, retrieve relevant
   chunks from the Vector Store, construct a grounded prompt, call an LLM, and
@@ -203,7 +224,7 @@ flowchart LR
 - **Current implementation**: not yet decided. See
   [ADR-0009](./adr/0009-embedding-model-and-llm-provider.md).
 
-### 4.9 Mobile Consumption Layer — *Phase 4*
+### 4.11 Mobile Consumption Layer — *Phase 4*
 
 - **Responsibility**: Render content and Q&A features for end users on mobile,
   using the same data as the web layer.
@@ -230,27 +251,6 @@ flowchart LR
 | Vector Store | Embedding Pipeline (writes) | RAG Query Service | Act as a system of record |
 | RAG Query Service | Vector Store, LLM provider | Web, Mobile | Answer ungrounded/uncited questions |
 | Mobile Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Introduce a separate backend |
-
----
-
-## 6. Data Flow Narrative
-
-1. **Content Preparation** converts supported legacy DOCX content to Unicode,
-   splits subject-level documents into chapter-level artifacts, and emits
-   metadata artifacts for later ingestion.
-2. **Content Ingestion** picks up prepared artifacts, applies idempotency rules,
-   and writes finished entries to the **CMS** via its API.
-3. The **CMS** becomes the system of record; it serves the **Web** (and later
-   **Mobile**) consumption layers directly via API, and stores media references
-   pointing at **Media Storage**.
-4. *(Phase 3)* On every publish/update/unpublish, the CMS fires a webhook that
-   triggers the **Embedding Pipeline**, which (re)computes embeddings and syncs
-   the **Vector Store**.
-5. *(Phase 3)* The **RAG Query Service** retrieves from the Vector Store at query
-   time, grounds an LLM response in that retrieved content, and returns an
-   answer with citations back to the CMS entries used.
-6. *(Phase 4)* **Mobile** integrates at the same two points as Web: the CMS API
-   and the RAG Query Service — no new backend surface is introduced.
 
 ---
 
