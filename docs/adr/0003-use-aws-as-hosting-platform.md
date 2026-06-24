@@ -6,8 +6,8 @@ Accepted
 
 ## Context
 
-The platform needs a cloud provider to host the CMS, ingestion/preprocessing
-compute, databases, storage, and — in later phases — vector/RAG infrastructure.
+The platform needs a cloud provider to host the CMS, content and metadata
+tooling, databases, storage, and — in later phases — vector/RAG infrastructure.
 Standardizing on a single provider simplifies security model, networking,
 billing, and operational knowledge across the team.
 

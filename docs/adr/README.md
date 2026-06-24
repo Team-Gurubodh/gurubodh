@@ -25,7 +25,7 @@ The companion [architecture.md](../architecture.md) describes the stable compone
 | [0003](./0003-use-aws-as-hosting-platform.md) | Use AWS as Hosting Platform | Accepted |
 | [0004](./0004-strapi-api-style.md) | Strapi API Style: REST vs GraphQL | Proposed |
 | [0005](./0005-cms-admin-access-control.md) | CMS Admin UI Access Control | Proposed |
-| [0006](./0006-content-preprocessing-orchestration.md) | Content Preprocessing Orchestration Approach | Proposed |
+| [0006](./0006-content-preparation-orchestration.md) | Content Preparation Orchestration Approach | Proposed |
 | [0007](./0007-nextjs-hosting-model-on-aws.md) | Next.js Hosting Model on AWS | Proposed |
 | [0008](./0008-vector-database-for-rag.md) | Vector Database for RAG (Phase 3) | Proposed |
 | [0009](./0009-embedding-model-and-llm-provider.md) | Embedding Model and LLM Provider (Phase 3) | Proposed |

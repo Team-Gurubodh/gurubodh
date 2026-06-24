@@ -8,11 +8,11 @@ Accepted
 
 The platform needs a headless CMS to store structured content and metadata,
 support content modeling (types, relations, taxonomies), manage a publishing
-lifecycle, and expose that content via API to ingestion/preprocessing tools
-(writes) and the web/mobile consumption layers (reads). We want to avoid
-recurring SaaS costs and vendor lock-in tied to a proprietary content store,
-and we are comfortable taking on the operational responsibility of hosting it
-ourselves.
+lifecycle, and expose that content via API to content ingestion and metadata
+ingestion tools (writes) and the web/mobile consumption layers (reads). We want
+to avoid recurring SaaS costs and vendor lock-in tied to a proprietary content
+store, and we are comfortable taking on the operational responsibility of
+hosting it ourselves.
 
 ## Decision
 
