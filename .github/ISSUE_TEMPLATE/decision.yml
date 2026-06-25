@@ -1,0 +1,34 @@
+name: Decision
+description: Propose or record a process, operational, or architecture decision.
+title: "[Decision]: "
+labels:
+  - type: decision
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What decision is needed and why now?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options Considered
+      description: List reasonable options and tradeoffs.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Decision
+      description: What should the team decide?
+    validations:
+      required: true
+  - type: textarea
+    id: documentation
+    attributes:
+      label: Documentation Target
+      description: Should this become an ADR, decision record, task update, or another doc?
+    validations:
+      required: false

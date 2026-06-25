@@ -1,0 +1,41 @@
+name: Bug Report
+description: Report a reproducible problem.
+title: "[Bug]: "
+labels:
+  - type: bug
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is happening?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps To Reproduce
+      description: List the smallest reproducible steps.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, runtime versions, app area, and relevant command output.
+    validations:
+      required: false
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Add any checks already performed.
+    validations:
+      required: false

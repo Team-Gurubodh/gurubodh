@@ -19,10 +19,14 @@ Gurubodh is a monorepo for the CMS application, content preparation tools, futur
 - `docs/README.md` - Documentation index and routing guide.
 - `docs/architecture.md` - Current architecture overview and boundaries.
 - `docs/agents/` - Expanded guidance for AI agents working in this repository.
+- `docs/development/` - Contributor workflow guides for GitHub, pull requests, and commit standards.
 - `docs/goals.md` - Project goals and non-goals.
 - `docs/adr/` - Architectural Decision Records.
 - `docs/decisions/` - Operational and process decisions.
 - `docs/tasks/` - Task briefs and execution history.
+- `CONTRIBUTING.md` - Contributor expectations and pull request workflow.
+- `SECURITY.md` - Security reporting and secrets policy.
+- `CODE_OF_CONDUCT.md` - Contributor conduct expectations.
 
 ## Common Commands
 
@@ -86,4 +90,3 @@ Shows the command-line help for `gurubodh-utils`, the content-preparation CLI.
 
 Runs the sample content-preparation job using
 `tools/content-preparation/jobs/002_spand_rahasya.json`.
-

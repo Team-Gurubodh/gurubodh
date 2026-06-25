@@ -12,6 +12,7 @@ Keep `AGENTS.md` short and route durable project knowledge here.
 - `limitations.md` - known limitations, risks, and constraints.
 - `schemas.md` - schema locations, ownership, and maintenance rules.
 - `agents/agent-contract.md` - expanded guidance for AI agents.
+- `development/` - contributor workflow guides for GitHub, pull requests, and Conventional Commits.
 - `tasks/` - task briefs and execution history.
 
 ## Records

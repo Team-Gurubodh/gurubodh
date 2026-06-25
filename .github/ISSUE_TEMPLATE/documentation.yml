@@ -1,0 +1,27 @@
+name: Documentation
+description: Request or track documentation work.
+title: "[Docs]: "
+labels:
+  - type: docs
+body:
+  - type: textarea
+    id: docs_area
+    attributes:
+      label: Documentation Area
+      description: Which document or topic needs work?
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should readers be able to understand or do after this change?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Add relevant links, decisions, or known gaps.
+    validations:
+      required: false

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/
+    about: Do not open public issues for security reports. Contact maintainers privately until GitHub security reporting is configured.
