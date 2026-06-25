@@ -1,7 +1,7 @@
 # Task-005: GitHub integration and Open Source best practices
 
 <record_type>task_history</record_type>
-<status>proposed</status>
+<status>in_progress</status>
 <date>2026-06-25</date>
 <owners>Gurubodh maintainers</owners>
 
@@ -58,11 +58,18 @@
 - Added GitHub pull request and issue templates under `.github/`.
 - Added a placeholder `.github/CODEOWNERS` file to be filled once GitHub owner or team handles are known.
 - Updated `README.md` and `docs/README.md` so the new contributor workflow docs are discoverable.
+- Created a project-specific SSH key for GitHub access and configured the local SSH host alias `github.com-gurubodh`.
+- Pushed the local repository to GitHub.
+- Moved the repository connection to the organization-owned repository `Team-Gurubodh/gurubodh`.
+- Confirmed local `origin` points to `git@github.com-gurubodh:Team-Gurubodh/gurubodh.git`.
+- Confirmed local `main` tracks `origin/main`.
+- Confirmed SSH authentication to GitHub works with the project-specific key.
+- Confirmed the `main` branch protection / ruleset is active in the organization repository.
+- Created and closed a test issue and pull request to validate the issue-first workflow.
 
 ## Follow-Up
 
-- Create the project-specific SSH key and add it to GitHub.
-- Push the repository to the empty private GitHub repository.
-- Configure `main` branch protection immediately after the first push.
 - Add Commitlint, Husky, GitHub Actions CI, and secret scanning in a separate scoped change.
 - Replace the placeholder CODEOWNERS entry with actual GitHub users or teams.
+- Add required status checks to the `main` branch ruleset after GitHub Actions workflows exist and have run at least once.
+- Invite team members after automation and ownership rules are in place.
