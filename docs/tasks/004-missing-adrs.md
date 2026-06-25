@@ -53,5 +53,4 @@ Candidate missing ADRs:
 
 ## Follow-up (Metadata Generation)
 
-- We have ```A-Glossary-Of-Philosophical-Terms.pdf``` saved in the ```docs/glossary``` directory. One experiment would be to use this or similar glossary and create tags of matching words or content-descriptors when a match is found. At this point, this is just a thought. 
-- The document is saved as readonly in order for code editors to modify the file and make it un-readable. Use the password ```gurubodh``` to open the file in any PDF reader.
+- We have ```A-Glossary-Of-Philosophical-Terms.pdf``` saved in the [Project documentation](https://gurubodh.atlassian.net/wiki/spaces/TSS/pages/5767177/A+glossary+of+philosophical+terms?atlOrigin=eyJpIjoiMWY5MjNhZGZjYzg1NDY1MTk3Nzk5YzdjYTU5ZTZjN2EiLCJwIjoiYyJ9) page. One experiment would be to use this or similar glossary and create tags of matching words or content-descriptors when a match is found. At this point, this is just a thought. 
