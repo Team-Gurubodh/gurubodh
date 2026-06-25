@@ -7,7 +7,7 @@ Accepted
 ## Context
 
 The platform needs a modern web UI to consume and present CMS content, with
-good SEO and performance, and a clear path to add RAG-based Q&A features to
+good ***SEO - Search Engine Optimization*** and performance, and a clear path to add RAG-based Q&A features to
 the same UI in a later phase. We want a framework with a strong ecosystem and
 broadly available engineering talent.
 
@@ -28,7 +28,7 @@ Adopt **Next.js (React)** as the web frontend framework.
 **Negative**
 - Adopting Next.js means adopting its framework conventions and release cadence,
   which the team must keep up with.
-- SSR/ISR hosting is operationally more complex than serving plain static files.
+- ***SSR - Server-Side Rendering*** / ***ISR - Incremental Static Regeneration*** hosting is operationally more complex than serving plain static files.
 - React/Next.js ecosystem churn requires ongoing maintenance attention.
 
 **Alternatives Considered**

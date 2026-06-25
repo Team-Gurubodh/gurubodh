@@ -7,7 +7,7 @@ Proposed
 ## Context
 
 The RAG layer needs an embedding model to vectorize content and queries, and
-an LLM to generate grounded answers from retrieved content.
+an LLM to generate grounded answers from retrieved content. The source text is in devanagari, with repeated usage of important terms and concepts from the spiritual domain, more specifically, Sanatana Dharma and/or Indian Knowledge System. Present LLM models are mostly trained in English language without much training in the domain of Sanatana Dharma and Indian Knowledge System.
 
 ## Decision
 
@@ -29,6 +29,7 @@ hosting decision (ADR-0003).
   using a provider's API directly.
 - Switching embedding models later requires re-embedding all existing content,
   so this choice has real switching costs once content volume grows.
+- The LLM may not understand what the user is actually seeking when a question is asked and thus may not give correct answers.
 
 **Alternatives Considered**
 - **OpenAI or Cohere APIs directly** — potentially best-in-class models for
