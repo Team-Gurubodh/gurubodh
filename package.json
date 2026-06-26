@@ -1,0 +1,25 @@
+{
+  "name": "gurubodh-repo-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Repository governance tooling for Gurubodh.",
+  "scripts": {
+    "commitlint": "commitlint --from origin/main --to HEAD --verbose",
+    "commitlint:edit": "commitlint --edit",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com-gurubodh:Team-Gurubodh/gurubodh.git"
+  },
+  "engines": {
+    "node": ">=22.12.0 <=26.x.x",
+    "npm": ">=10.0.0"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "@commitlint/cli": "^21.1.0",
+    "@commitlint/config-conventional": "^21.1.0",
+    "husky": "^9.1.7"
+  }
+}
