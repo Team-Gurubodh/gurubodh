@@ -45,9 +45,10 @@
    - Require conversation resolution and required checks once automation is available.
 5. Add automation in a follow-up scoped change.
    - Add Commitlint and Husky for local Conventional Commit enforcement.
-   - Add GitHub Actions for commit linting, CI checks, and secret scanning.
+   - Add GitHub Actions for commit linting and secret scanning.
+   - Postpone broader CMS and content-preparation CI until the desired CI strategy is clear.
 6. Invite team members after contribution docs exist and `main` is protected.
-7. Document semantic versioning now and add release automation later when release boundaries are clear.
+7. Document semantic versioning expectations now and postpone release automation until release boundaries are clear.
 
 ## Execution Results
 
@@ -66,10 +67,17 @@
 - Confirmed SSH authentication to GitHub works with the project-specific key.
 - Confirmed the `main` branch protection / ruleset is active in the organization repository.
 - Created and closed a test issue and pull request to validate the issue-first workflow.
+- Invited team members to the GitHub organization / repository as members, with one additional owner assigned.
+- Added root Commitlint and Husky configuration for local Conventional Commit enforcement.
+- Added a GitHub Actions Commitlint workflow for pull request titles and commits.
+- Added a GitHub Actions Gitleaks workflow for secret scanning.
+- Documented automation setup in `docs/development/automation.md`.
+- Postponed broader CMS and content-preparation CI checks until the team decides the desired CI strategy.
 
 ## Follow-Up
 
-- Add Commitlint, Husky, GitHub Actions CI, and secret scanning in a separate scoped change.
 - Replace the placeholder CODEOWNERS entry with actual GitHub users or teams.
-- Add required status checks to the `main` branch ruleset after GitHub Actions workflows exist and have run at least once.
-- Invite team members after automation and ownership rules are in place.
+- Add the `GITLEAKS_LICENSE` repository or organization secret required by `gitleaks/gitleaks-action` for organization-owned repositories.
+- Add required `Commitlint` and `Gitleaks` status checks to the `main` branch ruleset after both workflows run at least once.
+- Decide the broader CMS and content-preparation CI strategy in a separate task.
+- Decide later whether to add release automation for semantic versioning.

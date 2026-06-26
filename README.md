@@ -90,3 +90,15 @@ Shows the command-line help for `gurubodh-utils`, the content-preparation CLI.
 
 Runs the sample content-preparation job using
 `tools/content-preparation/jobs/002_spand_rahasya.json`.
+
+### Repository Tooling
+
+`npm ci`
+
+Installs root repository governance tooling, including Commitlint and Husky.
+Requires Node.js `>=22.12.0 <=26.x.x` and npm `>=10.0.0`.
+
+`npm run commitlint`
+
+Checks commits on the current branch against `origin/main` using the root
+Commitlint configuration.
