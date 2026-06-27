@@ -73,11 +73,12 @@
 - Added a GitHub Actions Gitleaks workflow for secret scanning.
 - Documented automation setup in `docs/development/automation.md`.
 - Postponed broader CMS and content-preparation CI checks until the team decides the desired CI strategy.
+- Confirmed `GITLEAKS_LICENSE` exists as a repository-level GitHub Actions secret.
+- Added `Commitlint` and `Gitleaks` as required status checks in the `main` branch ruleset.
+- Enabled the ruleset requirement for branches to be up to date before merging.
 
 ## Follow-Up
 
 - Replace the placeholder CODEOWNERS entry with actual GitHub users or teams.
-- Add the `GITLEAKS_LICENSE` repository or organization secret required by `gitleaks/gitleaks-action` for organization-owned repositories.
-- Add required `Commitlint` and `Gitleaks` status checks to the `main` branch ruleset after both workflows run at least once.
 - Decide the broader CMS and content-preparation CI strategy in a separate task.
 - Decide later whether to add release automation for semantic versioning.
