@@ -2,3 +2,5 @@
 # Example:
 # * @owner-or-org/maintainers
 
+# This team can review PRs and issues for the entire repository.
+* @Team-Gurubodh/maintainers
