@@ -1,7 +1,7 @@
 # Task-005: GitHub integration and Open Source best practices
 
 <record_type>task_history</record_type>
-<status>in_progress</status>
+<status>completed</status>
 <date>2026-06-25</date>
 <owners>Gurubodh maintainers</owners>
 
@@ -76,9 +76,11 @@
 - Confirmed `GITLEAKS_LICENSE` exists as a repository-level GitHub Actions secret.
 - Added `Commitlint` and `Gitleaks` as required status checks in the `main` branch ruleset.
 - Enabled the ruleset requirement for branches to be up to date before merging.
+- Replaced the placeholder `.github/CODEOWNERS` entry with `@Team-Gurubodh/maintainers` as the repository-wide code owner.
+- Confirmed the CODEOWNERS change was merged through the issue-first pull request workflow.
+- Completed the GitHub onboarding and repository governance setup for the current stage.
 
 ## Follow-Up
 
-- Replace the placeholder CODEOWNERS entry with actual GitHub users or teams.
-- Decide the broader CMS and content-preparation CI strategy in a separate task.
-- Decide later whether to add release automation for semantic versioning.
+- Create a separate CI strategy task before regular team code contributions begin. The CI strategy should decide which checks to run for the Strapi CMS, content-preparation tooling, schema files, documentation, and database scripts. Candidate checks include `make cms-build`, content-preparation install/help/sample runs, schema validation, and non-destructive database script validation.
+- Create a separate release/versioning decision before introducing automated releases. That decision should define whether Gurubodh releases apply to the whole monorepo or separately to the CMS, content-preparation tooling, future frontend, documentation, and infrastructure assets.
