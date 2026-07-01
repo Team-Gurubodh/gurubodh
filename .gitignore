@@ -52,6 +52,10 @@ apps/gurubodh-cms/public/uploads/*
 tools/content-preparation/input_word/
 tools/content-preparation/converted_word/
 
+# Seed-data local input/output
+tools/seed-data/sources/
+tools/seed-data/artifacts/
+
 # Temp / backup
 *.tmp
 *.bak

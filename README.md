@@ -7,6 +7,7 @@ Gurubodh is a monorepo for the CMS application, content preparation tools, futur
 - `apps/gurubodh-cms` - Strapi 5 CMS application.
 - `tools/content-preparation` - Python utility for preprocessing and preparing MS Word 2007 content and metadata artifacts.
 - `tools/content-ingestion` - Placeholder for future content ingestion tooling.
+- `tools/seed-data` - Seed-data preparation and ingestion tooling, starting with glossary terms.
 - `tools/metadata-generation` - Placeholder for future metadata generation tooling.
 - `tools/metadata-ingestion` - Placeholder for future metadata ingestion tooling.
 - `database/postgres/gurubodh-cms` - PostgreSQL infrastructure scripts for the CMS.
