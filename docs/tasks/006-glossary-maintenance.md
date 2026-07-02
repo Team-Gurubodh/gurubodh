@@ -275,18 +275,24 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`.
 
 #### Important Clarifications
-- Leading or trailing `Term` whitespace is reported separately as a warning, not
-  an error.
-- `Term` whitespace warnings include the actual cell value that caused the
-  warning.
+- Leading or trailing `Term` whitespace is reported separately as an error.
+- `Term` whitespace errors include the actual cell value that caused the error.
 - Internal whitespace in multi-word terms is allowed and does not produce a
-  warning.
+  validation issue.
 - Whitespace in non-term columns is not checked.
 - Duplicate-term validation removes all Unicode whitespace from `Term` values
   before checking uniqueness.
 - Required-field validation uses trimmed values.
 - This chunk validates CSV content only. It does not generate JSON artifacts or
   ingest seed data into Strapi.
+
+### Adjustment - 2026-07-02
+
+- Changed leading or trailing `Term` whitespace from a warning to an error so
+  CSV-to-JSON artifact generation will be blocked until the spreadsheet value is
+  cleaned.
+- Kept internal whitespace in multi-word terms valid.
+- Kept whitespace in non-term columns out of scope for validation.
 
 ## Follow-Up
 
