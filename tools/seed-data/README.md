@@ -105,17 +105,17 @@ JSON artifact is created. The validator currently checks:
   whitespace
 - malformed rows with the wrong number of columns
 - blank rows
-- whitespace in `Term` values
-- leading or trailing whitespace in non-term values
+- leading or trailing whitespace in `Term` values
 
 Duplicate-term validation builds the comparison key by removing all Unicode
 whitespace from the `Term` value. For example, `सूक्ष्म देह`, `सूक्ष्मदेह`, and
 ` सूक्ष्म  देह ` are treated as the same term for uniqueness checks.
 
 Whitespace findings are reported separately from duplicate-term findings. Term
-whitespace and non-term leading or trailing whitespace are warnings. Required
-field, term-code, duplicate-term, malformed-row, and blank-row issues are
-reported as errors.
+leading or trailing whitespace is reported as a warning. Internal whitespace in
+multi-word terms is allowed and does not produce a warning. Whitespace in other
+columns is not checked. Required field, term-code, duplicate-term,
+malformed-row, and blank-row issues are reported as errors.
 
 CSV-to-JSON artifact generation must run validation first and must abort before
 writing an artifact when validation reports any errors.

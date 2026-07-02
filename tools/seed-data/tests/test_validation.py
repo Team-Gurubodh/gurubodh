@@ -45,7 +45,7 @@ class GlossaryValidationTest(unittest.TestCase):
         self.assertEqual(0, len(result.errors))
         self.assertEqual(0, len(result.warnings))
 
-    def test_reports_whitespace_as_warning(self):
+    def test_allows_internal_term_whitespace_and_ignores_non_term_whitespace(self):
         self.write_csv(
             "Sr No,Term Code,Term,Definition\n"
             "1,T00001,सूक्ष्म देह,समष्टि \n"
@@ -55,15 +55,23 @@ class GlossaryValidationTest(unittest.TestCase):
 
         self.assertTrue(result.is_valid)
         self.assertEqual(0, len(result.errors))
-        self.assertEqual(2, len(result.warnings))
-        self.assertEqual({"Term", "Definition"}, {issue.column for issue in result.warnings})
-        self.assertTrue(
-            any(
-                issue.message == (
-                    "Term contains whitespace; duplicate checks ignore all whitespace."
-                )
-                for issue in result.warnings
-            )
+        self.assertEqual(0, len(result.warnings))
+
+    def test_reports_leading_or_trailing_term_whitespace_as_warning(self):
+        self.write_csv(
+            "Sr No,Term Code,Term,Definition\n"
+            "1,T00001, समष्टि ,definition\n"
+        )
+
+        result = self.validate()
+
+        self.assertTrue(result.is_valid)
+        self.assertEqual(0, len(result.errors))
+        self.assertEqual(1, len(result.warnings))
+        self.assertEqual("Term", result.warnings[0].column)
+        self.assertEqual(
+            "Term has leading or trailing whitespace.",
+            result.warnings[0].message,
         )
 
     def test_reports_invalid_rows_and_values_as_errors(self):

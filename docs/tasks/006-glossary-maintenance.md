@@ -258,17 +258,15 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
     whitespace
   - malformed rows with the wrong number of columns
   - blank rows
-  - whitespace in `Term` values
-  - leading or trailing whitespace in non-term values
+  - leading or trailing whitespace in `Term` values
 - Added standard-library regression tests for glossary CSV validation.
 - Updated `tools/seed-data/README.md` with the validation command and behavior.
 
 #### What Works
 - `gurubodh-seed-data glossary validate --source sanatan-glossary` validates the
   local Sanatan Glossary CSV successfully with no errors or warnings.
-- `gurubodh-seed-data glossary validate --source prabodhan-glossary` reports
-  14 whitespace warnings for local Prabodhan Glossary terms that contain spaces
-  or trailing spaces.
+- `gurubodh-seed-data glossary validate --source prabodhan-glossary` validates
+  the local Prabodhan Glossary CSV successfully with no errors or warnings.
 - `gurubodh-seed-data glossary validate --source wrong-name` still fails with
   exit code `2` and lists the accepted source keys.
 - Python syntax verification passed with:
@@ -277,7 +275,11 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`.
 
 #### Important Clarifications
-- Term whitespace is reported separately as a warning, not an error.
+- Leading or trailing `Term` whitespace is reported separately as a warning, not
+  an error.
+- Internal whitespace in multi-word terms is allowed and does not produce a
+  warning.
+- Whitespace in non-term columns is not checked.
 - Duplicate-term validation removes all Unicode whitespace from `Term` values
   before checking uniqueness.
 - Required-field validation uses trimmed values.

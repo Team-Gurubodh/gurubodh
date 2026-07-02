@@ -44,10 +44,6 @@ def normalize_term_for_uniqueness(term):
     return "".join(term.split())
 
 
-def has_whitespace(value):
-    return any(character.isspace() for character in value)
-
-
 def validate_glossary_csv(source):
     paths = glossary_paths(source)
     csv_path = resolve_seed_data_path(paths.csv_input)
@@ -139,29 +135,16 @@ def validate_glossary_csv(source):
                 for column, value in values.items()
             }
 
-            for column, value in values.items():
-                if column == "Term":
-                    if has_whitespace(value):
-                        issues.append(
-                            ValidationIssue(
-                                severity="warning",
-                                row_number=row_number,
-                                column=column,
-                                message=(
-                                    "Term contains whitespace; duplicate checks "
-                                    "ignore all whitespace."
-                                ),
-                            )
-                        )
-                elif value != value.strip():
-                    issues.append(
-                        ValidationIssue(
-                            severity="warning",
-                            row_number=row_number,
-                            column=column,
-                            message="Value has leading or trailing whitespace.",
-                        )
+            term_value = values["Term"]
+            if term_value != term_value.strip():
+                issues.append(
+                    ValidationIssue(
+                        severity="warning",
+                        row_number=row_number,
+                        column="Term",
+                        message="Term has leading or trailing whitespace.",
                     )
+                )
 
             for column in REQUIRED_GLOSSARY_HEADERS:
                 if not stripped_values[column]:
