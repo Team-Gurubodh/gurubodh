@@ -139,7 +139,7 @@ def validate_glossary_csv(source):
             if term_value != term_value.strip():
                 issues.append(
                     ValidationIssue(
-                        severity="warning",
+                        severity="error",
                         row_number=row_number,
                         column="Term",
                         message=(

@@ -57,7 +57,7 @@ class GlossaryValidationTest(unittest.TestCase):
         self.assertEqual(0, len(result.errors))
         self.assertEqual(0, len(result.warnings))
 
-    def test_reports_leading_or_trailing_term_whitespace_as_warning(self):
+    def test_reports_leading_or_trailing_term_whitespace_as_error(self):
         self.write_csv(
             "Sr No,Term Code,Term,Definition\n"
             "1,T00001, समष्टि ,definition\n"
@@ -65,13 +65,13 @@ class GlossaryValidationTest(unittest.TestCase):
 
         result = self.validate()
 
-        self.assertTrue(result.is_valid)
-        self.assertEqual(0, len(result.errors))
-        self.assertEqual(1, len(result.warnings))
-        self.assertEqual("Term", result.warnings[0].column)
+        self.assertFalse(result.is_valid)
+        self.assertEqual(1, len(result.errors))
+        self.assertEqual(0, len(result.warnings))
+        self.assertEqual("Term", result.errors[0].column)
         self.assertEqual(
             "Term has leading or trailing whitespace. Cell value: ' समष्टि '.",
-            result.warnings[0].message,
+            result.errors[0].message,
         )
 
     def test_reports_invalid_rows_and_values_as_errors(self):
