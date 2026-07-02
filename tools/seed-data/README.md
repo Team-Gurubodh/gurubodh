@@ -101,13 +101,24 @@ JSON artifact is created. The validator currently checks:
 - required headers: `Sr No`, `Term Code`, `Term`, and `Definition`
 - required field values
 - `Term Code` format and range: `T00001` through `T50000`
-- duplicate `Term` values within the same glossary source
+- duplicate `Term` values within the same glossary source after removing all
+  whitespace
 - malformed rows with the wrong number of columns
 - blank rows
-- leading or trailing whitespace in values
+- whitespace in `Term` values
+- leading or trailing whitespace in non-term values
 
-Whitespace issues are reported as warnings. Required field, term-code,
-duplicate-term, malformed-row, and blank-row issues are reported as errors.
+Duplicate-term validation builds the comparison key by removing all Unicode
+whitespace from the `Term` value. For example, `सूक्ष्म देह`, `सूक्ष्मदेह`, and
+` सूक्ष्म  देह ` are treated as the same term for uniqueness checks.
+
+Whitespace findings are reported separately from duplicate-term findings. Term
+whitespace and non-term leading or trailing whitespace are warnings. Required
+field, term-code, duplicate-term, malformed-row, and blank-row issues are
+reported as errors.
+
+CSV-to-JSON artifact generation must run validation first and must abort before
+writing an artifact when validation reports any errors.
 
 ## Planned Workflow
 

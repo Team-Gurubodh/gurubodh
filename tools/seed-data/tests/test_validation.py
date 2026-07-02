@@ -48,7 +48,7 @@ class GlossaryValidationTest(unittest.TestCase):
     def test_reports_whitespace_as_warning(self):
         self.write_csv(
             "Sr No,Term Code,Term,Definition\n"
-            "1,T00001,समष्टि ,समष्टि \n"
+            "1,T00001,सूक्ष्म देह,समष्टि \n"
         )
 
         result = self.validate()
@@ -57,12 +57,20 @@ class GlossaryValidationTest(unittest.TestCase):
         self.assertEqual(0, len(result.errors))
         self.assertEqual(2, len(result.warnings))
         self.assertEqual({"Term", "Definition"}, {issue.column for issue in result.warnings})
+        self.assertTrue(
+            any(
+                issue.message == (
+                    "Term contains whitespace; duplicate checks ignore all whitespace."
+                )
+                for issue in result.warnings
+            )
+        )
 
     def test_reports_invalid_rows_and_values_as_errors(self):
         self.write_csv(
             "Sr No,Term Code,Term,Definition\n"
-            "1,T00000,duplicate,definition\n"
-            "2,T50001,duplicate,definition\n"
+            "1,T00000,duplicate term,definition\n"
+            "2,T50001,duplicateterm,definition\n"
             "3,T12,unique,definition\n"
             "4,T00004,,definition\n"
             "\n"
@@ -80,6 +88,15 @@ class GlossaryValidationTest(unittest.TestCase):
         self.assertIn("Expected 4 columns, found 3.", messages)
         self.assertTrue(
             any(message.startswith("Duplicate term within source") for message in messages)
+        )
+        self.assertEqual(
+            2,
+            len(
+                [
+                    issue for issue in result.errors
+                    if issue.message.startswith("Duplicate term within source")
+                ]
+            ),
         )
 
     def test_reports_missing_required_headers(self):

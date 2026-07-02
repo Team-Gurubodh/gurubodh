@@ -40,6 +40,14 @@ class GlossaryValidationResult:
         return not self.errors
 
 
+def normalize_term_for_uniqueness(term):
+    return "".join(term.split())
+
+
+def has_whitespace(value):
+    return any(character.isspace() for character in value)
+
+
 def validate_glossary_csv(source):
     paths = glossary_paths(source)
     csv_path = resolve_seed_data_path(paths.csv_input)
@@ -132,7 +140,20 @@ def validate_glossary_csv(source):
             }
 
             for column, value in values.items():
-                if value != value.strip():
+                if column == "Term":
+                    if has_whitespace(value):
+                        issues.append(
+                            ValidationIssue(
+                                severity="warning",
+                                row_number=row_number,
+                                column=column,
+                                message=(
+                                    "Term contains whitespace; duplicate checks "
+                                    "ignore all whitespace."
+                                ),
+                            )
+                        )
+                elif value != value.strip():
                     issues.append(
                         ValidationIssue(
                             severity="warning",
@@ -179,18 +200,24 @@ def validate_glossary_csv(source):
 
             term = stripped_values["Term"]
             if term:
-                term_rows[term].append(row_number)
+                term_rows[normalize_term_for_uniqueness(term)].append(
+                    (row_number, term)
+                )
 
-    for term, row_numbers in term_rows.items():
-        if len(row_numbers) > 1:
-            rows = ", ".join(str(row_number) for row_number in row_numbers)
-            for row_number in row_numbers:
+    for normalized_term, row_terms in term_rows.items():
+        if len(row_terms) > 1:
+            rows = ", ".join(str(row_number) for row_number, _term in row_terms)
+            for row_number, term in row_terms:
                 issues.append(
                     ValidationIssue(
                         severity="error",
                         row_number=row_number,
                         column="Term",
-                        message=f"Duplicate term within source; also appears on rows: {rows}.",
+                        message=(
+                            "Duplicate term within source after removing "
+                            f"whitespace; normalized value '{normalized_term}' "
+                            f"appears on rows: {rows}. Row value: '{term}'."
+                        ),
                     )
                 )
 

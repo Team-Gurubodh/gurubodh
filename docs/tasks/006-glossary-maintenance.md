@@ -254,19 +254,21 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   - required headers: `Sr No`, `Term Code`, `Term`, `Definition`
   - required field values
   - `Term Code` format and range: `T00001` through `T50000`
-  - duplicate `Term` values within the same glossary source
+  - duplicate `Term` values within the same glossary source after removing all
+    whitespace
   - malformed rows with the wrong number of columns
   - blank rows
-  - leading or trailing whitespace in values
+  - whitespace in `Term` values
+  - leading or trailing whitespace in non-term values
 - Added standard-library regression tests for glossary CSV validation.
 - Updated `tools/seed-data/README.md` with the validation command and behavior.
 
 #### What Works
 - `gurubodh-seed-data glossary validate --source sanatan-glossary` validates the
   local Sanatan Glossary CSV successfully with no errors or warnings.
-- `gurubodh-seed-data glossary validate --source prabodhan-glossary` validates
-  the local Prabodhan Glossary CSV successfully with no errors and 8 whitespace
-  warnings.
+- `gurubodh-seed-data glossary validate --source prabodhan-glossary` reports
+  14 whitespace warnings for local Prabodhan Glossary terms that contain spaces
+  or trailing spaces.
 - `gurubodh-seed-data glossary validate --source wrong-name` still fails with
   exit code `2` and lists the accepted source keys.
 - Python syntax verification passed with:
@@ -275,8 +277,10 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`.
 
 #### Important Clarifications
-- Leading and trailing whitespace is reported as a warning, not an error.
-  Required-field validation and duplicate-term validation use trimmed values.
+- Term whitespace is reported separately as a warning, not an error.
+- Duplicate-term validation removes all Unicode whitespace from `Term` values
+  before checking uniqueness.
+- Required-field validation uses trimmed values.
 - This chunk validates CSV content only. It does not generate JSON artifacts or
   ingest seed data into Strapi.
 
@@ -288,6 +292,8 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   and
   `gurubodh-seed-data glossary generate --source prabodhan-glossary`.
 - The generation command should run validation before writing any artifact.
+- The generation command must abort before writing an artifact when validation
+  reports any errors.
 - Generate reviewable JSON artifacts under `tools/seed-data/artifacts/glossary/`.
 - Keep generated artifacts free of Strapi internal `id` and `documentId` values.
 - Include glossary source identity in the generated artifact.
