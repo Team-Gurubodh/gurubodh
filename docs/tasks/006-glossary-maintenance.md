@@ -173,4 +173,98 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 
 ## Execution Results
 
+### State Summary - 2026-07-01
+
+#### What Was Built
+- Created the canonical seed-data tooling boundary under `tools/seed-data`.
+- Added a Python package named `gurubodh-seed-data` with the console command
+  `gurubodh-seed-data`.
+- Added the initial top-level seed-data workflows:
+  - `glossary` - scaffolded
+  - `category` - planned
+  - `subject` - planned
+- Added the first glossary sources:
+  - `sanatan-glossary` - Sanatan Glossary
+  - `prabodhan-glossary` - Prabodhan Glossary
+- Added canonical local file-location provisions for glossary input/output:
+  - `sources/glossary/sanatan-glossary.csv`
+  - `sources/glossary/prabodhan-glossary.csv`
+  - `artifacts/glossary/sanatan-glossary.json`
+  - `artifacts/glossary/prabodhan-glossary.json`
+- Added source-key validation for glossary path lookup. Unsupported source keys
+  fail with accepted values listed.
+- Added `tools/seed-data/README.md` with setup, command, and local file-location
+  guidance.
+- Updated the top-level `README.md` to include `tools/seed-data` in the project
+  map.
+- Updated `.gitignore` so early-development local seed-data CSV sources and JSON
+  artifacts are not committed:
+  - `tools/seed-data/sources/`
+  - `tools/seed-data/artifacts/`
+- Merged PR #16, `chore(seed-data): scaffold glossary workflow`, into `main`.
+  This brought in both the task-history record and the seed-data scaffold.
+
+#### What Works
+- `gurubodh-seed-data workflows` lists scaffolded and planned seed-data
+  workflows.
+- `gurubodh-seed-data glossary sources` lists the two glossary sources without
+  premature Strapi content-type assumptions.
+- `gurubodh-seed-data glossary paths` displays canonical CSV input and JSON
+  artifact output paths for both glossary sources.
+- `gurubodh-seed-data glossary paths --source sanatan-glossary` filters to the
+  Sanatan Glossary source.
+- `gurubodh-seed-data glossary paths --source prabodhan-glossary` filters to the
+  Prabodhan Glossary source.
+- `gurubodh-seed-data glossary paths --source wrong-name` fails with exit code
+  `2` and reports:
+  `Accepted values: sanatan-glossary, prabodhan-glossary`.
+- Python syntax verification passed with:
+  `python3 -m compileall tools/seed-data/gurubodh_seed_data`.
+- Local downloaded glossary CSV files are present but ignored by git. Their
+  current headers were confirmed as:
+  `Sr No,Term Code,Term,Definition`.
+- Local `main` was fast-forwarded after PR #16 was merged, and the local and
+  remote feature branches were cleaned up.
+
+#### Important Clarifications
+- `glossary` is the seed-data workflow. `sanatan-glossary` and
+  `prabodhan-glossary` are glossary sources handled by that workflow.
+- There is currently no Strapi content type named `glossary-term` in the repo.
+  The seed-data scaffold intentionally no longer exposes a `Content Type` column
+  for glossary sources.
+- The final Strapi content model is still undecided. The likely direction is one
+  collection type with an explicit glossary/source field unless later CMS review
+  shows a strong reason to separate the two glossaries.
+- Google Sheets remains the authoring interface for now. Git-tracked CSV source
+  snapshots are deferred because the glossary data is still expected to change
+  frequently during early development.
+- Generated JSON artifacts are also ignored for now and will be regenerated once
+  the conversion workflow exists.
+- GitHub CLI authentication is valid in the user's normal shell, but not in the
+  Codex command environment. Git over SSH works from Codex, so Codex can still
+  push, fetch, pull, and clean branches; PR creation/inspection is currently best
+  handled through VS Code or GitHub UI.
+
 ## Follow-Up
+
+### Next Logical Chunk: Glossary CSV Validation
+- Create a new branch from updated `main` for the next slice of issue #11.
+- Add a validation command, likely:
+  `gurubodh-seed-data glossary validate --source sanatan-glossary`
+  and
+  `gurubodh-seed-data glossary validate --source prabodhan-glossary`.
+- The validation command should read the canonical CSV path from the source key.
+- Validate CSV content only; do not generate JSON in this chunk.
+- Initial validation rules should include:
+  - required headers: `Sr No`, `Term Code`, `Term`, `Definition`
+  - required field values
+  - `Term Code` format and range: `T00001` through `T50000`
+  - duplicate `Term` values within the same glossary source
+  - malformed or blank rows
+  - row-numbered error messages that can be mapped back to the spreadsheet
+- Decide how to handle leading/trailing whitespace in CSV values. The local
+  `prabodhan-glossary.csv` currently has visible trailing spaces in some values,
+  so the validator should either trim values before validation or report
+  whitespace issues clearly.
+- After CSV validation, the following chunk should be CSV-to-JSON artifact
+  generation under `tools/seed-data/artifacts/glossary/`.
