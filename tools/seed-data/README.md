@@ -63,6 +63,13 @@ Show paths for one glossary source:
 gurubodh-seed-data glossary paths --source sanatan-glossary
 ```
 
+Validate one downloaded glossary CSV source:
+
+```bash
+gurubodh-seed-data glossary validate --source sanatan-glossary
+gurubodh-seed-data glossary validate --source prabodhan-glossary
+```
+
 ## File Locations
 
 Manually downloaded Google Sheet CSV files belong under:
@@ -86,12 +93,28 @@ artifacts/glossary/sanatan-glossary.json
 artifacts/glossary/prabodhan-glossary.json
 ```
 
+## Validation
+
+Glossary validation checks the manually downloaded CSV before any generated
+JSON artifact is created. The validator currently checks:
+
+- required headers: `Sr No`, `Term Code`, `Term`, and `Definition`
+- required field values
+- `Term Code` format and range: `T00001` through `T50000`
+- duplicate `Term` values within the same glossary source
+- malformed rows with the wrong number of columns
+- blank rows
+- leading or trailing whitespace in values
+
+Whitespace issues are reported as warnings. Required field, term-code,
+duplicate-term, malformed-row, and blank-row issues are reported as errors.
+
 ## Planned Workflow
 
-Future steps will add repeatable validation, CSV-to-JSON artifact generation,
-and Strapi REST API ingestion. The seed-data tool will validate downloaded CSV
-files before generating artifacts, even when spreadsheet validation and
-conditional formatting are also configured for human data entry.
+Future steps will add CSV-to-JSON artifact generation and Strapi REST API
+ingestion. The seed-data tool validates downloaded CSV files before generating
+artifacts, even when spreadsheet validation and conditional formatting are also
+configured for human data entry.
 
 Generated artifacts must not include Strapi internal `id` or `documentId`
 values. Strapi is responsible for generating those identifiers during API-based

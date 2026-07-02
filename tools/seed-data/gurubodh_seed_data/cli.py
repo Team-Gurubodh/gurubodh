@@ -1,7 +1,9 @@
 import argparse
+import sys
 
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
 from gurubodh_seed_data.paths import glossary_paths
+from gurubodh_seed_data.validation import validate_glossary_csv
 from gurubodh_seed_data.workflows import list_workflows
 
 
@@ -50,6 +52,42 @@ def _print_workflows():
     _print_table(("Key", "Status", "Description"), rows)
 
 
+def _print_validation_issues(title, issues):
+    if not issues:
+        return
+
+    print()
+    print(title)
+    rows = [
+        (issue.row_number, issue.column, issue.message)
+        for issue in issues
+    ]
+    _print_table(("Row", "Column", "Message"), rows)
+
+
+def _validate_glossary_source(source_key):
+    source = get_glossary_source(source_key)
+    result = validate_glossary_csv(source)
+
+    print(f"Source: {result.source_key}")
+    print(f"CSV Input: {result.csv_path}")
+    print(f"Rows Checked: {result.data_row_count}")
+    print(f"Errors: {len(result.errors)}")
+    print(f"Warnings: {len(result.warnings)}")
+
+    _print_validation_issues("Errors", result.errors)
+    _print_validation_issues("Warnings", result.warnings)
+
+    if result.is_valid:
+        print()
+        print("Validation passed.")
+        return 0
+
+    print()
+    print("Validation failed.")
+    return 1
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="gurubodh-seed-data",
@@ -92,6 +130,20 @@ def build_parser():
     )
     paths_parser.set_defaults(handler=lambda args: _print_glossary_paths(args.source))
 
+    validate_parser = glossary_subparsers.add_parser(
+        "validate",
+        help="Validate a glossary CSV source file.",
+        description="Validate required headers, required values, term codes, duplicate terms, and malformed rows.",
+    )
+    validate_parser.add_argument(
+        "--source",
+        required=True,
+        help="Glossary source key to validate. Example: sanatan-glossary.",
+    )
+    validate_parser.set_defaults(
+        handler=lambda args: _validate_glossary_source(args.source)
+    )
+
     return parser
 
 
@@ -99,10 +151,11 @@ def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        args.handler(args)
+        exit_code = args.handler(args)
     except ValueError as error:
         parser.exit(2, f"error: {error}\n")
+    return exit_code or 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

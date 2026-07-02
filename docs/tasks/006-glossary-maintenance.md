@@ -245,26 +245,50 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   push, fetch, pull, and clean branches; PR creation/inspection is currently best
   handled through VS Code or GitHub UI.
 
-## Follow-Up
+### State Summary - 2026-07-02
 
-### Next Logical Chunk: Glossary CSV Validation
-- Create a new branch from updated `main` for the next slice of issue #11.
-- Add a validation command, likely:
-  `gurubodh-seed-data glossary validate --source sanatan-glossary`
-  and
-  `gurubodh-seed-data glossary validate --source prabodhan-glossary`.
-- The validation command should read the canonical CSV path from the source key.
-- Validate CSV content only; do not generate JSON in this chunk.
-- Initial validation rules should include:
+#### What Was Built
+- Created branch `feat-seed-data-glossary-validation` for the validation slice.
+- Added `gurubodh-seed-data glossary validate --source <source-key>`.
+- Added glossary CSV validation for:
   - required headers: `Sr No`, `Term Code`, `Term`, `Definition`
   - required field values
   - `Term Code` format and range: `T00001` through `T50000`
   - duplicate `Term` values within the same glossary source
-  - malformed or blank rows
-  - row-numbered error messages that can be mapped back to the spreadsheet
-- Decide how to handle leading/trailing whitespace in CSV values. The local
-  `prabodhan-glossary.csv` currently has visible trailing spaces in some values,
-  so the validator should either trim values before validation or report
-  whitespace issues clearly.
-- After CSV validation, the following chunk should be CSV-to-JSON artifact
-  generation under `tools/seed-data/artifacts/glossary/`.
+  - malformed rows with the wrong number of columns
+  - blank rows
+  - leading or trailing whitespace in values
+- Added standard-library regression tests for glossary CSV validation.
+- Updated `tools/seed-data/README.md` with the validation command and behavior.
+
+#### What Works
+- `gurubodh-seed-data glossary validate --source sanatan-glossary` validates the
+  local Sanatan Glossary CSV successfully with no errors or warnings.
+- `gurubodh-seed-data glossary validate --source prabodhan-glossary` validates
+  the local Prabodhan Glossary CSV successfully with no errors and 8 whitespace
+  warnings.
+- `gurubodh-seed-data glossary validate --source wrong-name` still fails with
+  exit code `2` and lists the accepted source keys.
+- Python syntax verification passed with:
+  `python3 -m compileall tools/seed-data/gurubodh_seed_data tools/seed-data/tests`.
+- Unit tests passed with:
+  `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`.
+
+#### Important Clarifications
+- Leading and trailing whitespace is reported as a warning, not an error.
+  Required-field validation and duplicate-term validation use trimmed values.
+- This chunk validates CSV content only. It does not generate JSON artifacts or
+  ingest seed data into Strapi.
+
+## Follow-Up
+
+### Next Logical Chunk: Glossary CSV-to-JSON Artifact Generation
+- Add a generation command, likely:
+  `gurubodh-seed-data glossary generate --source sanatan-glossary`
+  and
+  `gurubodh-seed-data glossary generate --source prabodhan-glossary`.
+- The generation command should run validation before writing any artifact.
+- Generate reviewable JSON artifacts under `tools/seed-data/artifacts/glossary/`.
+- Keep generated artifacts free of Strapi internal `id` and `documentId` values.
+- Include glossary source identity in the generated artifact.
+- Decide the first JSON artifact shape before implementing Strapi ingestion.
