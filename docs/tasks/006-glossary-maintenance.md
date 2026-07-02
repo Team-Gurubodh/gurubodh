@@ -266,8 +266,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 - `gurubodh-seed-data glossary validate --source sanatan-glossary` validates the
   local Sanatan Glossary CSV successfully with no errors or warnings.
 - `gurubodh-seed-data glossary validate --source prabodhan-glossary` validates
-  the local Prabodhan Glossary CSV successfully with no errors and 1 warning
-  for trailing whitespace in a `Term` value.
+  the local Prabodhan Glossary CSV successfully with no errors or warnings.
 - `gurubodh-seed-data glossary validate --source wrong-name` still fails with
   exit code `2` and lists the accepted source keys.
 - Python syntax verification passed with:
