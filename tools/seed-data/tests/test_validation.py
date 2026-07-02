@@ -70,7 +70,7 @@ class GlossaryValidationTest(unittest.TestCase):
         self.assertEqual(1, len(result.warnings))
         self.assertEqual("Term", result.warnings[0].column)
         self.assertEqual(
-            "Term has leading or trailing whitespace.",
+            "Term has leading or trailing whitespace. Cell value: ' समष्टि '.",
             result.warnings[0].message,
         )
 

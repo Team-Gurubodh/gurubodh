@@ -142,7 +142,10 @@ def validate_glossary_csv(source):
                         severity="warning",
                         row_number=row_number,
                         column="Term",
-                        message="Term has leading or trailing whitespace.",
+                        message=(
+                            "Term has leading or trailing whitespace. "
+                            f"Cell value: {term_value!r}."
+                        ),
                     )
                 )
 

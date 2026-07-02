@@ -112,10 +112,11 @@ whitespace from the `Term` value. For example, `सूक्ष्म देह`
 ` सूक्ष्म  देह ` are treated as the same term for uniqueness checks.
 
 Whitespace findings are reported separately from duplicate-term findings. Term
-leading or trailing whitespace is reported as a warning. Internal whitespace in
-multi-word terms is allowed and does not produce a warning. Whitespace in other
-columns is not checked. Required field, term-code, duplicate-term,
-malformed-row, and blank-row issues are reported as errors.
+leading or trailing whitespace is reported as a warning with the cell value
+included in the message. Internal whitespace in multi-word terms is allowed and
+does not produce a warning. Whitespace in other columns is not checked.
+Required field, term-code, duplicate-term, malformed-row, and blank-row issues
+are reported as errors.
 
 CSV-to-JSON artifact generation must run validation first and must abort before
 writing an artifact when validation reports any errors.
