@@ -63,6 +63,13 @@ Show paths for one glossary source:
 gurubodh-seed-data glossary paths --source sanatan-glossary
 ```
 
+Validate one downloaded glossary CSV source:
+
+```bash
+gurubodh-seed-data glossary validate --source sanatan-glossary
+gurubodh-seed-data glossary validate --source prabodhan-glossary
+```
+
 ## File Locations
 
 Manually downloaded Google Sheet CSV files belong under:
@@ -86,12 +93,40 @@ artifacts/glossary/sanatan-glossary.json
 artifacts/glossary/prabodhan-glossary.json
 ```
 
+## Validation
+
+Glossary validation checks the manually downloaded CSV before any generated
+JSON artifact is created. The validator currently checks:
+
+- required headers: `Sr No`, `Term Code`, `Term`, and `Definition`
+- required field values
+- `Term Code` format and range: `T00001` through `T50000`
+- duplicate `Term` values within the same glossary source after removing all
+  whitespace
+- malformed rows with the wrong number of columns
+- blank rows
+- leading or trailing whitespace in `Term` values
+
+Duplicate-term validation builds the comparison key by removing all Unicode
+whitespace from the `Term` value. For example, `सूक्ष्म देह`, `सूक्ष्मदेह`, and
+` सूक्ष्म  देह ` are treated as the same term for uniqueness checks.
+
+Whitespace findings are reported separately from duplicate-term findings. Term
+leading or trailing whitespace is reported as a warning with the cell value
+included in the message. Internal whitespace in multi-word terms is allowed and
+does not produce a warning. Whitespace in other columns is not checked.
+Required field, term-code, duplicate-term, malformed-row, and blank-row issues
+are reported as errors.
+
+CSV-to-JSON artifact generation must run validation first and must abort before
+writing an artifact when validation reports any errors.
+
 ## Planned Workflow
 
-Future steps will add repeatable validation, CSV-to-JSON artifact generation,
-and Strapi REST API ingestion. The seed-data tool will validate downloaded CSV
-files before generating artifacts, even when spreadsheet validation and
-conditional formatting are also configured for human data entry.
+Future steps will add CSV-to-JSON artifact generation and Strapi REST API
+ingestion. The seed-data tool validates downloaded CSV files before generating
+artifacts, even when spreadsheet validation and conditional formatting are also
+configured for human data entry.
 
 Generated artifacts must not include Strapi internal `id` or `documentId`
 values. Strapi is responsible for generating those identifiers during API-based
