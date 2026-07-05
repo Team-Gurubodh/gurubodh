@@ -9,6 +9,7 @@ Read these documents before making your first change:
 - `README.md` for the repository map and common commands.
 - `docs/README.md` for documentation routing.
 - `docs/development/github-workflow.md` for the contribution workflow.
+- `docs/development/git-github-cli-workflow-tutorial.md` for a beginner-friendly Git and GitHub CLI walkthrough.
 - `docs/development/conventional-commits.md` for commit message standards.
 
 ## Workflow
