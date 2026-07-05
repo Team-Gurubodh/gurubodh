@@ -93,6 +93,50 @@ artifacts/glossary/sanatan-glossary.json
 artifacts/glossary/prabodhan-glossary.json
 ```
 
+## Category and Subject Spreadsheet Validation
+
+Google Sheets setup scripts for Category and Subject seed-data authoring live
+under:
+
+```text
+scripts/google-sheets/
+```
+
+Current scripts:
+
+```text
+scripts/google-sheets/category-validations.gs
+scripts/google-sheets/shared-on-edit.gs
+scripts/google-sheets/subject-validations.gs
+```
+
+Use these scripts from Google Sheets by opening **Extensions > Apps Script** and
+adding all three script files to the same Apps Script project. Then run:
+
+```text
+setupCategorySeedDataSheet()
+setupSubjectSeedDataSheet()
+```
+
+Run the Category setup before the Subject setup when both sheets are in the same
+spreadsheet. The Subject script validates `category_code` against the Category
+codes in the `Categories` sheet.
+
+The Category and Subject scripts use one row per seed-data record. Non-localized
+fields such as `code`, `legacy_code`, `is_active`, and `sort_order` appear once.
+Localized fields are represented as locale-specific columns such as `name_en`,
+`description_en`, `name_hi-IN`, and `description_hi-IN`.
+
+The Subject sheet also includes `category_name_en` and `category_name_hi-IN`
+helper columns. Choose a Category by either English or Hindi name, and the
+`category_code` column is auto-filled from the `Categories` sheet. If both
+helper names are filled but resolve to different Category codes, the setup
+script highlights the mismatch.
+
+These spreadsheet validations are entry-time guidance for maintainers. The
+seed-data tooling should still validate exported source files before generating
+artifacts or ingesting data.
+
 ## Validation
 
 Glossary validation checks the manually downloaded CSV before any generated
