@@ -5,6 +5,9 @@
 
 This guide defines the default contribution workflow for Gurubodh.
 
+For a beginner-oriented command walkthrough, see
+`docs/development/git-github-cli-workflow-tutorial.md`.
+
 ## Principles
 
 - Start from a GitHub issue.
