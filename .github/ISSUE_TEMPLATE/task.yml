@@ -1,5 +1,5 @@
 name: Task
-description: Plan a scoped project task.
+description: Plan scoped non-feature work, cleanup, maintenance, migration, investigation, or enablement.
 title: "[Task]: "
 labels:
   - type: task

@@ -14,12 +14,13 @@ Read these documents before making your first change:
 ## Workflow
 
 1. Select or create a GitHub issue.
-2. Create a branch from `main`.
-3. Make a scoped change for one issue.
-4. Use Conventional Commits.
-5. Open a pull request linked to the issue.
-6. Run the relevant verification commands.
-7. Wait for review and required checks before merge.
+2. Choose the issue template that matches the work type: Feature, Bug Report, Documentation, Decision, or Task.
+3. Create a branch from `main`.
+4. Make a scoped change for one issue.
+5. Use Conventional Commits.
+6. Open a pull request linked to the issue.
+7. Run the relevant verification commands.
+8. Wait for review and required checks before merge.
 
 ## Pull Request Expectations
 
