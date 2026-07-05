@@ -1,0 +1,41 @@
+name: Feature
+description: Propose or plan a new functionality or meaningful capability.
+title: "feat: "
+labels:
+  - type: feature
+body:
+  - type: textarea
+    id: capability
+    attributes:
+      label: Capability
+      description: What new functionality or meaningful capability should be added?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Add relevant background, user needs, constraints, links, or prior decisions.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included and excluded?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: What should be true when this feature is complete?
+    validations:
+      required: false
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: How should contributors verify this feature?
+    validations:
+      required: false

@@ -35,6 +35,17 @@ Install the toolchain needed for the area you are changing. Common commands are 
 
 Create or select a GitHub issue before starting work.
 
+Choose the issue template that matches the work type:
+
+- **Feature** - new functionality or a meaningful capability. Feature issue
+  titles should start with `feat: ` so they align with Conventional Commits.
+- **Bug Report** - reproducible problems in existing behavior.
+- **Documentation** - documentation-only changes.
+- **Decision** - workflow, process, product, or architecture choices that need
+  an explicit decision before implementation.
+- **Task** - scoped non-feature work such as cleanup, maintenance, migration,
+  investigation, or project enablement.
+
 The issue should describe:
 
 - The problem or goal.
