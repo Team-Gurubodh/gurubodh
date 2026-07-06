@@ -75,6 +75,7 @@ gurubodh-seed-data glossary validate --source prabodhan-glossary
 Manually downloaded Google Sheet CSV files belong under:
 
 ```text
+sources/category-subject/
 sources/glossary/
 ```
 
@@ -84,9 +85,11 @@ Generated, reviewable JSON artifacts belong under:
 artifacts/glossary/
 ```
 
-Expected glossary file names:
+Expected CSV source and generated artifact file names:
 
 ```text
+sources/category-subject/categories.csv
+sources/category-subject/subjects.csv
 sources/glossary/sanatan-glossary.csv
 sources/glossary/prabodhan-glossary.csv
 artifacts/glossary/sanatan-glossary.json
@@ -107,6 +110,7 @@ Current scripts:
 ```text
 scripts/google-sheets/append-columns.gs
 scripts/google-sheets/category-validations.gs
+scripts/google-sheets/export-csv.gs
 scripts/google-sheets/shared-on-edit.gs
 scripts/google-sheets/subject-validations.gs
 ```
@@ -135,6 +139,22 @@ The append script adds any missing `from_date`, `to_date`, and
 `prabodhan_count` columns after the current last column. It is safe to re-run:
 existing columns are skipped, and validations, formatting, and default values
 are applied only to columns newly created by that run.
+
+To export Category and Subject seed-data CSV files, add `export-csv.gs` to the
+same Apps Script project and run:
+
+```text
+exportCategorySubjectSeedDataCsv()
+```
+
+The export script creates or updates `categories.csv` and `subjects.csv` in the
+same Google Drive folder as the spreadsheet. Download those files and save them
+locally under:
+
+```text
+sources/category-subject/categories.csv
+sources/category-subject/subjects.csv
+```
 
 The Category and Subject scripts use one row per seed-data record. Non-localized
 fields such as `code`, `legacy_code`, `is_active`, and `sort_order` appear once.
