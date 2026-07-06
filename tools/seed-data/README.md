@@ -105,13 +105,15 @@ scripts/google-sheets/
 Current scripts:
 
 ```text
+scripts/google-sheets/append-columns.gs
 scripts/google-sheets/category-validations.gs
 scripts/google-sheets/shared-on-edit.gs
 scripts/google-sheets/subject-validations.gs
 ```
 
 Use these scripts from Google Sheets by opening **Extensions > Apps Script** and
-adding all three script files to the same Apps Script project. Then run:
+adding the Category, Subject, and shared edit-trigger script files to the same
+Apps Script project. Then run:
 
 ```text
 setupCategorySeedDataSheet()
@@ -121,6 +123,18 @@ setupSubjectSeedDataSheet()
 Run the Category setup before the Subject setup when both sheets are in the same
 spreadsheet. The Subject script validates `category_code` against the Category
 codes in the `Categories` sheet.
+
+To append optional Subject tracking columns to an existing `Subjects` sheet,
+add `append-columns.gs` to the same Apps Script project and run:
+
+```text
+appendSubjectSeedDataColumns()
+```
+
+The append script adds any missing `from_date`, `to_date`, and
+`prabodhan_count` columns after the current last column. It is safe to re-run:
+existing columns are skipped, and validations, formatting, and default values
+are applied only to columns newly created by that run.
 
 The Category and Subject scripts use one row per seed-data record. Non-localized
 fields such as `code`, `legacy_code`, `is_active`, and `sort_order` appear once.
