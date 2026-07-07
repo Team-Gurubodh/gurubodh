@@ -9,9 +9,15 @@
 - `tools/content-preparation/config/conversion_job.schema.json`
 - `apps/gurubodh-cms/src/api/**/content-types/**/schema.json`
 
+## Planned Schema Locations
+
+- `tools/seed-data/config/seed_data_sources.schema.json`
+
 ## Ownership Guidance
 
 - Content preparation JSON schemas belong under `tools/content-preparation/config/`.
+- Seed-data JSON schemas belong under `tools/seed-data/config/` once the
+  config-driven source discovery task is implemented.
 - Strapi content type schemas belong under the relevant Strapi API directory.
 - New schema locations should be added to this index when introduced.
 

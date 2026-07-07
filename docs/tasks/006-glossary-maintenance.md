@@ -1,7 +1,7 @@
 # Task-006: Maintain Glossary of Philosophical Terms - Phase 1
 
 <record_type>task_history</record_type>
-<status>started</status>
+<status>closed-superseded</status>
 <date>2026-06-27</date>
 <owners>Gurubodh maintainers</owners>
 
@@ -308,3 +308,23 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 - Keep generated artifacts free of Strapi internal `id` and `documentId` values.
 - Include glossary source identity in the generated artifact.
 - Decide the first JSON artifact shape before implementing Strapi ingestion.
+
+## Closure - 2026-07-07
+
+This task is closed as superseded by the broader seed-data planning and
+implementation task series.
+
+The glossary-only workflow established the initial `tools/seed-data` boundary,
+the Google Sheets/CSV authoring model, the first glossary source definitions,
+and repeatable glossary CSV validation. The next work now covers `glossary`,
+`category`, and `subject` seed data together, with a shared interface contract,
+config-driven source discovery, JSON artifact generation, and later Strapi 5
+ingestion.
+
+Successor records:
+
+- `docs/tasks/007-seed-data-interface-and-config-foundation.md`
+- `docs/tasks/008-glossary-seed-data-json-artifacts.md`
+- `docs/tasks/009-category-seed-data-json-artifacts.md`
+- `docs/tasks/010-subject-seed-data-json-artifacts.md`
+- `docs/tasks/011-strapi-seed-data-ingestion.md`
