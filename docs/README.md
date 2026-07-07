@@ -11,6 +11,7 @@ Keep `AGENTS.md` short and route durable project knowledge here.
 - `architecture.md` - current system architecture and boundaries.
 - `limitations.md` - known limitations, risks, and constraints.
 - `schemas.md` - schema locations, ownership, and maintenance rules.
+- `interfaces/` - lightweight interface contracts for subsystem boundaries.
 - `agents/agent-contract.md` - expanded guidance for AI agents.
 - `development/` - contributor workflow guides for GitHub, pull requests, and Conventional Commits.
 - `tasks/` - task briefs and execution history.
@@ -19,6 +20,7 @@ Keep `AGENTS.md` short and route durable project knowledge here.
 
 - `adr/` - architectural decision records for durable architecture choices.
 - `decisions/` - operational, process, or product decisions that are not full ADRs.
+- `interfaces/` - lightweight records for data and workflow boundaries between subsystems.
 - `tasks/` - normalized task-history records and guidance.
 
 ## Templates

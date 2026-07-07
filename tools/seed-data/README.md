@@ -1,15 +1,21 @@
 # Seed Data
 
 Seed-data tooling prepares and ingests durable reference data for the Gurubodh
-CMS. This tool starts with glossary terms and is intended to grow incrementally
-to support other CMS seed-data workflows such as categories and subjects.
+CMS. The tool is evolving into the canonical workflow for externally maintained
+`glossary`, `category`, and `subject` seed data.
 
 ## Purpose
 
-The first workflow supports externally maintained glossaries of philosophical
-terms. These glossaries are maintained outside Strapi so domain experts and
-volunteers can contribute without needing to learn the Strapi admin interface.
-After successful ingestion, the CMS remains the system of record.
+Seed data is maintained outside Strapi so domain experts and volunteers can
+contribute through familiar spreadsheet workflows. CSV exports are validated and
+converted into reviewable JSON artifacts before later Strapi 5 ingestion. After
+successful ingestion, the CMS remains the system of record.
+
+The current seed-data source types are:
+
+- `category`
+- `subject`
+- `glossary`
 
 The initial glossary sources are:
 
@@ -24,6 +30,10 @@ Both sources are expected to use the same spreadsheet columns:
 - `Definition`
 
 The Google Sheet links will be recorded here once available.
+
+The lightweight interface contract for source CSV files, generated artifacts,
+and future Strapi ingestion is documented in
+`docs/interfaces/seed-data-artifacts.md`.
 
 ## Setup
 
@@ -72,29 +82,35 @@ gurubodh-seed-data glossary validate --source prabodhan-glossary
 
 ## File Locations
 
-Manually downloaded Google Sheet CSV files belong under:
+Manually downloaded Google Sheet CSV files are moving to the external source
+root:
 
 ```text
-sources/category-subject/
-sources/glossary/
+/Users/rajeev/Gurubodh_library/seed_data/csv_import
 ```
 
-Generated, reviewable JSON artifacts belong under:
+Expected CSV source paths under that root are:
 
 ```text
-artifacts/glossary/
+category/categories.csv
+glossary/sanatan-glossary.csv
+glossary/prabodhan-glossary.csv
+subject/subjects.csv
 ```
 
-Expected CSV source and generated artifact file names:
+Generated, reviewable JSON artifacts belong under this tool's artifact
+directory:
 
 ```text
-sources/category-subject/categories.csv
-sources/category-subject/subjects.csv
-sources/glossary/sanatan-glossary.csv
-sources/glossary/prabodhan-glossary.csv
+artifacts/category/categories.json
 artifacts/glossary/sanatan-glossary.json
 artifacts/glossary/prabodhan-glossary.json
+artifacts/subject/subjects.json
 ```
+
+Future work will move source definitions into
+`config/seed_data_sources.json`, validated by
+`config/seed_data_sources.schema.json`.
 
 ## Category and Subject Spreadsheet Validation
 
@@ -149,11 +165,11 @@ exportCategorySubjectSeedDataCsv()
 
 The export script creates or updates `categories.csv` and `subjects.csv` in the
 same Google Drive folder as the spreadsheet. Download those files and save them
-locally under:
+locally under the external CSV source root:
 
 ```text
-sources/category-subject/categories.csv
-sources/category-subject/subjects.csv
+/Users/rajeev/Gurubodh_library/seed_data/csv_import/category/categories.csv
+/Users/rajeev/Gurubodh_library/seed_data/csv_import/subject/subjects.csv
 ```
 
 The Category and Subject scripts use one row per seed-data record. Non-localized
@@ -201,7 +217,8 @@ writing an artifact when validation reports any errors.
 
 ## Planned Workflow
 
-Future steps will add CSV-to-JSON artifact generation and Strapi REST API
+Future steps will add config-driven source discovery, CSV-to-JSON artifact
+generation for glossary, category, and subject seed data, and Strapi REST API
 ingestion. The seed-data tool validates downloaded CSV files before generating
 artifacts, even when spreadsheet validation and conditional formatting are also
 configured for human data entry.
