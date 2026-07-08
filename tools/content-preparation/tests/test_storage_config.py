@@ -5,9 +5,16 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+from botocore.exceptions import ClientError
+
 from gurubodh_utils.config import load_conversion_job
 from gurubodh_utils.metadata import build_chapter_metadata
-from gurubodh_utils.storage import ensure_r2_destination_available, materialize_source, publish_r2_destination
+from gurubodh_utils.storage import (
+    R2StorageClient,
+    ensure_r2_destination_available,
+    materialize_source,
+    publish_r2_destination,
+)
 
 
 BASE_CONFIG = {
@@ -54,6 +61,14 @@ class FakeR2Client:
     def download_file(self, bucket, key, path):
         self.download = (bucket, key, Path(path).name)
         Path(path).write_bytes(b"docx bytes")
+
+
+class FakeMissingR2ObjectClient:
+    def download_file(self, bucket, key, path):
+        raise ClientError(
+            {"Error": {"Code": "404", "Message": "Not Found"}},
+            "HeadObject",
+        )
 
 
 class StorageConfigTests(unittest.TestCase):
@@ -155,7 +170,8 @@ class StorageConfigTests(unittest.TestCase):
         }
         client = FakeR2Client()
 
-        path, temp_dir = materialize_source(config, r2_client=client)
+        with redirect_stdout(StringIO()):
+            path, temp_dir = materialize_source(config, r2_client=client)
         self.addCleanup(temp_dir.cleanup)
 
         self.assertEqual(path.name, "source.docx")
@@ -167,6 +183,25 @@ class StorageConfigTests(unittest.TestCase):
                 "source_library/129_spand_rahasya/source.docx",
                 "source.docx",
             ),
+        )
+
+    def test_r2_source_download_404_has_clear_error(self):
+        client = R2StorageClient.__new__(R2StorageClient)
+        client._client_error = ClientError
+        client.client = FakeMissingR2ObjectClient()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(SystemExit) as exc:
+                client.download_file(
+                    "gurubodh-library-dev",
+                    "source_library/123_spand_rahasya/source.docx",
+                    Path(temp_dir) / "source.docx",
+                )
+
+        self.assertIn("R2 source object does not exist", str(exc.exception))
+        self.assertIn(
+            "r2://gurubodh-library-dev/source_library/123_spand_rahasya/source.docx",
+            str(exc.exception),
         )
 
     def test_r2_publish_fails_existing_object_without_overwrite(self):

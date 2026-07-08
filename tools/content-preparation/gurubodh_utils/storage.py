@@ -97,7 +97,16 @@ class R2StorageClient:
 
     def download_file(self, bucket, key, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.client.download_file(bucket, key, str(path))
+        try:
+            self.client.download_file(bucket, key, str(path))
+        except self._client_error as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                raise SystemExit(
+                    "R2 source object does not exist. Check the job source key or upload the source DOCX:\n"
+                    f"r2://{bucket}/{key}"
+                ) from exc
+            raise
 
 
 def source_reference(config):
@@ -173,6 +182,7 @@ def materialize_source(config, r2_client=None):
     filename = PurePosixPath(source["key"]).name
     path = Path(temp_dir.name) / filename
     client = r2_client or R2StorageClient.from_env()
+    print(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
     client.download_file(source["bucket"], source["key"], path)
     return path, temp_dir
 
