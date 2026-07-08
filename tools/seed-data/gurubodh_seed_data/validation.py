@@ -3,7 +3,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
-from gurubodh_seed_data.paths import glossary_paths, resolve_seed_data_path
+from gurubodh_seed_data.paths import glossary_paths
 
 
 REQUIRED_GLOSSARY_HEADERS = ("Sr No", "Term Code", "Term", "Definition")
@@ -46,7 +46,7 @@ def normalize_term_for_uniqueness(term):
 
 def validate_glossary_csv(source):
     paths = glossary_paths(source)
-    csv_path = resolve_seed_data_path(paths.csv_input)
+    csv_path = paths.csv_input
     issues = []
     data_row_count = 0
 
@@ -60,7 +60,7 @@ def validate_glossary_csv(source):
                     severity="error",
                     row_number=0,
                     column="File",
-                    message=f"CSV input file does not exist: {paths.csv_input}",
+                    message=f"CSV input file does not exist: {csv_path}",
                 ),
             ),
         )

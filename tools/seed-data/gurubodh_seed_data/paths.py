@@ -1,10 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-
-SEED_DATA_ROOT = Path(__file__).resolve().parents[1]
-GLOSSARY_SOURCE_DIR = Path("sources") / "glossary"
-GLOSSARY_ARTIFACT_DIR = Path("artifacts") / "glossary"
+from gurubodh_seed_data.config import load_seed_data_config
 
 
 @dataclass(frozen=True)
@@ -15,12 +12,9 @@ class GlossaryPaths:
 
 
 def glossary_paths(source):
+    config = load_seed_data_config()
     return GlossaryPaths(
         source_key=source.key,
-        csv_input=GLOSSARY_SOURCE_DIR / source.csv_filename,
-        json_output=GLOSSARY_ARTIFACT_DIR / source.json_filename,
+        csv_input=config.source_root / source.csv_path,
+        json_output=config.artifact_root / source.artifact_path,
     )
-
-
-def resolve_seed_data_path(path):
-    return SEED_DATA_ROOT / path

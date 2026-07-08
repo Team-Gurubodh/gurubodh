@@ -108,9 +108,17 @@ artifacts/glossary/prabodhan-glossary.json
 artifacts/subject/subjects.json
 ```
 
-Future work will move source definitions into
-`config/seed_data_sources.json`, validated by
-`config/seed_data_sources.schema.json`.
+Source definitions live in:
+
+```text
+config/seed_data_sources.json
+```
+
+The configuration is described by:
+
+```text
+config/seed_data_sources.schema.json
+```
 
 ## Category and Subject Spreadsheet Validation
 

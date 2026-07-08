@@ -1,7 +1,7 @@
 # Seed-Data Artifact Interface
 
 <record_type>interface_contract</record_type>
-<status>proposed</status>
+<status>accepted</status>
 <date>2026-07-07</date>
 <owners>Gurubodh maintainers</owners>
 
@@ -51,9 +51,8 @@ glossary/prabodhan-glossary.csv
 subject/subjects.csv
 ```
 
-The source root and source definitions should be represented in
-`tools/seed-data/config/seed_data_sources.json` after the config-driven
-foundation task is implemented.
+The source root and source definitions are represented in
+`tools/seed-data/config/seed_data_sources.json`.
 
 ## Artifact Locations
 
