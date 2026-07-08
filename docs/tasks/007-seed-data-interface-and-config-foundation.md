@@ -1,7 +1,7 @@
 # Task-007: Seed-Data Interface and Config Foundation
 
 <record_type>task_history</record_type>
-<status>proposed</status>
+<status>completed</status>
 <date>2026-07-07</date>
 <owners>Gurubodh maintainers</owners>
 
@@ -84,7 +84,52 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
 
 ## Execution Results
 
-Pending.
+### State Summary - 2026-07-08
+
+#### What Was Built
+
+- Created GitHub issue #38 for this implementation slice.
+- Created branch `issue-38-seed-data-config-foundation`.
+- Added `tools/seed-data/config/seed_data_sources.json`.
+- Added `tools/seed-data/config/seed_data_sources.schema.json`.
+- Loaded seed-data workflows and source records from JSON config instead of
+  hardcoded Python constants.
+- Preserved the existing glossary CLI commands:
+  - `gurubodh-seed-data workflows`
+  - `gurubodh-seed-data glossary sources`
+  - `gurubodh-seed-data glossary paths`
+  - `gurubodh-seed-data glossary validate --source <source-key>`
+- Updated glossary path resolution to read CSV files from the configured
+  external source root:
+  `/Users/rajeev/Gurubodh_library/seed_data/csv_import`.
+- Kept generated artifact paths under `tools/seed-data/artifacts/`.
+- Added unit tests for seed-data config loading and updated glossary validation
+  tests for config-driven source paths.
+- Updated schema and seed-data documentation now that the source config schema
+  exists.
+
+#### What Works
+
+- `gurubodh-seed-data workflows` lists `glossary`, `category`, and `subject`
+  from config.
+- `gurubodh-seed-data glossary sources` lists the configured glossary sources.
+- `gurubodh-seed-data glossary paths` displays external CSV paths and local
+  artifact paths from config.
+- `gurubodh-seed-data glossary validate --source sanatan-glossary` validates the
+  configured external CSV successfully.
+- `gurubodh-seed-data glossary validate --source prabodhan-glossary` validates
+  the configured external CSV successfully.
+
+#### Verification
+
+- `python3 -m compileall tools/seed-data/gurubodh_seed_data tools/seed-data/tests`
+- `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`
+- `tools/seed-data/.venv/bin/gurubodh-seed-data workflows`
+- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary sources`
+- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary paths`
+- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary paths --source sanatan-glossary`
+- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary validate --source sanatan-glossary`
+- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary validate --source prabodhan-glossary`
 
 ## Follow-Up
 

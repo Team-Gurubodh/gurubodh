@@ -1,0 +1,53 @@
+{
+  "$schema": "./seed_data_sources.schema.json",
+  "schema_version": 1,
+  "source_root": "/Users/rajeev/Gurubodh_library/seed_data/csv_import",
+  "artifact_root": "artifacts",
+  "workflows": [
+    {
+      "key": "glossary",
+      "status": "scaffolded",
+      "description": "Glossary seed data maintained through external spreadsheets."
+    },
+    {
+      "key": "category",
+      "status": "planned",
+      "description": "Category seed data workflow to be added incrementally."
+    },
+    {
+      "key": "subject",
+      "status": "planned",
+      "description": "Subject seed data workflow to be added incrementally."
+    }
+  ],
+  "sources": [
+    {
+      "key": "categories",
+      "workflow": "category",
+      "label": "Categories",
+      "csv_path": "category/categories.csv",
+      "artifact_path": "category/categories.json"
+    },
+    {
+      "key": "subjects",
+      "workflow": "subject",
+      "label": "Subjects",
+      "csv_path": "subject/subjects.csv",
+      "artifact_path": "subject/subjects.json"
+    },
+    {
+      "key": "sanatan-glossary",
+      "workflow": "glossary",
+      "label": "Sanatan Glossary",
+      "csv_path": "glossary/sanatan-glossary.csv",
+      "artifact_path": "glossary/sanatan-glossary.json"
+    },
+    {
+      "key": "prabodhan-glossary",
+      "workflow": "glossary",
+      "label": "Prabodhan Glossary",
+      "csv_path": "glossary/prabodhan-glossary.csv",
+      "artifact_path": "glossary/prabodhan-glossary.json"
+    }
+  ]
+}

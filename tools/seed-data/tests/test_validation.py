@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from gurubodh_seed_data.glossary import GlossarySource
+from gurubodh_seed_data.config import SeedDataSource
 from gurubodh_seed_data.validation import validate_glossary_csv
 
 
@@ -11,24 +11,41 @@ class GlossaryValidationTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
-        self.source_dir = self.root / "sources" / "glossary"
+        self.source_root = self.root / "csv_import"
+        self.source_dir = self.source_root / "glossary"
         self.source_dir.mkdir(parents=True)
-        self.source = GlossarySource(
+        self.config_path = self.root / "seed_data_sources.json"
+        self.config_path.write_text(
+            "{\n"
+            '  "schema_version": 1,\n'
+            f'  "source_root": "{self.source_root}",\n'
+            '  "artifact_root": "artifacts",\n'
+            '  "workflows": [\n'
+            '    {"key": "glossary", "status": "scaffolded", "description": "Glossary"}\n'
+            '  ],\n'
+            '  "sources": [\n'
+            '    {"key": "test-glossary", "workflow": "glossary", "label": "Test Glossary", "csv_path": "glossary/test-glossary.csv", "artifact_path": "glossary/test-glossary.json"}\n'
+            '  ]\n'
+            "}\n",
+            encoding="utf-8",
+        )
+        self.source = SeedDataSource(
             key="test-glossary",
-            name="Test Glossary",
-            csv_filename="test-glossary.csv",
-            json_filename="test-glossary.json",
+            workflow="glossary",
+            label="Test Glossary",
+            csv_path=Path("glossary/test-glossary.csv"),
+            artifact_path=Path("glossary/test-glossary.json"),
         )
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def write_csv(self, content):
-        csv_path = self.source_dir / self.source.csv_filename
+        csv_path = self.source_root / self.source.csv_path
         csv_path.write_text(content, encoding="utf-8")
 
     def validate(self):
-        with patch("gurubodh_seed_data.paths.SEED_DATA_ROOT", self.root):
+        with patch("gurubodh_seed_data.config.DEFAULT_CONFIG_PATH", self.config_path):
             return validate_glossary_csv(self.source)
 
     def test_valid_glossary_csv_passes(self):

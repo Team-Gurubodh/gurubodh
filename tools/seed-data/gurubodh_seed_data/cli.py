@@ -25,7 +25,7 @@ def _print_table(headers, rows):
 
 def _print_glossary_sources():
     rows = [
-        (source.key, source.name)
+        (source.key, source.label)
         for source in list_glossary_sources()
     ]
     _print_table(("Key", "Name"), rows)

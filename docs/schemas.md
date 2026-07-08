@@ -7,11 +7,12 @@
 
 - `tools/content-preparation/config/chapter_metadata.schema.json`
 - `tools/content-preparation/config/conversion_job.schema.json`
+- `tools/seed-data/config/seed_data_sources.schema.json`
 - `apps/gurubodh-cms/src/api/**/content-types/**/schema.json`
 
 ## Planned Schema Locations
 
-- `tools/seed-data/config/seed_data_sources.schema.json`
+None currently recorded.
 
 ## Ownership Guidance
 

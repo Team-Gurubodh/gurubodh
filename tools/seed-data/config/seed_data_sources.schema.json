@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/seed_data_sources.schema.json",
+  "title": "Gurubodh Seed-Data Source Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_root",
+    "artifact_root",
+    "workflows",
+    "sources"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "source_root": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute filesystem path where externally maintained CSV files are downloaded."
+    },
+    "artifact_root": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path under tools/seed-data where generated JSON artifacts are written."
+    },
+    "workflows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "status",
+          "description"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "scaffolded",
+              "active"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "workflow",
+          "label",
+          "csv_path",
+          "artifact_path"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "workflow": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "csv_path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^/].*\\.csv$"
+          },
+          "artifact_path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^/].*\\.json$"
+          }
+        }
+      }
+    }
+  }
+}
