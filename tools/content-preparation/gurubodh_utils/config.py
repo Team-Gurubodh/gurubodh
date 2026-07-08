@@ -42,6 +42,13 @@ def require_string(data, key, context, pattern=None):
     return value
 
 
+def optional_string_or_null(data, key, context):
+    value = data.get(key)
+    if value is not None and not isinstance(value, str):
+        raise SystemExit(f"Config error: {context}.{key} must be a string or null")
+    return value
+
+
 def chapter_split_regex_flags(chapter_split):
     flags = chapter_split.get("flags", [])
     if not isinstance(flags, list):
@@ -84,6 +91,35 @@ def source_is_legacy(config):
     return normalized_source_font_encoding(config) in SUPPORTED_LEGACY_ENCODINGS
 
 
+def storage_backend(section, context):
+    backend = section.get("backend", "local")
+    if backend not in {"local", "r2"}:
+        raise SystemExit(f"Config error: {context}.backend must be local or r2")
+    return backend
+
+
+def validate_source_storage(source):
+    backend = storage_backend(source, "source")
+    if backend == "local":
+        require_string(source, "root_dir", "source")
+        require_string(source, "relative_path", "source")
+    else:
+        require_string(source, "bucket", "source")
+        require_string(source, "key", "source")
+        optional_string_or_null(source, "url_base", "source")
+
+
+def validate_destination_storage(destination):
+    backend = storage_backend(destination, "destination")
+    if backend == "local":
+        require_string(destination, "root_dir", "destination")
+    else:
+        require_string(destination, "bucket", "destination")
+        require_string(destination, "prefix", "destination")
+        optional_string_or_null(destination, "url_base", "destination")
+    require_string(destination, "subject_dir", "destination")
+
+
 def validate_pipeline_matches_source(config, expected_pipeline=None):
     pipeline = config["pipeline"]
     if expected_pipeline and pipeline != expected_pipeline:
@@ -117,15 +153,15 @@ def load_conversion_job(path):
     naming = require_object(config, "naming", "root")
     chapter_split = require_object(config, "chapter_split", "root")
 
-    require_string(source, "root_dir", "source")
-    require_string(source, "relative_path", "source")
+    validate_source_storage(source)
     font_encoding = require_string(source, "font_encoding", "source")
     if font_encoding not in SUPPORTED_FONT_ENCODINGS:
         allowed = ", ".join(sorted(SUPPORTED_FONT_ENCODINGS))
         raise SystemExit(f"Config error: source.font_encoding must be one of: {allowed}")
-    require_string(source, "file_format", "source", r"[A-Za-z0-9]+")
-    require_string(destination, "root_dir", "destination")
-    require_string(destination, "subject_dir", "destination")
+    file_format = require_string(source, "file_format", "source", r"[A-Za-z0-9]+")
+    if file_format.lower() != "docx":
+        raise SystemExit("Config error: source.file_format must be docx")
+    validate_destination_storage(destination)
 
     require_string(naming, "category_code", "naming", r"CAT[0-9]{3}")
     require_string(naming, "subject_code", "naming", r"SUB[0-9]{3}")
@@ -143,4 +179,3 @@ def load_conversion_job(path):
         raise SystemExit("Config error: metadata_defaults must be an object")
     validate_pipeline_matches_source(config)
     return config
-

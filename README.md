@@ -80,7 +80,7 @@ current directory until it finds `config/conversion_job.schema.json` and
 ```bash
 gurubodh-utils run \
   --project-root tools/content-preparation \
-  --config jobs/002_spand_rahasya.json
+  --config jobs/002_spand_rahasya.local.json
 ```
 
 `make content-prep-help`
@@ -90,7 +90,7 @@ Shows the command-line help for `gurubodh-utils`, the content-preparation CLI.
 `make content-prep-run-sample`
 
 Runs the sample content-preparation job using
-`tools/content-preparation/jobs/002_spand_rahasya.json`.
+`tools/content-preparation/jobs/002_spand_rahasya.local.json`.
 
 ### Repository Tooling
 

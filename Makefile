@@ -19,4 +19,4 @@ content-prep-help:
 	cd tools/content-preparation && gurubodh-utils --help
 
 content-prep-run-sample:
-	cd tools/content-preparation && gurubodh-utils run --config jobs/002_spand_rahasya.json
+	cd tools/content-preparation && gurubodh-utils run --config jobs/002_spand_rahasya.local.json

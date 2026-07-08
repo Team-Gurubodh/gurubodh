@@ -3,17 +3,20 @@
   "pipeline": "unicode-docx-ingest",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
-    "relative_path": "129_spand_rahasya/unicode_fonts/ms_word/spand_rahasya.docx",
+    "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya.docx",
     "font_encoding": "unicode",
     "file_format": "docx"
   },
   "destination": {
-    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "129_spand_rahasya"
+    "backend": "r2",
+    "bucket": "gurubodh-library-dev",
+    "prefix": "cms_library",
+    "subject_dir": "123_spand_rahasya",
+    "url_base": null
   },
   "naming": {
-    "category_code": "CAT020",
-    "subject_code": "SUB129",
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
     "title_slug": "spand-rahasya",
     "version": "01",
     "subversion": "01"
@@ -21,7 +24,7 @@
   "chapter_split": {
     "enabled": true,
     "pattern_type": "regex",
-    "pattern": "प्रबोधन.*?जनवरी.*?२०२६"
+    "pattern": "प्रबोधन.*?जनवरी.*?2026"
   },
   "metadata_defaults": {
     "language": "hi-IN",

@@ -7,6 +7,7 @@
     "schema_version",
     "document",
     "files",
+    "storage",
     "processing",
     "conversion",
     "content_stats",
@@ -61,8 +62,7 @@
       "required": [
         "metadata_filename",
         "text_filename",
-        "msword_filename",
-        "original_source_relative_path"
+        "msword_filename"
       ],
       "properties": {
         "metadata_filename": {
@@ -76,10 +76,44 @@
         "msword_filename": {
           "type": "string",
           "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "storage": {
+      "type": "object",
+      "required": ["source", "artifacts"],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/storage_reference"
         },
-        "original_source_relative_path": {
-          "type": "string",
-          "minLength": 1
+        "artifacts": {
+          "type": "object",
+          "required": [
+            "metadata",
+            "text",
+            "msword",
+            "full_subject_msword",
+            "full_subject_text"
+          ],
+          "properties": {
+            "metadata": {
+              "$ref": "#/$defs/storage_reference"
+            },
+            "text": {
+              "$ref": "#/$defs/storage_reference"
+            },
+            "msword": {
+              "$ref": "#/$defs/storage_reference"
+            },
+            "full_subject_msword": {
+              "$ref": "#/$defs/storage_reference"
+            },
+            "full_subject_text": {
+              "$ref": "#/$defs/storage_reference"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -214,6 +248,65 @@
           "additionalProperties": false
         }
       },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "storage_reference": {
+      "type": "object",
+      "required": ["backend", "url"],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["local", "r2"]
+        },
+        "bucket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": ["string", "null"]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "backend": {
+              "const": "local"
+            }
+          },
+          "required": ["path"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["bucket"]
+              },
+              {
+                "required": ["key"]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "backend": {
+              "const": "r2"
+            }
+          },
+          "required": ["bucket", "key"],
+          "not": {
+            "required": ["path"]
+          }
+        }
+      ],
       "additionalProperties": false
     }
   },
