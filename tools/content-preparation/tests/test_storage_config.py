@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -8,7 +9,7 @@ from pathlib import Path
 from botocore.exceptions import ClientError
 
 from gurubodh_utils.config import load_conversion_job
-from gurubodh_utils.metadata import build_chapter_metadata
+from gurubodh_utils.metadata import build_chapter_metadata, text_artifact_integrity
 from gurubodh_utils.storage import (
     R2StorageClient,
     ensure_r2_destination_available,
@@ -158,6 +159,113 @@ class StorageConfigTests(unittest.TestCase):
             "cms_library/129_spand_rahasya/chapters/text_and_metadata/chapter.json",
         )
         self.assertIsNone(metadata["storage"]["artifacts"]["metadata"]["url"])
+
+    def test_chapter_metadata_includes_text_artifact_integrity(self):
+        text = "श्री स्वामी समर्थ\n\nUnicode chapter text: ज्ञान"
+
+        metadata = build_chapter_metadata(
+            BASE_CONFIG,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            text,
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh_utils run",
+        )
+
+        expected_digest = hashlib.sha256((text + "\n").encode("utf-8")).hexdigest()
+        self.assertEqual(
+            metadata["integrity"],
+            {
+                "artifacts": {
+                    "text": {
+                        "algorithm": "sha256",
+                        "encoding": "UTF-8",
+                        "line_endings": "LF",
+                        "scope": "artifact-bytes",
+                        "value": expected_digest,
+                    }
+                }
+            },
+        )
+        self.assertNotIn("metadata", metadata["integrity"]["artifacts"])
+
+    def test_text_artifact_integrity_changes_when_text_changes(self):
+        original = text_artifact_integrity("प्रबोधन")
+        changed = text_artifact_integrity("प्रबोधन बदलले")
+
+        self.assertNotEqual(
+            original["artifacts"]["text"]["value"],
+            changed["artifacts"]["text"]["value"],
+        )
+
+    def test_text_artifact_integrity_is_stable_across_storage_backends(self):
+        text = "एकच मजकूर"
+        local_config = json.loads(json.dumps(BASE_CONFIG))
+        r2_config = json.loads(json.dumps(BASE_CONFIG))
+        r2_config["destination"] = {
+            "backend": "r2",
+            "bucket": "gurubodh-library-dev",
+            "prefix": "cms_library",
+            "subject_dir": "129_spand_rahasya",
+            "url_base": None,
+        }
+        file_names = {
+            "metadata": "chapter.json",
+            "text": "chapter.txt",
+            "msword": "chapter.docx",
+            "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+            "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+            "msword_relative_path": Path("chapters/msword/chapter.docx"),
+            "full_msword_relative_path": Path("full_subject/full.docx"),
+            "full_text_relative_path": Path("full_subject/full.txt"),
+        }
+
+        local_metadata = build_chapter_metadata(
+            local_config,
+            1,
+            file_names,
+            text,
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh_utils run",
+        )
+        r2_metadata = build_chapter_metadata(
+            r2_config,
+            1,
+            file_names,
+            text,
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh_utils run",
+        )
+
+        self.assertEqual(local_metadata["integrity"], r2_metadata["integrity"])
+
+    def test_chapter_metadata_schema_requires_text_integrity_shape(self):
+        schema_path = Path(__file__).parents[1] / "config" / "chapter_metadata.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+        self.assertIn("integrity", schema["required"])
+        text_schema = schema["properties"]["integrity"]["properties"]["artifacts"]["properties"]["text"]
+        self.assertEqual(
+            text_schema["required"],
+            ["algorithm", "encoding", "line_endings", "scope", "value"],
+        )
+        self.assertEqual(text_schema["properties"]["algorithm"]["const"], "sha256")
+        self.assertEqual(text_schema["properties"]["encoding"]["const"], "UTF-8")
+        self.assertEqual(text_schema["properties"]["line_endings"]["const"], "LF")
+        self.assertEqual(text_schema["properties"]["scope"]["const"], "artifact-bytes")
+        self.assertEqual(text_schema["properties"]["value"]["pattern"], "^[a-f0-9]{64}$")
 
     def test_r2_source_materializes_to_temporary_docx(self):
         config = json.loads(json.dumps(BASE_CONFIG))

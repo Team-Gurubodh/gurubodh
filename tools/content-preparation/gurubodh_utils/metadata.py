@@ -1,3 +1,4 @@
+import hashlib
 import re
 
 from gurubodh_utils.constants import CHAPTER_METADATA_SCHEMA_VERSION
@@ -42,6 +43,21 @@ def text_stats(text):
     }
 
 
+def text_artifact_integrity(text):
+    artifact_bytes = (text + "\n").encode("utf-8")
+    return {
+        "artifacts": {
+            "text": {
+                "algorithm": "sha256",
+                "encoding": "UTF-8",
+                "line_endings": "LF",
+                "scope": "artifact-bytes",
+                "value": hashlib.sha256(artifact_bytes).hexdigest(),
+            }
+        }
+    }
+
+
 def build_chapter_metadata(
     config,
     chapter_number,
@@ -79,6 +95,7 @@ def build_chapter_metadata(
             "output_text_encoding": defaults.get("output_text_encoding", "UTF-8"),
             "converter_counts": converter_counts,
         },
+        "integrity": text_artifact_integrity(chapter_text_value),
         "content_stats": text_stats(chapter_text_value),
         "content": {
             "title": None,

@@ -18,6 +18,9 @@
 - Content preparation JSON schemas belong under `tools/content-preparation/config/`.
 - Conversion job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
+- Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
+  of the generated chapter `.txt` artifact bytes. It does not checksum the
+  metadata JSON artifact.
 - Seed-data JSON schemas belong under `tools/seed-data/config/` once the
   config-driven source discovery task is implemented.
 - Strapi content type schemas belong under the relevant Strapi API directory.
