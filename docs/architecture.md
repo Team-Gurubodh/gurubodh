@@ -96,9 +96,11 @@ flowchart LR
   - Write finalized entries directly into the CMS.
   - Render or serve content to end users.
   - Own the published content lifecycle.
-- **Current implementation**: local Python utility under
+- **Current implementation**: Python utility under
   `tools/content-preparation/`, currently used for legacy DOCX Unicode
-  conversion and chapter splitting.
+  conversion, Unicode DOCX ingest, chapter splitting, and preparation artifact
+  publication to local storage or Cloudflare R2. See
+  [ADR-0013](./adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md).
 - **Planned/recommended direction**: Shri-Lipi font conversion was unsuccessful. As such newly created documents cannot be used by our system. We need to find a solution to this problem.
 
 ### 4.2 Content Ingestion Layer

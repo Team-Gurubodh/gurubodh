@@ -18,7 +18,7 @@ full-subject output, chapter output, and metadata.
 From the project root, use the Python package CLI:
 
 ```bash
-python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.json
+python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.local.json
 ```
 
 `run` is the normal command for job execution. It reads the job config,
@@ -28,8 +28,8 @@ pipeline.
 You can also call a strict pipeline command:
 
 ```bash
-python3 -m gurubodh_utils unicode-ingest --config jobs/002_spand_rahasya.json
-python3 -m gurubodh_utils legacy-convert --config jobs/001_aacharan_shaastra.json
+python3 -m gurubodh_utils unicode-ingest --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh_utils legacy-convert --config jobs/001_aacharan_shaastra.local.json
 ```
 
 Strict commands are useful when you want the command itself to assert the
@@ -41,21 +41,21 @@ writing output.
 Use `run` for normal operations:
 
 ```bash
-python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.json
-python3 -m gurubodh_utils run --config jobs/001_aacharan_shaastra.json
+python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh_utils run --config jobs/001_aacharan_shaastra.local.json
 ```
 
 Use `unicode-ingest` when the source DOCX is already Unicode:
 
 ```bash
-python3 -m gurubodh_utils unicode-ingest --config jobs/002_spand_rahasya.json
+python3 -m gurubodh_utils unicode-ingest --config jobs/002_spand_rahasya.local.json
 ```
 
 Use `legacy-convert` when the source DOCX contains a supported legacy font
 encoding:
 
 ```bash
-python3 -m gurubodh_utils legacy-convert --config jobs/001_aacharan_shaastra.json
+python3 -m gurubodh_utils legacy-convert --config jobs/001_aacharan_shaastra.local.json
 ```
 
 ## Project Root Detection
@@ -67,7 +67,7 @@ When running from a source checkout without installing the package, run commands
 from the project root:
 
 ```bash
-python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.json
+python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.local.json
 ```
 
 If you run from another directory before installing the package, Python also
@@ -77,7 +77,7 @@ needs the project on its import path:
 PYTHONPATH=/path/to/gurubodh/tools/content-preparation \
   python3 -m gurubodh_utils run \
   --project-root /path/to/gurubodh/tools/content-preparation \
-  --config jobs/002_spand_rahasya.json
+  --config jobs/002_spand_rahasya.local.json
 ```
 
 After package installation, `python3 -m gurubodh_utils ...` and the optional
@@ -94,9 +94,9 @@ Root detection order:
 Examples:
 
 ```bash
-python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.json
-python3 -m gurubodh_utils run --project-root /path/to/gurubodh/tools/content-preparation --config jobs/002_spand_rahasya.json
-GURUBODH_UTILS_ROOT=/path/to/gurubodh/tools/content-preparation python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.json
+python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh_utils run --project-root /path/to/gurubodh/tools/content-preparation --config jobs/002_spand_rahasya.local.json
+GURUBODH_UTILS_ROOT=/path/to/gurubodh/tools/content-preparation python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.local.json
 ```
 
 Relative config paths are resolved from the current directory when possible,
@@ -250,7 +250,7 @@ from conversion facts.
 When a job is run through the dispatcher:
 
 ```bash
-python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.json
+python3 -m gurubodh_utils run --config jobs/002_spand_rahasya.local.json
 ```
 
 metadata records:
@@ -265,7 +265,7 @@ metadata records:
 When a job is run through the strict Unicode command:
 
 ```bash
-python3 -m gurubodh_utils unicode-ingest --config jobs/002_spand_rahasya.json
+python3 -m gurubodh_utils unicode-ingest --config jobs/002_spand_rahasya.local.json
 ```
 
 metadata records:

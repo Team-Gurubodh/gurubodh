@@ -8,6 +8,11 @@ from gurubodh_utils.project import resolve_project_context, resolve_project_path
 def add_common_options(parser):
     parser.add_argument("--config", required=True, help="Path to a Gurubodh CMS conversion job JSON file.")
     parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing local output or R2 objects instead of failing.",
+    )
+    parser.add_argument(
         "--project-root",
         help=(
             "Project root containing config/ and jobs/. If omitted, uses GURUBODH_UTILS_ROOT "
@@ -55,15 +60,14 @@ def main(argv=None):
     register_namespaces()
 
     if args.command == "run":
-        run_configured_job(context, config_path)
+        run_configured_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "unicode-ingest":
-        run_unicode_job(context, config_path)
+        run_unicode_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "legacy-convert":
-        run_legacy_job(context, config_path)
+        run_legacy_job(context, config_path, overwrite=args.overwrite)
     else:
         parser.error(f"Unsupported command: {args.command}")
 
 
 if __name__ == "__main__":
     main()
-

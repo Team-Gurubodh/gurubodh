@@ -15,8 +15,12 @@
     },
     "source": {
       "type": "object",
-      "required": ["root_dir", "relative_path", "font_encoding", "file_format"],
       "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["local", "r2"],
+          "default": "local"
+        },
         "root_dir": {
           "type": "string",
           "minLength": 1
@@ -24,6 +28,18 @@
         "relative_path": {
           "type": "string",
           "minLength": 1
+        },
+        "bucket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url_base": {
+          "type": ["string", "null"],
+          "default": null
         },
         "font_encoding": {
           "type": "string",
@@ -34,21 +50,77 @@
           "pattern": "^[A-Za-z0-9]+$"
         }
       },
+      "required": ["font_encoding", "file_format"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "const": "r2"
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": {
+            "required": ["bucket", "key"]
+          },
+          "else": {
+            "required": ["root_dir", "relative_path"]
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "destination": {
       "type": "object",
-      "required": ["root_dir", "subject_dir"],
+      "required": ["subject_dir"],
       "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["local", "r2"],
+          "default": "local"
+        },
         "root_dir": {
           "type": "string",
           "minLength": 1
         },
+        "bucket": {
+          "type": "string",
+          "minLength": 1,
+          "default": "gurubodh-library-dev"
+        },
+        "prefix": {
+          "type": "string",
+          "minLength": 1,
+          "default": "cms_library"
+        },
         "subject_dir": {
           "type": "string",
           "minLength": 1
+        },
+        "url_base": {
+          "type": ["string", "null"],
+          "default": null
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "const": "r2"
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": {
+            "required": ["bucket", "prefix"]
+          },
+          "else": {
+            "required": ["root_dir"]
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "naming": {

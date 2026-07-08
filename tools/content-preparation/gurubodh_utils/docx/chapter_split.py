@@ -8,7 +8,7 @@ from gurubodh_utils.docx.namespaces import NS, W
 from gurubodh_utils.docx.text import block_text
 from gurubodh_utils.docx.validate import validate_docx
 from gurubodh_utils.metadata import build_chapter_metadata
-from gurubodh_utils.naming import chapter_output_filename
+from gurubodh_utils.naming import chapter_output_filename, full_subject_output_filename
 from gurubodh_utils.text_utils import normalize_spaces, safe_filename
 from gurubodh_utils.time_utils import utc_now
 
@@ -165,7 +165,30 @@ def split_docx_into_chapters(
             metadata = build_chapter_metadata(
                 config,
                 index,
-                {"metadata": metadata_name, "text": text_name, "msword": docx_name},
+                {
+                    "metadata": metadata_name,
+                    "text": text_name,
+                    "msword": docx_name,
+                    "metadata_relative_path": (chapter_text_dir / metadata_name).relative_to(
+                        chapter_text_dir.parents[1]
+                    ),
+                    "text_relative_path": (chapter_text_dir / text_name).relative_to(
+                        chapter_text_dir.parents[1]
+                    ),
+                    "msword_relative_path": (chapter_docx_dir / docx_name).relative_to(
+                        chapter_docx_dir.parents[1]
+                    ),
+                    "full_msword_relative_path": (
+                        chapter_docx_dir.parents[1]
+                        / "full_subject"
+                        / full_subject_output_filename(config, ".docx")
+                    ).relative_to(chapter_docx_dir.parents[1]),
+                    "full_text_relative_path": (
+                        chapter_docx_dir.parents[1]
+                        / "full_subject"
+                        / full_subject_output_filename(config, ".txt")
+                    ).relative_to(chapter_docx_dir.parents[1]),
+                },
                 text_value,
                 converter_counts or {},
                 created_at,
@@ -181,4 +204,3 @@ def split_docx_into_chapters(
     print(f"wrote {len(outputs)} chapter files under {chapter_docx_dir}")
     print(f"wrote {len(outputs)} chapter text files under {chapter_text_dir}")
     return outputs
-

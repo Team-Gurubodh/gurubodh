@@ -2,6 +2,35 @@ import re
 
 from gurubodh_utils.constants import CHAPTER_METADATA_SCHEMA_VERSION
 from gurubodh_utils.naming import version_label
+from gurubodh_utils.storage import destination_artifact_reference, source_reference
+
+
+def chapter_storage_references(config, file_names):
+    return {
+        "source": source_reference(config),
+        "artifacts": {
+            "metadata": destination_artifact_reference(
+                config,
+                file_names["metadata_relative_path"],
+            ),
+            "text": destination_artifact_reference(
+                config,
+                file_names["text_relative_path"],
+            ),
+            "msword": destination_artifact_reference(
+                config,
+                file_names["msword_relative_path"],
+            ),
+            "full_subject_msword": destination_artifact_reference(
+                config,
+                file_names["full_msword_relative_path"],
+            ),
+            "full_subject_text": destination_artifact_reference(
+                config,
+                file_names["full_text_relative_path"],
+            ),
+        },
+    }
 
 
 def text_stats(text):
@@ -37,8 +66,8 @@ def build_chapter_metadata(
             "metadata_filename": file_names["metadata"],
             "text_filename": file_names["text"],
             "msword_filename": file_names["msword"],
-            "original_source_relative_path": config["source"]["relative_path"],
         },
+        "storage": chapter_storage_references(config, file_names),
         "processing": {
             "pipeline": config["pipeline"],
             "entry_point": entry_point,
@@ -65,4 +94,3 @@ def build_chapter_metadata(
             },
         },
     }
-
