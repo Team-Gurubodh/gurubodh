@@ -121,6 +121,33 @@ R2 objects may remain private. Generated metadata stores bucket/key references
 as canonical storage references and leaves URL fields as `null` unless
 `url_base` is configured.
 
+## Chapter Text Integrity
+
+Each generated chapter metadata JSON file includes:
+
+```json
+"integrity": {
+  "artifacts": {
+    "text": {
+      "algorithm": "sha256",
+      "encoding": "UTF-8",
+      "line_endings": "LF",
+      "scope": "artifact-bytes",
+      "value": "..."
+    }
+  }
+}
+```
+
+The `value` is the SHA-256 hex digest of the exact UTF-8 bytes written to the
+chapter `.txt` artifact in `chapters/text_and_metadata/`, including the final LF
+newline. It does not describe the metadata JSON file itself.
+
+Content ingestion can compare this value with a previously ingested chapter to
+skip unchanged text artifacts, detect source text changes across local and
+R2-backed jobs, and decide when future chunks, embeddings, or RAG indexes need
+to be rebuilt.
+
 For R2 destinations, the tool checks the destination subject prefix before
 processing starts. If objects already exist and `--overwrite` is not supplied,
 the job fails before doing DOCX conversion or chapter splitting. During upload,

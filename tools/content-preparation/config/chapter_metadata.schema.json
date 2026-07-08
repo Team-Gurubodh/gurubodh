@@ -10,6 +10,7 @@
     "storage",
     "processing",
     "conversion",
+    "integrity",
     "content_stats",
     "content",
     "annotations"
@@ -165,6 +166,53 @@
             "type": "integer",
             "minimum": 0
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["artifacts"],
+      "properties": {
+        "artifacts": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "text": {
+              "type": "object",
+              "required": [
+                "algorithm",
+                "encoding",
+                "line_endings",
+                "scope",
+                "value"
+              ],
+              "properties": {
+                "algorithm": {
+                  "type": "string",
+                  "const": "sha256"
+                },
+                "encoding": {
+                  "type": "string",
+                  "const": "UTF-8"
+                },
+                "line_endings": {
+                  "type": "string",
+                  "const": "LF"
+                },
+                "scope": {
+                  "type": "string",
+                  "const": "artifact-bytes"
+                },
+                "value": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
