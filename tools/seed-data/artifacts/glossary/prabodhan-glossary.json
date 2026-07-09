@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "workflow": "glossary",
+  "source": {
+    "key": "prabodhan-glossary",
+    "label": "Prabodhan Glossary"
+  },
+  "strapi": {
+    "collection_type": "prabodhan-glossary",
+    "display_name": "Prabodhan Glossary"
+  },
+  "records": [
+    {
+      "term_code": "T00001",
+      "term": "समष्टि",
+      "definition": "समष्टि"
+    },
+    {
+      "term_code": "T00002",
+      "term": "शास्त्र",
+      "definition": "शास्त्र"
+    },
+    {
+      "term_code": "T00003",
+      "term": "क्रिया",
+      "definition": "क्रिया"
+    },
+    {
+      "term_code": "T00004",
+      "term": "ईशणा",
+      "definition": "ईशणा"
+    },
+    {
+      "term_code": "T00005",
+      "term": "सूक्ष्म देह",
+      "definition": "सूक्ष्म देह"
+    },
+    {
+      "term_code": "T00006",
+      "term": "आचरण",
+      "definition": "आचरण"
+    },
+    {
+      "term_code": "T00007",
+      "term": "शमन",
+      "definition": "शमन"
+    },
+    {
+      "term_code": "T00008",
+      "term": "दमन",
+      "definition": "दमन"
+    },
+    {
+      "term_code": "T00009",
+      "term": "प्रमाद",
+      "definition": "प्रमाद"
+    },
+    {
+      "term_code": "T00010",
+      "term": "अनुसंधान",
+      "definition": "अनुसंधान"
+    },
+    {
+      "term_code": "T00011",
+      "term": "नित्य आर्चन",
+      "definition": "नित्य आर्चन"
+    },
+    {
+      "term_code": "T00012",
+      "term": "नित्य उपासना",
+      "definition": "नित्य उपासना"
+    },
+    {
+      "term_code": "T00013",
+      "term": "नित्य कर्तव्य",
+      "definition": "नित्य कर्तव्य"
+    },
+    {
+      "term_code": "T00014",
+      "term": "नित्य कर्म",
+      "definition": "नित्य कर्म"
+    },
+    {
+      "term_code": "T00015",
+      "term": "मनुष्य जन्म का प्रयोजन",
+      "definition": "मनुष्य जन्म का प्रयोजन"
+    },
+    {
+      "term_code": "T00016",
+      "term": "जीवात्मा",
+      "definition": "जीवात्मा"
+    },
+    {
+      "term_code": "T00017",
+      "term": "सदाचार",
+      "definition": "सदाचार"
+    },
+    {
+      "term_code": "T00018",
+      "term": "तपस्या",
+      "definition": "तपस्या"
+    },
+    {
+      "term_code": "T00019",
+      "term": "सेवा",
+      "definition": "सेवा"
+    }
+  ]
+}

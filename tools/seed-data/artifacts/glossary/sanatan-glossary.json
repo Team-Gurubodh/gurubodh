@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "workflow": "glossary",
+  "source": {
+    "key": "sanatan-glossary",
+    "label": "Sanatan Glossary"
+  },
+  "strapi": {
+    "collection_type": "sanatan-glossary",
+    "display_name": "Sanatan Glossary"
+  },
+  "records": [
+    {
+      "term_code": "T00001",
+      "term": "anirvachaneeya",
+      "definition": "indescribable"
+    },
+    {
+      "term_code": "T00002",
+      "term": "anugraha",
+      "definition": "grace"
+    },
+    {
+      "term_code": "T00003",
+      "term": "anubandha",
+      "definition": "indispensable priliminary factors to any shastra"
+    },
+    {
+      "term_code": "T00004",
+      "term": "indriya",
+      "definition": "sense orgnans"
+    },
+    {
+      "term_code": "T00005",
+      "term": "utpatti",
+      "definition": "evolution, creation"
+    }
+  ]
+}

@@ -16,6 +16,10 @@ Tasks 008, 009, and 010 produce reviewed JSON artifacts. This task connects
 those artifacts to Strapi 5 content types after the artifact shapes and stable
 keys are defined.
 
+For glossary seed data, the Sanatan Glossary and Prabodhan Glossary Collection
+Types should already exist before this task begins. Task 012 is responsible for
+creating those Collection Types from the contract recorded by Task 008.
+
 Ingestion introduces runtime concerns that should remain separate from
 CSV-to-JSON generation:
 
@@ -36,11 +40,13 @@ CSV-to-JSON generation:
 - Add dry-run behavior before live writes.
 - Use Strapi MCP or schema inspection here if useful, not during artifact
   generation.
+- Do not create or mutate Strapi Collection Type schemas as part of ingestion.
 
 ## Approved Plan
 
 1. Confirm target Strapi content types and field names for category, subject,
-   and glossary records.
+   and glossary records. For glossary records, use the Collection Types created
+   by Task 012.
 2. Define per-type ingestion mappings from JSON artifact fields to Strapi API
    payloads.
 3. Add dry-run mode that reports:

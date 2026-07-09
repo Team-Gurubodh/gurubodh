@@ -7,6 +7,7 @@
 
 - `tools/content-preparation/config/chapter_metadata.schema.json`
 - `tools/content-preparation/config/conversion_job.schema.json`
+- `tools/seed-data/config/glossary_artifact.schema.json`
 - `tools/seed-data/config/seed_data_sources.schema.json`
 - `apps/gurubodh-cms/src/api/**/content-types/**/schema.json`
 
@@ -24,6 +25,9 @@ None currently recorded.
   metadata JSON artifact.
 - Seed-data JSON schemas belong under `tools/seed-data/config/` once the
   config-driven source discovery task is implemented.
+- Glossary seed-data artifacts are validated by
+  `tools/seed-data/config/glossary_artifact.schema.json` before they are used by
+  later ingestion tooling.
 - Strapi content type schemas belong under the relevant Strapi API directory.
 - New schema locations should be added to this index when introduced.
 
