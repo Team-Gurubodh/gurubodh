@@ -78,9 +78,109 @@ internal identifiers.
 - Category records use a stable category code.
 - Subject records use a stable subject code and reference category by category
   code.
-- Glossary records use a stable term code. If term codes are not globally
-  unique across glossary sources, ingestion must use a documented composite key
-  of glossary source plus term code.
+- Glossary records use a stable term code within the target glossary
+  collection. Sanatan Glossary and Prabodhan Glossary are separate glossary
+  sources that are intended to become separate Strapi Collection Types, so term
+  codes are not required to be globally unique across glossary sources.
+
+## Glossary Artifact Contract
+
+Task 008 finalizes the first glossary artifact contract for:
+
+```text
+artifacts/glossary/sanatan-glossary.json
+artifacts/glossary/prabodhan-glossary.json
+```
+
+Each glossary artifact represents one source glossary and one intended Strapi
+Collection Type target. The artifact is not itself a Strapi content-type schema;
+it is reviewable seed data prepared for a later ingestion tool.
+
+The initial glossary artifact shape should use this envelope:
+
+```json
+{
+  "schema_version": 1,
+  "workflow": "glossary",
+  "source": {
+    "key": "sanatan-glossary",
+    "label": "Sanatan Glossary"
+  },
+  "strapi": {
+    "collection_type": "sanatan-glossary",
+    "display_name": "Sanatan Glossary"
+  },
+  "records": [
+    {
+      "term_code": "T00001",
+      "term": "anirvachaneeya",
+      "definition": "indescribable"
+    }
+  ]
+}
+```
+
+The required common record fields are:
+
+- `term_code` - stable business key within the target glossary collection.
+- `term` - glossary term.
+- `definition` - glossary definition.
+
+The generator must not include Strapi internal identifiers such as `id`,
+`documentId`, internal timestamps, or created/updated user fields. Those values
+belong to Strapi and are assigned or managed during ingestion.
+
+Sanatan Glossary and Prabodhan Glossary may diverge over time. The initial
+artifact schema should validate the common envelope and required common fields,
+while allowing the implementation to introduce collection-specific fields in a
+future schema version or collection-specific schema if Prabodhan Glossary needs
+additional properties.
+
+## Glossary Strapi Collection Type Contract
+
+Sanatan Glossary and Prabodhan Glossary should be modeled as separate Strapi 5
+Collection Types. Task 008 records this contract but does not create the CMS
+schema files.
+
+The future CMS task should create Strapi schema files under the CMS app using
+the standard Strapi content-type location:
+
+```text
+apps/gurubodh-cms/src/api/sanatan-glossary/content-types/sanatan-glossary/schema.json
+apps/gurubodh-cms/src/api/prabodhan-glossary/content-types/prabodhan-glossary/schema.json
+```
+
+The initial shared Strapi-facing fields should be:
+
+- `term_code` - unique and required within the collection.
+- `term` - required text/string field containing the glossary term.
+- `definition` - required text field containing the glossary definition.
+
+There are no glossary relationships in the initial contract. Later work may add
+collection-specific fields, especially for Prabodhan Glossary, without requiring
+Sanatan Glossary to adopt the same fields.
+
+The later Strapi ingestion task should assume these Collection Types already
+exist. It should focus on dry-run reporting, idempotent create/update behavior,
+API authentication, payload construction, and conflict handling.
+
+## Artifact Schema Location
+
+Formal JSON Schemas for seed-data artifacts belong under:
+
+```text
+tools/seed-data/config/
+```
+
+The glossary artifact schema should be introduced as:
+
+```text
+tools/seed-data/config/glossary_artifact.schema.json
+```
+
+That schema validates generated seed-data artifact files before ingestion. It is
+separate from the Strapi Collection Type schemas stored under
+`apps/gurubodh-cms/src/api/`.
 
 ## Validation Responsibilities
 
@@ -123,9 +223,10 @@ Strapi remains responsible for generating native `id` and Strapi 5
 
 ## Open Decisions
 
-- Final Strapi content-type field names for category, subject, and glossary
-  records.
-- Whether glossary term code is globally unique or scoped by glossary source.
-- Exact generated JSON shape for each seed-data type.
-- Whether generated artifacts should eventually be committed or remain ignored
-  regenerated outputs.
+- Final Strapi content-type field names for category and subject records.
+- Future collection-specific glossary fields beyond the initial shared
+  `term_code`, `term`, and `definition` fields.
+- Exact generated JSON shape for category and subject seed-data artifacts.
+- Whether generated category, subject, and glossary artifacts should all be
+  committed as reviewable project data or selectively regenerated as local
+  outputs.

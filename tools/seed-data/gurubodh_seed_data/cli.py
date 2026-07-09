@@ -2,6 +2,7 @@ import argparse
 import sys
 
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
+from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
 from gurubodh_seed_data.paths import glossary_paths
 from gurubodh_seed_data.validation import validate_glossary_csv
 from gurubodh_seed_data.workflows import list_workflows
@@ -88,6 +89,42 @@ def _validate_glossary_source(source_key):
     return 1
 
 
+def _generate_glossary_artifact(source_key):
+    source = get_glossary_source(source_key)
+    result = write_glossary_artifact(source)
+
+    print(f"Source: {result.source_key}")
+    print(f"CSV Input: {result.csv_path}")
+    print(f"JSON Output: {result.json_path}")
+    print(f"Rows Checked: {result.csv_validation_result.data_row_count}")
+    print(f"Records Written: {result.record_count}")
+    print(f"CSV Errors: {len(result.csv_validation_result.errors)}")
+    print(f"Artifact Errors: {len(result.artifact_validation_result.errors)}")
+
+    _print_validation_issues("CSV Errors", result.csv_validation_result.errors)
+
+    if result.artifact_validation_result.errors:
+        print()
+        print("Artifact Errors")
+        rows = [
+            ("Artifact", error)
+            for error in result.artifact_validation_result.errors
+        ]
+        _print_table(("Location", "Message"), rows)
+
+    if (
+        result.csv_validation_result.is_valid
+        and result.artifact_validation_result.is_valid
+    ):
+        print()
+        print("Generation passed.")
+        return 0
+
+    print()
+    print("Generation failed.")
+    return 1
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="gurubodh-seed-data",
@@ -142,6 +179,20 @@ def build_parser():
     )
     validate_parser.set_defaults(
         handler=lambda args: _validate_glossary_source(args.source)
+    )
+
+    generate_parser = glossary_subparsers.add_parser(
+        "generate",
+        help="Generate a glossary JSON artifact.",
+        description="Validate a glossary CSV source and generate its JSON artifact.",
+    )
+    generate_parser.add_argument(
+        "--source",
+        required=True,
+        help="Glossary source key to generate. Example: sanatan-glossary.",
+    )
+    generate_parser.set_defaults(
+        handler=lambda args: _generate_glossary_artifact(args.source)
     )
 
     return parser

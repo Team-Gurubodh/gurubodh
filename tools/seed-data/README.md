@@ -80,6 +80,13 @@ gurubodh-seed-data glossary validate --source sanatan-glossary
 gurubodh-seed-data glossary validate --source prabodhan-glossary
 ```
 
+Generate one glossary JSON artifact:
+
+```bash
+gurubodh-seed-data glossary generate --source sanatan-glossary
+gurubodh-seed-data glossary generate --source prabodhan-glossary
+```
+
 ## File Locations
 
 Manually downloaded Google Sheet CSV files are moving to the external source
@@ -119,6 +126,15 @@ The configuration is described by:
 ```text
 config/seed_data_sources.schema.json
 ```
+
+Glossary artifacts are described by:
+
+```text
+config/glossary_artifact.schema.json
+```
+
+Generated glossary artifacts are reviewable project data and are expected to be
+committed after they are regenerated and verified.
 
 ## Category and Subject Spreadsheet Validation
 
@@ -223,14 +239,42 @@ blank-row issues are reported as errors.
 CSV-to-JSON artifact generation must run validation first and must abort before
 writing an artifact when validation reports any errors.
 
-## Planned Workflow
+## Glossary Artifact Generation
 
-Future steps will add config-driven source discovery, CSV-to-JSON artifact
-generation for glossary, category, and subject seed data, and Strapi REST API
-ingestion. The seed-data tool validates downloaded CSV files before generating
-artifacts, even when spreadsheet validation and conditional formatting are also
-configured for human data entry.
+Glossary generation reads the configured CSV source, runs the same validation as
+the `validate` command, parses the valid rows, and writes deterministic JSON
+under `artifacts/glossary/`.
+
+The current generated glossary artifacts are:
+
+```text
+artifacts/glossary/sanatan-glossary.json
+artifacts/glossary/prabodhan-glossary.json
+```
+
+Each artifact includes:
+
+- `schema_version`
+- `workflow`
+- `source`
+- `strapi`
+- `records`
+
+The `strapi` object records the intended future Strapi Collection Type target.
+The artifact is not itself a Strapi content-type schema. The actual Strapi
+Collection Type schema files will be created by a later CMS task.
 
 Generated artifacts must not include Strapi internal `id` or `documentId`
 values. Strapi is responsible for generating those identifiers during API-based
 ingestion.
+
+## Planned Workflow
+
+Future steps will add CSV-to-JSON artifact generation for category and subject
+seed data, Strapi Collection Types for glossary data, and Strapi REST API
+ingestion. The seed-data tool validates downloaded CSV files before generating
+artifacts, even when spreadsheet validation and conditional formatting are also
+configured for human data entry.
+
+Strapi ingestion remains a separate workflow. It should read generated artifacts
+after the relevant Strapi Collection Types already exist.
