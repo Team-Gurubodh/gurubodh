@@ -31,6 +31,42 @@ Both sources are expected to use the same spreadsheet columns:
 
 The Google Sheet links will be recorded here once available.
 
+The Category source is:
+
+- `categories` - Categories
+
+The current Category CSV columns are:
+
+- `code`
+- `legacy_code`
+- `is_active`
+- `sort_order`
+- `desired_status`
+- `name_en`
+- `description_en`
+- `name_hi-IN`
+- `description_hi-IN`
+
+The Subject source is:
+
+- `subjects` - Subjects
+
+The current Subject CSV columns are:
+
+- `code`
+- `legacy_code`
+- `is_active`
+- `sort_order`
+- `category_code`
+- `desired_status`
+- `name_en`
+- `description_en`
+- `name_hi-IN`
+- `description_hi-IN`
+- `from_date`
+- `to_date`
+- `prabodhan_count`
+
 The lightweight interface contract for source CSV files, generated artifacts,
 and future Strapi ingestion is documented in
 `docs/interfaces/seed-data-artifacts.md`.
@@ -87,6 +123,34 @@ gurubodh-seed-data glossary generate --source sanatan-glossary
 gurubodh-seed-data glossary generate --source prabodhan-glossary
 ```
 
+List supported category or subject sources:
+
+```bash
+gurubodh-seed-data category sources
+gurubodh-seed-data subject sources
+```
+
+List canonical category or subject input and output paths:
+
+```bash
+gurubodh-seed-data category paths
+gurubodh-seed-data subject paths
+```
+
+Validate category and subject CSV sources:
+
+```bash
+gurubodh-seed-data category validate --source categories
+gurubodh-seed-data subject validate --source subjects
+```
+
+Generate category and subject JSON artifacts:
+
+```bash
+gurubodh-seed-data category generate --source categories
+gurubodh-seed-data subject generate --source subjects
+```
+
 ## File Locations
 
 Manually downloaded Google Sheet CSV files are moving to the external source
@@ -133,8 +197,16 @@ Glossary artifacts are described by:
 config/glossary_artifact.schema.json
 ```
 
-Generated glossary artifacts are reviewable project data and are expected to be
-committed after they are regenerated and verified.
+Category, glossary, and subject artifacts are described by:
+
+```text
+config/category_artifact.schema.json
+config/glossary_artifact.schema.json
+config/subject_artifact.schema.json
+```
+
+Generated seed-data artifacts are reviewable project data and are expected to
+be committed after they are regenerated and verified.
 
 ## Category and Subject Spreadsheet Validation
 
@@ -201,11 +273,13 @@ fields such as `code`, `legacy_code`, `is_active`, and `sort_order` appear once.
 Localized fields are represented as locale-specific columns such as `name_en`,
 `description_en`, `name_hi-IN`, and `description_hi-IN`.
 
-The Subject sheet also includes `category_name_en` and `category_name_hi-IN`
-helper columns. Choose a Category by either English or Hindi name, and the
-`category_code` column is auto-filled from the `Categories` sheet. If both
-helper names are filled but resolve to different Category codes, the setup
-script highlights the mismatch.
+The Subject Google Sheet setup script includes `category_name_en` and
+`category_name_hi-IN` helper columns. Choose a Category by either English or
+Hindi name, and the `category_code` column is auto-filled from the `Categories`
+sheet. If both helper names are filled but resolve to different Category codes,
+the setup script highlights the mismatch. The current downloaded Subject CSV
+uses the exported `category_code` relationship key directly and includes
+optional tracking columns: `from_date`, `to_date`, and `prabodhan_count`.
 
 These spreadsheet validations are entry-time guidance for maintainers. The
 seed-data tooling should still validate exported source files before generating
@@ -239,6 +313,36 @@ blank-row issues are reported as errors.
 CSV-to-JSON artifact generation must run validation first and must abort before
 writing an artifact when validation reports any errors.
 
+Category validation checks:
+
+- required headers in expected order
+- required values for `code`, `is_active`, `sort_order`, `desired_status`, and
+  `name_en`
+- `code` format: `CATnnn`
+- duplicate non-empty `code`, `legacy_code`, and `sort_order` values
+- boolean parsing for `is_active`
+- integer parsing for `sort_order`
+- `desired_status` values: `draft` or `published`
+- maximum length rules for `legacy_code`, `name_en`, and `name_hi-IN`
+- malformed rows and blank rows
+
+Subject validation checks:
+
+- required headers in expected order
+- required values for `code`, `is_active`, `sort_order`, `category_code`,
+  `desired_status`, and `name_en`
+- `code` format: `SUBnnn`
+- `category_code` format: `CATnnn`
+- duplicate non-empty `code`, `legacy_code`, and `sort_order` values
+- boolean parsing for `is_active`
+- integer parsing for `sort_order`
+- optional `from_date` and `to_date` format: `YYYY-MM-DD`
+- optional integer parsing for `prabodhan_count`
+- `desired_status` values: `draft` or `published`
+- maximum length rules for `legacy_code`, `name_en`, and `name_hi-IN`
+- unresolved `category_code` references against the Category source
+- malformed rows and blank rows
+
 ## Glossary Artifact Generation
 
 Glossary generation reads the configured CSV source, runs the same validation as
@@ -268,10 +372,31 @@ Generated artifacts must not include Strapi internal `id` or `documentId`
 values. Strapi is responsible for generating those identifiers during API-based
 ingestion.
 
+## Category And Subject Artifact Generation
+
+Category generation reads `category/categories.csv`, runs Category validation,
+validates the generated artifact against
+`config/category_artifact.schema.json`, and writes:
+
+```text
+artifacts/category/categories.json
+```
+
+Subject generation reads `subject/subjects.csv`, runs Subject validation,
+validates `category_code` references against the Category source, validates the
+generated artifact against `config/subject_artifact.schema.json`, and writes:
+
+```text
+artifacts/subject/subjects.json
+```
+
+Both workflows include source identity and intended future Strapi target
+metadata. Subject artifacts keep `category_code` as a stable relationship key
+and do not include Strapi relation IDs.
+
 ## Planned Workflow
 
-Future steps will add CSV-to-JSON artifact generation for category and subject
-seed data, Strapi Collection Types for glossary data, and Strapi REST API
+Future steps will add Strapi Collection Types for seed data and Strapi REST API
 ingestion. The seed-data tool validates downloaded CSV files before generating
 artifacts, even when spreadsheet validation and conditional formatting are also
 configured for human data entry.

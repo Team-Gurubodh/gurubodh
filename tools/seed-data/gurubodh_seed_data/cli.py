@@ -1,10 +1,18 @@
 import argparse
 import sys
 
+from gurubodh_seed_data.category import get_category_source, list_category_sources
+from gurubodh_seed_data.category_artifacts import write_category_artifact
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
 from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
-from gurubodh_seed_data.paths import glossary_paths
-from gurubodh_seed_data.validation import validate_glossary_csv
+from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
+from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
+from gurubodh_seed_data.subject_artifacts import write_subject_artifact
+from gurubodh_seed_data.validation import (
+    validate_category_csv,
+    validate_glossary_csv,
+    validate_subject_csv,
+)
 from gurubodh_seed_data.workflows import list_workflows
 
 
@@ -32,6 +40,22 @@ def _print_glossary_sources():
     _print_table(("Key", "Name"), rows)
 
 
+def _print_category_sources():
+    rows = [
+        (source.key, source.label)
+        for source in list_category_sources()
+    ]
+    _print_table(("Key", "Name"), rows)
+
+
+def _print_subject_sources():
+    rows = [
+        (source.key, source.label)
+        for source in list_subject_sources()
+    ]
+    _print_table(("Key", "Name"), rows)
+
+
 def _print_glossary_paths(source_key=None):
     sources = (
         (get_glossary_source(source_key),)
@@ -41,6 +65,32 @@ def _print_glossary_paths(source_key=None):
     rows = []
     for source in sources:
         paths = glossary_paths(source)
+        rows.append((paths.source_key, paths.csv_input, paths.json_output))
+    _print_table(("Source", "CSV Input", "JSON Output"), rows)
+
+
+def _print_category_paths(source_key=None):
+    sources = (
+        (get_category_source(source_key),)
+        if source_key
+        else list_category_sources()
+    )
+    rows = []
+    for source in sources:
+        paths = category_paths(source)
+        rows.append((paths.source_key, paths.csv_input, paths.json_output))
+    _print_table(("Source", "CSV Input", "JSON Output"), rows)
+
+
+def _print_subject_paths(source_key=None):
+    sources = (
+        (get_subject_source(source_key),)
+        if source_key
+        else list_subject_sources()
+    )
+    rows = []
+    for source in sources:
+        paths = subject_paths(source)
         rows.append((paths.source_key, paths.csv_input, paths.json_output))
     _print_table(("Source", "CSV Input", "JSON Output"), rows)
 
@@ -70,6 +120,39 @@ def _validate_glossary_source(source_key):
     source = get_glossary_source(source_key)
     result = validate_glossary_csv(source)
 
+    print(f"Source: {result.source_key}")
+    print(f"CSV Input: {result.csv_path}")
+    print(f"Rows Checked: {result.data_row_count}")
+    print(f"Errors: {len(result.errors)}")
+    print(f"Warnings: {len(result.warnings)}")
+
+    _print_validation_issues("Errors", result.errors)
+    _print_validation_issues("Warnings", result.warnings)
+
+    if result.is_valid:
+        print()
+        print("Validation passed.")
+        return 0
+
+    print()
+    print("Validation failed.")
+    return 1
+
+
+def _validate_category_source(source_key):
+    source = get_category_source(source_key)
+    result = validate_category_csv(source)
+    return _print_csv_validation_result(result)
+
+
+def _validate_subject_source(source_key):
+    source = get_subject_source(source_key)
+    category_source = get_category_source("categories")
+    result = validate_subject_csv(source, category_source)
+    return _print_csv_validation_result(result)
+
+
+def _print_csv_validation_result(result):
     print(f"Source: {result.source_key}")
     print(f"CSV Input: {result.csv_path}")
     print(f"Rows Checked: {result.data_row_count}")
@@ -123,6 +206,125 @@ def _generate_glossary_artifact(source_key):
     print()
     print("Generation failed.")
     return 1
+
+
+def _generate_category_artifact(source_key):
+    source = get_category_source(source_key)
+    result = write_category_artifact(source)
+    return _print_generation_result(result)
+
+
+def _generate_subject_artifact(source_key):
+    source = get_subject_source(source_key)
+    result = write_subject_artifact(source)
+    return _print_generation_result(result)
+
+
+def _print_generation_result(result):
+    print(f"Source: {result.source_key}")
+    print(f"CSV Input: {result.csv_path}")
+    print(f"JSON Output: {result.json_path}")
+    print(f"Rows Checked: {result.csv_validation_result.data_row_count}")
+    print(f"Records Written: {result.record_count}")
+    print(f"CSV Errors: {len(result.csv_validation_result.errors)}")
+    print(f"Artifact Errors: {len(result.artifact_validation_result.errors)}")
+
+    _print_validation_issues("CSV Errors", result.csv_validation_result.errors)
+
+    if result.artifact_validation_result.errors:
+        print()
+        print("Artifact Errors")
+        rows = [
+            ("Artifact", error)
+            for error in result.artifact_validation_result.errors
+        ]
+        _print_table(("Location", "Message"), rows)
+
+    if (
+        result.csv_validation_result.is_valid
+        and result.artifact_validation_result.is_valid
+    ):
+        print()
+        print("Generation passed.")
+        return 0
+
+    print()
+    print("Generation failed.")
+    return 1
+
+
+def _add_reference_workflow_parser(subparsers, workflow, source_example):
+    workflow_parser = subparsers.add_parser(
+        workflow,
+        help=f"Work with {workflow} seed data.",
+        description=f"Commands for {workflow} seed-data sources and artifacts.",
+    )
+    workflow_subparsers = workflow_parser.add_subparsers(
+        dest=f"{workflow}_command",
+        required=True,
+    )
+
+    sources_parser = workflow_subparsers.add_parser(
+        "sources",
+        help=f"List supported {workflow} sources.",
+        description=f"List {workflow} sources accepted by the seed-data workflow.",
+    )
+    if workflow == "category":
+        sources_parser.set_defaults(handler=lambda _args: _print_category_sources())
+    else:
+        sources_parser.set_defaults(handler=lambda _args: _print_subject_sources())
+
+    paths_parser = workflow_subparsers.add_parser(
+        "paths",
+        help=f"List expected {workflow} input and output paths.",
+        description=f"List canonical CSV input and JSON artifact paths for {workflow} sources.",
+    )
+    paths_parser.add_argument(
+        "--source",
+        help=f"Optional {workflow} source key to show. Example: {source_example}.",
+    )
+    if workflow == "category":
+        paths_parser.set_defaults(handler=lambda args: _print_category_paths(args.source))
+    else:
+        paths_parser.set_defaults(handler=lambda args: _print_subject_paths(args.source))
+
+    validate_parser = workflow_subparsers.add_parser(
+        "validate",
+        help=f"Validate a {workflow} CSV source file.",
+        description=f"Validate required headers, values, stable keys, duplicates, and malformed rows for {workflow} seed data.",
+    )
+    validate_parser.add_argument(
+        "--source",
+        required=True,
+        help=f"{workflow.title()} source key to validate. Example: {source_example}.",
+    )
+    if workflow == "category":
+        validate_parser.set_defaults(
+            handler=lambda args: _validate_category_source(args.source)
+        )
+    else:
+        validate_parser.set_defaults(
+            handler=lambda args: _validate_subject_source(args.source)
+        )
+
+    generate_parser = workflow_subparsers.add_parser(
+        "generate",
+        help=f"Generate a {workflow} JSON artifact.",
+        description=f"Validate a {workflow} CSV source and generate its JSON artifact.",
+    )
+    generate_parser.add_argument(
+        "--source",
+        required=True,
+        help=f"{workflow.title()} source key to generate. Example: {source_example}.",
+    )
+    if workflow == "category":
+        generate_parser.set_defaults(
+            handler=lambda args: _generate_category_artifact(args.source)
+        )
+    else:
+        generate_parser.set_defaults(
+            handler=lambda args: _generate_subject_artifact(args.source)
+        )
 
 
 def build_parser():
@@ -194,6 +396,9 @@ def build_parser():
     generate_parser.set_defaults(
         handler=lambda args: _generate_glossary_artifact(args.source)
     )
+
+    _add_reference_workflow_parser(subparsers, "category", "categories")
+    _add_reference_workflow_parser(subparsers, "subject", "subjects")
 
     return parser
 

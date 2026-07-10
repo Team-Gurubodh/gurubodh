@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/subject_artifact.schema.json",
+  "title": "Gurubodh Subject Seed-Data Artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "workflow",
+    "source",
+    "strapi",
+    "records"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "workflow": {
+      "const": "subject"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "strapi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collection_type",
+        "display_name"
+      ],
+      "properties": {
+        "collection_type": {
+          "const": "subject"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject_code",
+          "legacy_code",
+          "is_active",
+          "sort_order",
+          "category_code",
+          "desired_status",
+          "name_en",
+          "description_en",
+          "name_hi_IN",
+          "description_hi_IN",
+          "from_date",
+          "to_date",
+          "prabodhan_count"
+        ],
+        "properties": {
+          "subject_code": {
+            "type": "string",
+            "pattern": "^SUB[0-9]{3}$"
+          },
+          "legacy_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "category_code": {
+            "type": "string",
+            "pattern": "^CAT[0-9]{3}$"
+          },
+          "desired_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          },
+          "name_en": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description_en": {
+            "type": "string"
+          },
+          "name_hi_IN": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "description_hi_IN": {
+            "type": "string"
+          },
+          "from_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "to_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "prabodhan_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

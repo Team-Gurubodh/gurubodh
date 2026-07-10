@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "workflow": "category",
+  "source": {
+    "key": "categories",
+    "label": "Categories"
+  },
+  "strapi": {
+    "collection_type": "category",
+    "display_name": "Categories"
+  },
+  "records": [
+    {
+      "category_code": "CAT001",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 1,
+      "desired_status": "published",
+      "name_en": "Tattvagyan",
+      "description_en": "Tattvagyan",
+      "name_hi_IN": "तत्त्वज्ञान",
+      "description_hi_IN": "तत्त्वज्ञान"
+    },
+    {
+      "category_code": "CAT002",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 2,
+      "desired_status": "published",
+      "name_en": "Gurutattva",
+      "description_en": "Gurutattva",
+      "name_hi_IN": "गुरुतत्त्व",
+      "description_hi_IN": "गुरुतत्त्व"
+    },
+    {
+      "category_code": "CAT003",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 3,
+      "desired_status": "published",
+      "name_en": "Charitra",
+      "description_en": "Charitra",
+      "name_hi_IN": "चरित्र",
+      "description_hi_IN": "चरित्र"
+    },
+    {
+      "category_code": "CAT004",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 4,
+      "desired_status": "published",
+      "name_en": "Aacharan",
+      "description_en": "Aacharan",
+      "name_hi_IN": "आचरण",
+      "description_hi_IN": "आचरण"
+    },
+    {
+      "category_code": "CAT005",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 5,
+      "desired_status": "published",
+      "name_en": "Manav Snskriti",
+      "description_en": "Manav Snskriti",
+      "name_hi_IN": "मानव संस्कृति",
+      "description_hi_IN": "मानव संस्कृति"
+    },
+    {
+      "category_code": "CAT006",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 6,
+      "desired_status": "published",
+      "name_en": "Bhakti",
+      "description_en": "Bhakti",
+      "name_hi_IN": "भक्ति",
+      "description_hi_IN": "भक्ति"
+    },
+    {
+      "category_code": "CAT007",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 7,
+      "desired_status": "published",
+      "name_en": "Darshan Shastra",
+      "description_en": "Darshan Shastra",
+      "name_hi_IN": "दर्शन शास्त्र",
+      "description_hi_IN": "दर्शन शास्त्र"
+    },
+    {
+      "category_code": "CAT008",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 8,
+      "desired_status": "published",
+      "name_en": "Samajabhimukh Vishay",
+      "description_en": "Samajabhimukh Vishay",
+      "name_hi_IN": "समाजाभिमुख विषय",
+      "description_hi_IN": "समाजाभिमुख विषय"
+    },
+    {
+      "category_code": "CAT009",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 9,
+      "desired_status": "published",
+      "name_en": "Shrutigyan",
+      "description_en": "Shrutigyan",
+      "name_hi_IN": "श्रुतिज्ञान",
+      "description_hi_IN": "श्रुतिज्ञान"
+    },
+    {
+      "category_code": "CAT010",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 10,
+      "desired_status": "published",
+      "name_en": "Upasana-Sadhan",
+      "description_en": "Upasana-Sadhan",
+      "name_hi_IN": "उपासना-साधना",
+      "description_hi_IN": "उपासना-साधना"
+    },
+    {
+      "category_code": "CAT011",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 11,
+      "desired_status": "published",
+      "name_en": "Yog",
+      "description_en": "Yog",
+      "name_hi_IN": "योग",
+      "description_hi_IN": "योग"
+    }
+  ]
+}

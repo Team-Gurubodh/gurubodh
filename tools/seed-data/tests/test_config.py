@@ -1,8 +1,12 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+from gurubodh_seed_data.category import get_category_source, list_category_sources
 from gurubodh_seed_data.config import load_seed_data_config
+from gurubodh_seed_data.paths import category_paths, subject_paths
+from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
 
 
 class SeedDataConfigTest(unittest.TestCase):
@@ -62,6 +66,35 @@ class SeedDataConfigTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "unsupported workflow"):
             load_seed_data_config(self.config_path)
+
+    def test_category_and_subject_source_lookup_and_paths(self):
+        self.write_config(
+            "{\n"
+            '  "schema_version": 1,\n'
+            '  "source_root": "/tmp/seed-data",\n'
+            '  "artifact_root": "artifacts",\n'
+            '  "workflows": [\n'
+            '    {"key": "category", "status": "scaffolded", "description": "Category"},\n'
+            '    {"key": "subject", "status": "scaffolded", "description": "Subject"}\n'
+            '  ],\n'
+            '  "sources": [\n'
+            '    {"key": "categories", "workflow": "category", "label": "Categories", "csv_path": "category/categories.csv", "artifact_path": "category/categories.json"},\n'
+            '    {"key": "subjects", "workflow": "subject", "label": "Subjects", "csv_path": "subject/subjects.csv", "artifact_path": "subject/subjects.json"}\n'
+            '  ]\n'
+            "}\n"
+        )
+
+        with patch("gurubodh_seed_data.config.DEFAULT_CONFIG_PATH", self.config_path):
+            self.assertEqual(("categories",), tuple(source.key for source in list_category_sources()))
+            self.assertEqual(("subjects",), tuple(source.key for source in list_subject_sources()))
+            category = get_category_source("categories")
+            subject = get_subject_source("subjects")
+
+            self.assertEqual(
+                Path("/tmp/seed-data/category/categories.csv"),
+                category_paths(category).csv_input,
+            )
+            self.assertTrue(str(subject_paths(subject).json_output).endswith("artifacts/subject/subjects.json"))
 
 
 if __name__ == "__main__":
