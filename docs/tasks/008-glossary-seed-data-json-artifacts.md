@@ -45,8 +45,8 @@ the actual Strapi CMS content-type schema files.
   `tools/seed-data/config/glossary_artifact.schema.json`.
 - Record the durable artifact and intended Strapi Collection Type contract in
   `docs/interfaces/seed-data-artifacts.md`.
-- Keep actual Strapi Collection Type schema creation in a separate follow-up
-  task so Task 011 can stay focused on ingestion logic.
+- Keep actual Strapi Collection Type schema creation in a separate future
+  glossary CMS task so Category and Subject ingestion can proceed separately.
 - Make generated glossary artifacts reviewable project data instead of ignored
   local-only outputs.
 
@@ -140,9 +140,9 @@ ignore patterns.
   local seed-data source files remain ignored.
 - Updated `docs/interfaces/seed-data-artifacts.md` with the durable glossary
   artifact contract and intended Strapi Collection Type contract.
-- Added Task 012 to create the actual Strapi glossary Collection Types later.
-- Updated Task 011 so ingestion assumes the required glossary Collection Types
-  already exist.
+- Recorded that actual Strapi glossary Collection Types should be created in a
+  later glossary CMS task.
+- Left glossary ingestion separate from Category and Subject ingestion planning.
 - Updated seed-data documentation and schema documentation.
 
 #### What Works
@@ -175,6 +175,6 @@ ignore patterns.
 ## Follow-Up
 
 - Category artifact generation follows in Task 009.
-- Strapi glossary Collection Type creation follows in Task 012.
-- Strapi ingestion follows later in Task 011, after the required Collection
-  Types exist.
+- Category and Subject Strapi ingestion planning follows in Task 011.
+- Strapi glossary Collection Type creation and glossary ingestion remain
+  deferred to a separate future task.

@@ -176,5 +176,5 @@ relative to:
 
 - Later Strapi schema compatibility and ingestion tasks should decide how to
   compare subject artifacts with the Strapi 5 subject Collection Type.
-- Strapi 5 ingestion follows only after category, subject, and glossary artifact
-  contracts are finalized and the relevant CMS content types are confirmed.
+- Category and Subject Strapi 5 ingestion planning follows in Task 011.
+- Glossary ingestion remains deferred to a separate future task.
