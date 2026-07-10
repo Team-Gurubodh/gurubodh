@@ -136,4 +136,5 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
 - Task 008 will implement glossary config-driven JSON artifact generation.
 - Task 009 will implement category CSV validation and JSON artifact generation.
 - Task 010 will implement subject CSV validation and JSON artifact generation.
-- Task 011 will implement Strapi 5 ingestion and compatibility checks.
+- Task 011 will plan staged Strapi 5 Category and Subject ingestion and
+  compatibility checks. Glossary ingestion remains deferred.

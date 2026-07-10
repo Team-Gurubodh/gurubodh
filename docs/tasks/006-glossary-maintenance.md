@@ -327,4 +327,5 @@ Successor records:
 - `docs/tasks/008-glossary-seed-data-json-artifacts.md`
 - `docs/tasks/009-category-seed-data-json-artifacts.md`
 - `docs/tasks/010-subject-seed-data-json-artifacts.md`
-- `docs/tasks/011-strapi-seed-data-ingestion.md`
+- `docs/tasks/011-strapi-seed-data-ingestion.md` for Category and Subject
+  Strapi ingestion planning. Glossary CMS ingestion remains deferred.
