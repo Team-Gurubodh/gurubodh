@@ -164,6 +164,134 @@ The later Strapi ingestion task should assume these Collection Types already
 exist. It should focus on dry-run reporting, idempotent create/update behavior,
 API authentication, payload construction, and conflict handling.
 
+## Category Artifact Contract
+
+Task 009 finalizes the category artifact contract for:
+
+```text
+artifacts/category/categories.json
+```
+
+The category artifact represents the configured Category CSV source and the
+future Strapi Category Collection Type target. The artifact is reviewable seed
+data prepared for a later ingestion tool; it is not a Strapi content-type
+schema.
+
+The category artifact shape uses this envelope:
+
+```json
+{
+  "schema_version": 1,
+  "workflow": "category",
+  "source": {
+    "key": "categories",
+    "label": "Categories"
+  },
+  "strapi": {
+    "collection_type": "category",
+    "display_name": "Categories"
+  },
+  "records": [
+    {
+      "category_code": "CAT001",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 1,
+      "desired_status": "published",
+      "name_en": "Tattvagyan",
+      "description_en": "Tattvagyan",
+      "name_hi_IN": "तत्त्वज्ञान",
+      "description_hi_IN": "तत्त्वज्ञान"
+    }
+  ]
+}
+```
+
+The required common record fields are:
+
+- `category_code` - stable category business key.
+- `legacy_code` - optional legacy reference code, represented as `null` when
+  blank in CSV.
+- `is_active` - parsed boolean activity flag.
+- `sort_order` - parsed integer ordering value.
+- `desired_status` - intended publish lifecycle value, currently `draft` or
+  `published`.
+- `name_en` and `description_en` - English display text.
+- `name_hi_IN` and `description_hi_IN` - Hindi display text from CSV columns
+  named `name_hi-IN` and `description_hi-IN`.
+
+The generated artifact must not include Strapi internal identifiers such as
+`id`, `documentId`, internal timestamps, or created/updated user fields.
+
+## Subject Artifact Contract
+
+Task 010 finalizes the subject artifact contract for:
+
+```text
+artifacts/subject/subjects.json
+```
+
+The subject artifact represents the configured Subject CSV source and the
+future Strapi Subject Collection Type target. Subject records reference
+categories by stable `category_code`; the artifact must not include Strapi
+relation IDs.
+
+The subject artifact shape uses this envelope:
+
+```json
+{
+  "schema_version": 1,
+  "workflow": "subject",
+  "source": {
+    "key": "subjects",
+    "label": "Subjects"
+  },
+  "strapi": {
+    "collection_type": "subject",
+    "display_name": "Subjects"
+  },
+  "records": [
+    {
+      "subject_code": "SUB001",
+      "legacy_code": null,
+      "is_active": true,
+      "sort_order": 1,
+      "category_code": "CAT008",
+      "desired_status": "published",
+      "name_en": "Swasthya Rahasya",
+      "description_en": "Swasthya Rahasya",
+      "name_hi_IN": "स्वास्थ्य रहस्य",
+      "description_hi_IN": "स्वास्थ्य रहस्य",
+      "from_date": "2005-11-04",
+      "to_date": "2006-01-22",
+      "prabodhan_count": 24
+    }
+  ]
+}
+```
+
+The required common record fields are:
+
+- `subject_code` - stable subject business key.
+- `legacy_code` - optional legacy reference code, represented as `null` when
+  blank in CSV.
+- `is_active` - parsed boolean activity flag.
+- `sort_order` - parsed integer ordering value.
+- `category_code` - stable category business key used for the relationship.
+- `desired_status` - intended publish lifecycle value, currently `draft` or
+  `published`.
+- `name_en` and `description_en` - English display text.
+- `name_hi_IN` and `description_hi_IN` - Hindi display text from CSV columns
+  named `name_hi-IN` and `description_hi-IN`.
+- `from_date` and `to_date` - optional `YYYY-MM-DD` source timeline values,
+  represented as `null` when blank in CSV.
+- `prabodhan_count` - optional parsed integer count, represented as `null` when
+  blank in CSV.
+
+The generated artifact must not include Strapi internal identifiers such as
+`id`, `documentId`, internal timestamps, relation IDs, or created/updated user
+fields.
+
 ## Artifact Schema Location
 
 Formal JSON Schemas for seed-data artifacts belong under:
@@ -175,7 +303,9 @@ tools/seed-data/config/
 The glossary artifact schema should be introduced as:
 
 ```text
+tools/seed-data/config/category_artifact.schema.json
 tools/seed-data/config/glossary_artifact.schema.json
+tools/seed-data/config/subject_artifact.schema.json
 ```
 
 That schema validates generated seed-data artifact files before ingestion. It is
@@ -223,10 +353,8 @@ Strapi remains responsible for generating native `id` and Strapi 5
 
 ## Open Decisions
 
-- Final Strapi content-type field names for category and subject records.
 - Future collection-specific glossary fields beyond the initial shared
   `term_code`, `term`, and `definition` fields.
-- Exact generated JSON shape for category and subject seed-data artifacts.
 - Whether generated category, subject, and glossary artifacts should all be
   committed as reviewable project data or selectively regenerated as local
   outputs.

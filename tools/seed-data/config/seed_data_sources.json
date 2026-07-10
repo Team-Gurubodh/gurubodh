@@ -11,13 +11,13 @@
     },
     {
       "key": "category",
-      "status": "planned",
-      "description": "Category seed data workflow to be added incrementally."
+      "status": "scaffolded",
+      "description": "Category seed data maintained through external spreadsheets."
     },
     {
       "key": "subject",
-      "status": "planned",
-      "description": "Subject seed data workflow to be added incrementally."
+      "status": "scaffolded",
+      "description": "Subject seed data maintained through external spreadsheets."
     }
   ],
   "sources": [
