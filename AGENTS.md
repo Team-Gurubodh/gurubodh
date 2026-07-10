@@ -31,6 +31,38 @@ ML research workspace.
 - Preserve secrets: do not copy values from `.env` files into tracked documentation.
 </working_rules>
 
+<github_workflow>
+GitHub Issue-first workflow is mandatory for any task that modifies tracked files or repository state.
+
+Before making any change to tracked files:
+
+1. Determine whether the requested work is associated with an existing GitHub Issue.
+2. If no issue exists:
+   - Do not modify the repository.
+   - Stop and ask the user whether a new GitHub Issue should be created.
+3. Read the complete issue description (and discussion, if available) before planning or implementing changes.
+4. Treat the GitHub Issue as the authoritative definition of scope.
+   - Do not implement requirements outside the issue unless explicitly instructed by the user.
+5. Create and work from a dedicated branch.
+   - Never work directly on `main`, `master`, or any protected branch.
+   - Prefer the repository's branch naming convention. If none exists, use:
+     `issue-<issue-number>-<short-description>`.
+6. Reference the GitHub Issue in:
+   - commit messages
+   - pull request title
+   - pull request description
+7. Before considering the task complete:
+   - run all relevant verification steps documented by the repository;
+   - report any skipped verification together with the reason;
+   - summarize the changes made;
+   - prepare a pull request description linked to the GitHub Issue.
+8. Never merge, squash, rebase, or otherwise integrate changes into the target branch unless the user explicitly instructs you to do so.
+9. If the user's request conflicts with this workflow, pause implementation and ask for clarification before modifying the repository.
+
+This workflow is mandatory unless the user explicitly instructs otherwise.
+</github_workflow>
+
+
 <verification>
 - For CMS changes, prefer the commands documented in `README.md` and `apps/gurubodh-cms/README.md`.
 - For content preparation changes, prefer the commands documented in `tools/content-preparation/README.md`.
