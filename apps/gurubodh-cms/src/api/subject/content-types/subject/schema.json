@@ -4,7 +4,7 @@
   "info": {
     "singularName": "subject",
     "pluralName": "subjects",
-    "displayName": "subject"
+    "displayName": "Subject"
   },
   "options": {
     "draftAndPublish": true

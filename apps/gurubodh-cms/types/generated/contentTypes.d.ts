@@ -567,7 +567,7 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
 export interface ApiSubjectSubject extends Struct.CollectionTypeSchema {
   collectionName: 'subjects';
   info: {
-    displayName: 'subject';
+    displayName: 'Subject';
     pluralName: 'subjects';
     singularName: 'subject';
   };
