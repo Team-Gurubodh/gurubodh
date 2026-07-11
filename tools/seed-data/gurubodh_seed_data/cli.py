@@ -3,11 +3,18 @@ import sys
 
 from gurubodh_seed_data.category import get_category_source, list_category_sources
 from gurubodh_seed_data.category_artifacts import write_category_artifact
+from gurubodh_seed_data.category_ingestion import (
+    apply_category_ingestion,
+    plan_category_ingestion,
+)
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
 from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
 from gurubodh_seed_data.ingestion_artifacts import load_ingestion_artifacts
 from gurubodh_seed_data.ingestion_mode import IngestionMode
-from gurubodh_seed_data.ingestion_report import build_stage2_report, render_report
+from gurubodh_seed_data.ingestion_report import (
+    build_stage3_category_report,
+    render_report,
+)
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
 from gurubodh_seed_data.strapi_client import StrapiClient
 from gurubodh_seed_data.strapi_config import load_strapi_config
@@ -144,15 +151,42 @@ def _run_ingestion_plan(args):
         return 1
 
     config = _load_strapi_config_from_args(args)
-    preflight_result = run_preflight(StrapiClient(config), config)
+    client = StrapiClient(config)
+    preflight_result = run_preflight(client, config)
     _print_preflight_result(preflight_result)
     if not preflight_result.is_valid:
         return 1
 
-    report = build_stage2_report(mode, artifact_result, preflight_result)
+    category_artifact = _find_loaded_artifact(artifact_result, "category")
+    category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
+    report = build_stage3_category_report(mode, artifact_result, category_plan)
+    if category_plan.conflicts:
+        print()
+        print(render_report(report))
+        return 1
+
+    applied = False
+    if mode.can_write:
+        apply_category_ingestion(client, config, mode, category_plan)
+        applied = True
+        category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
+        report = build_stage3_category_report(
+            mode,
+            artifact_result,
+            category_plan,
+            applied=applied,
+        )
+
     print()
     print(render_report(report))
     return 0
+
+
+def _find_loaded_artifact(artifact_result, workflow):
+    for artifact in artifact_result.artifacts:
+        if artifact.workflow == workflow:
+            return artifact
+    raise ValueError(f"{workflow} artifact was not loaded.")
 
 
 def _print_validation_issues(title, issues):
@@ -409,8 +443,8 @@ def _add_strapi_options(parser):
 def _add_ingestion_parser(subparsers):
     ingest_parser = subparsers.add_parser(
         "ingest",
-        help="Inspect seed-data artifacts and Strapi ingestion readiness.",
-        description="Stage 2 ingestion foundation commands for Category and Subject seed data.",
+        help="Inspect and apply seed-data ingestion plans.",
+        description="Ingestion commands for Category and Subject seed data.",
     )
     ingest_subparsers = ingest_parser.add_subparsers(
         dest="ingest_command",
@@ -427,8 +461,8 @@ def _add_ingestion_parser(subparsers):
 
     plan_parser = ingest_subparsers.add_parser(
         "plan",
-        help="Load Category and Subject artifacts and print a Stage 2 dry-run report.",
-        description="Run artifact loading and read-only preflight before later adapter planning.",
+        help="Load artifacts and print or apply the Category ingestion plan.",
+        description="Run artifact loading, preflight, and Stage 3 Category ingestion planning.",
     )
     _add_strapi_options(plan_parser)
     plan_mode = plan_parser.add_mutually_exclusive_group()
@@ -442,7 +476,7 @@ def _add_ingestion_parser(subparsers):
     plan_mode.add_argument(
         "--apply",
         action="store_true",
-        help="Explicitly request apply mode. Stage 2 still performs no writes.",
+        help="Explicitly apply Category writes after a conflict-free plan.",
     )
     plan_parser.set_defaults(handler=_run_ingestion_plan)
 
