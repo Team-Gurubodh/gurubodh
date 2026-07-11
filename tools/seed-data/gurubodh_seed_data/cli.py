@@ -5,7 +5,13 @@ from gurubodh_seed_data.category import get_category_source, list_category_sourc
 from gurubodh_seed_data.category_artifacts import write_category_artifact
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
 from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
+from gurubodh_seed_data.ingestion_artifacts import load_ingestion_artifacts
+from gurubodh_seed_data.ingestion_mode import IngestionMode
+from gurubodh_seed_data.ingestion_report import build_stage2_report, render_report
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
+from gurubodh_seed_data.strapi_client import StrapiClient
+from gurubodh_seed_data.strapi_config import load_strapi_config
+from gurubodh_seed_data.strapi_preflight import run_preflight
 from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
 from gurubodh_seed_data.subject_artifacts import write_subject_artifact
 from gurubodh_seed_data.validation import (
@@ -101,6 +107,52 @@ def _print_workflows():
         for workflow in list_workflows()
     ]
     _print_table(("Key", "Status", "Description"), rows)
+
+
+def _load_strapi_config_from_args(args):
+    return load_strapi_config(
+        base_url=args.strapi_url,
+        api_token=args.strapi_token,
+        default_locale=args.default_locale,
+        localized_locale=args.localized_locale,
+        timeout_seconds=args.timeout_seconds,
+    )
+
+
+def _print_preflight_result(result):
+    rows = [
+        (check.name, "pass" if check.passed else "fail", check.message)
+        for check in result.checks
+    ]
+    _print_table(("Check", "Result", "Message"), rows)
+
+
+def _run_ingestion_preflight(args):
+    config = _load_strapi_config_from_args(args)
+    result = run_preflight(StrapiClient(config), config)
+    _print_preflight_result(result)
+    return 0 if result.is_valid else 1
+
+
+def _run_ingestion_plan(args):
+    mode = IngestionMode(apply=args.apply)
+    artifact_result = load_ingestion_artifacts()
+
+    if artifact_result.errors:
+        for error in artifact_result.errors:
+            print(f"Artifact error: {error}")
+        return 1
+
+    config = _load_strapi_config_from_args(args)
+    preflight_result = run_preflight(StrapiClient(config), config)
+    _print_preflight_result(preflight_result)
+    if not preflight_result.is_valid:
+        return 1
+
+    report = build_stage2_report(mode, artifact_result, preflight_result)
+    print()
+    print(render_report(report))
+    return 0
 
 
 def _print_validation_issues(title, issues):
@@ -327,6 +379,74 @@ def _add_reference_workflow_parser(subparsers, workflow, source_example):
         )
 
 
+def _add_strapi_options(parser):
+    parser.add_argument(
+        "--strapi-url",
+        help="Strapi base URL. Defaults to GURUBODH_STRAPI_URL.",
+    )
+    parser.add_argument(
+        "--strapi-token",
+        help="Strapi API token. Defaults to GURUBODH_STRAPI_API_TOKEN.",
+    )
+    parser.add_argument(
+        "--default-locale",
+        default="en",
+        help="Expected Strapi default locale for English fields. Default: en.",
+    )
+    parser.add_argument(
+        "--localized-locale",
+        default="hi-IN",
+        help="Expected Hindi localization locale. Default: hi-IN.",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=10.0,
+        help="Strapi request timeout in seconds. Default: 10.",
+    )
+
+
+def _add_ingestion_parser(subparsers):
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Inspect seed-data artifacts and Strapi ingestion readiness.",
+        description="Stage 2 ingestion foundation commands for Category and Subject seed data.",
+    )
+    ingest_subparsers = ingest_parser.add_subparsers(
+        dest="ingest_command",
+        required=True,
+    )
+
+    preflight_parser = ingest_subparsers.add_parser(
+        "preflight",
+        help="Run read-only Strapi ingestion readiness checks.",
+        description="Check Strapi reachability, API access, locales, and Draft & Publish support.",
+    )
+    _add_strapi_options(preflight_parser)
+    preflight_parser.set_defaults(handler=_run_ingestion_preflight)
+
+    plan_parser = ingest_subparsers.add_parser(
+        "plan",
+        help="Load Category and Subject artifacts and print a Stage 2 dry-run report.",
+        description="Run artifact loading and read-only preflight before later adapter planning.",
+    )
+    _add_strapi_options(plan_parser)
+    plan_mode = plan_parser.add_mutually_exclusive_group()
+    plan_mode.add_argument(
+        "--dry-run",
+        action="store_false",
+        dest="apply",
+        default=False,
+        help="Inspect only; this is the default.",
+    )
+    plan_mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="Explicitly request apply mode. Stage 2 still performs no writes.",
+    )
+    plan_parser.set_defaults(handler=_run_ingestion_plan)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="gurubodh-seed-data",
@@ -399,6 +519,7 @@ def build_parser():
 
     _add_reference_workflow_parser(subparsers, "category", "categories")
     _add_reference_workflow_parser(subparsers, "subject", "subjects")
+    _add_ingestion_parser(subparsers)
 
     return parser
 

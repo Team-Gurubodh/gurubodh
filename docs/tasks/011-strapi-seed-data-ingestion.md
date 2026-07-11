@@ -370,6 +370,23 @@ Expected output:
   - Booted Strapi successfully against the throwaway local PostgreSQL database
     `gurubodh_db_copy`; confirmed the `subjects` table has `from_date`,
     `to_date`, and `prabodhan_count` columns.
+- 2026-07-11: Stage 2 implementation started under GitHub issue
+  [#53](https://github.com/Team-Gurubodh/gurubodh/issues/53).
+  - Added a seed-data `ingest` command group with read-only `preflight` and
+    dry-run-default `plan` commands.
+  - Added artifact loading for reviewed Category and Subject JSON artifacts.
+  - Added Strapi API configuration from CLI options or environment variables:
+    `GURUBODH_STRAPI_URL` and `GURUBODH_STRAPI_API_TOKEN`.
+  - Added a Strapi REST client foundation for authenticated collection reads,
+    create/update wrappers, locale-aware writes, and publish-by-status wrapper.
+  - Added read-only preflight checks for Category and Subject endpoint access,
+    expected locales, and Draft & Publish status queries.
+  - Added Stage 2 report output with create/update/matching/conflict/blocked/
+    skipped/publish sections while intentionally blocking adapter writes until
+    later stages.
+  - Added unit tests for artifact loading, config validation, dry-run write
+    blocking, explicit apply mode, mocked Strapi client behavior, and preflight
+    locale failures.
 
 ## Follow-Up
 
