@@ -12,7 +12,7 @@ from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
 from gurubodh_seed_data.ingestion_artifacts import load_ingestion_artifacts
 from gurubodh_seed_data.ingestion_mode import IngestionMode
 from gurubodh_seed_data.ingestion_report import (
-    build_stage3_category_report,
+    build_stage4_ingestion_report,
     render_report,
 )
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
@@ -21,6 +21,10 @@ from gurubodh_seed_data.strapi_config import load_strapi_config
 from gurubodh_seed_data.strapi_preflight import run_preflight
 from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
 from gurubodh_seed_data.subject_artifacts import write_subject_artifact
+from gurubodh_seed_data.subject_ingestion import (
+    apply_subject_ingestion,
+    plan_subject_ingestion,
+)
 from gurubodh_seed_data.validation import (
     validate_category_csv,
     validate_glossary_csv,
@@ -158,9 +162,27 @@ def _run_ingestion_plan(args):
         return 1
 
     category_artifact = _find_loaded_artifact(artifact_result, "category")
+    subject_artifact = _find_loaded_artifact(artifact_result, "subject")
     category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
-    report = build_stage3_category_report(mode, artifact_result, category_plan)
+    subject_plan = plan_subject_ingestion(client, config, subject_artifact.artifact)
+    report = build_stage4_ingestion_report(
+        mode,
+        artifact_result,
+        category_plan,
+        subject_plan,
+    )
     if category_plan.conflicts:
+        print()
+        print(render_report(report))
+        return 1
+    category_writes_can_resolve_subject_blocks = (
+        mode.can_write
+        and subject_plan.blocked_records
+        and (category_plan.to_create or category_plan.to_update)
+    )
+    if subject_plan.conflicts or (
+        subject_plan.blocked_records and not category_writes_can_resolve_subject_blocks
+    ):
         print()
         print(render_report(report))
         return 1
@@ -168,12 +190,27 @@ def _run_ingestion_plan(args):
     applied = False
     if mode.can_write:
         apply_category_ingestion(client, config, mode, category_plan)
+        category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
+        subject_plan = plan_subject_ingestion(client, config, subject_artifact.artifact)
+        if category_plan.conflicts or subject_plan.conflicts or subject_plan.blocked_records:
+            report = build_stage4_ingestion_report(
+                mode,
+                artifact_result,
+                category_plan,
+                subject_plan,
+            )
+            print()
+            print(render_report(report))
+            return 1
+        apply_subject_ingestion(client, config, mode, subject_plan)
         applied = True
         category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
-        report = build_stage3_category_report(
+        subject_plan = plan_subject_ingestion(client, config, subject_artifact.artifact)
+        report = build_stage4_ingestion_report(
             mode,
             artifact_result,
             category_plan,
+            subject_plan,
             applied=applied,
         )
 
@@ -461,8 +498,8 @@ def _add_ingestion_parser(subparsers):
 
     plan_parser = ingest_subparsers.add_parser(
         "plan",
-        help="Load artifacts and print or apply the Category ingestion plan.",
-        description="Run artifact loading, preflight, and Stage 3 Category ingestion planning.",
+        help="Load artifacts and print or apply the Category and Subject ingestion plan.",
+        description="Run artifact loading, preflight, and Stage 4 Category and Subject ingestion planning.",
     )
     _add_strapi_options(plan_parser)
     plan_mode = plan_parser.add_mutually_exclusive_group()
@@ -476,7 +513,7 @@ def _add_ingestion_parser(subparsers):
     plan_mode.add_argument(
         "--apply",
         action="store_true",
-        help="Explicitly apply Category writes after a conflict-free plan.",
+        help="Explicitly apply Category and Subject writes after a conflict-free plan.",
     )
     plan_parser.set_defaults(handler=_run_ingestion_plan)
 

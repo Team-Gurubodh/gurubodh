@@ -66,7 +66,15 @@ class FakeCategoryClient:
         self.update_calls = []
         self.publish_calls = []
 
-    def get_collection(self, plural_api_id, filters=None, locale=None, status=None, page_size=100):
+    def get_collection(
+        self,
+        plural_api_id,
+        filters=None,
+        locale=None,
+        status=None,
+        page_size=100,
+        page=None,
+    ):
         records = self.records_by_locale.get(locale, ())
         if filters:
             for field, value in filters.items():

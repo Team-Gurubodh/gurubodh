@@ -26,14 +26,27 @@ class StrapiClient:
         self.config = config
         self._opener = opener or urlopen
 
-    def get_collection(self, plural_api_id, filters=None, locale=None, status=None, page_size=100):
+    def get_collection(
+        self,
+        plural_api_id,
+        filters=None,
+        locale=None,
+        status=None,
+        page_size=100,
+        page=None,
+        populate=None,
+    ):
         params = {
             "pagination[pageSize]": page_size,
         }
+        if page:
+            params["pagination[page]"] = page
         if locale:
             params["locale"] = locale
         if status:
             params["status"] = status
+        if populate:
+            params["populate"] = populate
         for field, value in (filters or {}).items():
             params[f"filters[{field}][$eq]"] = value
         return self.request("GET", f"/api/{plural_api_id}", params=params).body

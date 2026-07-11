@@ -160,23 +160,23 @@ gurubodh-seed-data ingest preflight
 ```
 
 Load reviewed Category and Subject artifacts, run preflight, and print the
-Category ingestion dry-run report:
+Category and Subject ingestion dry-run report:
 
 ```bash
 gurubodh-seed-data ingest plan
 ```
 
-`ingest plan` is dry-run by default. It plans Category creates, updates,
-matches, conflicts, and publish actions while keeping Subject ingestion blocked
-until Stage 4. To write Category records to an approved disposable or staging
-Strapi instance, pass the explicit apply flag:
+`ingest plan` is dry-run by default. It plans Category and Subject creates,
+updates, matches, conflicts, blocked records, relation resolution, and publish
+actions. To write Category and Subject records to an approved disposable or
+staging Strapi instance, pass the explicit apply flag:
 
 ```bash
 gurubodh-seed-data ingest plan --apply
 ```
 
-After a successful apply, rerun the default dry-run command. A clean Category
-apply should report no pending Category creates or updates.
+After a successful apply, rerun the default dry-run command. A clean apply
+should report no pending Category or Subject creates or updates.
 
 ## File Locations
 
