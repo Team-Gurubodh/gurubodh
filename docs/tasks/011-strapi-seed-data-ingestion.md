@@ -356,7 +356,20 @@ Expected output:
 
 ## Execution Results
 
-Pending.
+- 2026-07-11: Stage 1 implementation started under GitHub issue
+  [#51](https://github.com/Team-Gurubodh/gurubodh/issues/51).
+  - Added optional non-localized Subject fields:
+    - `from_date` as a Strapi `date`;
+    - `to_date` as a Strapi `date`;
+    - `prabodhan_count` as a Strapi `integer`.
+  - Confirmed Category and Subject `name` and `description` remain localized.
+  - Confirmed Category and Subject route/controller/service files exist for
+    REST ingestion.
+  - Ran Strapi schema JSON validation, Stage 1 schema assertions,
+    `git diff --check`, and `make cms-build`.
+  - Booted Strapi successfully against the throwaway local PostgreSQL database
+    `gurubodh_db_copy`; confirmed the `subjects` table has `from_date`,
+    `to_date`, and `prabodhan_count` columns.
 
 ## Follow-Up
 

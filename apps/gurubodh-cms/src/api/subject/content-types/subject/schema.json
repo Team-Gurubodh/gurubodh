@@ -81,6 +81,30 @@
       "relation": "manyToOne",
       "target": "api::category.category",
       "inversedBy": "subjects"
+    },
+    "from_date": {
+      "type": "date",
+      "pluginOptions": {
+        "i18n": {
+          "localized": false
+        }
+      }
+    },
+    "to_date": {
+      "type": "date",
+      "pluginOptions": {
+        "i18n": {
+          "localized": false
+        }
+      }
+    },
+    "prabodhan_count": {
+      "type": "integer",
+      "pluginOptions": {
+        "i18n": {
+          "localized": false
+        }
+      }
     }
   }
 }
