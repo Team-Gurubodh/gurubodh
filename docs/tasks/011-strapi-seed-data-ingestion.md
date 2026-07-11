@@ -425,6 +425,27 @@ Expected output:
   - Final Category/Subject dry-run after apply reported 135 matching records,
     0 creates, 0 updates, 0 conflicts, 0 blocked records, and 0 publish
     actions.
+- 2026-07-11: Stage 5 implementation started under GitHub issue
+  [#59](https://github.com/Team-Gurubodh/gurubodh/issues/59).
+  - Added maintainer-facing Strapi ingestion operations guidance to
+    `tools/seed-data/README.md`.
+  - Documented required environment variables, API token permissions, locale
+    expectations, clean local database recommendation, preflight checks,
+    dry-run/apply commands, report sections, end-to-end verification checklist,
+    recovery actions, and current operational limitations.
+  - Updated the seed-data README to reflect that Category and Subject ingestion
+    are both implemented, with the combined apply command running
+    Category-first and then Subject ingestion after replanning.
+  - Ran Category and Subject CSV validation, the seed-data unit test suite,
+    `git diff --check`, `make cms-build`, Strapi preflight, ingestion dry-run,
+    ingestion apply against the throwaway Strapi database, and final dry-run
+    idempotency verification.
+  - `make cms-build` completed successfully while Strapi logged an `EPERM`
+    warning when attempting to read
+    `/Users/rajeev/Library/Preferences/com.strapi/config.json`.
+  - Final Category/Subject dry-run after apply reported 135 matching records,
+    0 creates, 0 updates, 0 conflicts, 0 blocked records, and 0 publish
+    actions.
 
 ## Follow-Up
 

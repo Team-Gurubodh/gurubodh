@@ -176,7 +176,8 @@ gurubodh-seed-data ingest plan --apply
 ```
 
 After a successful apply, rerun the default dry-run command. A clean apply
-should report no pending Category or Subject creates or updates.
+should report no pending Category or Subject creates, updates, conflicts,
+blocked records, or publish actions.
 
 ## File Locations
 
@@ -430,7 +431,234 @@ for human data entry.
 Strapi ingestion remains a separate workflow. It should read generated artifacts
 after the relevant Strapi Collection Types already exist.
 
-Category ingestion uses the Strapi REST API, reconciles records by stable
-`code`, writes English fields to the default locale, writes Hindi fields to
-`hi-IN`, publishes all created or updated records, and ignores artifact
-`desired_status`. Subject ingestion is planned for the next stage.
+Category and Subject ingestion use the Strapi REST API and never write directly
+to the PostgreSQL database. Both adapters reconcile records by stable `code`,
+write English fields to the default locale, write Hindi fields to `hi-IN`,
+publish all created or updated records, and ignore artifact `desired_status`.
+Subject ingestion resolves the `category` relation from the artifact
+`category_code` to the target Category `documentId`.
+
+The current ingestion command plans and applies Category and Subject records
+together. In apply mode, it writes Categories first, replans both workflows, and
+then writes Subjects only if the Category plan is conflict-free and all Subject
+Category relations resolve. This preserves the Category-before-Subject
+dependency without exposing separate Category-only and Subject-only maintainer
+commands.
+
+### Strapi Requirements
+
+Run ingestion only against an approved local or staging Strapi instance. For
+local integration testing, prefer a clean throwaway PostgreSQL database so trial
+data, duplicate codes, or duplicate sort orders do not hide ingestion issues.
+
+The CMS must already provide these Collection Types and REST endpoints:
+
+- `category`
+- `subject`
+
+The expected locale setup is:
+
+- Strapi default locale: `en`
+- Hindi localization locale: `hi-IN`
+
+The default locale must be English because the ingestion adapters write
+`name_en` and `description_en` into the default locale entry. The `hi-IN`
+locale must exist before ingestion so Hindi localizations can be created or
+updated.
+
+Set these environment variables before running ingestion commands:
+
+```bash
+export GURUBODH_STRAPI_URL=http://localhost:1337
+export GURUBODH_STRAPI_API_TOKEN=<token>
+```
+
+The API token must be kept out of tracked files. It needs enough permissions to:
+
+- read `categories` and `subjects`;
+- create and update `categories` and `subjects`;
+- read `/api/i18n/locales`;
+- query draft and published Category and Subject records;
+- publish Category and Subject records through Strapi REST writes using
+  `status=published`.
+
+If a non-default local setup uses different locale codes, pass them explicitly:
+
+```bash
+gurubodh-seed-data ingest preflight \
+  --default-locale en \
+  --localized-locale hi-IN
+```
+
+Keep production ingestion out of this workflow until a separate production
+readiness decision has been accepted.
+
+### Preflight And Reports
+
+Run a read-only preflight before planning or applying writes:
+
+```bash
+gurubodh-seed-data ingest preflight
+```
+
+The preflight report includes these checks:
+
+- Category endpoint access;
+- Subject endpoint access;
+- default locale suitability for English fields;
+- `hi-IN` locale availability;
+- Draft & Publish status-query support for Categories;
+- Draft & Publish status-query support for Subjects.
+
+Run the dry-run planner:
+
+```bash
+gurubodh-seed-data ingest plan
+```
+
+The ingestion report includes:
+
+- artifact record counts for Category and Subject;
+- records to create;
+- records to update;
+- records already matching;
+- conflicts;
+- blocked records;
+- skipped fields;
+- publish actions;
+- explanatory messages.
+
+`desired_status` should appear under skipped fields. This is expected because
+the current ingestion workflow publishes all ingested Category and Subject
+records regardless of artifact `desired_status`.
+
+### End-To-End Checklist
+
+Use this checklist for local or staging verification:
+
+1. Activate the seed-data virtual environment:
+
+   ```bash
+   cd tools/seed-data
+   . .venv/bin/activate
+   ```
+
+2. Validate the Category source CSV:
+
+   ```bash
+   gurubodh-seed-data category validate --source categories
+   ```
+
+3. Validate the Subject source CSV:
+
+   ```bash
+   gurubodh-seed-data subject validate --source subjects
+   ```
+
+4. Regenerate artifacts only if the reviewed CSV sources changed:
+
+   ```bash
+   gurubodh-seed-data category generate --source categories
+   gurubodh-seed-data subject generate --source subjects
+   ```
+
+5. Build the CMS from the monorepo root:
+
+   ```bash
+   make cms-build
+   ```
+
+6. Start Strapi against the approved throwaway or staging database:
+
+   ```bash
+   make cms-dev
+   ```
+
+7. Export the Strapi URL and API token in the ingestion shell:
+
+   ```bash
+   export GURUBODH_STRAPI_URL=http://localhost:1337
+   export GURUBODH_STRAPI_API_TOKEN=<token>
+   ```
+
+8. Run read-only preflight:
+
+   ```bash
+   gurubodh-seed-data ingest preflight
+   ```
+
+9. Run the Category and Subject dry-run plan:
+
+   ```bash
+   gurubodh-seed-data ingest plan
+   ```
+
+10. Review the dry-run report. Continue only when conflicts and blocked records
+    are both zero.
+
+11. Apply Category and Subject ingestion:
+
+    ```bash
+    gurubodh-seed-data ingest plan --apply
+    ```
+
+12. Run the dry-run plan again:
+
+    ```bash
+    gurubodh-seed-data ingest plan
+    ```
+
+13. Confirm the final dry-run reports:
+
+    - `Records to create: 0`
+    - `Records to update: 0`
+    - `Conflicts: 0`
+    - `Blocked records: 0`
+    - `Publish actions: 0`
+
+14. Inspect Strapi Admin and spot-check that Category and Subject records are
+    published in English and have `hi-IN` localizations. For Subjects, confirm
+    Category relations and optional `from_date`, `to_date`, and
+    `prabodhan_count` values where present.
+
+### Recovery Guidance
+
+Dry-run conflicts should be fixed before apply. Correct the source CSV and
+regenerate artifacts when the artifact is wrong, or clean the local/staging
+Strapi trial data when the CMS contains duplicate codes or sort-order
+collisions.
+
+If Category apply fails, stop before trusting Subject ingestion. Rerun
+`gurubodh-seed-data ingest plan` and resolve Category conflicts or partial
+updates before trying apply again.
+
+If Subject apply fails, rerun the dry-run after confirming Category records
+exist and have stable `documentId` values. Subject records with missing or
+ambiguous Category targets remain blocked until the Category data is corrected.
+
+If a field mapping problem is found before apply, fix the adapter and rerun the
+dry-run. If a field mapping problem is found after apply, update records through
+the ingestion workflow by stable `code` after reviewing a fresh dry-run report.
+Do not repair mapped data with direct database edits.
+
+If local trial data is contaminated, clean local tables or recreate the
+throwaway database only after taking any needed backup. Do not use this cleanup
+guidance for production data.
+
+### Operational Limitations
+
+Current Category and Subject ingestion is intentionally additive and
+update-oriented. It does not delete Strapi records that are absent from the
+artifacts.
+
+The CLI exposes one combined Category and Subject ingestion plan. Maintainers
+cannot currently run a Category-only or Subject-only apply command without code
+changes, although the apply sequence is internally Category-first.
+
+The report is aggregated across Category and Subject records. It does not yet
+print per-record diffs for every planned change, so maintainers should inspect
+the source artifacts and Strapi Admin when a dry-run reports unexpected updates.
+
+The workflow has been verified for Strapi 5 REST localization writes using
+`PUT /api/<collection>/{documentId}?locale=hi-IN&status=published`. Recheck this
+behavior after Strapi upgrades or content-type localization changes.
