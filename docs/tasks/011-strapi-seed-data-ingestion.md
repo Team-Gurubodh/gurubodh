@@ -404,6 +404,27 @@ Expected output:
     dry-run idempotency verification.
   - Final Category dry-run after apply reported 11 matching Category records,
     0 creates, 0 updates, 0 conflicts, and 0 publish actions.
+- 2026-07-11: Stage 4 implementation started under GitHub issue
+  [#57](https://github.com/Team-Gurubodh/gurubodh/issues/57).
+  - Added Subject ingestion planning by stable `code`.
+  - Added explicit Subject field mapping for English default-locale payloads
+    and `hi-IN` localized payloads.
+  - Added Category relation resolution from Subject artifact `category_code` to
+    Category Strapi `documentId`.
+  - Added blocked Subject planning when referenced Category records are missing
+    or ambiguous.
+  - Added dry-run classification for Subject creates, updates, matching
+    records, conflicts, and blocked records.
+  - Added apply behavior for Subject default-locale writes, Hindi localization
+    writes, Category relation writes, and publish-on-write behavior.
+  - Added paginated Strapi collection reads so ingestion planning handles more
+    than Strapi's default 100 returned records.
+  - Ran the seed-data unit test suite, Subject dry-run, Subject apply against
+    the throwaway Strapi database, and final Category/Subject dry-run
+    idempotency verification.
+  - Final Category/Subject dry-run after apply reported 135 matching records,
+    0 creates, 0 updates, 0 conflicts, 0 blocked records, and 0 publish
+    actions.
 
 ## Follow-Up
 
