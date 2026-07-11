@@ -100,6 +100,25 @@ class StrapiClientTest(unittest.TestCase):
         self.assertIn("filters%5Bcode%5D%5B%24eq%5D=CAT001", request.full_url)
         self.assertEqual("Bearer token", request.get_header("Authorization"))
 
+    def test_builds_localized_create_as_document_locale_update(self):
+        opener = RecordingOpener((FakeResponse(body={"data": {"documentId": "doc-id"}}),))
+        client = self.make_client(opener)
+
+        result = client.create_localization(
+            "categories",
+            "doc-id",
+            {"name": "तत्त्वज्ञान"},
+            locale="hi-IN",
+            publish=True,
+        )
+
+        request, _timeout = opener.requests[0]
+        self.assertEqual({"data": {"documentId": "doc-id"}}, result)
+        self.assertEqual("PUT", request.get_method())
+        self.assertIn("/api/categories/doc-id?", request.full_url)
+        self.assertIn("locale=hi-IN", request.full_url)
+        self.assertIn("status=published", request.full_url)
+
     def test_wraps_strapi_http_errors(self):
         error = HTTPError(
             "http://localhost:1337/api/categories",

@@ -387,6 +387,23 @@ Expected output:
   - Added unit tests for artifact loading, config validation, dry-run write
     blocking, explicit apply mode, mocked Strapi client behavior, and preflight
     locale failures.
+- 2026-07-11: Stage 3 implementation started under GitHub issue
+  [#55](https://github.com/Team-Gurubodh/gurubodh/issues/55).
+  - Added Category ingestion planning by stable `code`.
+  - Added explicit Category field mapping for English default-locale payloads
+    and `hi-IN` localized payloads.
+  - Added dry-run classification for creates, updates, matching records, and
+    conflicts.
+  - Added apply behavior for Category default-locale writes, Hindi
+    localization writes, and publish-on-write behavior.
+  - Kept Subject ingestion blocked until Stage 4.
+  - Confirmed Strapi 5 localization writes for this app use
+    `PUT /api/categories/{documentId}?locale=hi-IN&status=published`.
+  - Ran the seed-data unit test suite, `git diff --check`, Category dry-run,
+    Category apply against the throwaway Strapi database, and final Category
+    dry-run idempotency verification.
+  - Final Category dry-run after apply reported 11 matching Category records,
+    0 creates, 0 updates, 0 conflicts, and 0 publish actions.
 
 ## Follow-Up
 

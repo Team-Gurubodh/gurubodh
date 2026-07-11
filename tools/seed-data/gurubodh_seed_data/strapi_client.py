@@ -58,6 +58,19 @@ class StrapiClient:
             data={"data": data},
         ).body
 
+    def create_localization(self, plural_api_id, document_id, data, locale=None, publish=False):
+        params = {}
+        if locale:
+            params["locale"] = locale
+        if publish:
+            params["status"] = "published"
+        return self.request(
+            "PUT",
+            f"/api/{plural_api_id}/{document_id}",
+            params=params,
+            data={"data": data},
+        ).body
+
     def update_document(self, plural_api_id, document_id, data, locale=None, publish=False):
         params = {}
         if locale:

@@ -160,15 +160,23 @@ gurubodh-seed-data ingest preflight
 ```
 
 Load reviewed Category and Subject artifacts, run preflight, and print the
-Stage 2 ingestion foundation report:
+Category ingestion dry-run report:
 
 ```bash
 gurubodh-seed-data ingest plan
 ```
 
-`ingest plan` is dry-run by default. It accepts `--apply` only as an explicit
-mode flag, but Stage 2 still performs no Strapi writes because Category and
-Subject ingestion adapters are intentionally deferred to later stages.
+`ingest plan` is dry-run by default. It plans Category creates, updates,
+matches, conflicts, and publish actions while keeping Subject ingestion blocked
+until Stage 4. To write Category records to an approved disposable or staging
+Strapi instance, pass the explicit apply flag:
+
+```bash
+gurubodh-seed-data ingest plan --apply
+```
+
+After a successful apply, rerun the default dry-run command. A clean Category
+apply should report no pending Category creates or updates.
 
 ## File Locations
 
@@ -413,12 +421,16 @@ Both workflows include source identity and intended future Strapi target
 metadata. Subject artifacts keep `category_code` as a stable relationship key
 and do not include Strapi relation IDs.
 
-## Planned Workflow
+## Strapi Ingestion Workflow
 
-Future steps will add Strapi Collection Types for seed data and Strapi REST API
-ingestion. The seed-data tool validates downloaded CSV files before generating
-artifacts, even when spreadsheet validation and conditional formatting are also
-configured for human data entry.
+The seed-data tool validates downloaded CSV files before generating artifacts,
+even when spreadsheet validation and conditional formatting are also configured
+for human data entry.
 
 Strapi ingestion remains a separate workflow. It should read generated artifacts
 after the relevant Strapi Collection Types already exist.
+
+Category ingestion uses the Strapi REST API, reconciles records by stable
+`code`, writes English fields to the default locale, writes Hindi fields to
+`hi-IN`, publishes all created or updated records, and ignores artifact
+`desired_status`. Subject ingestion is planned for the next stage.
