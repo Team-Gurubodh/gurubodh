@@ -151,6 +151,25 @@ gurubodh-seed-data category generate --source categories
 gurubodh-seed-data subject generate --source subjects
 ```
 
+Run read-only Strapi ingestion preflight checks:
+
+```bash
+export GURUBODH_STRAPI_URL=http://localhost:1337
+export GURUBODH_STRAPI_API_TOKEN=<token>
+gurubodh-seed-data ingest preflight
+```
+
+Load reviewed Category and Subject artifacts, run preflight, and print the
+Stage 2 ingestion foundation report:
+
+```bash
+gurubodh-seed-data ingest plan
+```
+
+`ingest plan` is dry-run by default. It accepts `--apply` only as an explicit
+mode flag, but Stage 2 still performs no Strapi writes because Category and
+Subject ingestion adapters are intentionally deferred to later stages.
+
 ## File Locations
 
 Manually downloaded Google Sheet CSV files are moving to the external source
