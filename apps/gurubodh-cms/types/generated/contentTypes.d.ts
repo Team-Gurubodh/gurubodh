@@ -601,6 +601,12 @@ export interface ApiSubjectSubject extends Struct.CollectionTypeSchema {
           localized: true;
         };
       }>;
+    from_date: Schema.Attribute.Date &
+      Schema.Attribute.SetPluginOptions<{
+        i18n: {
+          localized: false;
+        };
+      }>;
     is_active: Schema.Attribute.Boolean &
       Schema.Attribute.Required &
       Schema.Attribute.SetPluginOptions<{
@@ -635,10 +641,22 @@ export interface ApiSubjectSubject extends Struct.CollectionTypeSchema {
         maxLength: 255;
       }> &
       Schema.Attribute.DefaultTo<'Your Subject name here'>;
+    prabodhan_count: Schema.Attribute.Integer &
+      Schema.Attribute.SetPluginOptions<{
+        i18n: {
+          localized: false;
+        };
+      }>;
     publishedAt: Schema.Attribute.DateTime;
     sort_order: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.Unique &
+      Schema.Attribute.SetPluginOptions<{
+        i18n: {
+          localized: false;
+        };
+      }>;
+    to_date: Schema.Attribute.Date &
       Schema.Attribute.SetPluginOptions<{
         i18n: {
           localized: false;
