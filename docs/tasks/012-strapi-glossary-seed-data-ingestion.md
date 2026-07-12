@@ -322,6 +322,43 @@ Expected output:
   through Strapi Admin for every glossary term.
 - The workflow is repeatable, reviewable, and recoverable.
 
+## Execution Results
+
+### Stage 2 - 2026-07-12
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/67
+
+Implementation branch:
+
+```text
+issue-67-glossary-preflight-artifact-loading
+```
+
+Implemented read-only glossary ingestion preflight support in
+`tools/seed-data`:
+
+- added reviewed Sanatan Glossary and Prabodhan Glossary artifact loading for
+  ingestion preflight;
+- validates both artifacts against
+  `tools/seed-data/config/glossary_artifact.schema.json`;
+- verifies artifact `strapi.collection_type` values against the approved
+  glossary targets only;
+- checks authenticated read access and Draft & Publish status-query support for
+  `sanatan-glossaries` and `prabodhan-glossaries`;
+- added the command:
+
+```bash
+gurubodh-seed-data ingest glossary-preflight
+```
+
+Stage 2 intentionally performs no create, update, or publish writes.
+
+Verification found that the command reached Strapi and initially received
+`403 Forbidden` for both glossary endpoints while the same token passed
+Category and Subject preflight. After updating the Strapi API token permissions,
+the glossary preflight passed for both endpoint access and Draft & Publish
+status queries.
+
 ## Out Of Scope
 
 - Direct database writes.

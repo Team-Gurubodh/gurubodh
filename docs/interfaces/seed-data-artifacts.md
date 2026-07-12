@@ -152,7 +152,8 @@ apps/gurubodh-cms/src/api/prabodhan-glossary/content-types/prabodhan-glossary/sc
 
 The initial shared Strapi-facing fields should be:
 
-- `term_code` - unique and required within the collection.
+- `code` - unique and required within the collection. Ingestion maps artifact
+  `term_code` to this Strapi field.
 - `term` - required text/string field containing the glossary term.
 - `definition` - required text field containing the glossary definition.
 
