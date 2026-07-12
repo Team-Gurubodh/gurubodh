@@ -11,13 +11,16 @@ from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sourc
 from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
 from gurubodh_seed_data.glossary_ingestion import (
     load_glossary_ingestion_artifacts,
+    plan_glossary_ingestion,
     run_glossary_preflight,
 )
 from gurubodh_seed_data.ingestion_artifacts import load_ingestion_artifacts
 from gurubodh_seed_data.ingestion_mode import IngestionMode
 from gurubodh_seed_data.ingestion_report import (
     build_glossary_stage2_report,
+    build_glossary_stage3_report,
     build_stage4_ingestion_report,
+    render_glossary_plan_report,
     render_report,
     render_glossary_report,
 )
@@ -165,6 +168,34 @@ def _run_glossary_ingestion_preflight(args):
     print()
     print(render_glossary_report(report))
     return 0 if artifact_result.is_valid and preflight_result.is_valid else 1
+
+
+def _run_glossary_ingestion_plan(args):
+    mode = IngestionMode()
+    artifact_result = load_glossary_ingestion_artifacts()
+    if artifact_result.errors:
+        for error in artifact_result.errors:
+            print(f"Artifact error: {error}")
+
+    config = _load_strapi_config_from_args(args)
+    client = StrapiClient(config)
+    preflight_result = run_glossary_preflight(client)
+    _print_preflight_result(preflight_result)
+
+    glossary_plan = (
+        plan_glossary_ingestion(client, artifact_result.artifacts)
+        if artifact_result.is_valid and preflight_result.is_valid
+        else plan_glossary_ingestion(client, ())
+    )
+    report = build_glossary_stage3_report(
+        mode,
+        artifact_result,
+        preflight_result,
+        glossary_plan,
+    )
+    print()
+    print(render_glossary_plan_report(report))
+    return 0 if report.conflicts == 0 and report.blocked_records == 0 else 1
 
 
 def _run_ingestion_plan(args):
@@ -525,6 +556,14 @@ def _add_ingestion_parser(subparsers):
     )
     _add_strapi_options(glossary_preflight_parser)
     glossary_preflight_parser.set_defaults(handler=_run_glossary_ingestion_preflight)
+
+    glossary_plan_parser = ingest_subparsers.add_parser(
+        "glossary-plan",
+        help="Load artifacts and print the glossary ingestion dry-run plan.",
+        description="Run artifact loading, preflight, and Stage 3 glossary ingestion planning without writes.",
+    )
+    _add_strapi_options(glossary_plan_parser)
+    glossary_plan_parser.set_defaults(handler=_run_glossary_ingestion_plan)
 
     plan_parser = ingest_subparsers.add_parser(
         "plan",

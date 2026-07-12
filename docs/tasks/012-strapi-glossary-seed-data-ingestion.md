@@ -359,6 +359,45 @@ Category and Subject preflight. After updating the Strapi API token permissions,
 the glossary preflight passed for both endpoint access and Draft & Publish
 status queries.
 
+### Stage 3 - 2026-07-12
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/69
+
+Implementation branch:
+
+```text
+issue-69-glossary-dry-run-planning
+```
+
+Implemented read-only glossary ingestion planning in `tools/seed-data`:
+
+- added a parameterized glossary ingestion planner for Sanatan Glossary and
+  Prabodhan Glossary;
+- maps artifact `term_code`, `term`, and `definition` fields explicitly to
+  Strapi `code`, `term`, and `definition` fields;
+- queries existing glossary records by stable `code`;
+- classifies records as creates, updates, already matching, conflicts, or
+  blocked records;
+- reports publish intent for every created or updated glossary record;
+- detects duplicate artifact codes within one glossary, duplicate existing
+  Strapi codes within one glossary Collection Type, missing required artifact
+  values, mismatched artifact targets, and missing required existing Strapi
+  fields;
+- confirms duplicate codes across Sanatan Glossary and Prabodhan Glossary are
+  allowed because the Collection Types are separate;
+- added the command:
+
+```bash
+gurubodh-seed-data ingest glossary-plan
+```
+
+Stage 3 intentionally performs no create, update, or publish writes.
+
+Verification ran the seed-data unit test suite, `git diff --check`, and a
+read-only glossary dry-run against the throwaway Strapi database. The glossary
+dry-run reported 24 records to create, 0 updates, 0 matching records,
+0 conflicts, 0 blocked records, and 24 planned publish actions.
+
 ## Out Of Scope
 
 - Direct database writes.
