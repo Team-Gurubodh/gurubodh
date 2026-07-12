@@ -37,6 +37,9 @@ None currently recorded.
   `tools/seed-data/config/subject_artifact.schema.json` before they are used by
   later ingestion tooling.
 - Strapi content type schemas belong under the relevant Strapi API directory.
+- Sanatan Glossary and Prabodhan Glossary Strapi content types store glossary
+  `code`, `term`, and `definition` fields as non-localized fields and use
+  Draft & Publish.
 - New schema locations should be added to this index when introduced.
 
 ## Change Rules
