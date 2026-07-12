@@ -77,7 +77,13 @@ def build_glossary_stage2_report(mode, artifact_result, preflight_result):
     )
 
 
-def build_glossary_stage3_report(mode, artifact_result, preflight_result, glossary_plan):
+def build_glossary_stage3_report(
+    mode,
+    artifact_result,
+    preflight_result,
+    glossary_plan,
+    applied=False,
+):
     sanatan_records = 0
     prabodhan_records = 0
     targets = []
@@ -91,9 +97,14 @@ def build_glossary_stage3_report(mode, artifact_result, preflight_result, glossa
         )
 
     messages = [
-        "Stage 3 glossary adapter planned Sanatan Glossary and Prabodhan Glossary ingestion.",
-        "Dry-run only; no Strapi writes were performed.",
+        "Stage 4 glossary adapter planned Sanatan Glossary and Prabodhan Glossary ingestion.",
     ]
+    if applied:
+        messages.append("Glossary apply completed; this report shows the post-apply plan.")
+    elif mode.can_write:
+        messages.append("Apply mode requested; writes are ready to run.")
+    else:
+        messages.append("Dry-run only; no Strapi writes were performed.")
     messages.extend(artifact_result.errors)
     messages.extend(preflight_result.errors)
     messages.extend(glossary_plan.messages)

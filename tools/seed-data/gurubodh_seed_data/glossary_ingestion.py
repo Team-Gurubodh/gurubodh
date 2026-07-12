@@ -243,6 +243,30 @@ def plan_glossary_ingestion(client, loaded_artifacts):
     return GlossaryIngestionPlan(items=tuple(items))
 
 
+def apply_glossary_ingestion(client, mode, plan):
+    mode.require_write_allowed()
+    if not plan.can_apply:
+        raise RuntimeError("Glossary ingestion plan has conflicts or blocked records and cannot be applied.")
+
+    for item in plan.items:
+        if item.is_matching:
+            continue
+        if item.is_create:
+            client.create_document(
+                item.plural_api_id,
+                item.payload,
+                publish=True,
+            )
+            continue
+        if item.is_update:
+            client.update_document(
+                item.plural_api_id,
+                item.document_id,
+                item.payload,
+                publish=True,
+            )
+
+
 def _validate_approved_target(artifact, target):
     errors = []
     source_key = artifact.get("source", {}).get("key")
@@ -392,9 +416,9 @@ def _fetch_existing_records(client, plural_api_id):
     records = {}
     for status in ("draft", "published", None):
         for record in _fetch_collection_records(client, plural_api_id, status):
+            stable_document_key = _record_value(record, "documentId") or _record_value(record, "id")
             key = (
-                _record_value(record, "documentId"),
-                _record_value(record, "id"),
+                stable_document_key,
                 _record_value(record, "code"),
             )
             records[key] = record
