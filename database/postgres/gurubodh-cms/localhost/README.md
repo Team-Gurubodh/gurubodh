@@ -8,4 +8,5 @@ Directory guide:
 
 - `init/` contains one-time role, owner, and extension bootstrap scripts.
 - `migrations/` contains database-specific privilege and lockdown scripts.
-
+- `scripts/` contains localhost helper scripts for DBA workflows, such as
+  cloning a CMS database for local testing.
