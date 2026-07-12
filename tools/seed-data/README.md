@@ -159,6 +159,13 @@ export GURUBODH_STRAPI_API_TOKEN=<token>
 gurubodh-seed-data ingest preflight
 ```
 
+Load reviewed Sanatan Glossary and Prabodhan Glossary artifacts, validate their
+approved Strapi targets, and run read-only glossary endpoint preflight checks:
+
+```bash
+gurubodh-seed-data ingest glossary-preflight
+```
+
 Load reviewed Category and Subject artifacts, run preflight, and print the
 Category and Subject ingestion dry-run report:
 
