@@ -438,6 +438,45 @@ glossary dry-run, and repeated glossary apply. The final dry-run and repeated
 apply both reported 0 creates, 0 updates, 24 matching records, 0 conflicts,
 0 blocked records, and 0 publish actions.
 
+### Stage 5 - 2026-07-12
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/73
+
+Implementation branch:
+
+```text
+issue-73-task-12-stage-5-glossary-e2e
+```
+
+Added maintainer-facing glossary ingestion operations documentation in
+`tools/seed-data/README.md`:
+
+- documented required Strapi environment variables and API token permissions;
+- documented glossary preflight, dry-run, apply, and post-apply commands;
+- added the complete glossary end-to-end checklist for CSV validation, optional
+  artifact regeneration, CMS build/start, preflight, dry-run, apply, final
+  dry-run, and Strapi Admin inspection;
+- documented recovery guidance for missing endpoints, dry-run conflicts,
+  failed apply, field-mapping problems, and local trial data contamination;
+- recorded glossary operational limitations, including additive-only behavior,
+  combined Sanatan/Prabodhan apply, aggregated report output, and Strapi 5
+  status-query duplicate views by numeric `id`.
+
+Verification ran the seed-data unit test suite, Sanatan Glossary CSV
+validation, Prabodhan Glossary CSV validation, `make cms-build`, glossary
+preflight, glossary dry-run, glossary apply against the throwaway Strapi
+database, and post-apply glossary dry-run.
+
+The live glossary preflight passed 4 checks. The dry-run, apply, and
+post-apply dry-run all reported 0 creates, 0 updates, 24 matching records,
+0 conflicts, 0 blocked records, and 0 publish actions.
+
+`make cms-build` completed successfully. During the build, Strapi printed a
+non-fatal `EPERM` warning while trying to read
+`~/Library/Preferences/com.strapi/config.json` in the local execution
+environment; TypeScript compilation, build-context generation, and admin-panel
+build still completed.
+
 ## Out Of Scope
 
 - Direct database writes.

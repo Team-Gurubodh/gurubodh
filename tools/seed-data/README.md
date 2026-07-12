@@ -689,3 +689,248 @@ the source artifacts and Strapi Admin when a dry-run reports unexpected updates.
 The workflow has been verified for Strapi 5 REST localization writes using
 `PUT /api/<collection>/{documentId}?locale=hi-IN&status=published`. Recheck this
 behavior after Strapi upgrades or content-type localization changes.
+
+## Glossary Strapi Ingestion Workflow
+
+Glossary ingestion reads the reviewed Sanatan Glossary and Prabodhan Glossary
+JSON artifacts and writes them to the CMS through Strapi REST APIs. It does not
+write directly to PostgreSQL.
+
+Sanatan Glossary and Prabodhan Glossary are separate Strapi Collection Types.
+The ingestion adapter maps artifact fields explicitly:
+
+| Artifact field | Strapi field |
+| --- | --- |
+| `term_code` | `code` |
+| `term` | `term` |
+| `definition` | `definition` |
+
+Glossary records are reconciled by stable `code` within each glossary
+Collection Type. The same code may exist once in Sanatan Glossary and once in
+Prabodhan Glossary without conflict. Glossary ingestion is additive and
+update-oriented; it does not delete Strapi records that are absent from the
+artifacts.
+
+### Glossary Strapi Requirements
+
+Run glossary ingestion only against an approved local or staging Strapi
+instance. For local integration testing, prefer a clean throwaway PostgreSQL
+database so trial records or duplicate codes do not hide ingestion issues.
+
+The CMS must already provide these Collection Types and REST endpoints:
+
+- `sanatan-glossary` through `/api/sanatan-glossaries`
+- `prabodhan-glossary` through `/api/prabodhan-glossaries`
+
+Both Collection Types must use Draft & Publish and include non-localized
+required fields:
+
+- `code`
+- `term`
+- `definition`
+
+Set these environment variables before running glossary ingestion commands:
+
+```bash
+export GURUBODH_STRAPI_URL=http://localhost:1337
+export GURUBODH_STRAPI_API_TOKEN=<token>
+```
+
+The API token must be kept out of tracked files. It needs enough permissions to:
+
+- read `sanatan-glossaries` and `prabodhan-glossaries`;
+- create and update `sanatan-glossaries` and `prabodhan-glossaries`;
+- query draft and published Sanatan Glossary and Prabodhan Glossary records;
+- publish glossary records through Strapi REST writes using
+  `status=published`.
+
+Keep production glossary ingestion out of this workflow until a separate
+production readiness decision has been accepted.
+
+### Glossary Preflight And Reports
+
+Run read-only glossary preflight before planning or applying writes:
+
+```bash
+gurubodh-seed-data ingest glossary-preflight
+```
+
+The glossary preflight report includes these checks:
+
+- reviewed Sanatan Glossary artifact loading and schema validation;
+- reviewed Prabodhan Glossary artifact loading and schema validation;
+- approved artifact `strapi.collection_type` target validation;
+- Sanatan Glossary endpoint access;
+- Prabodhan Glossary endpoint access;
+- Draft & Publish status-query support for both glossary endpoints.
+
+Run the glossary dry-run planner:
+
+```bash
+gurubodh-seed-data ingest glossary-plan
+```
+
+The glossary plan report includes:
+
+- artifact record counts for Sanatan Glossary and Prabodhan Glossary;
+- configured Strapi target collections;
+- records to create;
+- records to update;
+- records already matching;
+- conflicts;
+- blocked records;
+- skipped fields;
+- publish actions;
+- explanatory messages.
+
+Continue to apply only when conflicts and blocked records are both zero.
+
+To write glossary records to an approved throwaway or staging Strapi instance,
+pass the explicit apply flag:
+
+```bash
+gurubodh-seed-data ingest glossary-plan --apply
+```
+
+After a successful glossary apply, rerun the default dry-run command:
+
+```bash
+gurubodh-seed-data ingest glossary-plan
+```
+
+A clean post-apply dry-run should report:
+
+- `Records to create: 0`
+- `Records to update: 0`
+- `Conflicts: 0`
+- `Blocked records: 0`
+- `Publish actions: 0`
+
+### Glossary End-To-End Checklist
+
+Use this checklist for local or staging verification:
+
+1. Activate the seed-data virtual environment:
+
+   ```bash
+   cd tools/seed-data
+   . .venv/bin/activate
+   ```
+
+2. Validate the Sanatan Glossary source CSV:
+
+   ```bash
+   gurubodh-seed-data glossary validate --source sanatan-glossary
+   ```
+
+3. Validate the Prabodhan Glossary source CSV:
+
+   ```bash
+   gurubodh-seed-data glossary validate --source prabodhan-glossary
+   ```
+
+4. Regenerate glossary artifacts only if the reviewed CSV sources changed:
+
+   ```bash
+   gurubodh-seed-data glossary generate --source sanatan-glossary
+   gurubodh-seed-data glossary generate --source prabodhan-glossary
+   ```
+
+5. Build the CMS from the monorepo root:
+
+   ```bash
+   make cms-build
+   ```
+
+6. Start Strapi against the approved throwaway or staging database:
+
+   ```bash
+   make cms-dev
+   ```
+
+7. Export the Strapi URL and API token in the ingestion shell:
+
+   ```bash
+   export GURUBODH_STRAPI_URL=http://localhost:1337
+   export GURUBODH_STRAPI_API_TOKEN=<token>
+   ```
+
+8. Run read-only glossary preflight:
+
+   ```bash
+   gurubodh-seed-data ingest glossary-preflight
+   ```
+
+9. Run the glossary dry-run plan:
+
+   ```bash
+   gurubodh-seed-data ingest glossary-plan
+   ```
+
+10. Review the dry-run report. Continue only when conflicts and blocked records
+    are both zero.
+
+11. Apply glossary ingestion:
+
+    ```bash
+    gurubodh-seed-data ingest glossary-plan --apply
+    ```
+
+12. Run the glossary dry-run plan again:
+
+    ```bash
+    gurubodh-seed-data ingest glossary-plan
+    ```
+
+13. Confirm the final dry-run reports:
+
+    - `Records to create: 0`
+    - `Records to update: 0`
+    - `Conflicts: 0`
+    - `Blocked records: 0`
+    - `Publish actions: 0`
+
+14. Inspect Strapi Admin and spot-check that Sanatan Glossary and Prabodhan
+    Glossary records are published.
+
+### Glossary Recovery Guidance
+
+If a glossary endpoint is missing, complete Strapi glossary schema readiness
+before running ingestion. Do not work around a missing Collection Type with
+direct database writes.
+
+Dry-run conflicts should be fixed before apply. Correct the source CSV and
+regenerate artifacts when the artifact is wrong, or clean the local/staging
+Strapi trial data when the CMS contains duplicate glossary codes.
+
+If glossary apply fails, rerun `gurubodh-seed-data ingest glossary-plan` and
+reconcile the reported state by stable `code`. Apply is designed to be
+repeatable after the underlying issue is corrected.
+
+If a field mapping problem is found before apply, fix the glossary adapter and
+rerun the dry-run. If a field mapping problem is found after apply, update
+records through the ingestion workflow by stable `code` after reviewing a fresh
+dry-run report. Do not repair mapped data with direct database edits.
+
+If local trial data is contaminated, clean local tables or recreate the
+throwaway database only after taking any needed backup. Do not use this cleanup
+guidance for production data.
+
+### Glossary Operational Limitations
+
+Current glossary ingestion is intentionally additive and update-oriented. It
+does not delete Strapi records that are absent from the artifacts.
+
+The CLI exposes one combined glossary ingestion plan. Maintainers cannot
+currently run a Sanatan-only or Prabodhan-only apply command without code
+changes, although the adapter keeps the two Collection Types separate and allows
+the same code to exist once in each glossary.
+
+The report is aggregated across both glossary targets. It does not yet print
+per-record diffs for every planned update, so maintainers should inspect the
+source artifacts and Strapi Admin when a dry-run reports unexpected updates.
+
+Strapi 5 status queries can return the same published document through multiple
+status views with different numeric `id` values. The glossary planner
+de-duplicates fetched records by stable `documentId` and `code`; recheck this
+behavior after Strapi upgrades or content-type publishing changes.
