@@ -10,11 +10,13 @@ from gurubodh_seed_data.cli import build_parser
 from gurubodh_seed_data.glossary_ingestion import (
     APPROVED_GLOSSARY_TARGETS,
     LoadedGlossaryArtifact,
+    apply_glossary_ingestion,
     build_glossary_payload,
     load_glossary_ingestion_artifacts,
     plan_glossary_ingestion,
     run_glossary_preflight,
 )
+from gurubodh_seed_data.ingestion_mode import IngestionMode
 from gurubodh_seed_data.strapi_client import StrapiClientError
 
 
@@ -24,6 +26,8 @@ class FakeGlossaryClient:
         self.records_by_plural_api_id = records_by_plural_api_id or {}
         self.get_collection_calls = []
         self.write_calls = []
+        self.create_calls = []
+        self.update_calls = []
 
     def get_collection(self, plural_api_id, filters=None, locale=None, status=None, page_size=100, page=None):
         self.get_collection_calls.append((plural_api_id, status, page_size))
@@ -35,13 +39,15 @@ class FakeGlossaryClient:
                 records = tuple(record for record in records if record.get(field) == value)
         return {"data": list(records)}
 
-    def create_document(self, *_args, **_kwargs):
+    def create_document(self, plural_api_id, data, locale=None, publish=False):
         self.write_calls.append("create")
-        raise AssertionError("Glossary dry-run must not create documents.")
+        self.create_calls.append((plural_api_id, data, locale, publish))
+        return {"data": {**data, "documentId": "created-glossary-document-id"}}
 
-    def update_document(self, *_args, **_kwargs):
+    def update_document(self, plural_api_id, document_id, data, locale=None, publish=False):
         self.write_calls.append("update")
-        raise AssertionError("Glossary dry-run must not update documents.")
+        self.update_calls.append((plural_api_id, document_id, data, locale, publish))
+        return {"data": {**data, "documentId": document_id}}
 
     def publish_document(self, *_args, **_kwargs):
         self.write_calls.append("publish")
@@ -59,11 +65,12 @@ def glossary_record(code="T00001", term="anugraha", definition="grace"):
 def strapi_glossary_record(
     code="T00001",
     document_id="glossary-document-id",
+    numeric_id=1,
     term="anugraha",
     definition="grace",
 ):
     return {
-        "id": 1,
+        "id": numeric_id,
         "documentId": document_id,
         "code": code,
         "term": term,
@@ -336,6 +343,24 @@ class GlossaryPlanningTest(unittest.TestCase):
         self.assertEqual(1, plan.conflicts)
         self.assertIn("Duplicate existing Sanatan Glossary records", plan.messages[0])
 
+    def test_deduplicates_same_document_returned_with_different_numeric_ids(self):
+        client = FakeGlossaryClient(
+            records_by_plural_api_id={
+                "sanatan-glossaries": (
+                    strapi_glossary_record(numeric_id=1),
+                    strapi_glossary_record(numeric_id=2),
+                )
+            }
+        )
+
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        self.assertEqual(0, plan.conflicts)
+        self.assertEqual(1, plan.already_matching)
+
     def test_reports_missing_required_artifact_values(self):
         plan = plan_glossary_ingestion(
             FakeGlossaryClient(),
@@ -372,6 +397,90 @@ class GlossaryPlanningTest(unittest.TestCase):
         self.assertEqual(1, plan.conflicts)
         self.assertIn("missing required Strapi field: definition", plan.messages[0])
 
+
+class GlossaryApplyTest(unittest.TestCase):
+    def test_dry_run_mode_cannot_apply(self):
+        client = FakeGlossaryClient()
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "Dry-run mode cannot perform"):
+            apply_glossary_ingestion(client, IngestionMode(), plan)
+
+        self.assertEqual([], client.write_calls)
+
+    def test_apply_is_blocked_by_conflicts(self):
+        client = FakeGlossaryClient()
+        plan = plan_glossary_ingestion(
+            client,
+            (
+                loaded_glossary_artifact(
+                    "sanatan-glossary",
+                    glossary_record(),
+                    glossary_record(term="duplicate"),
+                ),
+            ),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "conflicts or blocked records"):
+            apply_glossary_ingestion(client, IngestionMode(apply=True), plan)
+
+        self.assertEqual([], client.write_calls)
+
+    def test_apply_creates_missing_glossary_record_as_published(self):
+        client = FakeGlossaryClient()
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        apply_glossary_ingestion(client, IngestionMode(apply=True), plan)
+
+        self.assertEqual(
+            [
+                (
+                    "sanatan-glossaries",
+                    {"code": "T00001", "term": "anugraha", "definition": "grace"},
+                    None,
+                    True,
+                )
+            ],
+            client.create_calls,
+        )
+        self.assertEqual([], client.update_calls)
+
+    def test_apply_updates_changed_glossary_record_as_published(self):
+        client = FakeGlossaryClient(
+            records_by_plural_api_id={
+                "sanatan-glossaries": (
+                    strapi_glossary_record(definition="old definition"),
+                )
+            }
+        )
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        apply_glossary_ingestion(client, IngestionMode(apply=True), plan)
+
+        self.assertEqual([], client.create_calls)
+        self.assertEqual(
+            [
+                (
+                    "sanatan-glossaries",
+                    "glossary-document-id",
+                    {"code": "T00001", "term": "anugraha", "definition": "grace"},
+                    None,
+                    True,
+                )
+            ],
+            client.update_calls,
+        )
+
+
 class GlossaryIngestionCliTest(unittest.TestCase):
     def test_glossary_stage2_command_does_not_accept_apply_mode(self):
         parser = build_parser()
@@ -380,12 +489,12 @@ class GlossaryIngestionCliTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 parser.parse_args(("ingest", "glossary-preflight", "--apply"))
 
-    def test_glossary_stage3_command_does_not_accept_apply_mode(self):
+    def test_glossary_stage4_command_accepts_apply_mode(self):
         parser = build_parser()
 
-        with redirect_stderr(StringIO()):
-            with self.assertRaises(SystemExit):
-                parser.parse_args(("ingest", "glossary-plan", "--apply"))
+        args = parser.parse_args(("ingest", "glossary-plan", "--apply"))
+
+        self.assertTrue(args.apply)
 
 
 if __name__ == "__main__":

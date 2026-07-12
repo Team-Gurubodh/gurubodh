@@ -173,9 +173,18 @@ preflight checks, and print the read-only glossary ingestion dry-run plan:
 gurubodh-seed-data ingest glossary-plan
 ```
 
-`ingest glossary-plan` plans Sanatan Glossary and Prabodhan Glossary creates,
-updates, matching records, conflicts, and publish actions. Stage 3 intentionally
-does not accept an apply flag and performs no Strapi writes.
+`ingest glossary-plan` is dry-run by default. It plans Sanatan Glossary and
+Prabodhan Glossary creates, updates, matching records, conflicts, blocked
+records, and publish actions. To write glossary records to an approved
+disposable or staging Strapi instance, pass the explicit apply flag:
+
+```bash
+gurubodh-seed-data ingest glossary-plan --apply
+```
+
+After a successful glossary apply, rerun the default dry-run command. A clean
+apply should report no pending glossary creates, updates, conflicts, blocked
+records, or publish actions.
 
 Load reviewed Category and Subject artifacts, run preflight, and print the
 Category and Subject ingestion dry-run report:

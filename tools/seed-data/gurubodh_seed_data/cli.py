@@ -10,6 +10,7 @@ from gurubodh_seed_data.category_ingestion import (
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
 from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
 from gurubodh_seed_data.glossary_ingestion import (
+    apply_glossary_ingestion,
     load_glossary_ingestion_artifacts,
     plan_glossary_ingestion,
     run_glossary_preflight,
@@ -171,7 +172,7 @@ def _run_glossary_ingestion_preflight(args):
 
 
 def _run_glossary_ingestion_plan(args):
-    mode = IngestionMode()
+    mode = IngestionMode(apply=args.apply)
     artifact_result = load_glossary_ingestion_artifacts()
     if artifact_result.errors:
         for error in artifact_result.errors:
@@ -193,9 +194,31 @@ def _run_glossary_ingestion_plan(args):
         preflight_result,
         glossary_plan,
     )
+    if report.conflicts or report.blocked_records:
+        print()
+        print(render_glossary_plan_report(report))
+        return 1
+
+    applied = False
+    if mode.can_write:
+        apply_glossary_ingestion(client, mode, glossary_plan)
+        applied = True
+        glossary_plan = plan_glossary_ingestion(client, artifact_result.artifacts)
+        report = build_glossary_stage3_report(
+            mode,
+            artifact_result,
+            preflight_result,
+            glossary_plan,
+            applied=applied,
+        )
+        if report.conflicts or report.blocked_records:
+            print()
+            print(render_glossary_plan_report(report))
+            return 1
+
     print()
     print(render_glossary_plan_report(report))
-    return 0 if report.conflicts == 0 and report.blocked_records == 0 else 1
+    return 0
 
 
 def _run_ingestion_plan(args):
@@ -559,10 +582,23 @@ def _add_ingestion_parser(subparsers):
 
     glossary_plan_parser = ingest_subparsers.add_parser(
         "glossary-plan",
-        help="Load artifacts and print the glossary ingestion dry-run plan.",
-        description="Run artifact loading, preflight, and Stage 3 glossary ingestion planning without writes.",
+        help="Load artifacts and print or apply the glossary ingestion plan.",
+        description="Run artifact loading, preflight, and Stage 4 glossary ingestion planning.",
     )
     _add_strapi_options(glossary_plan_parser)
+    glossary_plan_mode = glossary_plan_parser.add_mutually_exclusive_group()
+    glossary_plan_mode.add_argument(
+        "--dry-run",
+        action="store_false",
+        dest="apply",
+        default=False,
+        help="Inspect only; this is the default.",
+    )
+    glossary_plan_mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="Explicitly apply glossary writes after a conflict-free plan.",
+    )
     glossary_plan_parser.set_defaults(handler=_run_glossary_ingestion_plan)
 
     plan_parser = ingest_subparsers.add_parser(

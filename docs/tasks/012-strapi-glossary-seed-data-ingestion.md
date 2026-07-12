@@ -398,6 +398,46 @@ read-only glossary dry-run against the throwaway Strapi database. The glossary
 dry-run reported 24 records to create, 0 updates, 0 matching records,
 0 conflicts, 0 blocked records, and 24 planned publish actions.
 
+### Stage 4 - 2026-07-12
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/71
+
+Implementation branch:
+
+```text
+issue-71-glossary-apply-publish-idempotency
+```
+
+Implemented write-capable glossary ingestion in `tools/seed-data`:
+
+- added explicit apply support to:
+
+```bash
+gurubodh-seed-data ingest glossary-plan --apply
+```
+
+- kept `gurubodh-seed-data ingest glossary-plan` as a dry-run by default;
+- blocks glossary apply when artifact loading, preflight, conflicts, or blocked
+  records prevent a safe write;
+- creates missing Sanatan Glossary and Prabodhan Glossary records by stable
+  `code`;
+- updates changed Sanatan Glossary and Prabodhan Glossary records by stable
+  `code`;
+- publishes every created or updated glossary record through Strapi REST;
+- re-queries Strapi after apply and reports the final post-apply plan;
+- preserves Category and Subject ingestion behavior.
+
+Verification found that Strapi status queries can return the same published
+document through multiple status views with different numeric `id` values. The
+glossary planner now de-duplicates fetched records by stable `documentId` and
+`code` so repeated dry-runs and applies do not report false duplicate conflicts.
+
+Verification ran the seed-data unit test suite, `git diff --check`, glossary
+dry-run, glossary apply against the throwaway Strapi database, post-apply
+glossary dry-run, and repeated glossary apply. The final dry-run and repeated
+apply both reported 0 creates, 0 updates, 24 matching records, 0 conflicts,
+0 blocked records, and 0 publish actions.
+
 ## Out Of Scope
 
 - Direct database writes.
