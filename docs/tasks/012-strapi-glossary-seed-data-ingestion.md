@@ -362,6 +362,27 @@ Expected output:
   - keep glossary fields non-localized;
   - publish all entries in both glossaries;
   - use `code` as the Strapi field name instead of `term_code`.
+- 2026-07-12: Stage 1 implementation started under GitHub issue
+  [#65](https://github.com/Team-Gurubodh/gurubodh/issues/65).
+  - Added Sanatan Glossary and Prabodhan Glossary Strapi Collection Type API
+    files with `code`, `term`, and `definition` fields.
+  - Enabled Draft & Publish for both glossary Collection Types.
+  - Confirmed generated REST plural API IDs:
+    - `sanatan-glossaries`;
+    - `prabodhan-glossaries`.
+  - Ran Strapi schema JSON validation, `git diff --check`, Strapi type
+    generation, and `make cms-build`.
+  - Booted Strapi successfully against the throwaway local PostgreSQL database
+    `gurubodh_db_copy`; unauthenticated route probes returned `403` for both
+    glossary endpoints and `404` for a non-existent endpoint, confirming the
+    glossary routes exist.
+  - Initial authenticated probes with the available API token returned `403`
+    for the glossary endpoints while existing Category and Subject probes
+    returned `200`.
+  - After the API token permissions were updated for the newly added glossary
+    Collection Types, authenticated probes returned `200` for
+    `sanatan-glossaries` and `prabodhan-glossaries`; both collections were
+    reachable and empty as expected before ingestion.
 
 ## Follow-Up
 

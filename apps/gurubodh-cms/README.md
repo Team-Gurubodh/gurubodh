@@ -69,6 +69,8 @@ verification command for CMS changes.
 The current CMS scaffold includes:
 
 - `category`
+- `prabodhan-glossary`
+- `sanatan-glossary`
 - `subject`
 
 Content type schemas live under:
