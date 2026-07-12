@@ -166,6 +166,17 @@ approved Strapi targets, and run read-only glossary endpoint preflight checks:
 gurubodh-seed-data ingest glossary-preflight
 ```
 
+Load reviewed Sanatan Glossary and Prabodhan Glossary artifacts, run glossary
+preflight checks, and print the read-only glossary ingestion dry-run plan:
+
+```bash
+gurubodh-seed-data ingest glossary-plan
+```
+
+`ingest glossary-plan` plans Sanatan Glossary and Prabodhan Glossary creates,
+updates, matching records, conflicts, and publish actions. Stage 3 intentionally
+does not accept an apply flag and performs no Strapi writes.
+
 Load reviewed Category and Subject artifacts, run preflight, and print the
 Category and Subject ingestion dry-run report:
 

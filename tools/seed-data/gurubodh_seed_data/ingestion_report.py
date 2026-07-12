@@ -29,6 +29,22 @@ class GlossaryStage2Report:
     messages: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class GlossaryStage3Report:
+    mode: str
+    sanatan_records: int = 0
+    prabodhan_records: int = 0
+    targets: tuple[str, ...] = ()
+    to_create: int = 0
+    to_update: int = 0
+    already_matching: int = 0
+    conflicts: int = 0
+    blocked_records: int = 0
+    skipped_fields: tuple[str, ...] = ()
+    publish_actions: int = 0
+    messages: tuple[str, ...] = ()
+
+
 def build_glossary_stage2_report(mode, artifact_result, preflight_result):
     sanatan_records = 0
     prabodhan_records = 0
@@ -57,6 +73,47 @@ def build_glossary_stage2_report(mode, artifact_result, preflight_result):
         preflight_failed=sum(1 for check in preflight_result.checks if not check.passed),
         conflicts=len(artifact_result.errors) + len(preflight_result.errors),
         blocked_records=sanatan_records + prabodhan_records,
+        messages=tuple(messages),
+    )
+
+
+def build_glossary_stage3_report(mode, artifact_result, preflight_result, glossary_plan):
+    sanatan_records = 0
+    prabodhan_records = 0
+    targets = []
+    for artifact in artifact_result.artifacts:
+        if artifact.source_key == "sanatan-glossary":
+            sanatan_records = artifact.record_count
+        elif artifact.source_key == "prabodhan-glossary":
+            prabodhan_records = artifact.record_count
+        targets.append(
+            f"{artifact.collection_type} -> {artifact.plural_api_id}"
+        )
+
+    messages = [
+        "Stage 3 glossary adapter planned Sanatan Glossary and Prabodhan Glossary ingestion.",
+        "Dry-run only; no Strapi writes were performed.",
+    ]
+    messages.extend(artifact_result.errors)
+    messages.extend(preflight_result.errors)
+    messages.extend(glossary_plan.messages)
+
+    return GlossaryStage3Report(
+        mode=mode.name,
+        sanatan_records=sanatan_records,
+        prabodhan_records=prabodhan_records,
+        targets=tuple(targets),
+        to_create=glossary_plan.to_create,
+        to_update=glossary_plan.to_update,
+        already_matching=glossary_plan.already_matching,
+        conflicts=(
+            len(artifact_result.errors)
+            + len(preflight_result.errors)
+            + glossary_plan.conflicts
+        ),
+        blocked_records=glossary_plan.blocked_records,
+        skipped_fields=("source.key", "strapi.collection_type"),
+        publish_actions=glossary_plan.publish_actions,
         messages=tuple(messages),
     )
 
@@ -212,6 +269,41 @@ def render_glossary_report(report):
             f"Checks failed: {report.preflight_failed}",
             f"Conflicts: {report.conflicts}",
             f"Blocked records: {report.blocked_records}",
+        ]
+    )
+    if report.messages:
+        lines.append("")
+        lines.append("Messages")
+        lines.extend(f"- {message}" for message in report.messages)
+    return "\n".join(lines)
+
+
+def render_glossary_plan_report(report):
+    lines = [
+        "Glossary Seed-Data Ingestion Report",
+        f"Mode: {report.mode}",
+        "",
+        "Artifacts",
+        f"Sanatan Glossary records: {report.sanatan_records}",
+        f"Prabodhan Glossary records: {report.prabodhan_records}",
+        "",
+        "Targets",
+    ]
+    if report.targets:
+        lines.extend(f"- {target}" for target in report.targets)
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "Plan Summary",
+            f"Records to create: {report.to_create}",
+            f"Records to update: {report.to_update}",
+            f"Records already matching: {report.already_matching}",
+            f"Conflicts: {report.conflicts}",
+            f"Blocked records: {report.blocked_records}",
+            f"Skipped fields: {', '.join(report.skipped_fields) if report.skipped_fields else 'none'}",
+            f"Publish actions: {report.publish_actions}",
         ]
     )
     if report.messages:

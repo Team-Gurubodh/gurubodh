@@ -8,15 +8,20 @@ from unittest.mock import patch
 
 from gurubodh_seed_data.cli import build_parser
 from gurubodh_seed_data.glossary_ingestion import (
+    APPROVED_GLOSSARY_TARGETS,
+    LoadedGlossaryArtifact,
+    build_glossary_payload,
     load_glossary_ingestion_artifacts,
+    plan_glossary_ingestion,
     run_glossary_preflight,
 )
 from gurubodh_seed_data.strapi_client import StrapiClientError
 
 
 class FakeGlossaryClient:
-    def __init__(self, failing_plural_api_id=None):
+    def __init__(self, failing_plural_api_id=None, records_by_plural_api_id=None):
         self.failing_plural_api_id = failing_plural_api_id
+        self.records_by_plural_api_id = records_by_plural_api_id or {}
         self.get_collection_calls = []
         self.write_calls = []
 
@@ -24,19 +29,68 @@ class FakeGlossaryClient:
         self.get_collection_calls.append((plural_api_id, status, page_size))
         if plural_api_id == self.failing_plural_api_id:
             raise StrapiClientError("GET", f"http://localhost:1337/api/{plural_api_id}", status_code=404)
-        return {"data": []}
+        records = self.records_by_plural_api_id.get(plural_api_id, ())
+        if filters:
+            for field, value in filters.items():
+                records = tuple(record for record in records if record.get(field) == value)
+        return {"data": list(records)}
 
     def create_document(self, *_args, **_kwargs):
         self.write_calls.append("create")
-        raise AssertionError("Glossary Stage 2 must not create documents.")
+        raise AssertionError("Glossary dry-run must not create documents.")
 
     def update_document(self, *_args, **_kwargs):
         self.write_calls.append("update")
-        raise AssertionError("Glossary Stage 2 must not update documents.")
+        raise AssertionError("Glossary dry-run must not update documents.")
 
     def publish_document(self, *_args, **_kwargs):
         self.write_calls.append("publish")
-        raise AssertionError("Glossary Stage 2 must not publish documents.")
+        raise AssertionError("Glossary dry-run must not publish documents.")
+
+
+def glossary_record(code="T00001", term="anugraha", definition="grace"):
+    return {
+        "term_code": code,
+        "term": term,
+        "definition": definition,
+    }
+
+
+def strapi_glossary_record(
+    code="T00001",
+    document_id="glossary-document-id",
+    term="anugraha",
+    definition="grace",
+):
+    return {
+        "id": 1,
+        "documentId": document_id,
+        "code": code,
+        "term": term,
+        "definition": definition,
+    }
+
+
+def loaded_glossary_artifact(source_key, *records):
+    target = APPROVED_GLOSSARY_TARGETS[source_key]
+    return LoadedGlossaryArtifact(
+        source_key=target.source_key,
+        path=f"/tmp/{source_key}.json",
+        record_count=len(records),
+        collection_type=target.collection_type,
+        plural_api_id=target.plural_api_id,
+        display_name=target.display_name,
+        artifact={
+            "schema_version": 1,
+            "workflow": "glossary",
+            "source": {"key": target.source_key, "label": target.display_name},
+            "strapi": {
+                "collection_type": target.collection_type,
+                "display_name": target.display_name,
+            },
+            "records": list(records),
+        },
+    )
 
 
 class GlossaryIngestionArtifactLoadTest(unittest.TestCase):
@@ -177,6 +231,147 @@ class GlossaryPreflightTest(unittest.TestCase):
         self.assertTrue(any("Cannot read prabodhan-glossaries" in error for error in result.errors))
 
 
+class GlossaryPlanningTest(unittest.TestCase):
+    def test_builds_glossary_payload_from_artifact_fields(self):
+        payload = build_glossary_payload(glossary_record())
+
+        self.assertEqual(
+            {
+                "code": "T00001",
+                "term": "anugraha",
+                "definition": "grace",
+            },
+            payload,
+        )
+
+    def test_dry_run_classifies_missing_glossary_record_as_create(self):
+        client = FakeGlossaryClient()
+
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        self.assertEqual(1, plan.to_create)
+        self.assertEqual(0, plan.to_update)
+        self.assertEqual(1, plan.publish_actions)
+        self.assertEqual([], client.write_calls)
+
+    def test_dry_run_classifies_changed_glossary_record_as_update(self):
+        client = FakeGlossaryClient(
+            records_by_plural_api_id={
+                "sanatan-glossaries": (
+                    strapi_glossary_record(definition="old definition"),
+                )
+            }
+        )
+
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        self.assertEqual(0, plan.to_create)
+        self.assertEqual(1, plan.to_update)
+        self.assertEqual(1, plan.publish_actions)
+        self.assertEqual("glossary-document-id", plan.items[0].document_id)
+
+    def test_dry_run_classifies_matching_glossary_record(self):
+        client = FakeGlossaryClient(
+            records_by_plural_api_id={
+                "sanatan-glossaries": (strapi_glossary_record(),)
+            }
+        )
+
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        self.assertEqual(1, plan.already_matching)
+        self.assertEqual(0, plan.publish_actions)
+
+    def test_reports_duplicate_artifact_codes_within_one_glossary(self):
+        plan = plan_glossary_ingestion(
+            FakeGlossaryClient(),
+            (
+                loaded_glossary_artifact(
+                    "sanatan-glossary",
+                    glossary_record(),
+                    glossary_record(term="second term"),
+                ),
+            ),
+        )
+
+        self.assertEqual(1, plan.conflicts)
+        self.assertIn("Duplicate artifact term_code", plan.messages[0])
+
+    def test_allows_same_code_across_different_glossary_collections(self):
+        plan = plan_glossary_ingestion(
+            FakeGlossaryClient(),
+            (
+                loaded_glossary_artifact("sanatan-glossary", glossary_record()),
+                loaded_glossary_artifact("prabodhan-glossary", glossary_record()),
+            ),
+        )
+
+        self.assertEqual(0, plan.conflicts)
+        self.assertEqual(2, plan.to_create)
+
+    def test_reports_duplicate_existing_code_within_one_glossary(self):
+        client = FakeGlossaryClient(
+            records_by_plural_api_id={
+                "sanatan-glossaries": (
+                    strapi_glossary_record(document_id="one"),
+                    strapi_glossary_record(document_id="two"),
+                )
+            }
+        )
+
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        self.assertEqual(1, plan.conflicts)
+        self.assertIn("Duplicate existing Sanatan Glossary records", plan.messages[0])
+
+    def test_reports_missing_required_artifact_values(self):
+        plan = plan_glossary_ingestion(
+            FakeGlossaryClient(),
+            (
+                loaded_glossary_artifact(
+                    "sanatan-glossary",
+                    {"term_code": "T00001", "term": "", "definition": "grace"},
+                ),
+            ),
+        )
+
+        self.assertEqual(1, plan.conflicts)
+        self.assertIn("Missing required artifact value: term", plan.messages[0])
+
+    def test_reports_missing_required_strapi_fields(self):
+        client = FakeGlossaryClient(
+            records_by_plural_api_id={
+                "sanatan-glossaries": (
+                    {
+                        "id": 1,
+                        "documentId": "glossary-document-id",
+                        "code": "T00001",
+                        "term": "anugraha",
+                    },
+                )
+            }
+        )
+
+        plan = plan_glossary_ingestion(
+            client,
+            (loaded_glossary_artifact("sanatan-glossary", glossary_record()),),
+        )
+
+        self.assertEqual(1, plan.conflicts)
+        self.assertIn("missing required Strapi field: definition", plan.messages[0])
+
 class GlossaryIngestionCliTest(unittest.TestCase):
     def test_glossary_stage2_command_does_not_accept_apply_mode(self):
         parser = build_parser()
@@ -184,6 +379,13 @@ class GlossaryIngestionCliTest(unittest.TestCase):
         with redirect_stderr(StringIO()):
             with self.assertRaises(SystemExit):
                 parser.parse_args(("ingest", "glossary-preflight", "--apply"))
+
+    def test_glossary_stage3_command_does_not_accept_apply_mode(self):
+        parser = build_parser()
+
+        with redirect_stderr(StringIO()):
+            with self.assertRaises(SystemExit):
+                parser.parse_args(("ingest", "glossary-plan", "--apply"))
 
 
 if __name__ == "__main__":
