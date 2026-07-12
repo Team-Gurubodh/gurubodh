@@ -87,3 +87,15 @@ GRANT strapi_schema_editor TO strapi_schema_migrator;
 -- 
 -- Allow migration_runner to act on behalf of strapi
 GRANT strapi TO strapi_schema_migrator;
+
+-- How to use migration_runner for schema migrations:
+-- 1. Connect to gurubodh_db as strapi_schema_migrator
+--    \c gurubodh_db strapi_schema_migrator
+-- 2. Set the role to strapi (the owner of the schema)
+--    SET ROLE strapi;
+--    SET search_path TO public;
+-- 3. Perform the schema migration (CREATE TABLE, ALTER TABLE, etc.)
+--    CREATE TABLE ...
+--    ALTER TABLE ...
+-- 4. Reset the role back to strapi_schema_migrator
+--    RESET ROLE;

@@ -4,6 +4,9 @@
 -- /docker-entrypoint-initdb.d/
 -- ============================================================
 
+-- Connect to the target database
+\c gurubodh_db
+
 -- Enable UUID generation (useful for Strapi 5 primary keys)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
