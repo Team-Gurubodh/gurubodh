@@ -90,11 +90,29 @@ formatter integration. If the block is omitted, formatting is disabled.
 }
 ```
 
-Stage 1 defines and validates the configuration contract only. It does not call
-Sarvam or generate formatted chapter artifacts yet.
+When formatting is enabled, chapter splitting calls Sarvam after the canonical
+raw chapter `.txt` artifact is written. A successful formatting response writes
+formatted artifacts beside the chapter text and metadata files:
 
-Stage 2 adds the formatter module foundation. Pipeline integration and formatted
-chapter artifacts are still future stages.
+```text
+chapters/text_and_metadata/
+  CAT020_SUB129_spand-rahasya_001_v01.01.txt
+  CAT020_SUB129_spand-rahasya_001_v01.01.json
+  CAT020_SUB129_spand-rahasya_001_v01.01.formatted.json
+  CAT020_SUB129_spand-rahasya_001_v01.01.formatted.md
+```
+
+The canonical raw chapter `.txt` artifact remains unchanged. The formatted JSON
+artifact preserves formatter provenance and paragraphs; the formatted Markdown
+artifact is display-friendly paragraph text without generated headings.
+
+If formatting fails and `continue_on_error` is `true`, the job prints a warning,
+omits formatted files for that chapter, and continues with the canonical chapter
+artifacts. If `continue_on_error` is `false`, the job fails on the formatting
+error.
+
+Metadata references, formatted artifact integrity checksums, and checksum-based
+reuse are planned for later Task 14 stages.
 
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
 enabled. Install the optional Sarvam SDK dependency when you need formatter
