@@ -540,6 +540,62 @@ four targets and each target reported all reviewed records already matching
 Strapi with no pending creates, updates, conflicts, blocked records, or publish
 actions.
 
+### Stage 4 - 2026-07-13
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/83
+
+Implementation branch:
+
+```text
+issue-83-task-13-stage-4-target-apply
+```
+
+Implemented target-specific apply routing for `tools/seed-data`:
+
+- wired `gurubodh-seed-data ingest apply <target>` for:
+  - `category`;
+  - `subject`;
+  - `sanatan-glossary`;
+  - `prabodhan-glossary`;
+- each apply command now loads only the selected target artifact, runs
+  target-specific preflight checks, plans the selected target, and blocks writes
+  when artifact loading, preflight, conflicts, or blocked records prevent a safe
+  write;
+- routed target apply operations to the existing proven appliers:
+  - Category writes only to `categories`;
+  - Subject writes only to `subjects` and continues to read Category records
+    only for dependency resolution;
+  - Sanatan Glossary writes only to `sanatan-glossaries`;
+  - Prabodhan Glossary writes only to `prabodhan-glossaries`;
+- re-plans the selected target after apply and returns a failing exit code if
+  the post-apply plan still has pending creates, updates, conflicts, blocked
+  records, or publish actions;
+- preserved `plan <target>` as dry-run-only.
+
+Verification ran the seed-data unit test suite, command-shape checks, and live
+target apply checks against the throwaway Strapi database:
+
+```bash
+cd tools/seed-data
+python3 -m unittest discover -s tests
+python3 -m gurubodh_seed_data.cli ingest --help
+python3 -m gurubodh_seed_data.cli ingest preflight --help
+python3 -m gurubodh_seed_data.cli ingest plan --help
+python3 -m gurubodh_seed_data.cli ingest apply --help
+python3 -m gurubodh_seed_data.cli ingest apply category
+python3 -m gurubodh_seed_data.cli ingest plan category
+python3 -m gurubodh_seed_data.cli ingest apply subject
+python3 -m gurubodh_seed_data.cli ingest plan subject
+python3 -m gurubodh_seed_data.cli ingest apply sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest plan sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest apply prabodhan-glossary
+python3 -m gurubodh_seed_data.cli ingest plan prabodhan-glossary
+```
+
+The unit test suite passed with 101 tests. The live apply and follow-up plan
+checks passed for all four targets, and each target reported no pending creates,
+updates, conflicts, blocked records, or publish actions after apply.
+
 ## Follow-Up
 
 - Create implementation issues or implementation branches from GitHub issue

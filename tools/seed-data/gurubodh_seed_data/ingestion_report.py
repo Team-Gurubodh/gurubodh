@@ -72,13 +72,34 @@ def build_target_plan_report(
     artifact_result,
     preflight_result,
     target_plan,
+    applied=False,
 ):
     target = artifact_result.target
     artifact = artifact_result.artifact
     messages = [
-        f"Task 13 Stage 3 planned {target.display_name} ingestion.",
-        "Dry-run only; no Strapi writes were performed.",
+        (
+            f"Task 13 Stage 4 applied {target.display_name} ingestion."
+            if applied
+            else f"Task 13 Stage 3 planned {target.display_name} ingestion."
+        ),
     ]
+    has_blockers = bool(
+        artifact_result.errors
+        or preflight_result.errors
+        or target_plan.errors
+        or target_plan.conflicts
+        or target_plan.blocked_records
+    )
+    if applied:
+        messages.append("Apply completed; this report shows the post-apply plan.")
+        if target_plan.to_create or target_plan.to_update or target_plan.publish_actions:
+            messages.append("Post-apply verification still has pending write or publish actions.")
+    elif mode.can_write and has_blockers:
+        messages.append("Apply mode requested; writes are blocked by the reported issues.")
+    elif mode.can_write:
+        messages.append("Apply mode requested; writes are ready to run.")
+    else:
+        messages.append("Dry-run only; no Strapi writes were performed.")
     messages.extend(artifact_result.errors)
     messages.extend(preflight_result.errors)
     messages.extend(target_plan.errors)

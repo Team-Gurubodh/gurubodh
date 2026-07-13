@@ -1,13 +1,17 @@
 import json
 from dataclasses import dataclass
 
-from gurubodh_seed_data.category_ingestion import plan_category_ingestion
+from gurubodh_seed_data.category_ingestion import (
+    apply_category_ingestion,
+    plan_category_ingestion,
+)
 from gurubodh_seed_data.category import get_category_source
 from gurubodh_seed_data.category_artifacts import validate_category_artifact
 from gurubodh_seed_data.glossary import get_glossary_source
 from gurubodh_seed_data.glossary_artifacts import validate_glossary_artifact
 from gurubodh_seed_data.glossary_ingestion import (
     LoadedGlossaryArtifact,
+    apply_glossary_ingestion,
     plan_glossary_ingestion,
 )
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
@@ -15,7 +19,10 @@ from gurubodh_seed_data.strapi_client import StrapiClientError
 from gurubodh_seed_data.strapi_preflight import PreflightCheck, PreflightResult
 from gurubodh_seed_data.subject import get_subject_source
 from gurubodh_seed_data.subject_artifacts import validate_subject_artifact
-from gurubodh_seed_data.subject_ingestion import plan_subject_ingestion
+from gurubodh_seed_data.subject_ingestion import (
+    apply_subject_ingestion,
+    plan_subject_ingestion,
+)
 
 
 @dataclass(frozen=True)
@@ -260,6 +267,27 @@ def plan_target_ingestion(client, config, artifact_result):
         )
 
     return TargetIngestionPlan(target=target, plan=plan)
+
+
+def apply_target_ingestion(client, config, mode, target_plan):
+    if not target_plan.is_valid:
+        raise RuntimeError(
+            f"{target_plan.target.display_name} ingestion plan has errors and cannot be applied."
+        )
+    if not target_plan.can_apply:
+        raise RuntimeError(
+            f"{target_plan.target.display_name} ingestion plan has conflicts or blocked records and cannot be applied."
+        )
+
+    target = target_plan.target
+    if target.key == "category":
+        apply_category_ingestion(client, config, mode, target_plan.plan)
+    elif target.key == "subject":
+        apply_subject_ingestion(client, config, mode, target_plan.plan)
+    elif target.workflow == "glossary":
+        apply_glossary_ingestion(client, mode, target_plan.plan)
+    else:
+        raise RuntimeError(f"Unsupported target apply route: {target.key}")
 
 
 def _as_glossary_artifact(artifact):

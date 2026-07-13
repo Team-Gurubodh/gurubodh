@@ -1,15 +1,20 @@
 import json
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from gurubodh_seed_data.cli import _run_target_ingestion_apply
 from gurubodh_seed_data.strapi_client import StrapiClientError
 from gurubodh_seed_data.strapi_config import load_strapi_config
 from gurubodh_seed_data.ingestion_mode import IngestionMode
 from gurubodh_seed_data.ingestion_report import build_target_plan_report
 from gurubodh_seed_data.target_ingestion import (
     INGEST_TARGET_REGISTRY,
+    apply_target_ingestion,
     load_target_artifact,
     plan_target_ingestion,
     run_target_preflight,
@@ -86,6 +91,81 @@ class FakeTargetPlanClient:
 
     def publish_document(self, *_args, **_kwargs):
         self.write_calls.append("publish")
+
+
+class FakeTargetApplyClient:
+    def __init__(self, records_by_plural_api_id=None):
+        self.records_by_plural_api_id = {
+            plural_api_id: list(records)
+            for plural_api_id, records in (records_by_plural_api_id or {}).items()
+        }
+        self.get_collection_calls = []
+        self.write_calls = []
+        self.next_id = 100
+
+    def get_collection(
+        self,
+        plural_api_id,
+        filters=None,
+        locale=None,
+        status=None,
+        page_size=100,
+        page=None,
+        populate=None,
+    ):
+        self.get_collection_calls.append(
+            (plural_api_id, locale, status, page_size, page, populate)
+        )
+        records = tuple(self.records_by_plural_api_id.get(plural_api_id, ()))
+        if locale:
+            records = tuple(record for record in records if record.get("locale") == locale)
+        if filters:
+            for field, value in filters.items():
+                records = tuple(record for record in records if record.get(field) == value)
+        return {"data": list(records)}
+
+    def get_locales(self):
+        return [
+            {"code": "en", "isDefault": True},
+            {"code": "hi-IN", "isDefault": False},
+        ]
+
+    def create_document(self, plural_api_id, data, locale=None, publish=False):
+        document_id = f"{plural_api_id}-document-{self.next_id}"
+        self.next_id += 1
+        record = {**data, "id": self.next_id, "documentId": document_id}
+        if locale:
+            record["locale"] = locale
+        self.records_by_plural_api_id.setdefault(plural_api_id, []).append(record)
+        self.write_calls.append(("create", plural_api_id, locale, publish))
+        return {"data": record}
+
+    def create_localization(self, plural_api_id, document_id, data, locale=None, publish=False):
+        record = {**data, "id": self.next_id, "documentId": document_id}
+        self.next_id += 1
+        if locale:
+            record["locale"] = locale
+        self.records_by_plural_api_id.setdefault(plural_api_id, []).append(record)
+        self.write_calls.append(("localize", plural_api_id, locale, publish))
+        return {"data": record}
+
+    def update_document(self, plural_api_id, document_id, data, locale=None, publish=False):
+        records = self.records_by_plural_api_id.setdefault(plural_api_id, [])
+        for index, record in enumerate(records):
+            if record.get("documentId") == document_id and (
+                locale is None or record.get("locale") == locale
+            ):
+                updated = {**record, **data, "documentId": document_id}
+                if locale:
+                    updated["locale"] = locale
+                records[index] = updated
+                break
+        self.write_calls.append(("update", plural_api_id, locale, publish))
+        return {"data": {**data, "documentId": document_id}}
+
+    def publish_document(self, plural_api_id, document_id, locale=None):
+        self.write_calls.append(("publish", plural_api_id, locale, True))
+        return {"data": {"documentId": document_id, "locale": locale}}
 
 
 def category_artifact():
@@ -601,6 +681,143 @@ class TargetPlanTest(unittest.TestCase):
         self.assertEqual(1, plan.already_matching)
         self.assertEqual(1, plan.conflicts)
         self.assertEqual([], client.write_calls)
+
+
+class TargetApplyTest(unittest.TestCase):
+    def setUp(self):
+        self.artifacts = TargetArtifactLoadTest()
+        self.artifacts.setUp()
+        self.config = load_strapi_config(
+            base_url="http://localhost:1337",
+            api_token="token",
+            environ={},
+        )
+
+    def tearDown(self):
+        self.artifacts.tearDown()
+
+    def write_artifact(self, target_key, artifact=None):
+        relative_path, artifact_factory = VALID_ARTIFACTS[target_key]
+        self.artifacts.write_json(relative_path, artifact or artifact_factory())
+
+    def load_result(self, target_key):
+        return self.artifacts.with_config(lambda: load_target_artifact(target_key))
+
+    def plan(self, client, target_key):
+        return plan_target_ingestion(client, self.config, self.load_result(target_key))
+
+    def test_apply_category_writes_only_categories(self):
+        self.write_artifact("category")
+        client = FakeTargetApplyClient()
+        plan = self.plan(client, "category")
+
+        apply_target_ingestion(client, self.config, IngestionMode(apply=True), plan)
+
+        self.assertEqual(
+            [("create", "categories"), ("localize", "categories")],
+            [(call[0], call[1]) for call in client.write_calls],
+        )
+
+    def test_apply_subject_writes_only_subjects_when_category_dependencies_exist(self):
+        self.write_artifact("subject")
+        client = FakeTargetApplyClient(
+            {
+                "categories": (
+                    strapi_category(),
+                    strapi_category(locale="hi-IN"),
+                )
+            }
+        )
+        plan = self.plan(client, "subject")
+
+        apply_target_ingestion(client, self.config, IngestionMode(apply=True), plan)
+
+        self.assertEqual(
+            [("create", "subjects"), ("localize", "subjects")],
+            [(call[0], call[1]) for call in client.write_calls],
+        )
+
+    def test_apply_subject_blocks_missing_category_dependencies_without_writes(self):
+        self.write_artifact("subject")
+        client = FakeTargetApplyClient()
+        plan = self.plan(client, "subject")
+
+        with self.assertRaisesRegex(RuntimeError, "conflicts or blocked records"):
+            apply_target_ingestion(client, self.config, IngestionMode(apply=True), plan)
+
+        self.assertEqual([], client.write_calls)
+
+    def test_apply_sanatan_glossary_writes_only_sanatan_glossaries(self):
+        self.write_artifact("sanatan-glossary")
+        client = FakeTargetApplyClient()
+        plan = self.plan(client, "sanatan-glossary")
+
+        apply_target_ingestion(client, self.config, IngestionMode(apply=True), plan)
+
+        self.assertEqual(
+            [("create", "sanatan-glossaries")],
+            [(call[0], call[1]) for call in client.write_calls],
+        )
+
+    def test_apply_prabodhan_glossary_writes_only_prabodhan_glossaries(self):
+        self.write_artifact("prabodhan-glossary")
+        client = FakeTargetApplyClient()
+        plan = self.plan(client, "prabodhan-glossary")
+
+        apply_target_ingestion(client, self.config, IngestionMode(apply=True), plan)
+
+        self.assertEqual(
+            [("create", "prabodhan-glossaries")],
+            [(call[0], call[1]) for call in client.write_calls],
+        )
+
+    def test_apply_is_blocked_by_conflicts_without_writes(self):
+        artifact = category_artifact()
+        artifact["records"].append(
+            {
+                **artifact["records"][0],
+                "category_code": "CAT002",
+                "sort_order": 1,
+            }
+        )
+        self.write_artifact("category", artifact)
+        client = FakeTargetApplyClient()
+        plan = self.plan(client, "category")
+
+        with self.assertRaisesRegex(RuntimeError, "conflicts or blocked records"):
+            apply_target_ingestion(client, self.config, IngestionMode(apply=True), plan)
+
+        self.assertEqual([], client.write_calls)
+
+    def test_cli_apply_replans_after_apply(self):
+        self.write_artifact("category")
+        client = FakeTargetApplyClient()
+        args = SimpleNamespace(
+            target="category",
+            strapi_url="http://localhost:1337",
+            strapi_token="token",
+            default_locale="en",
+            localized_locale="hi-IN",
+            timeout_seconds=10.0,
+        )
+
+        with patch("gurubodh_seed_data.cli.StrapiClient", return_value=client):
+            with redirect_stdout(StringIO()) as stdout:
+                exit_code = self.artifacts.with_config(
+                    lambda: _run_target_ingestion_apply(args)
+                )
+
+        self.assertEqual(0, exit_code)
+        self.assertIn("Apply completed; this report shows the post-apply plan.", stdout.getvalue())
+        self.assertIn("Records to create: 0", stdout.getvalue())
+        self.assertEqual(
+            [("create", "categories"), ("localize", "categories")],
+            [(call[0], call[1]) for call in client.write_calls],
+        )
+        self.assertGreaterEqual(
+            sum(1 for call in client.get_collection_calls if call[0] == "categories"),
+            6,
+        )
 
 
 if __name__ == "__main__":
