@@ -29,6 +29,11 @@ from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_pat
 from gurubodh_seed_data.strapi_client import StrapiClient
 from gurubodh_seed_data.strapi_config import load_strapi_config
 from gurubodh_seed_data.strapi_preflight import run_preflight
+from gurubodh_seed_data.target_ingestion import (
+    INGEST_TARGET_REGISTRY,
+    load_target_artifact,
+    run_target_preflight,
+)
 from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
 from gurubodh_seed_data.subject_artifacts import write_subject_artifact
 from gurubodh_seed_data.subject_ingestion import (
@@ -554,18 +559,46 @@ def _add_strapi_options(parser):
 
 
 INGEST_OPERATIONS = ("preflight", "plan", "apply")
-INGEST_TARGETS = (
-    "category",
-    "subject",
-    "sanatan-glossary",
-    "prabodhan-glossary",
-)
+INGEST_TARGETS = tuple(INGEST_TARGET_REGISTRY)
 
 
-def _run_target_ingestion_command(_args):
-    raise ValueError(
-        "Target-specific ingest execution will be implemented in later Task 13 stages."
-    )
+def _run_target_ingestion_command(args):
+    if args.operation != "preflight":
+        raise ValueError(
+            f"Target-specific ingest {args.operation} will be implemented in later Task 13 stages."
+        )
+
+    artifact_result = load_target_artifact(args.target)
+    if artifact_result.errors:
+        for error in artifact_result.errors:
+            print(f"Artifact error: {error}")
+
+    config = _load_strapi_config_from_args(args)
+    preflight_result = run_target_preflight(StrapiClient(config), config, args.target)
+    _print_preflight_result(preflight_result)
+    print()
+    _print_target_preflight_summary(artifact_result, preflight_result)
+    return 0 if artifact_result.is_valid and preflight_result.is_valid else 1
+
+
+def _print_target_preflight_summary(artifact_result, preflight_result):
+    artifact = artifact_result.artifact
+    rows = [
+        ("Target", artifact_result.target.key),
+        ("Display Name", artifact_result.target.display_name),
+        ("Workflow", artifact_result.target.workflow),
+        ("Collection", artifact_result.target.collection_type),
+        ("Plural API ID", artifact_result.target.plural_api_id),
+        ("Artifact Path", artifact.path if artifact else "not loaded"),
+        ("Records", artifact.record_count if artifact else 0),
+        (
+            "Preflight Checks",
+            f"{sum(1 for check in preflight_result.checks if check.passed)} passed, "
+            f"{sum(1 for check in preflight_result.checks if not check.passed)} failed",
+        ),
+        ("Writes", "not performed"),
+    ]
+    _print_table(("Field", "Value"), rows)
 
 
 def _add_ingestion_parser(subparsers):
