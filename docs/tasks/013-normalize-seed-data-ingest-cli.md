@@ -492,6 +492,54 @@ python3 -m gurubodh_seed_data.cli ingest preflight prabodhan-glossary
 The unit test suite passed with 87 tests. The live preflight checks passed for
 all four targets and each command reported that no writes were performed.
 
+### Stage 3 - 2026-07-13
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/81
+
+Implementation branch:
+
+```text
+issue-81-task-13-stage-3-target-plan
+```
+
+Implemented target-specific dry-run planning for `tools/seed-data`:
+
+- wired `gurubodh-seed-data ingest plan <target>` for:
+  - `category`;
+  - `subject`;
+  - `sanatan-glossary`;
+  - `prabodhan-glossary`;
+- routed each target to the existing proven planner while loading only the
+  selected artifact;
+- kept `plan` dry-run-only and left `apply <target>` deferred to Stage 4;
+- added a single-target plan report that clearly identifies the selected target,
+  artifact path, preflight result, plan summary, skipped fields, and dry-run
+  write status;
+- kept glossary planning isolated so Sanatan Glossary planning does not load or
+  report Prabodhan Glossary, and Prabodhan Glossary planning does not load or
+  report Sanatan Glossary;
+- added Subject blocked-record guidance that tells the operator to run the
+  Category workflow first when Category dependencies are missing.
+
+Stage 3 performs no create, update, localization, or publish writes.
+
+Verification ran the seed-data unit test suite and read-only target plan checks
+against the throwaway Strapi database:
+
+```bash
+cd tools/seed-data
+python3 -m unittest discover -s tests
+python3 -m gurubodh_seed_data.cli ingest plan category
+python3 -m gurubodh_seed_data.cli ingest plan subject
+python3 -m gurubodh_seed_data.cli ingest plan sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest plan prabodhan-glossary
+```
+
+The unit test suite passed with 94 tests. The live plan checks passed for all
+four targets and each target reported all reviewed records already matching
+Strapi with no pending creates, updates, conflicts, blocked records, or publish
+actions.
+
 ## Follow-Up
 
 - Create implementation issues or implementation branches from GitHub issue

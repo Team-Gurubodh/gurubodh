@@ -6,9 +6,12 @@ from unittest.mock import patch
 
 from gurubodh_seed_data.strapi_client import StrapiClientError
 from gurubodh_seed_data.strapi_config import load_strapi_config
+from gurubodh_seed_data.ingestion_mode import IngestionMode
+from gurubodh_seed_data.ingestion_report import build_target_plan_report
 from gurubodh_seed_data.target_ingestion import (
     INGEST_TARGET_REGISTRY,
     load_target_artifact,
+    plan_target_ingestion,
     run_target_preflight,
 )
 
@@ -37,6 +40,46 @@ class FakeTargetPreflightClient:
 
     def create_document(self, *_args, **_kwargs):
         self.write_calls.append("create")
+
+    def update_document(self, *_args, **_kwargs):
+        self.write_calls.append("update")
+
+    def publish_document(self, *_args, **_kwargs):
+        self.write_calls.append("publish")
+
+
+class FakeTargetPlanClient:
+    def __init__(self, records_by_plural_api_id=None):
+        self.records_by_plural_api_id = records_by_plural_api_id or {}
+        self.get_collection_calls = []
+        self.write_calls = []
+
+    def get_collection(
+        self,
+        plural_api_id,
+        filters=None,
+        locale=None,
+        status=None,
+        page_size=100,
+        page=None,
+        populate=None,
+    ):
+        self.get_collection_calls.append(
+            (plural_api_id, locale, status, page_size, page, populate)
+        )
+        records = self.records_by_plural_api_id.get(plural_api_id, ())
+        if locale:
+            records = tuple(record for record in records if record.get("locale") == locale)
+        if filters:
+            for field, value in filters.items():
+                records = tuple(record for record in records if record.get(field) == value)
+        return {"data": list(records)}
+
+    def create_document(self, *_args, **_kwargs):
+        self.write_calls.append("create")
+
+    def create_localization(self, *_args, **_kwargs):
+        self.write_calls.append("localize")
 
     def update_document(self, *_args, **_kwargs):
         self.write_calls.append("update")
@@ -106,6 +149,65 @@ def glossary_artifact(source_key):
                 "definition": "grace",
             }
         ],
+    }
+
+
+def strapi_category(
+    code="CAT001",
+    document_id="category-document-id",
+    sort_order=1,
+    name="Tattvagyan",
+    locale="en",
+):
+    return {
+        "id": 1,
+        "documentId": document_id,
+        "code": code,
+        "legacy_code": None,
+        "is_active": True,
+        "sort_order": sort_order,
+        "name": name,
+        "description": name,
+        "locale": locale,
+    }
+
+
+def strapi_subject(
+    code="SUB001",
+    document_id="subject-document-id",
+    sort_order=1,
+    name="Swasthya Rahasya",
+    locale="en",
+):
+    return {
+        "id": 1,
+        "documentId": document_id,
+        "code": code,
+        "legacy_code": None,
+        "is_active": True,
+        "sort_order": sort_order,
+        "category": {"documentId": "category-document-id"},
+        "from_date": None,
+        "to_date": None,
+        "prabodhan_count": None,
+        "name": name,
+        "description": name,
+        "locale": locale,
+    }
+
+
+def strapi_glossary(
+    code="T00001",
+    document_id="glossary-document-id",
+    term="anugraha",
+    definition="grace",
+):
+    return {
+        "id": 1,
+        "documentId": document_id,
+        "code": code,
+        "term": term,
+        "definition": definition,
     }
 
 
@@ -311,6 +413,193 @@ class TargetPreflightTest(unittest.TestCase):
             ],
             client.get_collection_calls,
         )
+        self.assertEqual([], client.write_calls)
+
+
+class TargetPlanTest(unittest.TestCase):
+    def setUp(self):
+        self.artifacts = TargetArtifactLoadTest()
+        self.artifacts.setUp()
+        self.config = load_strapi_config(
+            base_url="http://localhost:1337",
+            api_token="token",
+            environ={},
+        )
+
+    def tearDown(self):
+        self.artifacts.tearDown()
+
+    def write_artifact(self, target_key, artifact=None):
+        relative_path, artifact_factory = VALID_ARTIFACTS[target_key]
+        self.artifacts.write_json(relative_path, artifact or artifact_factory())
+
+    def load_result(self, target_key):
+        return self.artifacts.with_config(lambda: load_target_artifact(target_key))
+
+    def test_plan_category_routes_to_category_artifact_only_without_writes(self):
+        self.write_artifact("category")
+        client = FakeTargetPlanClient()
+
+        plan = plan_target_ingestion(client, self.config, self.load_result("category"))
+
+        self.assertEqual(1, plan.to_create)
+        self.assertEqual(0, plan.to_update)
+        self.assertEqual(2, plan.publish_actions)
+        self.assertEqual({"categories"}, {call[0] for call in client.get_collection_calls})
+        self.assertEqual([], client.write_calls)
+
+    def test_plan_category_classifies_update_matching_and_conflict(self):
+        artifact = category_artifact()
+        artifact["records"].append(
+            {
+                **artifact["records"][0],
+                "category_code": "CAT002",
+                "sort_order": 2,
+            }
+        )
+        artifact["records"].append(
+            {
+                **artifact["records"][0],
+                "category_code": "CAT003",
+                "sort_order": 2,
+            }
+        )
+        self.write_artifact("category", artifact)
+        client = FakeTargetPlanClient(
+            {
+                "categories": (
+                    strapi_category(name="Old name"),
+                    strapi_category(name="Tattvagyan", locale="hi-IN"),
+                    strapi_category(
+                        code="CAT002",
+                        document_id="cat-two",
+                        sort_order=2,
+                    ),
+                    strapi_category(
+                        code="CAT002",
+                        document_id="cat-two",
+                        sort_order=2,
+                        locale="hi-IN",
+                    ),
+                )
+            }
+        )
+
+        plan = plan_target_ingestion(client, self.config, self.load_result("category"))
+
+        self.assertEqual(1, plan.to_update)
+        self.assertEqual(1, plan.already_matching)
+        self.assertEqual(1, plan.conflicts)
+        self.assertEqual([], client.write_calls)
+
+    def test_plan_subject_blocks_missing_category_and_recommends_category_workflow(self):
+        self.write_artifact("subject")
+        client = FakeTargetPlanClient()
+        artifact_result = self.load_result("subject")
+
+        plan = plan_target_ingestion(client, self.config, artifact_result)
+        report = build_target_plan_report(
+            IngestionMode(),
+            artifact_result,
+            run_target_preflight(FakeTargetPreflightClient(), self.config, "subject"),
+            plan,
+        )
+
+        self.assertEqual(1, plan.blocked_records)
+        self.assertIn("Referenced Category code CAT001 was not found", plan.messages[0])
+        self.assertTrue(
+            any("run the Category workflow first" in message for message in report.messages)
+        )
+        self.assertEqual([], client.write_calls)
+
+    def test_plan_subject_classifies_matching_record_without_category_writes(self):
+        self.write_artifact("subject")
+        client = FakeTargetPlanClient(
+            {
+                "categories": (
+                    strapi_category(),
+                    strapi_category(locale="hi-IN"),
+                ),
+                "subjects": (
+                    strapi_subject(),
+                    strapi_subject(name="Swasthya Rahasya", locale="hi-IN"),
+                ),
+            }
+        )
+
+        plan = plan_target_ingestion(client, self.config, self.load_result("subject"))
+
+        self.assertEqual(1, plan.already_matching)
+        self.assertEqual(
+            {"categories", "subjects"},
+            {call[0] for call in client.get_collection_calls},
+        )
+        self.assertEqual([], client.write_calls)
+
+    def test_plan_sanatan_glossary_never_reads_prabodhan_artifact_or_endpoint(self):
+        self.write_artifact("sanatan-glossary")
+        client = FakeTargetPlanClient()
+
+        plan = plan_target_ingestion(
+            client,
+            self.config,
+            self.load_result("sanatan-glossary"),
+        )
+
+        self.assertEqual(1, plan.to_create)
+        self.assertEqual(
+            {"sanatan-glossaries"},
+            {call[0] for call in client.get_collection_calls},
+        )
+        self.assertEqual([], client.write_calls)
+
+    def test_plan_prabodhan_glossary_never_reads_sanatan_artifact_or_endpoint(self):
+        self.write_artifact("prabodhan-glossary")
+        client = FakeTargetPlanClient(
+            {
+                "prabodhan-glossaries": (
+                    strapi_glossary(definition="old definition"),
+                )
+            }
+        )
+
+        plan = plan_target_ingestion(
+            client,
+            self.config,
+            self.load_result("prabodhan-glossary"),
+        )
+
+        self.assertEqual(1, plan.to_update)
+        self.assertEqual(
+            {"prabodhan-glossaries"},
+            {call[0] for call in client.get_collection_calls},
+        )
+        self.assertEqual([], client.write_calls)
+
+    def test_plan_glossary_classifies_matching_and_conflict(self):
+        artifact = glossary_artifact("sanatan-glossary")
+        artifact["records"].append(
+            {"term_code": "T00002", "term": "second", "definition": "second"}
+        )
+        self.write_artifact("sanatan-glossary", artifact)
+        client = FakeTargetPlanClient(
+            {
+                "sanatan-glossaries": (
+                    strapi_glossary(),
+                    strapi_glossary(code="T00002", document_id="one"),
+                    strapi_glossary(code="T00002", document_id="two"),
+                )
+            }
+        )
+
+        plan = plan_target_ingestion(
+            client,
+            self.config,
+            self.load_result("sanatan-glossary"),
+        )
+
+        self.assertEqual(1, plan.already_matching)
+        self.assertEqual(1, plan.conflicts)
         self.assertEqual([], client.write_calls)
 
 

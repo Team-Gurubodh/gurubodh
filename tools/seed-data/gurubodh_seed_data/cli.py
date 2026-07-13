@@ -20,10 +20,12 @@ from gurubodh_seed_data.ingestion_mode import IngestionMode
 from gurubodh_seed_data.ingestion_report import (
     build_glossary_stage2_report,
     build_glossary_stage3_report,
+    build_target_plan_report,
     build_stage4_ingestion_report,
     render_glossary_plan_report,
     render_report,
     render_glossary_report,
+    render_target_plan_report,
 )
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
 from gurubodh_seed_data.strapi_client import StrapiClient
@@ -31,7 +33,9 @@ from gurubodh_seed_data.strapi_config import load_strapi_config
 from gurubodh_seed_data.strapi_preflight import run_preflight
 from gurubodh_seed_data.target_ingestion import (
     INGEST_TARGET_REGISTRY,
+    TargetIngestionPlan,
     load_target_artifact,
+    plan_target_ingestion,
     run_target_preflight,
 )
 from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
@@ -563,11 +567,18 @@ INGEST_TARGETS = tuple(INGEST_TARGET_REGISTRY)
 
 
 def _run_target_ingestion_command(args):
-    if args.operation != "preflight":
+    if args.operation == "preflight":
+        return _run_target_ingestion_preflight(args)
+    if args.operation == "plan":
+        return _run_target_ingestion_plan(args)
+    if args.operation == "apply":
         raise ValueError(
             f"Target-specific ingest {args.operation} will be implemented in later Task 13 stages."
         )
+    raise ValueError(f"Unsupported target-specific ingest operation: {args.operation}")
 
+
+def _run_target_ingestion_preflight(args):
     artifact_result = load_target_artifact(args.target)
     if artifact_result.errors:
         for error in artifact_result.errors:
@@ -579,6 +590,35 @@ def _run_target_ingestion_command(args):
     print()
     _print_target_preflight_summary(artifact_result, preflight_result)
     return 0 if artifact_result.is_valid and preflight_result.is_valid else 1
+
+
+def _run_target_ingestion_plan(args):
+    mode = IngestionMode()
+    artifact_result = load_target_artifact(args.target)
+    if artifact_result.errors:
+        for error in artifact_result.errors:
+            print(f"Artifact error: {error}")
+
+    config = _load_strapi_config_from_args(args)
+    client = StrapiClient(config)
+    preflight_result = run_target_preflight(client, config, args.target)
+    _print_preflight_result(preflight_result)
+
+    target_plan = (
+        plan_target_ingestion(client, config, artifact_result)
+        if artifact_result.is_valid and preflight_result.is_valid
+        else TargetIngestionPlan(target=artifact_result.target)
+    )
+    report = build_target_plan_report(
+        mode,
+        artifact_result,
+        preflight_result,
+        target_plan,
+    )
+
+    print()
+    print(render_target_plan_report(report))
+    return 0 if report.conflicts == 0 and report.blocked_records == 0 else 1
 
 
 def _print_target_preflight_summary(artifact_result, preflight_result):
