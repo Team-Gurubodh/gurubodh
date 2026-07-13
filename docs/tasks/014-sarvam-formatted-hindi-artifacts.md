@@ -163,6 +163,60 @@ Expected validation rules:
 - `regenerate` should support the initial value
   `when-source-checksum-changes`.
 
+## Schema Versioning And Validation
+
+The future implementation changes the public content-preparation contracts, so
+schema versioning must be handled deliberately.
+
+Expected schema version changes:
+
+- Bump `conversion_job.schema.json` from `1.2.0` to `1.3.0`.
+- Bump `chapter_metadata.schema.json` from `1.2.0` to `1.3.0`.
+- Update the corresponding schema-version constants in code.
+- Update docs and tests in the same implementation change.
+
+Rationale:
+
+- The `formatting` job config block is optional and backward-compatible, but it
+  expands the conversion job contract.
+- Formatted artifact references and formatting status are optional for jobs that
+  do not enable formatting, but generated metadata can now carry a richer
+  artifact contract.
+- Downstream tools should be able to identify which schema contract produced or
+  validated an artifact.
+
+Existing conversion jobs should not require manual edits from maintainers. The
+implementation should provide an automatic migration path from `1.2.0` job
+configs to `1.3.0`.
+
+Migration requirements:
+
+- Provide a `gurubodh-utils` migration command or equivalent documented command
+  that updates existing `schema_version: "1.2.0"` job configs to
+  `schema_version: "1.3.0"`.
+- Preserve all existing job fields and formatting.
+- Add no `formatting` block by default, or add it only with
+  `enabled: false`, so migrated jobs keep their current behavior.
+- Support a dry-run or preview mode that reports which files would change.
+- Support an apply mode that writes the migrated files.
+- Refuse or warn on unsupported schema versions instead of silently rewriting
+  unknown files.
+- Cover migration behavior with tests for local sample jobs.
+
+Validation requirements:
+
+- Validate `1.3.0` job configs with formatting omitted.
+- Validate `1.3.0` job configs with formatting disabled.
+- Validate `1.3.0` job configs with formatting enabled.
+- Reject invalid formatting providers, invalid output formats, invalid retry
+  values, and invalid regeneration modes.
+- Validate chapter metadata with formatting disabled and no formatted artifacts.
+- Validate chapter metadata with successful formatted artifacts.
+- Validate chapter metadata with formatting failure status and no display-ready
+  formatted Markdown artifact.
+- Keep backward compatibility expectations explicit for any consumer that still
+  reads `1.2.0` metadata during the transition.
+
 ## Metadata Requirements
 
 Chapter metadata should discoverably reference formatted artifacts when they
@@ -382,9 +436,12 @@ Required behavior:
 ### Stage 1 - Configuration And Schema Contract
 
 1. Extend `conversion_job.schema.json` with optional `formatting`.
-2. Extend `config.py` validation for the new formatting block.
-3. Add tests for omitted formatting config, disabled formatting, enabled Sarvam
+2. Bump the conversion job schema version to `1.3.0`.
+3. Extend `config.py` validation for the new formatting block.
+4. Add tests for omitted formatting config, disabled formatting, enabled Sarvam
    formatting, invalid providers, invalid model names, and defaults.
+5. Add an automatic migration command or equivalent documented command for
+   converting `1.2.0` job configs to `1.3.0` without manual editing.
 
 ### Stage 2 - Formatter Module
 
@@ -407,10 +464,11 @@ Required behavior:
 ### Stage 4 - Metadata And Integrity
 
 1. Extend `chapter_metadata.schema.json`.
-2. Extend metadata generation to include formatted artifact file names, storage
+2. Bump the chapter metadata schema version to `1.3.0`.
+3. Extend metadata generation to include formatted artifact file names, storage
    references, checksums, and formatting status.
-3. Preserve backward compatibility for jobs that do not enable formatting.
-4. Add schema and metadata unit tests.
+4. Preserve backward compatibility for jobs that do not enable formatting.
+5. Add schema and metadata unit tests.
 
 ### Stage 5 - Reuse And Regeneration
 
@@ -439,6 +497,12 @@ Required behavior:
 - Successful formatting writes both `*.formatted.json` and `*.formatted.md`.
 - Formatted artifacts are referenced from chapter metadata when present.
 - Formatted artifacts include integrity checksums.
+- Conversion job and chapter metadata schemas are bumped to `1.3.0`.
+- Existing `1.2.0` conversion job configs can be migrated to `1.3.0` without
+  manual editing.
+- The migration path has dry-run/preview behavior and tests.
+- `1.3.0` config and metadata validation covers formatting enabled, disabled,
+  successful, skipped, and failed states.
 - Failed formatting does not fail the content-preparation job when
   `continue_on_error` is true.
 - The CLI reports formatting warnings and summary counts.
