@@ -151,60 +151,48 @@ gurubodh-seed-data category generate --source categories
 gurubodh-seed-data subject generate --source subjects
 ```
 
-Run read-only Strapi ingestion preflight checks:
+Set Strapi connection details before running ingestion commands:
 
 ```bash
 export GURUBODH_STRAPI_URL=http://localhost:1337
 export GURUBODH_STRAPI_API_TOKEN=<token>
-gurubodh-seed-data ingest preflight
 ```
 
-Load reviewed Sanatan Glossary and Prabodhan Glossary artifacts, validate their
-approved Strapi targets, and run read-only glossary endpoint preflight checks:
+Run read-only Strapi ingestion preflight checks for one seed-data target:
 
 ```bash
-gurubodh-seed-data ingest glossary-preflight
+gurubodh-seed-data ingest preflight category
+gurubodh-seed-data ingest preflight subject
+gurubodh-seed-data ingest preflight sanatan-glossary
+gurubodh-seed-data ingest preflight prabodhan-glossary
 ```
 
-Load reviewed Sanatan Glossary and Prabodhan Glossary artifacts, run glossary
-preflight checks, and print the read-only glossary ingestion dry-run plan:
+Load one reviewed artifact, run target-specific preflight checks, and print the
+read-only ingestion dry-run plan:
 
 ```bash
-gurubodh-seed-data ingest glossary-plan
+gurubodh-seed-data ingest plan category
+gurubodh-seed-data ingest plan subject
+gurubodh-seed-data ingest plan sanatan-glossary
+gurubodh-seed-data ingest plan prabodhan-glossary
 ```
 
-`ingest glossary-plan` is dry-run by default. It plans Sanatan Glossary and
-Prabodhan Glossary creates, updates, matching records, conflicts, blocked
-records, and publish actions. To write glossary records to an approved
-disposable or staging Strapi instance, pass the explicit apply flag:
+`ingest plan <target>` is always dry-run only. It reports creates, updates,
+matching records, conflicts, blocked records, skipped fields, and publish
+actions for the selected target without performing Strapi writes.
+
+Apply one target to an approved disposable or staging Strapi instance:
 
 ```bash
-gurubodh-seed-data ingest glossary-plan --apply
+gurubodh-seed-data ingest apply category
+gurubodh-seed-data ingest apply subject
+gurubodh-seed-data ingest apply sanatan-glossary
+gurubodh-seed-data ingest apply prabodhan-glossary
 ```
 
-After a successful glossary apply, rerun the default dry-run command. A clean
-apply should report no pending glossary creates, updates, conflicts, blocked
-records, or publish actions.
-
-Load reviewed Category and Subject artifacts, run preflight, and print the
-Category and Subject ingestion dry-run report:
-
-```bash
-gurubodh-seed-data ingest plan
-```
-
-`ingest plan` is dry-run by default. It plans Category and Subject creates,
-updates, matches, conflicts, blocked records, relation resolution, and publish
-actions. To write Category and Subject records to an approved disposable or
-staging Strapi instance, pass the explicit apply flag:
-
-```bash
-gurubodh-seed-data ingest plan --apply
-```
-
-After a successful apply, rerun the default dry-run command. A clean apply
-should report no pending Category or Subject creates, updates, conflicts,
-blocked records, or publish actions.
+After a successful apply, rerun the corresponding `ingest plan <target>`
+command. A clean apply should report no pending creates, updates, conflicts,
+blocked records, or publish actions for that target.
 
 ## File Locations
 
@@ -513,6 +501,7 @@ If a non-default local setup uses different locale codes, pass them explicitly:
 
 ```bash
 gurubodh-seed-data ingest preflight \
+  category \
   --default-locale en \
   --localized-locale hi-IN
 ```
@@ -525,27 +514,28 @@ readiness decision has been accepted.
 Run a read-only preflight before planning or applying writes:
 
 ```bash
-gurubodh-seed-data ingest preflight
+gurubodh-seed-data ingest preflight category
+gurubodh-seed-data ingest preflight subject
 ```
 
 The preflight report includes these checks:
 
-- Category endpoint access;
-- Subject endpoint access;
+- selected target endpoint access;
+- Category read access when the selected target is `subject`;
 - default locale suitability for English fields;
 - `hi-IN` locale availability;
-- Draft & Publish status-query support for Categories;
-- Draft & Publish status-query support for Subjects.
+- Draft & Publish status-query support for the selected target.
 
 Run the dry-run planner:
 
 ```bash
-gurubodh-seed-data ingest plan
+gurubodh-seed-data ingest plan category
+gurubodh-seed-data ingest plan subject
 ```
 
 The ingestion report includes:
 
-- artifact record counts for Category and Subject;
+- selected artifact record counts;
 - records to create;
 - records to update;
 - records already matching;
@@ -611,28 +601,32 @@ Use this checklist for local or staging verification:
 8. Run read-only preflight:
 
    ```bash
-   gurubodh-seed-data ingest preflight
+   gurubodh-seed-data ingest preflight category
+   gurubodh-seed-data ingest preflight subject
    ```
 
-9. Run the Category and Subject dry-run plan:
+9. Run the Category and Subject dry-run plans:
 
    ```bash
-   gurubodh-seed-data ingest plan
+   gurubodh-seed-data ingest plan category
+   gurubodh-seed-data ingest plan subject
    ```
 
-10. Review the dry-run report. Continue only when conflicts and blocked records
-    are both zero.
+10. Review each dry-run report. Continue only when conflicts and blocked
+    records are both zero for the target being applied.
 
-11. Apply Category and Subject ingestion:
+11. Apply Category and Subject ingestion in dependency order:
 
     ```bash
-    gurubodh-seed-data ingest plan --apply
+    gurubodh-seed-data ingest apply category
+    gurubodh-seed-data ingest apply subject
     ```
 
-12. Run the dry-run plan again:
+12. Run the dry-run plans again:
 
     ```bash
-    gurubodh-seed-data ingest plan
+    gurubodh-seed-data ingest plan category
+    gurubodh-seed-data ingest plan subject
     ```
 
 13. Confirm the final dry-run reports:
@@ -656,8 +650,8 @@ Strapi trial data when the CMS contains duplicate codes or sort-order
 collisions.
 
 If Category apply fails, stop before trusting Subject ingestion. Rerun
-`gurubodh-seed-data ingest plan` and resolve Category conflicts or partial
-updates before trying apply again.
+`gurubodh-seed-data ingest plan category` and resolve Category conflicts or
+partial updates before trying apply again.
 
 If Subject apply fails, rerun the dry-run after confirming Category records
 exist and have stable `documentId` values. Subject records with missing or
@@ -678,13 +672,12 @@ Current Category and Subject ingestion is intentionally additive and
 update-oriented. It does not delete Strapi records that are absent from the
 artifacts.
 
-The CLI exposes one combined Category and Subject ingestion plan. Maintainers
-cannot currently run a Category-only or Subject-only apply command without code
-changes, although the apply sequence is internally Category-first.
+Category and Subject ingestion are run as separate targets. Run Category first
+when Subject records depend on Category relations.
 
-The report is aggregated across Category and Subject records. It does not yet
-print per-record diffs for every planned change, so maintainers should inspect
-the source artifacts and Strapi Admin when a dry-run reports unexpected updates.
+The report is scoped to the selected target. It does not yet print per-record
+diffs for every planned change, so maintainers should inspect the source
+artifacts and Strapi Admin when a dry-run reports unexpected updates.
 
 The workflow has been verified for Strapi 5 REST localization writes using
 `PUT /api/<collection>/{documentId}?locale=hi-IN&status=published`. Recheck this
@@ -692,9 +685,9 @@ behavior after Strapi upgrades or content-type localization changes.
 
 ## Glossary Strapi Ingestion Workflow
 
-Glossary ingestion reads the reviewed Sanatan Glossary and Prabodhan Glossary
-JSON artifacts and writes them to the CMS through Strapi REST APIs. It does not
-write directly to PostgreSQL.
+Glossary ingestion reads one reviewed Sanatan Glossary or Prabodhan Glossary
+JSON artifact at a time and writes the selected target to the CMS through
+Strapi REST APIs. It does not write directly to PostgreSQL.
 
 Sanatan Glossary and Prabodhan Glossary are separate Strapi Collection Types.
 The ingestion adapter maps artifact fields explicitly:
@@ -752,28 +745,28 @@ production readiness decision has been accepted.
 Run read-only glossary preflight before planning or applying writes:
 
 ```bash
-gurubodh-seed-data ingest glossary-preflight
+gurubodh-seed-data ingest preflight sanatan-glossary
+gurubodh-seed-data ingest preflight prabodhan-glossary
 ```
 
 The glossary preflight report includes these checks:
 
-- reviewed Sanatan Glossary artifact loading and schema validation;
-- reviewed Prabodhan Glossary artifact loading and schema validation;
-- approved artifact `strapi.collection_type` target validation;
-- Sanatan Glossary endpoint access;
-- Prabodhan Glossary endpoint access;
-- Draft & Publish status-query support for both glossary endpoints.
+- selected reviewed glossary artifact loading and schema validation;
+- selected artifact `strapi.collection_type` target validation;
+- selected glossary endpoint access;
+- Draft & Publish status-query support for the selected glossary endpoint.
 
 Run the glossary dry-run planner:
 
 ```bash
-gurubodh-seed-data ingest glossary-plan
+gurubodh-seed-data ingest plan sanatan-glossary
+gurubodh-seed-data ingest plan prabodhan-glossary
 ```
 
 The glossary plan report includes:
 
-- artifact record counts for Sanatan Glossary and Prabodhan Glossary;
-- configured Strapi target collections;
+- selected artifact record counts;
+- selected Strapi target collection;
 - records to create;
 - records to update;
 - records already matching;
@@ -785,17 +778,18 @@ The glossary plan report includes:
 
 Continue to apply only when conflicts and blocked records are both zero.
 
-To write glossary records to an approved throwaway or staging Strapi instance,
-pass the explicit apply flag:
+Apply one glossary target to an approved throwaway or staging Strapi instance:
 
 ```bash
-gurubodh-seed-data ingest glossary-plan --apply
+gurubodh-seed-data ingest apply sanatan-glossary
+gurubodh-seed-data ingest apply prabodhan-glossary
 ```
 
-After a successful glossary apply, rerun the default dry-run command:
+After a successful glossary apply, rerun the corresponding dry-run command:
 
 ```bash
-gurubodh-seed-data ingest glossary-plan
+gurubodh-seed-data ingest plan sanatan-glossary
+gurubodh-seed-data ingest plan prabodhan-glossary
 ```
 
 A clean post-apply dry-run should report:
@@ -858,28 +852,32 @@ Use this checklist for local or staging verification:
 8. Run read-only glossary preflight:
 
    ```bash
-   gurubodh-seed-data ingest glossary-preflight
+   gurubodh-seed-data ingest preflight sanatan-glossary
+   gurubodh-seed-data ingest preflight prabodhan-glossary
    ```
 
-9. Run the glossary dry-run plan:
+9. Run the glossary dry-run plans:
 
    ```bash
-   gurubodh-seed-data ingest glossary-plan
+   gurubodh-seed-data ingest plan sanatan-glossary
+   gurubodh-seed-data ingest plan prabodhan-glossary
    ```
 
-10. Review the dry-run report. Continue only when conflicts and blocked records
-    are both zero.
+10. Review each dry-run report. Continue only when conflicts and blocked
+    records are both zero for the target being applied.
 
 11. Apply glossary ingestion:
 
     ```bash
-    gurubodh-seed-data ingest glossary-plan --apply
+    gurubodh-seed-data ingest apply sanatan-glossary
+    gurubodh-seed-data ingest apply prabodhan-glossary
     ```
 
-12. Run the glossary dry-run plan again:
+12. Run the glossary dry-run plans again:
 
     ```bash
-    gurubodh-seed-data ingest glossary-plan
+    gurubodh-seed-data ingest plan sanatan-glossary
+    gurubodh-seed-data ingest plan prabodhan-glossary
     ```
 
 13. Confirm the final dry-run reports:
@@ -903,9 +901,9 @@ Dry-run conflicts should be fixed before apply. Correct the source CSV and
 regenerate artifacts when the artifact is wrong, or clean the local/staging
 Strapi trial data when the CMS contains duplicate glossary codes.
 
-If glossary apply fails, rerun `gurubodh-seed-data ingest glossary-plan` and
-reconcile the reported state by stable `code`. Apply is designed to be
-repeatable after the underlying issue is corrected.
+If glossary apply fails, rerun `gurubodh-seed-data ingest plan <target>` for
+the affected glossary and reconcile the reported state by stable `code`. Apply
+is designed to be repeatable after the underlying issue is corrected.
 
 If a field mapping problem is found before apply, fix the glossary adapter and
 rerun the dry-run. If a field mapping problem is found after apply, update
@@ -921,12 +919,10 @@ guidance for production data.
 Current glossary ingestion is intentionally additive and update-oriented. It
 does not delete Strapi records that are absent from the artifacts.
 
-The CLI exposes one combined glossary ingestion plan. Maintainers cannot
-currently run a Sanatan-only or Prabodhan-only apply command without code
-changes, although the adapter keeps the two Collection Types separate and allows
-the same code to exist once in each glossary.
+Sanatan Glossary and Prabodhan Glossary ingestion are run as separate targets.
+The same code may exist once in each glossary without conflict.
 
-The report is aggregated across both glossary targets. It does not yet print
+The report is scoped to the selected glossary target. It does not yet print
 per-record diffs for every planned update, so maintainers should inspect the
 source artifacts and Strapi Admin when a dry-run reports unexpected updates.
 

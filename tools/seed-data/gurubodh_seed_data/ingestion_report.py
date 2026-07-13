@@ -78,9 +78,9 @@ def build_target_plan_report(
     artifact = artifact_result.artifact
     messages = [
         (
-            f"Task 13 Stage 4 applied {target.display_name} ingestion."
+            f"Applied {target.display_name} ingestion."
             if applied
-            else f"Task 13 Stage 3 planned {target.display_name} ingestion."
+            else f"Planned {target.display_name} ingestion."
         ),
     ]
     has_blockers = bool(
