@@ -11,6 +11,7 @@
     "processing",
     "conversion",
     "integrity",
+    "formatting",
     "content_stats",
     "content",
     "annotations"
@@ -18,7 +19,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.2.0"
+      "const": "1.3.0"
     },
     "document": {
       "type": "object",
@@ -77,6 +78,14 @@
         "msword_filename": {
           "type": "string",
           "minLength": 1
+        },
+        "formatted_json_filename": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formatted_markdown_filename": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
@@ -111,6 +120,12 @@
               "$ref": "#/$defs/storage_reference"
             },
             "full_subject_text": {
+              "$ref": "#/$defs/storage_reference"
+            },
+            "formatted_json": {
+              "$ref": "#/$defs/storage_reference"
+            },
+            "formatted_markdown": {
               "$ref": "#/$defs/storage_reference"
             }
           },
@@ -179,40 +194,62 @@
           "required": ["text"],
           "properties": {
             "text": {
-              "type": "object",
-              "required": [
-                "algorithm",
-                "encoding",
-                "line_endings",
-                "scope",
-                "value"
-              ],
-              "properties": {
-                "algorithm": {
-                  "type": "string",
-                  "const": "sha256"
-                },
-                "encoding": {
-                  "type": "string",
-                  "const": "UTF-8"
-                },
-                "line_endings": {
-                  "type": "string",
-                  "const": "LF"
-                },
-                "scope": {
-                  "type": "string",
-                  "const": "artifact-bytes"
-                },
-                "value": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                }
-              },
-              "additionalProperties": false
+              "$ref": "#/$defs/artifact_integrity"
+            },
+            "formatted_json": {
+              "$ref": "#/$defs/artifact_integrity"
+            },
+            "formatted_markdown": {
+              "$ref": "#/$defs/artifact_integrity"
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "formatting": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "provider",
+        "model",
+        "fallback_model",
+        "model_used",
+        "status",
+        "warning",
+        "source_text_sha256"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "const": "sarvam"
+        },
+        "model": {
+          "type": "string",
+          "enum": ["sarvam-30b", "sarvam-105b"]
+        },
+        "fallback_model": {
+          "type": "string",
+          "enum": ["sarvam-30b", "sarvam-105b"]
+        },
+        "model_used": {
+          "type": ["string", "null"],
+          "enum": ["sarvam-30b", "sarvam-105b", null]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["disabled", "formatted", "skipped-unchanged", "failed"]
+        },
+        "warning": {
+          "type": ["string", "null"]
+        },
+        "source_text_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "additionalProperties": false
@@ -300,6 +337,39 @@
     }
   },
   "$defs": {
+    "artifact_integrity": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "encoding",
+        "line_endings",
+        "scope",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "sha256"
+        },
+        "encoding": {
+          "type": "string",
+          "const": "UTF-8"
+        },
+        "line_endings": {
+          "type": "string",
+          "const": "LF"
+        },
+        "scope": {
+          "type": "string",
+          "const": "artifact-bytes"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
     "storage_reference": {
       "type": "object",
       "required": ["backend", "url"],

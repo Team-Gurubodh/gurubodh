@@ -193,6 +193,25 @@ def print_formatting_summary(summary):
     )
 
 
+def formatted_metadata_file_names(formatting_result, subject_dir):
+    file_names = {}
+    artifacts = formatting_result.get("artifacts", {}) if formatting_result else {}
+
+    json_path = artifacts.get("json")
+    if json_path:
+        file_names["formatted_json"] = json_path.name
+        file_names["formatted_json_path"] = json_path
+        file_names["formatted_json_relative_path"] = json_path.relative_to(subject_dir)
+
+    markdown_path = artifacts.get("markdown")
+    if markdown_path:
+        file_names["formatted_markdown"] = markdown_path.name
+        file_names["formatted_markdown_path"] = markdown_path
+        file_names["formatted_markdown_relative_path"] = markdown_path.relative_to(subject_dir)
+
+    return file_names
+
+
 def split_docx_into_chapters(
     docx_path,
     chapter_split,
@@ -278,11 +297,16 @@ def split_docx_into_chapters(
                         / "full_subject"
                         / full_subject_output_filename(config, ".txt")
                     ).relative_to(chapter_docx_dir.parents[1]),
+                    **formatted_metadata_file_names(
+                        formatting_result,
+                        chapter_text_dir.parents[1],
+                    ),
                 },
                 text_value,
                 converter_counts or {},
                 created_at,
                 entry_point or "",
+                formatting_result,
             )
             (chapter_text_dir / metadata_name).write_text(
                 json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
