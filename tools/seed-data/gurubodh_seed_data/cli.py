@@ -34,6 +34,7 @@ from gurubodh_seed_data.strapi_preflight import run_preflight
 from gurubodh_seed_data.target_ingestion import (
     INGEST_TARGET_REGISTRY,
     TargetIngestionPlan,
+    apply_target_ingestion,
     load_target_artifact,
     plan_target_ingestion,
     run_target_preflight,
@@ -572,9 +573,7 @@ def _run_target_ingestion_command(args):
     if args.operation == "plan":
         return _run_target_ingestion_plan(args)
     if args.operation == "apply":
-        raise ValueError(
-            f"Target-specific ingest {args.operation} will be implemented in later Task 13 stages."
-        )
+        return _run_target_ingestion_apply(args)
     raise ValueError(f"Unsupported target-specific ingest operation: {args.operation}")
 
 
@@ -621,6 +620,49 @@ def _run_target_ingestion_plan(args):
     return 0 if report.conflicts == 0 and report.blocked_records == 0 else 1
 
 
+def _run_target_ingestion_apply(args):
+    mode = IngestionMode(apply=True)
+    artifact_result = load_target_artifact(args.target)
+    if artifact_result.errors:
+        for error in artifact_result.errors:
+            print(f"Artifact error: {error}")
+
+    config = _load_strapi_config_from_args(args)
+    client = StrapiClient(config)
+    preflight_result = run_target_preflight(client, config, args.target)
+    _print_preflight_result(preflight_result)
+
+    target_plan = (
+        plan_target_ingestion(client, config, artifact_result)
+        if artifact_result.is_valid and preflight_result.is_valid
+        else TargetIngestionPlan(target=artifact_result.target)
+    )
+    report = build_target_plan_report(
+        mode,
+        artifact_result,
+        preflight_result,
+        target_plan,
+    )
+    if report.conflicts or report.blocked_records:
+        print()
+        print(render_target_plan_report(report))
+        return 1
+
+    apply_target_ingestion(client, config, mode, target_plan)
+    target_plan = plan_target_ingestion(client, config, artifact_result)
+    report = build_target_plan_report(
+        mode,
+        artifact_result,
+        preflight_result,
+        target_plan,
+        applied=True,
+    )
+
+    print()
+    print(render_target_plan_report(report))
+    return 0 if not _target_report_has_pending_apply_work(report) else 1
+
+
 def _print_target_preflight_summary(artifact_result, preflight_result):
     artifact = artifact_result.artifact
     rows = [
@@ -639,6 +681,16 @@ def _print_target_preflight_summary(artifact_result, preflight_result):
         ("Writes", "not performed"),
     ]
     _print_table(("Field", "Value"), rows)
+
+
+def _target_report_has_pending_apply_work(report):
+    return bool(
+        report.to_create
+        or report.to_update
+        or report.conflicts
+        or report.blocked_records
+        or report.publish_actions
+    )
 
 
 def _add_ingestion_parser(subparsers):
