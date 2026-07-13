@@ -197,6 +197,26 @@ def ensure_local_destination(subject_dir, overwrite):
     subject_dir.mkdir(parents=True, exist_ok=True)
 
 
+def collect_formatted_artifacts(subject_dir):
+    chapter_text_dir = subject_dir / "chapters" / "text_and_metadata"
+    if not chapter_text_dir.exists():
+        return {}
+
+    artifacts = {}
+    for path in chapter_text_dir.glob("*.formatted.*"):
+        if path.suffix not in {".json", ".md"}:
+            continue
+        artifacts[path.relative_to(subject_dir)] = path.read_bytes()
+    return artifacts
+
+
+def restore_formatted_artifacts(subject_dir, artifacts):
+    for relative_path, content in artifacts.items():
+        path = subject_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+
 def ensure_r2_destination_available(config, overwrite, r2_client=None):
     if overwrite or not is_r2(config["destination"]):
         return

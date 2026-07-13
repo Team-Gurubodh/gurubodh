@@ -5,6 +5,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+from gurubodh_utils.paths import destination_paths_for_job
 from gurubodh_utils.docx.chapter_split import format_chapter_artifacts
 from gurubodh_utils.formatting import source_text_sha256
 from gurubodh_utils.storage import publish_r2_destination
@@ -24,6 +25,7 @@ FORMATTING_CONFIG = {
 
 
 R2_CONFIG = {
+    "formatting": FORMATTING_CONFIG,
     "destination": {
         "backend": "r2",
         "bucket": "gurubodh-library-dev",
@@ -31,6 +33,16 @@ R2_CONFIG = {
         "subject_dir": "129_spand_rahasya",
         "url_base": None,
     }
+}
+
+
+LOCAL_CONFIG = {
+    "formatting": FORMATTING_CONFIG,
+    "destination": {
+        "backend": "local",
+        "root_dir": "",
+        "subject_dir": "129_spand_rahasya",
+    },
 }
 
 
@@ -95,6 +107,151 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                 markdown_path.read_text(encoding="utf-8"),
                 "पहला वाक्य।\n\nदूसरा वाक्य।\n",
             )
+
+    def test_valid_matching_formatted_artifacts_are_reused_without_formatter_call(self):
+        text = "पहला वाक्य दूसरा वाक्य"
+        formatter = FakeFormatter(error=AssertionError("formatter should not be called"))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            json_path = output_dir / "chapter.formatted.json"
+            markdown_path = output_dir / "chapter.formatted.md"
+            json_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0.0",
+                        "provider": "sarvam",
+                        "model": "sarvam-30b",
+                        "fallback_model_used": None,
+                        "source_text_sha256": source_text_sha256(text),
+                        "status": "formatted",
+                        "paragraphs": ["पहला वाक्य।", "दूसरा वाक्य।"],
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            markdown_path.write_text("पहला वाक्य।\n\nदूसरा वाक्य।\n", encoding="utf-8")
+
+            result = format_chapter_artifacts(
+                output_dir,
+                "chapter.txt",
+                1,
+                text,
+                FORMATTING_CONFIG,
+                formatter,
+            )
+
+            self.assertEqual(result["status"], "skipped-unchanged")
+            self.assertEqual(result["artifacts"], {"json": json_path, "markdown": markdown_path})
+            self.assertEqual(formatter.calls, [])
+
+    def test_checksum_mismatch_regenerates_formatted_artifacts(self):
+        old_text = "पुराना पाठ"
+        new_text = "नया पाठ"
+        formatter = FakeFormatter(
+            result={
+                "schema_version": "1.0.0",
+                "provider": "sarvam",
+                "model": "sarvam-30b",
+                "fallback_model_used": None,
+                "source_text_sha256": source_text_sha256(new_text),
+                "status": "formatted",
+                "paragraphs": ["नया पाठ।"],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            (output_dir / "chapter.formatted.json").write_text(
+                json.dumps(
+                    {
+                        "source_text_sha256": source_text_sha256(old_text),
+                        "status": "formatted",
+                        "paragraphs": ["पुराना पाठ।"],
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (output_dir / "chapter.formatted.md").write_text("पुराना पाठ।\n", encoding="utf-8")
+
+            result = format_chapter_artifacts(
+                output_dir,
+                "chapter.txt",
+                1,
+                new_text,
+                FORMATTING_CONFIG,
+                formatter,
+            )
+
+            self.assertEqual(result["status"], "formatted")
+            self.assertEqual(formatter.calls, [new_text])
+            self.assertEqual(
+                (output_dir / "chapter.formatted.md").read_text(encoding="utf-8"),
+                "नया पाठ।\n",
+            )
+
+    def test_invalid_existing_formatted_json_regenerates(self):
+        text = "प्रबोधन"
+        formatter = FakeFormatter(
+            result={
+                "schema_version": "1.0.0",
+                "provider": "sarvam",
+                "model": "sarvam-30b",
+                "fallback_model_used": None,
+                "source_text_sha256": source_text_sha256(text),
+                "status": "formatted",
+                "paragraphs": ["प्रबोधन।"],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            (output_dir / "chapter.formatted.json").write_text("not-json\n", encoding="utf-8")
+            (output_dir / "chapter.formatted.md").write_text("old\n", encoding="utf-8")
+
+            result = format_chapter_artifacts(
+                output_dir,
+                "chapter.txt",
+                1,
+                text,
+                FORMATTING_CONFIG,
+                formatter,
+            )
+
+            self.assertEqual(result["status"], "formatted")
+            self.assertEqual(formatter.calls, [text])
+
+    def test_local_overwrite_preserves_only_existing_formatted_artifacts_for_reuse(self):
+        config = json.loads(json.dumps(LOCAL_CONFIG))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config["destination"]["root_dir"] = temp_dir
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            artifact_dir = subject_dir / "chapters" / "text_and_metadata"
+            artifact_dir.mkdir(parents=True)
+            (artifact_dir / "chapter.formatted.json").write_text("{}\n", encoding="utf-8")
+            (artifact_dir / "chapter.formatted.md").write_text("formatted\n", encoding="utf-8")
+            (artifact_dir / "chapter.txt").write_text("raw\n", encoding="utf-8")
+
+            paths, temp_destination = destination_paths_for_job(config, overwrite=True)
+
+            self.assertIsNone(temp_destination)
+            self.assertEqual(paths["subject"], subject_dir)
+            self.assertTrue((artifact_dir / "chapter.formatted.json").exists())
+            self.assertTrue((artifact_dir / "chapter.formatted.md").exists())
+            self.assertFalse((artifact_dir / "chapter.txt").exists())
+
+    def test_r2_reuse_strategy_starts_from_current_temp_artifact_tree_only(self):
+        paths, temp_destination = destination_paths_for_job(R2_CONFIG, overwrite=True)
+        self.addCleanup(temp_destination.cleanup)
+
+        self.assertIsNotNone(temp_destination)
+        self.assertIn("gurubodh-content-prep-", str(paths["subject"]))
+        self.assertFalse((paths["text_and_metadata"] / "chapter.formatted.json").exists())
 
     def test_disabled_formatting_does_not_call_formatter_or_write_artifacts(self):
         formatter = FakeFormatter(error=AssertionError("formatter should not be called"))

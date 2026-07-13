@@ -113,8 +113,24 @@ error.
 
 Chapter metadata records formatted artifact filenames, storage references,
 formatted artifact integrity checksums, and per-chapter formatting status when
-formatted files are produced. Checksum-based reuse is planned for a later Task
-14 stage.
+formatted files are produced.
+
+When `regenerate` is `when-source-checksum-changes`, the formatter compares the
+raw chapter text SHA-256 with `source_text_sha256` in an existing
+`*.formatted.json` artifact. If the checksum matches and the requested formatted
+artifacts are present and valid, the Sarvam call is skipped and chapter metadata
+records `formatting.status` as `skipped-unchanged`. If the checksum differs, the
+formatted JSON is invalid, the formatted status is not display-ready, or a
+requested formatted artifact is missing, the formatter regenerates the formatted
+artifacts.
+
+For local destinations, reruns with `--overwrite` preserve existing
+`*.formatted.json` and `*.formatted.md` files long enough for checksum-based
+reuse validation, while other generated artifacts are replaced. For R2
+destinations, jobs build artifacts in a temporary local subject tree before
+upload. Stage 5 does not download previously uploaded R2 artifacts for reuse; R2
+jobs only reuse formatted artifacts that have already been materialized into the
+current local artifact tree by a future cache or restore step.
 
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
 enabled. Install the optional Sarvam SDK dependency when you need formatter
