@@ -1,12 +1,9 @@
 import json
 import unittest
-from contextlib import redirect_stderr
-from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from gurubodh_seed_data.cli import build_parser
 from gurubodh_seed_data.glossary_ingestion import (
     APPROVED_GLOSSARY_TARGETS,
     LoadedGlossaryArtifact,
@@ -479,23 +476,6 @@ class GlossaryApplyTest(unittest.TestCase):
             ],
             client.update_calls,
         )
-
-
-class GlossaryIngestionCliTest(unittest.TestCase):
-    def test_glossary_stage2_command_does_not_accept_apply_mode(self):
-        parser = build_parser()
-
-        with redirect_stderr(StringIO()):
-            with self.assertRaises(SystemExit):
-                parser.parse_args(("ingest", "glossary-preflight", "--apply"))
-
-    def test_glossary_stage4_command_accepts_apply_mode(self):
-        parser = build_parser()
-
-        args = parser.parse_args(("ingest", "glossary-plan", "--apply"))
-
-        self.assertTrue(args.apply)
-
 
 if __name__ == "__main__":
     unittest.main()

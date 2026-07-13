@@ -553,74 +553,45 @@ def _add_strapi_options(parser):
     )
 
 
+INGEST_OPERATIONS = ("preflight", "plan", "apply")
+INGEST_TARGETS = (
+    "category",
+    "subject",
+    "sanatan-glossary",
+    "prabodhan-glossary",
+)
+
+
+def _run_target_ingestion_command(_args):
+    raise ValueError(
+        "Target-specific ingest execution will be implemented in later Task 13 stages."
+    )
+
+
 def _add_ingestion_parser(subparsers):
     ingest_parser = subparsers.add_parser(
         "ingest",
         help="Inspect and apply seed-data ingestion plans.",
-        description="Ingestion commands for Category and Subject seed data.",
+        description="Ingestion commands for individual seed-data targets.",
     )
     ingest_subparsers = ingest_parser.add_subparsers(
-        dest="ingest_command",
+        dest="operation",
         required=True,
     )
 
-    preflight_parser = ingest_subparsers.add_parser(
-        "preflight",
-        help="Run read-only Strapi ingestion readiness checks.",
-        description="Check Strapi reachability, API access, locales, and Draft & Publish support.",
-    )
-    _add_strapi_options(preflight_parser)
-    preflight_parser.set_defaults(handler=_run_ingestion_preflight)
-
-    glossary_preflight_parser = ingest_subparsers.add_parser(
-        "glossary-preflight",
-        help="Run read-only glossary artifact and Strapi readiness checks.",
-        description="Load reviewed glossary artifacts, validate approved targets, and check glossary endpoints without writes.",
-    )
-    _add_strapi_options(glossary_preflight_parser)
-    glossary_preflight_parser.set_defaults(handler=_run_glossary_ingestion_preflight)
-
-    glossary_plan_parser = ingest_subparsers.add_parser(
-        "glossary-plan",
-        help="Load artifacts and print or apply the glossary ingestion plan.",
-        description="Run artifact loading, preflight, and Stage 4 glossary ingestion planning.",
-    )
-    _add_strapi_options(glossary_plan_parser)
-    glossary_plan_mode = glossary_plan_parser.add_mutually_exclusive_group()
-    glossary_plan_mode.add_argument(
-        "--dry-run",
-        action="store_false",
-        dest="apply",
-        default=False,
-        help="Inspect only; this is the default.",
-    )
-    glossary_plan_mode.add_argument(
-        "--apply",
-        action="store_true",
-        help="Explicitly apply glossary writes after a conflict-free plan.",
-    )
-    glossary_plan_parser.set_defaults(handler=_run_glossary_ingestion_plan)
-
-    plan_parser = ingest_subparsers.add_parser(
-        "plan",
-        help="Load artifacts and print or apply the Category and Subject ingestion plan.",
-        description="Run artifact loading, preflight, and Stage 4 Category and Subject ingestion planning.",
-    )
-    _add_strapi_options(plan_parser)
-    plan_mode = plan_parser.add_mutually_exclusive_group()
-    plan_mode.add_argument(
-        "--dry-run",
-        action="store_false",
-        dest="apply",
-        default=False,
-        help="Inspect only; this is the default.",
-    )
-    plan_mode.add_argument(
-        "--apply",
-        action="store_true",
-        help="Explicitly apply Category and Subject writes after a conflict-free plan.",
-    )
-    plan_parser.set_defaults(handler=_run_ingestion_plan)
+    for operation in INGEST_OPERATIONS:
+        operation_parser = ingest_subparsers.add_parser(
+            operation,
+            help=f"Run {operation} for one seed-data target.",
+            description=f"Run {operation} for category, subject, or one glossary target.",
+        )
+        _add_strapi_options(operation_parser)
+        operation_parser.add_argument(
+            "target",
+            choices=INGEST_TARGETS,
+            help="Seed-data target to process.",
+        )
+        operation_parser.set_defaults(handler=_run_target_ingestion_command)
 
 
 def build_parser():
