@@ -8,7 +8,9 @@ from pathlib import Path
 
 from botocore.exceptions import ClientError
 
+from gurubodh_utils.cli import main as cli_main
 from gurubodh_utils.config import load_conversion_job
+from gurubodh_utils.constants import DEFAULT_FORMATTING_CONFIG
 from gurubodh_utils.metadata import build_chapter_metadata, text_artifact_integrity
 from gurubodh_utils.storage import (
     R2StorageClient,
@@ -19,7 +21,7 @@ from gurubodh_utils.storage import (
 
 
 BASE_CONFIG = {
-    "schema_version": "1.2.0",
+    "schema_version": "1.3.0",
     "pipeline": "unicode-docx-ingest",
     "source": {
         "root_dir": "/tmp/source",
@@ -85,6 +87,177 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
         self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya")
+
+    def test_omitted_formatting_defaults_to_disabled(self):
+        config = load_conversion_job(self.write_config(BASE_CONFIG))
+
+        self.assertEqual(config["formatting"], DEFAULT_FORMATTING_CONFIG)
+        self.assertFalse(config["formatting"]["enabled"])
+
+    def test_disabled_formatting_block_receives_defaults(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": False}
+
+        loaded = load_conversion_job(self.write_config(config))
+
+        self.assertEqual(loaded["formatting"], DEFAULT_FORMATTING_CONFIG)
+
+    def test_enabled_sarvam_formatting_shape_loads(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {
+            "enabled": True,
+            "provider": "sarvam",
+            "model": "sarvam-30b",
+            "fallback_model": "sarvam-105b",
+            "output_formats": ["json", "markdown"],
+            "continue_on_error": True,
+            "delay_seconds": 5,
+            "max_retries": 3,
+            "regenerate": "when-source-checksum-changes",
+        }
+
+        loaded = load_conversion_job(self.write_config(config))
+
+        self.assertTrue(loaded["formatting"]["enabled"])
+        self.assertEqual(loaded["formatting"]["model"], "sarvam-30b")
+        self.assertEqual(loaded["formatting"]["fallback_model"], "sarvam-105b")
+
+    def test_formatting_rejects_invalid_provider(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "provider": "other"}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.provider", str(exc.exception))
+
+    def test_formatting_rejects_non_boolean_enabled(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": "yes"}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.enabled", str(exc.exception))
+
+    def test_formatting_rejects_invalid_model_name(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "model": "not-a-sarvam-model"}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.model", str(exc.exception))
+
+    def test_formatting_rejects_invalid_output_format(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "output_formats": ["json", "html"]}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.output_formats", str(exc.exception))
+
+    def test_formatting_rejects_invalid_retry_values(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "max_retries": 99}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.max_retries", str(exc.exception))
+
+    def test_formatting_rejects_invalid_regeneration_mode(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "regenerate": "always"}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.regenerate", str(exc.exception))
+
+    def test_conversion_job_schema_declares_formatting_contract(self):
+        schema_path = Path(__file__).parents[1] / "config" / "conversion_job.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        formatting = schema["properties"]["formatting"]["properties"]
+
+        self.assertEqual(schema["properties"]["schema_version"]["const"], "1.3.0")
+        self.assertEqual(formatting["provider"]["const"], "sarvam")
+        self.assertEqual(formatting["model"]["default"], "sarvam-30b")
+        self.assertEqual(formatting["fallback_model"]["default"], "sarvam-105b")
+        self.assertEqual(formatting["output_formats"]["items"]["enum"], ["json", "markdown"])
+        self.assertEqual(formatting["continue_on_error"]["default"], True)
+        self.assertEqual(formatting["delay_seconds"]["default"], 5)
+        self.assertEqual(formatting["max_retries"]["default"], 3)
+        self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
+
+    def test_migrate_configs_preview_reports_without_writing(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        original = '{\n  "schema_version": "1.2.0",\n  "pipeline": "unicode-docx-ingest"\n}\n'
+        path.write_text(original, encoding="utf-8")
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        self.assertIn("would-migrate", stdout.getvalue())
+        self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+    def test_migrate_configs_apply_updates_only_schema_version(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        path.write_text(
+            '{\n'
+            '  "schema_version": "1.2.0",\n'
+            '  "pipeline": "unicode-docx-ingest",\n'
+            '  "description": "spacing is preserved"\n'
+            '}\n',
+            encoding="utf-8",
+        )
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                "--apply",
+                str(path),
+            ])
+
+        self.assertIn("migrated", stdout.getvalue())
+        self.assertEqual(
+            path.read_text(encoding="utf-8"),
+            '{\n'
+            '  "schema_version": "1.3.0",\n'
+            '  "pipeline": "unicode-docx-ingest",\n'
+            '  "description": "spacing is preserved"\n'
+            '}\n',
+        )
+
+    def test_migrate_configs_refuses_unsupported_schema_version(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        path.write_text('{"schema_version": "0.9.0"}', encoding="utf-8")
+
+        with self.assertRaises(SystemExit) as exc:
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        self.assertIn("unsupported schema_version", str(exc.exception))
 
     def test_r2_source_and_destination_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))

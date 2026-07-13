@@ -51,6 +51,48 @@ gurubodh-utils run \
   --config jobs/002_spand_rahasya.local.json
 ```
 
+## Job Schema Migration
+
+Conversion job configs use `schema_version`. To preview migration from
+`1.2.0` configs to the current `1.3.0` schema without writing files:
+
+```bash
+gurubodh-utils migrate-configs jobs/002_spand_rahasya.local.json
+```
+
+To apply the migration:
+
+```bash
+gurubodh-utils migrate-configs --apply jobs/002_spand_rahasya.local.json
+```
+
+The migration updates the schema version only and preserves existing fields.
+Unsupported schema versions are refused instead of silently rewritten.
+
+## Optional Formatting Configuration
+
+Schema `1.3.0` adds an optional `formatting` block for the future Sarvam Hindi
+formatter integration. If the block is omitted, formatting is disabled.
+
+```json
+{
+  "formatting": {
+    "enabled": true,
+    "provider": "sarvam",
+    "model": "sarvam-30b",
+    "fallback_model": "sarvam-105b",
+    "output_formats": ["json", "markdown"],
+    "continue_on_error": true,
+    "delay_seconds": 5,
+    "max_retries": 3,
+    "regenerate": "when-source-checksum-changes"
+  }
+}
+```
+
+Stage 1 defines and validates the configuration contract only. It does not call
+Sarvam or generate formatted chapter artifacts yet.
+
 ## Storage Configuration
 
 The conversion job supports `local` and `r2` source/destination storage
