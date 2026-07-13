@@ -71,8 +71,8 @@ Unsupported schema versions are refused instead of silently rewritten.
 
 ## Optional Formatting Configuration
 
-Schema `1.3.0` adds an optional `formatting` block for the future Sarvam Hindi
-formatter integration. If the block is omitted, formatting is disabled.
+Schema `1.3.0` adds an optional `formatting` block for Sarvam Hindi formatter
+integration. If the block is omitted, formatting is disabled.
 
 ```json
 {
@@ -151,6 +151,21 @@ but do not commit API keys. Sarvam's API base URL is `https://api.sarvam.ai`;
 normal formatter usage goes through the official Sarvam SDK, so you should not
 need to configure the URL separately.
 
+The sample job `jobs/002_spand_rahasya.formatting-disabled.local.json` includes
+an explicit disabled formatting block:
+
+```json
+{
+  "formatting": {
+    "enabled": false
+  }
+}
+```
+
+This sample is safe for normal local runs and does not require Sarvam
+credentials. Use it when you want to verify the schema `1.3.0` formatting shape
+without making API calls.
+
 ## Storage Configuration
 
 The conversion job supports `local` and `r2` source/destination storage
@@ -161,6 +176,7 @@ Sample jobs are split by backend:
 ```text
 jobs/001_aacharan_shaastra.local.json
 jobs/001_aacharan_shaastra.r2-output.json
+jobs/002_spand_rahasya.formatting-disabled.local.json
 jobs/002_spand_rahasya.local.json
 jobs/002_spand_rahasya.r2-output.json
 ```
