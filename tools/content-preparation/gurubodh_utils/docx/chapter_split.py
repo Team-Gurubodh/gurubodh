@@ -7,6 +7,7 @@ from xml.etree import ElementTree as ET
 from gurubodh_utils.docx.namespaces import NS, W
 from gurubodh_utils.docx.text import block_text
 from gurubodh_utils.docx.validate import validate_docx
+from gurubodh_utils.formatting import SarvamFormatter
 from gurubodh_utils.metadata import build_chapter_metadata
 from gurubodh_utils.naming import chapter_output_filename, full_subject_output_filename
 from gurubodh_utils.text_utils import normalize_spaces, safe_filename
@@ -116,6 +117,82 @@ def write_chapter_docx(source_docx, output_path, document_xml):
                 target.writestr(info, data)
 
 
+def formatted_artifact_names(text_name):
+    base_name = text_name.removesuffix(".txt")
+    return {
+        "json": f"{base_name}.formatted.json",
+        "markdown": f"{base_name}.formatted.md",
+    }
+
+
+def formatted_markdown(paragraphs):
+    return "\n\n".join(paragraph.strip() for paragraph in paragraphs if paragraph.strip()) + "\n"
+
+
+def write_formatted_artifacts(chapter_text_dir, text_name, formatted_result, output_formats):
+    names = formatted_artifact_names(text_name)
+    written = {}
+
+    if "json" in output_formats:
+        json_path = chapter_text_dir / names["json"]
+        json_path.write_text(
+            json.dumps(formatted_result, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        written["json"] = json_path
+
+    if "markdown" in output_formats:
+        markdown_path = chapter_text_dir / names["markdown"]
+        markdown_path.write_text(
+            formatted_markdown(formatted_result["paragraphs"]),
+            encoding="utf-8",
+        )
+        written["markdown"] = markdown_path
+
+    return written
+
+
+def format_chapter_artifacts(
+    chapter_text_dir,
+    text_name,
+    chapter_number,
+    chapter_text_value,
+    formatting_config,
+    formatter,
+):
+    if not formatting_config or not formatting_config.get("enabled"):
+        return {"status": "disabled", "warning": None, "artifacts": {}}
+
+    try:
+        formatted_result = formatter.format_text(chapter_text_value)
+        artifacts = write_formatted_artifacts(
+            chapter_text_dir,
+            text_name,
+            formatted_result,
+            set(formatting_config["output_formats"]),
+        )
+        return {"status": "formatted", "warning": None, "artifacts": artifacts}
+    except Exception as exc:
+        base_name = text_name.removesuffix(".txt")
+        warning = f"formatting failed for chapter {chapter_number:03d} {base_name}: {exc}"
+        if not formatting_config.get("continue_on_error", True):
+            raise SystemExit(warning) from exc
+        print(f"warning: {warning}")
+        return {"status": "failed", "warning": warning, "artifacts": {}}
+
+
+def print_formatting_summary(summary):
+    total = summary["formatted"] + summary["failed"] + summary["disabled"]
+    if total == 0:
+        return
+    print(
+        "formatting summary: "
+        f"formatted={summary['formatted']} "
+        f"failed={summary['failed']} "
+        f"disabled={summary['disabled']}"
+    )
+
+
 def split_docx_into_chapters(
     docx_path,
     chapter_split,
@@ -144,6 +221,9 @@ def split_docx_into_chapters(
 
     outputs = []
     created_at = utc_now()
+    formatting_config = config.get("formatting") if config else None
+    formatter = SarvamFormatter(formatting_config) if formatting_config and formatting_config.get("enabled") else None
+    formatting_summary = {"formatted": 0, "failed": 0, "disabled": 0}
     for index, blocks in enumerate(chapters, start=1):
         if config:
             docx_name = chapter_output_filename(config, index, ".docx")
@@ -161,6 +241,16 @@ def split_docx_into_chapters(
         write_chapter_docx(docx_path, output_path, xml)
         text_value = chapter_text(subject_blocks + blocks)
         text_path.write_text(text_value + "\n", encoding="utf-8")
+        if config:
+            formatting_result = format_chapter_artifacts(
+                chapter_text_dir,
+                text_name,
+                index,
+                text_value,
+                formatting_config,
+                formatter,
+            )
+            formatting_summary[formatting_result["status"]] += 1
         if config:
             metadata = build_chapter_metadata(
                 config,
@@ -203,4 +293,5 @@ def split_docx_into_chapters(
 
     print(f"wrote {len(outputs)} chapter files under {chapter_docx_dir}")
     print(f"wrote {len(outputs)} chapter text files under {chapter_text_dir}")
+    print_formatting_summary(formatting_summary)
     return outputs
