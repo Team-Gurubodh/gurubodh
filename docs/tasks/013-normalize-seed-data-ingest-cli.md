@@ -437,7 +437,60 @@ This CLI normalization should not require CMS schema or build changes.
 
 ## Execution Results
 
-Not started.
+### Stage 2 - 2026-07-13
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/79
+
+Implementation branch:
+
+```text
+issue-79-task-13-stage-2-target-preflight
+```
+
+Implemented target-specific artifact loading and read-only preflight routing in
+`tools/seed-data`:
+
+- added a target registry for:
+  - `category`;
+  - `subject`;
+  - `sanatan-glossary`;
+  - `prabodhan-glossary`;
+- added one-target-at-a-time artifact loading with schema validation and target
+  identity checks;
+- validates glossary target routing so Sanatan artifacts cannot be routed to
+  Prabodhan endpoints, and Prabodhan artifacts cannot be routed to Sanatan
+  endpoints;
+- added target-specific preflight behavior:
+  - Category checks Category endpoint access, expected locales, and Category
+    Draft & Publish status-query support;
+  - Subject checks Subject endpoint access, Category read access for relation
+    dependency resolution, expected locales, and Subject Draft & Publish
+    status-query support;
+  - Sanatan Glossary checks only the Sanatan Glossary endpoint and Draft &
+    Publish support;
+  - Prabodhan Glossary checks only the Prabodhan Glossary endpoint and Draft &
+    Publish support;
+- wired `gurubodh-seed-data ingest preflight <target>` to the new target-specific
+  read-only route;
+- kept `plan <target>` and `apply <target>` explicitly deferred to later Task
+  13 stages.
+
+Stage 2 performs no create, update, localization, or publish writes.
+
+Verification ran the seed-data unit test suite and read-only preflight checks
+against the throwaway Strapi database:
+
+```bash
+cd tools/seed-data
+python3 -m unittest discover -s tests
+python3 -m gurubodh_seed_data.cli ingest preflight category
+python3 -m gurubodh_seed_data.cli ingest preflight subject
+python3 -m gurubodh_seed_data.cli ingest preflight sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest preflight prabodhan-glossary
+```
+
+The unit test suite passed with 87 tests. The live preflight checks passed for
+all four targets and each command reported that no writes were performed.
 
 ## Follow-Up
 
