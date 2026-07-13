@@ -51,6 +51,26 @@ class FakeSarvamClient:
         self.chat = FakeChat(responses)
 
 
+class FakeCompletionsWithoutResponseFormat:
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def __call__(self, *, model, messages):
+        self.calls.append({"model": model, "messages": messages})
+        return self.response
+
+
+class FakeChatWithoutResponseFormat:
+    def __init__(self, response):
+        self.completions = FakeCompletionsWithoutResponseFormat(response)
+
+
+class FakeSarvamClientWithoutResponseFormat:
+    def __init__(self, response):
+        self.chat = FakeChatWithoutResponseFormat(response)
+
+
 class FormattingTests(unittest.TestCase):
     def test_formatter_import_does_not_require_sarvam_sdk(self):
         formatter = SarvamFormatter(formatting_config(), client=FakeSarvamClient([
@@ -87,6 +107,18 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(call["messages"][0]["content"], HINDI_FORMATTING_SYSTEM_PROMPT)
         self.assertEqual(call["messages"][1], {"role": "user", "content": "ॐ"})
 
+    def test_sarvam_chat_request_allows_clients_without_response_format(self):
+        client = FakeSarvamClientWithoutResponseFormat('{"paragraphs": ["ॐ।"]}')
+        formatter = SarvamFormatter(formatting_config(), client=client)
+
+        result = formatter.format_text("ॐ")
+
+        self.assertEqual(result["paragraphs"], ["ॐ।"])
+        call = client.chat.completions.calls[0]
+        self.assertEqual(call["model"], "sarvam-30b")
+        self.assertNotIn("response_format", call)
+        self.assertEqual(call["messages"][0]["content"], HINDI_FORMATTING_SYSTEM_PROMPT)
+
     def test_parser_accepts_openai_style_choice_response(self):
         response = {
             "choices": [
@@ -99,6 +131,32 @@ class FormattingTests(unittest.TestCase):
         }
 
         self.assertEqual(parse_sarvam_formatting_response(response), ["एक।", "दो।"])
+
+    def test_parser_accepts_json_with_markdown_fence_markers(self):
+        response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": '```json\n{"paragraphs": ["एक।"]}\n```',
+                    }
+                }
+            ]
+        }
+
+        self.assertEqual(parse_sarvam_formatting_response(response), ["एक।"])
+
+    def test_parser_accepts_json_with_trailing_markdown_fence_marker(self):
+        response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"paragraphs": ["एक।"]}\n```',
+                    }
+                }
+            ]
+        }
+
+        self.assertEqual(parse_sarvam_formatting_response(response), ["एक।"])
 
     def test_parser_rejects_invalid_json(self):
         with self.assertRaises(SarvamResponseError) as exc:

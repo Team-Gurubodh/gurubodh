@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 import json
 import os
 import time
@@ -111,6 +112,7 @@ def parse_sarvam_formatting_response(raw_response):
     if not isinstance(text, str) or not text.strip():
         raise SarvamResponseError("Sarvam response did not contain JSON text")
 
+    text = normalize_json_response_text(text)
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -131,6 +133,18 @@ def parse_sarvam_formatting_response(raw_response):
                 f"Sarvam response paragraph {index} must be a non-empty string"
             )
     return [paragraph.strip() for paragraph in paragraphs]
+
+
+def normalize_json_response_text(text):
+    stripped = text.strip()
+    if stripped.startswith("```json"):
+        stripped = stripped.removeprefix("```json").strip()
+    elif stripped.startswith("```"):
+        stripped = stripped.removeprefix("```").strip()
+
+    if stripped.endswith("```"):
+        stripped = stripped.removesuffix("```").strip()
+    return stripped
 
 
 def extract_response_text(raw_response):
@@ -257,24 +271,36 @@ def call_sarvam_chat_completion(client, model, messages):
     if completions is not None:
         create = getattr(completions, "create", None)
         if callable(create):
-            return create(
-                model=model,
-                messages=messages,
-                response_format=SARVAM_FORMATTING_RESPONSE_SCHEMA,
-            )
+            return call_with_optional_response_format(create, model, messages)
         if callable(completions):
-            return completions(
-                model=model,
-                messages=messages,
-                response_format=SARVAM_FORMATTING_RESPONSE_SCHEMA,
-            )
+            return call_with_optional_response_format(completions, model, messages)
 
     create_chat_completion = getattr(client, "create_chat_completion", None)
     if callable(create_chat_completion):
-        return create_chat_completion(
-            model=model,
-            messages=messages,
-            response_format=SARVAM_FORMATTING_RESPONSE_SCHEMA,
-        )
+        return call_with_optional_response_format(create_chat_completion, model, messages)
 
     raise SarvamPermanentError("Unsupported Sarvam client shape for chat completion")
+
+
+def call_with_optional_response_format(callable_obj, model, messages):
+    kwargs = {
+        "model": model,
+        "messages": messages,
+    }
+    if accepts_keyword(callable_obj, "response_format"):
+        kwargs["response_format"] = SARVAM_FORMATTING_RESPONSE_SCHEMA
+    return callable_obj(**kwargs)
+
+
+def accepts_keyword(callable_obj, keyword):
+    try:
+        parameters = inspect.signature(callable_obj).parameters
+    except (TypeError, ValueError):
+        return True
+
+    if keyword in parameters:
+        return True
+    return any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
