@@ -93,6 +93,28 @@ formatter integration. If the block is omitted, formatting is disabled.
 Stage 1 defines and validates the configuration contract only. It does not call
 Sarvam or generate formatted chapter artifacts yet.
 
+Stage 2 adds the formatter module foundation. Pipeline integration and formatted
+chapter artifacts are still future stages.
+
+Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
+enabled. Install the optional Sarvam SDK dependency when you need formatter
+access:
+
+```bash
+pip install -e ".[formatting]"
+```
+
+Put the key in your shell environment before running the tool:
+
+```bash
+export SARVAM_API_KEY=...
+```
+
+You may also keep it in a local untracked `.env` file for your own shell setup,
+but do not commit API keys. Sarvam's API base URL is `https://api.sarvam.ai`;
+normal formatter usage goes through the official Sarvam SDK, so you should not
+need to configure the URL separately.
+
 ## Storage Configuration
 
 The conversion job supports `local` and `r2` source/destination storage
