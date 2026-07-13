@@ -3,34 +3,16 @@ import sys
 
 from gurubodh_seed_data.category import get_category_source, list_category_sources
 from gurubodh_seed_data.category_artifacts import write_category_artifact
-from gurubodh_seed_data.category_ingestion import (
-    apply_category_ingestion,
-    plan_category_ingestion,
-)
 from gurubodh_seed_data.glossary import get_glossary_source, list_glossary_sources
 from gurubodh_seed_data.glossary_artifacts import write_glossary_artifact
-from gurubodh_seed_data.glossary_ingestion import (
-    apply_glossary_ingestion,
-    load_glossary_ingestion_artifacts,
-    plan_glossary_ingestion,
-    run_glossary_preflight,
-)
-from gurubodh_seed_data.ingestion_artifacts import load_ingestion_artifacts
 from gurubodh_seed_data.ingestion_mode import IngestionMode
 from gurubodh_seed_data.ingestion_report import (
-    build_glossary_stage2_report,
-    build_glossary_stage3_report,
     build_target_plan_report,
-    build_stage4_ingestion_report,
-    render_glossary_plan_report,
-    render_report,
-    render_glossary_report,
     render_target_plan_report,
 )
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
 from gurubodh_seed_data.strapi_client import StrapiClient
 from gurubodh_seed_data.strapi_config import load_strapi_config
-from gurubodh_seed_data.strapi_preflight import run_preflight
 from gurubodh_seed_data.target_ingestion import (
     INGEST_TARGET_REGISTRY,
     TargetIngestionPlan,
@@ -41,10 +23,6 @@ from gurubodh_seed_data.target_ingestion import (
 )
 from gurubodh_seed_data.subject import get_subject_source, list_subject_sources
 from gurubodh_seed_data.subject_artifacts import write_subject_artifact
-from gurubodh_seed_data.subject_ingestion import (
-    apply_subject_ingestion,
-    plan_subject_ingestion,
-)
 from gurubodh_seed_data.validation import (
     validate_category_csv,
     validate_glossary_csv,
@@ -156,160 +134,6 @@ def _print_preflight_result(result):
         for check in result.checks
     ]
     _print_table(("Check", "Result", "Message"), rows)
-
-
-def _run_ingestion_preflight(args):
-    config = _load_strapi_config_from_args(args)
-    result = run_preflight(StrapiClient(config), config)
-    _print_preflight_result(result)
-    return 0 if result.is_valid else 1
-
-
-def _run_glossary_ingestion_preflight(args):
-    mode = IngestionMode()
-    artifact_result = load_glossary_ingestion_artifacts()
-    if artifact_result.errors:
-        for error in artifact_result.errors:
-            print(f"Artifact error: {error}")
-
-    config = _load_strapi_config_from_args(args)
-    preflight_result = run_glossary_preflight(StrapiClient(config))
-    _print_preflight_result(preflight_result)
-    report = build_glossary_stage2_report(mode, artifact_result, preflight_result)
-    print()
-    print(render_glossary_report(report))
-    return 0 if artifact_result.is_valid and preflight_result.is_valid else 1
-
-
-def _run_glossary_ingestion_plan(args):
-    mode = IngestionMode(apply=args.apply)
-    artifact_result = load_glossary_ingestion_artifacts()
-    if artifact_result.errors:
-        for error in artifact_result.errors:
-            print(f"Artifact error: {error}")
-
-    config = _load_strapi_config_from_args(args)
-    client = StrapiClient(config)
-    preflight_result = run_glossary_preflight(client)
-    _print_preflight_result(preflight_result)
-
-    glossary_plan = (
-        plan_glossary_ingestion(client, artifact_result.artifacts)
-        if artifact_result.is_valid and preflight_result.is_valid
-        else plan_glossary_ingestion(client, ())
-    )
-    report = build_glossary_stage3_report(
-        mode,
-        artifact_result,
-        preflight_result,
-        glossary_plan,
-    )
-    if report.conflicts or report.blocked_records:
-        print()
-        print(render_glossary_plan_report(report))
-        return 1
-
-    applied = False
-    if mode.can_write:
-        apply_glossary_ingestion(client, mode, glossary_plan)
-        applied = True
-        glossary_plan = plan_glossary_ingestion(client, artifact_result.artifacts)
-        report = build_glossary_stage3_report(
-            mode,
-            artifact_result,
-            preflight_result,
-            glossary_plan,
-            applied=applied,
-        )
-        if report.conflicts or report.blocked_records:
-            print()
-            print(render_glossary_plan_report(report))
-            return 1
-
-    print()
-    print(render_glossary_plan_report(report))
-    return 0
-
-
-def _run_ingestion_plan(args):
-    mode = IngestionMode(apply=args.apply)
-    artifact_result = load_ingestion_artifacts()
-
-    if artifact_result.errors:
-        for error in artifact_result.errors:
-            print(f"Artifact error: {error}")
-        return 1
-
-    config = _load_strapi_config_from_args(args)
-    client = StrapiClient(config)
-    preflight_result = run_preflight(client, config)
-    _print_preflight_result(preflight_result)
-    if not preflight_result.is_valid:
-        return 1
-
-    category_artifact = _find_loaded_artifact(artifact_result, "category")
-    subject_artifact = _find_loaded_artifact(artifact_result, "subject")
-    category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
-    subject_plan = plan_subject_ingestion(client, config, subject_artifact.artifact)
-    report = build_stage4_ingestion_report(
-        mode,
-        artifact_result,
-        category_plan,
-        subject_plan,
-    )
-    if category_plan.conflicts:
-        print()
-        print(render_report(report))
-        return 1
-    category_writes_can_resolve_subject_blocks = (
-        mode.can_write
-        and subject_plan.blocked_records
-        and (category_plan.to_create or category_plan.to_update)
-    )
-    if subject_plan.conflicts or (
-        subject_plan.blocked_records and not category_writes_can_resolve_subject_blocks
-    ):
-        print()
-        print(render_report(report))
-        return 1
-
-    applied = False
-    if mode.can_write:
-        apply_category_ingestion(client, config, mode, category_plan)
-        category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
-        subject_plan = plan_subject_ingestion(client, config, subject_artifact.artifact)
-        if category_plan.conflicts or subject_plan.conflicts or subject_plan.blocked_records:
-            report = build_stage4_ingestion_report(
-                mode,
-                artifact_result,
-                category_plan,
-                subject_plan,
-            )
-            print()
-            print(render_report(report))
-            return 1
-        apply_subject_ingestion(client, config, mode, subject_plan)
-        applied = True
-        category_plan = plan_category_ingestion(client, config, category_artifact.artifact)
-        subject_plan = plan_subject_ingestion(client, config, subject_artifact.artifact)
-        report = build_stage4_ingestion_report(
-            mode,
-            artifact_result,
-            category_plan,
-            subject_plan,
-            applied=applied,
-        )
-
-    print()
-    print(render_report(report))
-    return 0
-
-
-def _find_loaded_artifact(artifact_result, workflow):
-    for artifact in artifact_result.artifacts:
-        if artifact.workflow == workflow:
-            return artifact
-    raise ValueError(f"{workflow} artifact was not loaded.")
 
 
 def _print_validation_issues(title, issues):

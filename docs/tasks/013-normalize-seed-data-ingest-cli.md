@@ -1,7 +1,7 @@
 # Task-013: Normalize Seed-Data Ingest CLI Command Structure
 
 <record_type>task_history</record_type>
-<status>proposed</status>
+<status>completed</status>
 <date>2026-07-13</date>
 <owners>Gurubodh maintainers</owners>
 <github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/75</github_issue>
@@ -596,10 +596,72 @@ The unit test suite passed with 101 tests. The live apply and follow-up plan
 checks passed for all four targets, and each target reported no pending creates,
 updates, conflicts, blocked records, or publish actions after apply.
 
+### Stage 5 - 2026-07-13
+
+GitHub issue: https://github.com/Team-Gurubodh/gurubodh/issues/85
+
+Implementation branch:
+
+```text
+issue-85-task-13-stage-5-cli-cleanup
+```
+
+Completed the public CLI simplification for `tools/seed-data`:
+
+- removed the unreachable legacy CLI handlers for:
+  - `ingest preflight` without a target;
+  - `ingest plan` without a target;
+  - `ingest plan --apply`;
+  - `ingest glossary-preflight`;
+  - `ingest glossary-plan`;
+  - `ingest glossary-plan --apply`;
+- kept the public parser limited to:
+  - `gurubodh-seed-data ingest preflight <target>`;
+  - `gurubodh-seed-data ingest plan <target>`;
+  - `gurubodh-seed-data ingest apply <target>`;
+- updated seed-data README examples to show only target-specific ingestion
+  commands;
+- refreshed target plan/apply report wording so it no longer refers to earlier
+  Task 13 implementation stages.
+
+Verification ran the seed-data unit test suite, command-shape checks, rejected
+legacy-form checks, and live target checks against the throwaway Strapi
+database:
+
+```bash
+cd tools/seed-data
+python3 -m unittest discover -s tests
+python3 -m gurubodh_seed_data.cli ingest --help
+python3 -m gurubodh_seed_data.cli ingest preflight --help
+python3 -m gurubodh_seed_data.cli ingest plan --help
+python3 -m gurubodh_seed_data.cli ingest apply --help
+python3 -m gurubodh_seed_data.cli ingest plan --apply category
+python3 -m gurubodh_seed_data.cli ingest preflight category
+python3 -m gurubodh_seed_data.cli ingest plan category
+python3 -m gurubodh_seed_data.cli ingest preflight subject
+python3 -m gurubodh_seed_data.cli ingest plan subject
+python3 -m gurubodh_seed_data.cli ingest preflight sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest plan sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest preflight prabodhan-glossary
+python3 -m gurubodh_seed_data.cli ingest plan prabodhan-glossary
+python3 -m gurubodh_seed_data.cli ingest apply category
+python3 -m gurubodh_seed_data.cli ingest apply subject
+python3 -m gurubodh_seed_data.cli ingest apply sanatan-glossary
+python3 -m gurubodh_seed_data.cli ingest apply prabodhan-glossary
+git diff --check
+```
+
+The unit test suite passed with 101 tests. Help text exposed only
+`preflight`, `plan`, and `apply` operations with required targets, and
+`plan --help` did not expose `--apply`. The explicit
+`ingest plan --apply category` legacy form failed argument parsing as expected.
+The live preflight, plan, and apply checks passed for all four targets, and each
+apply command reported no pending creates, updates, conflicts, blocked records,
+or publish actions after post-apply re-planning.
+
 ## Follow-Up
 
-- Create implementation issues or implementation branches from GitHub issue
-  #75 when work resumes.
+- No remaining Task 13 implementation stages are planned.
 - Consider an `all` target only after the single-target command grammar has
   proven insufficient in real operator use.
 - Consider a durable decision record only if the CLI grammar becomes a broader
