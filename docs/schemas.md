@@ -20,6 +20,9 @@ None currently recorded.
 ## Ownership Guidance
 
 - Content preparation JSON schemas belong under `tools/content-preparation/config/`.
+- Conversion job configs currently use schema version `1.3.0`, including an
+  optional `formatting` block for the Sarvam Hindi formatting configuration
+  contract. Omitting the block keeps formatting disabled.
 - Conversion job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum

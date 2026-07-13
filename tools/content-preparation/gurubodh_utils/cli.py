@@ -1,8 +1,19 @@
 import argparse
 
+from gurubodh_utils.config import migrate_conversion_job_paths
 from gurubodh_utils.docx.namespaces import register_namespaces
 from gurubodh_utils.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
 from gurubodh_utils.project import resolve_project_context, resolve_project_path
+
+
+def add_project_root_option(parser):
+    parser.add_argument(
+        "--project-root",
+        help=(
+            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_UTILS_ROOT "
+            "or walks upward from the current directory."
+        ),
+    )
 
 
 def add_common_options(parser):
@@ -12,13 +23,7 @@ def add_common_options(parser):
         action="store_true",
         help="Replace existing local output or R2 objects instead of failing.",
     )
-    parser.add_argument(
-        "--project-root",
-        help=(
-            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_UTILS_ROOT "
-            "or walks upward from the current directory."
-        ),
-    )
+    add_project_root_option(parser)
 
 
 def build_parser():
@@ -49,22 +54,53 @@ def build_parser():
     )
     add_common_options(legacy_parser)
 
+    migrate_parser = subparsers.add_parser(
+        "migrate-configs",
+        help="Migrate conversion job configs to the current schema version.",
+        description=(
+            "Preview or apply conversion job schema migrations. By default this command "
+            "only reports files that would change."
+        ),
+    )
+    add_project_root_option(migrate_parser)
+    migrate_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Write migrated config files. Without this flag, only preview changes.",
+    )
+    migrate_parser.add_argument(
+        "configs",
+        nargs="+",
+        help="Conversion job JSON files to migrate.",
+    )
+
     return parser
+
+
+def run_migration(context, args):
+    config_paths = [resolve_project_path(context, config) for config in args.configs]
+    results = migrate_conversion_job_paths(config_paths, apply=args.apply)
+    for result in results:
+        print(f"{result['status']}: {result['path']}")
 
 
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     context = resolve_project_context(args.project_root)
-    config_path = resolve_project_path(context, args.config)
     register_namespaces()
 
     if args.command == "run":
+        config_path = resolve_project_path(context, args.config)
         run_configured_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "unicode-ingest":
+        config_path = resolve_project_path(context, args.config)
         run_unicode_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "legacy-convert":
+        config_path = resolve_project_path(context, args.config)
         run_legacy_job(context, config_path, overwrite=args.overwrite)
+    elif args.command == "migrate-configs":
+        run_migration(context, args)
     else:
         parser.error(f"Unsupported command: {args.command}")
 

@@ -149,7 +149,7 @@ Unicode source:
 
 ```json
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "pipeline": "unicode-docx-ingest",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
@@ -173,7 +173,7 @@ Legacy APS source:
 
 ```json
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "pipeline": "legacy-docx-to-unicode",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
