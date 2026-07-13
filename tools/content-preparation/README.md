@@ -111,8 +111,10 @@ omits formatted files for that chapter, and continues with the canonical chapter
 artifacts. If `continue_on_error` is `false`, the job fails on the formatting
 error.
 
-Metadata references, formatted artifact integrity checksums, and checksum-based
-reuse are planned for later Task 14 stages.
+Chapter metadata records formatted artifact filenames, storage references,
+formatted artifact integrity checksums, and per-chapter formatting status when
+formatted files are produced. Checksum-based reuse is planned for a later Task
+14 stage.
 
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
 enabled. Install the optional Sarvam SDK dependency when you need formatter

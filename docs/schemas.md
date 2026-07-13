@@ -25,9 +25,12 @@ None currently recorded.
   contract. Omitting the block keeps formatting disabled.
 - Conversion job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
-- Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
-  of the generated chapter `.txt` artifact bytes. It does not checksum the
-  metadata JSON artifact.
+- Chapter metadata uses schema version `1.3.0`. It includes
+  `integrity.artifacts.text` for the SHA-256 checksum of the generated chapter
+  `.txt` artifact bytes. When Sarvam formatting writes formatted chapter
+  artifacts, metadata also includes formatted artifact filenames, storage
+  references, artifact checksums, and formatting status. It does not checksum
+  the metadata JSON artifact.
 - Seed-data JSON schemas belong under `tools/seed-data/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

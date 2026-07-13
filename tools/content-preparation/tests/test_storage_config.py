@@ -11,7 +11,11 @@ from botocore.exceptions import ClientError
 from gurubodh_utils.cli import main as cli_main
 from gurubodh_utils.config import load_conversion_job
 from gurubodh_utils.constants import DEFAULT_FORMATTING_CONFIG
-from gurubodh_utils.metadata import build_chapter_metadata, text_artifact_integrity
+from gurubodh_utils.metadata import (
+    build_chapter_metadata,
+    source_text_sha256,
+    text_artifact_integrity,
+)
 from gurubodh_utils.storage import (
     R2StorageClient,
     ensure_r2_destination_available,
@@ -372,6 +376,171 @@ class StorageConfigTests(unittest.TestCase):
         )
         self.assertNotIn("metadata", metadata["integrity"]["artifacts"])
 
+    def test_chapter_metadata_records_disabled_formatting_without_formatted_artifacts(self):
+        metadata = build_chapter_metadata(
+            BASE_CONFIG,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            "प्रबोधन",
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh_utils run",
+        )
+
+        self.assertEqual(metadata["schema_version"], "1.3.0")
+        self.assertEqual(
+            metadata["formatting"],
+            {
+                "enabled": False,
+                "provider": "sarvam",
+                "model": "sarvam-30b",
+                "fallback_model": "sarvam-105b",
+                "model_used": None,
+                "status": "disabled",
+                "warning": None,
+                "source_text_sha256": None,
+            },
+        )
+        self.assertNotIn("formatted_json_filename", metadata["files"])
+        self.assertNotIn("formatted_json", metadata["storage"]["artifacts"])
+        self.assertNotIn("formatted_json", metadata["integrity"]["artifacts"])
+
+    def test_chapter_metadata_records_successful_formatted_artifacts(self):
+        text = "पहला वाक्य दूसरा वाक्य"
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {
+            "enabled": True,
+            "provider": "sarvam",
+            "model": "sarvam-30b",
+            "fallback_model": "sarvam-105b",
+            "output_formats": ["json", "markdown"],
+            "continue_on_error": True,
+            "delay_seconds": 0,
+            "max_retries": 0,
+            "regenerate": "when-source-checksum-changes",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            artifact_dir = subject_dir / "chapters" / "text_and_metadata"
+            artifact_dir.mkdir(parents=True)
+            formatted_json_path = artifact_dir / "chapter.formatted.json"
+            formatted_markdown_path = artifact_dir / "chapter.formatted.md"
+            formatted_json = '{"paragraphs": ["पहला।"]}\n'
+            formatted_markdown = "पहला।\n"
+            formatted_json_path.write_text(formatted_json, encoding="utf-8")
+            formatted_markdown_path.write_text(formatted_markdown, encoding="utf-8")
+            expected_json_digest = hashlib.sha256(formatted_json.encode("utf-8")).hexdigest()
+            expected_markdown_digest = hashlib.sha256(
+                formatted_markdown.encode("utf-8")
+            ).hexdigest()
+
+            metadata = build_chapter_metadata(
+                config,
+                1,
+                {
+                    "metadata": "chapter.json",
+                    "text": "chapter.txt",
+                    "msword": "chapter.docx",
+                    "formatted_json": "chapter.formatted.json",
+                    "formatted_markdown": "chapter.formatted.md",
+                    "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                    "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                    "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                    "full_msword_relative_path": Path("full_subject/full.docx"),
+                    "full_text_relative_path": Path("full_subject/full.txt"),
+                    "formatted_json_relative_path": Path(
+                        "chapters/text_and_metadata/chapter.formatted.json"
+                    ),
+                    "formatted_markdown_relative_path": Path(
+                        "chapters/text_and_metadata/chapter.formatted.md"
+                    ),
+                    "formatted_json_path": formatted_json_path,
+                    "formatted_markdown_path": formatted_markdown_path,
+                },
+                text,
+                {},
+                "2026-07-08T00:00:00Z",
+                "python3 -m gurubodh_utils run",
+                {"status": "formatted", "warning": None, "artifacts": {}},
+            )
+
+        self.assertEqual(metadata["files"]["formatted_json_filename"], "chapter.formatted.json")
+        self.assertEqual(metadata["files"]["formatted_markdown_filename"], "chapter.formatted.md")
+        self.assertEqual(
+            metadata["storage"]["artifacts"]["formatted_json"]["path"],
+            "chapters/text_and_metadata/chapter.formatted.json",
+        )
+        self.assertEqual(
+            metadata["storage"]["artifacts"]["formatted_markdown"]["path"],
+            "chapters/text_and_metadata/chapter.formatted.md",
+        )
+        self.assertEqual(
+            metadata["integrity"]["artifacts"]["formatted_json"]["value"],
+            expected_json_digest,
+        )
+        self.assertEqual(
+            metadata["integrity"]["artifacts"]["formatted_markdown"]["value"],
+            expected_markdown_digest,
+        )
+        self.assertEqual(
+            metadata["formatting"],
+            {
+                "enabled": True,
+                "provider": "sarvam",
+                "model": "sarvam-30b",
+                "fallback_model": "sarvam-105b",
+                "model_used": "sarvam-30b",
+                "status": "formatted",
+                "warning": None,
+                "source_text_sha256": source_text_sha256(text),
+            },
+        )
+
+    def test_chapter_metadata_records_failed_formatting_without_display_artifacts(self):
+        text = "प्रबोधन"
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True}
+
+        metadata = build_chapter_metadata(
+            config,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            text,
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh_utils run",
+            {
+                "status": "failed",
+                "warning": "formatting failed for chapter 001 chapter: rate limit",
+                "artifacts": {},
+            },
+        )
+
+        self.assertEqual(metadata["formatting"]["status"], "failed")
+        self.assertEqual(metadata["formatting"]["source_text_sha256"], source_text_sha256(text))
+        self.assertNotIn("formatted_markdown_filename", metadata["files"])
+        self.assertNotIn("formatted_markdown", metadata["storage"]["artifacts"])
+        self.assertNotIn("formatted_markdown", metadata["integrity"]["artifacts"])
+
     def test_text_artifact_integrity_changes_when_text_changes(self):
         original = text_artifact_integrity("प्रबोधन")
         changed = text_artifact_integrity("प्रबोधन बदलले")
@@ -428,8 +597,28 @@ class StorageConfigTests(unittest.TestCase):
         schema_path = Path(__file__).parents[1] / "config" / "chapter_metadata.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
+        self.assertEqual(schema["properties"]["schema_version"]["const"], "1.3.0")
         self.assertIn("integrity", schema["required"])
-        text_schema = schema["properties"]["integrity"]["properties"]["artifacts"]["properties"]["text"]
+        self.assertIn("formatting", schema["required"])
+        files = schema["properties"]["files"]["properties"]
+        storage_artifacts = schema["properties"]["storage"]["properties"]["artifacts"]["properties"]
+        integrity_artifacts = schema["properties"]["integrity"]["properties"]["artifacts"]["properties"]
+        formatting = schema["properties"]["formatting"]["properties"]
+        text_schema = schema["$defs"]["artifact_integrity"]
+
+        self.assertIn("formatted_json_filename", files)
+        self.assertIn("formatted_markdown_filename", files)
+        self.assertIn("formatted_json", storage_artifacts)
+        self.assertIn("formatted_markdown", storage_artifacts)
+        self.assertEqual(integrity_artifacts["text"]["$ref"], "#/$defs/artifact_integrity")
+        self.assertEqual(
+            integrity_artifacts["formatted_json"]["$ref"],
+            "#/$defs/artifact_integrity",
+        )
+        self.assertEqual(
+            formatting["status"]["enum"],
+            ["disabled", "formatted", "skipped-unchanged", "failed"],
+        )
         self.assertEqual(
             text_schema["required"],
             ["algorithm", "encoding", "line_endings", "scope", "value"],
