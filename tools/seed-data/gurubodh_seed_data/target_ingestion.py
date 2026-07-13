@@ -1,15 +1,21 @@
 import json
 from dataclasses import dataclass
 
+from gurubodh_seed_data.category_ingestion import plan_category_ingestion
 from gurubodh_seed_data.category import get_category_source
 from gurubodh_seed_data.category_artifacts import validate_category_artifact
 from gurubodh_seed_data.glossary import get_glossary_source
 from gurubodh_seed_data.glossary_artifacts import validate_glossary_artifact
+from gurubodh_seed_data.glossary_ingestion import (
+    LoadedGlossaryArtifact,
+    plan_glossary_ingestion,
+)
 from gurubodh_seed_data.paths import category_paths, glossary_paths, subject_paths
 from gurubodh_seed_data.strapi_client import StrapiClientError
 from gurubodh_seed_data.strapi_preflight import PreflightCheck, PreflightResult
 from gurubodh_seed_data.subject import get_subject_source
 from gurubodh_seed_data.subject_artifacts import validate_subject_artifact
+from gurubodh_seed_data.subject_ingestion import plan_subject_ingestion
 
 
 @dataclass(frozen=True)
@@ -51,6 +57,49 @@ class TargetArtifactLoadResult:
     @property
     def total_records(self):
         return self.artifact.record_count if self.artifact else 0
+
+
+@dataclass(frozen=True)
+class TargetIngestionPlan:
+    target: IngestTarget
+    plan: object | None = None
+    errors: tuple[str, ...] = ()
+
+    @property
+    def is_valid(self):
+        return not self.errors
+
+    @property
+    def to_create(self):
+        return self.plan.to_create if self.plan else 0
+
+    @property
+    def to_update(self):
+        return self.plan.to_update if self.plan else 0
+
+    @property
+    def already_matching(self):
+        return self.plan.already_matching if self.plan else 0
+
+    @property
+    def conflicts(self):
+        return self.plan.conflicts if self.plan else 0
+
+    @property
+    def blocked_records(self):
+        return getattr(self.plan, "blocked_records", 0) if self.plan else 0
+
+    @property
+    def publish_actions(self):
+        return self.plan.publish_actions if self.plan else 0
+
+    @property
+    def messages(self):
+        return self.plan.messages if self.plan else ()
+
+    @property
+    def can_apply(self):
+        return bool(self.plan and self.plan.can_apply)
 
 
 INGEST_TARGET_REGISTRY = {
@@ -185,6 +234,44 @@ def run_target_preflight(client, config, target_key):
         checks.append(_check_draft_publish(client, target.plural_api_id))
 
     return PreflightResult(checks=tuple(checks))
+
+
+def plan_target_ingestion(client, config, artifact_result):
+    if not artifact_result.is_valid:
+        return TargetIngestionPlan(
+            target=artifact_result.target,
+            errors=artifact_result.errors,
+        )
+
+    target = artifact_result.target
+    artifact = artifact_result.artifact.artifact
+
+    if target.key == "category":
+        plan = plan_category_ingestion(client, config, artifact)
+    elif target.key == "subject":
+        plan = plan_subject_ingestion(client, config, artifact)
+    elif target.workflow == "glossary":
+        loaded_artifact = _as_glossary_artifact(artifact_result.artifact)
+        plan = plan_glossary_ingestion(client, (loaded_artifact,))
+    else:
+        return TargetIngestionPlan(
+            target=target,
+            errors=(f"Unsupported target plan route: {target.key}",),
+        )
+
+    return TargetIngestionPlan(target=target, plan=plan)
+
+
+def _as_glossary_artifact(artifact):
+    return LoadedGlossaryArtifact(
+        source_key=artifact.source_key,
+        path=artifact.path,
+        record_count=artifact.record_count,
+        collection_type=artifact.collection_type,
+        plural_api_id=artifact.plural_api_id,
+        display_name=artifact.display_name,
+        artifact=artifact.artifact,
+    )
 
 
 def _validate_target_identity(artifact, target):
