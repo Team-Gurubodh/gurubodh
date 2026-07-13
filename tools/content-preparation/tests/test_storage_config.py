@@ -106,6 +106,18 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertEqual(loaded["formatting"], DEFAULT_FORMATTING_CONFIG)
 
+    def test_formatting_disabled_sample_job_loads_without_credentials(self):
+        sample_path = (
+            Path(__file__).parents[1]
+            / "jobs"
+            / "002_spand_rahasya.formatting-disabled.local.json"
+        )
+
+        loaded = load_conversion_job(sample_path)
+
+        self.assertEqual(loaded["formatting"], DEFAULT_FORMATTING_CONFIG)
+        self.assertFalse(loaded["formatting"]["enabled"])
+
     def test_enabled_sarvam_formatting_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["formatting"] = {

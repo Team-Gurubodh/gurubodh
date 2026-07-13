@@ -1,10 +1,11 @@
 # Task-014: Sarvam Formatted Hindi Chapter Artifacts
 
 <record_type>task_history</record_type>
-<status>proposed</status>
+<status>accepted</status>
 <date>2026-07-13</date>
 <owners>Gurubodh maintainers</owners>
 <github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/87</github_issue>
+<stage_6_github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/99</stage_6_github_issue>
 
 ## Goal
 
@@ -487,6 +488,19 @@ Required behavior:
    is safe for normal local runs.
 4. Run the content-preparation test suite.
 5. Manually test one representative chapter with Sarvam credentials outside CI.
+
+Stage 6 execution is tracked in
+https://github.com/Team-Gurubodh/gurubodh/issues/99. The documentation pass
+adds an explicit formatting-disabled local sample job so normal local runs can
+exercise the `1.3.0` formatting contract without requiring Sarvam credentials.
+Automated verification should use the content-preparation virtual environment:
+
+```bash
+tools/content-preparation/.venv/bin/python -m unittest discover -s tools/content-preparation/tests
+```
+
+Manual Sarvam verification remains an operator-run check because it requires
+local source documents and a private `SARVAM_API_KEY`.
 
 ## Acceptance Criteria
 
