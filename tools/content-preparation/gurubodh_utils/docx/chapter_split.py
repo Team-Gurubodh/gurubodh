@@ -7,7 +7,7 @@ from xml.etree import ElementTree as ET
 from gurubodh_utils.docx.namespaces import NS, W
 from gurubodh_utils.docx.text import block_text
 from gurubodh_utils.docx.validate import validate_docx
-from gurubodh_utils.formatting import SarvamFormatter
+from gurubodh_utils.formatting import SarvamFormatter, source_text_sha256
 from gurubodh_utils.metadata import build_chapter_metadata
 from gurubodh_utils.naming import chapter_output_filename, full_subject_output_filename
 from gurubodh_utils.text_utils import normalize_spaces, safe_filename
@@ -152,6 +152,40 @@ def write_formatted_artifacts(chapter_text_dir, text_name, formatted_result, out
     return written
 
 
+def reusable_formatted_artifacts(chapter_text_dir, text_name, chapter_text_value, output_formats):
+    names = formatted_artifact_names(text_name)
+    json_path = chapter_text_dir / names["json"]
+    markdown_path = chapter_text_dir / names["markdown"]
+
+    if "json" in output_formats and not json_path.exists():
+        return None
+    if "markdown" in output_formats and not markdown_path.exists():
+        return None
+
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    if data.get("status") != "formatted":
+        return None
+    if data.get("source_text_sha256") != source_text_sha256(chapter_text_value):
+        return None
+
+    paragraphs = data.get("paragraphs")
+    if not isinstance(paragraphs, list) or not paragraphs:
+        return None
+    if any(not isinstance(paragraph, str) or not paragraph.strip() for paragraph in paragraphs):
+        return None
+
+    artifacts = {}
+    if "json" in output_formats:
+        artifacts["json"] = json_path
+    if "markdown" in output_formats:
+        artifacts["markdown"] = markdown_path
+    return artifacts
+
+
 def format_chapter_artifacts(
     chapter_text_dir,
     text_name,
@@ -164,12 +198,23 @@ def format_chapter_artifacts(
         return {"status": "disabled", "warning": None, "artifacts": {}}
 
     try:
+        output_formats = set(formatting_config["output_formats"])
+        if formatting_config.get("regenerate") == "when-source-checksum-changes":
+            artifacts = reusable_formatted_artifacts(
+                chapter_text_dir,
+                text_name,
+                chapter_text_value,
+                output_formats,
+            )
+            if artifacts:
+                return {"status": "skipped-unchanged", "warning": None, "artifacts": artifacts}
+
         formatted_result = formatter.format_text(chapter_text_value)
         artifacts = write_formatted_artifacts(
             chapter_text_dir,
             text_name,
             formatted_result,
-            set(formatting_config["output_formats"]),
+            output_formats,
         )
         return {"status": "formatted", "warning": None, "artifacts": artifacts}
     except Exception as exc:
@@ -182,12 +227,18 @@ def format_chapter_artifacts(
 
 
 def print_formatting_summary(summary):
-    total = summary["formatted"] + summary["failed"] + summary["disabled"]
+    total = (
+        summary["formatted"]
+        + summary["skipped-unchanged"]
+        + summary["failed"]
+        + summary["disabled"]
+    )
     if total == 0:
         return
     print(
         "formatting summary: "
         f"formatted={summary['formatted']} "
+        f"skipped_unchanged={summary['skipped-unchanged']} "
         f"failed={summary['failed']} "
         f"disabled={summary['disabled']}"
     )
@@ -242,7 +293,7 @@ def split_docx_into_chapters(
     created_at = utc_now()
     formatting_config = config.get("formatting") if config else None
     formatter = SarvamFormatter(formatting_config) if formatting_config and formatting_config.get("enabled") else None
-    formatting_summary = {"formatted": 0, "failed": 0, "disabled": 0}
+    formatting_summary = {"formatted": 0, "skipped-unchanged": 0, "failed": 0, "disabled": 0}
     for index, blocks in enumerate(chapters, start=1):
         if config:
             docx_name = chapter_output_filename(config, index, ".docx")
