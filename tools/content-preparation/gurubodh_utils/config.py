@@ -166,12 +166,16 @@ def validate_previous_conversion_job(path, data):
         )
 
 
-def default_formatting_block_text():
-    formatting_json = json.dumps(DEFAULT_FORMATTING_CONFIG, ensure_ascii=False, indent=2)
+def formatting_block_text(formatting_config):
+    formatting_json = json.dumps(formatting_config, ensure_ascii=False, indent=2)
     lines = formatting_json.splitlines()
     property_lines = [f'  "formatting": {lines[0]}']
     property_lines.extend(f"  {line}" for line in lines[1:])
     return "\n".join(property_lines)
+
+
+def default_formatting_block_text():
+    return formatting_block_text(DEFAULT_FORMATTING_CONFIG)
 
 
 def find_root_object_closing_brace(text):
@@ -467,7 +471,24 @@ def migrate_conversion_job_text(path, apply=False):
     schema_version = data.get("schema_version")
     if schema_version == CONVERSION_JOB_SCHEMA_VERSION:
         if "formatting" in data:
-            return {"path": path, "status": "unchanged-current"}
+            raw_formatting = (
+                dict(data["formatting"]) if isinstance(data["formatting"], dict) else None
+            )
+            normalized_formatting = validate_and_normalize_formatting(data)
+            if raw_formatting == normalized_formatting:
+                return {"path": path, "status": "unchanged-current"}
+
+            migrated_text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+            if apply:
+                path.write_text(migrated_text, encoding="utf-8")
+                status = "updated-formatting-defaults"
+            else:
+                status = "would-update-formatting-defaults"
+            return {
+                "path": path,
+                "status": status,
+                "formatting_block": formatting_block_text(normalized_formatting),
+            }
 
         migrated_text = add_default_formatting_block(original_text)
         if apply:

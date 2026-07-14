@@ -98,6 +98,11 @@ against `config/conversion_job.1.2.0.schema.json` before previewing or applying
 changes. Unsupported schema versions and invalid `1.2.0` configs are refused
 instead of silently rewritten.
 
+For current `1.3.0` configs that already have a `formatting` block, the
+migration also normalizes missing formatting defaults such as
+`reasoning_effort` and `max_tokens` without changing explicitly configured
+values like `enabled` or `continue_on_error`.
+
 ## Optional Formatting Configuration
 
 Schema `1.3.0` adds an optional `formatting` block for Sarvam Hindi formatter
