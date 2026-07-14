@@ -110,6 +110,13 @@ def build_sarvam_client(api_key=None, environ=None):
 def parse_sarvam_formatting_response(raw_response):
     text = extract_response_text(raw_response)
     if not isinstance(text, str) or not text.strip():
+        if response_finished_without_content_due_to_length(raw_response):
+            raise SarvamResponseError(
+                "Sarvam response stopped with finish_reason='length' before returning "
+                "JSON text. The completion output-token limit was exhausted; increase "
+                "formatting.max_tokens if the model tier supports it, or reduce the "
+                "request size."
+            )
         raise SarvamResponseError("Sarvam response did not contain JSON text")
 
     text = normalize_json_response_text(text)
@@ -191,6 +198,29 @@ def extract_response_text_from_choice(choice):
     return getattr(choice, "text", None) or getattr(choice, "content", None)
 
 
+def response_finished_without_content_due_to_length(raw_response):
+    choice = first_response_choice(raw_response)
+    if choice is None:
+        return False
+    return choice_value(choice, "finish_reason") == "length"
+
+
+def first_response_choice(raw_response):
+    if isinstance(raw_response, dict):
+        choices = raw_response.get("choices")
+    else:
+        choices = getattr(raw_response, "choices", None)
+    if choices:
+        return choices[0]
+    return None
+
+
+def choice_value(choice, key):
+    if isinstance(choice, dict):
+        return choice.get(key)
+    return getattr(choice, key, None)
+
+
 def is_retryable_sarvam_error(exc):
     if isinstance(exc, SarvamRetryableError):
         return True
@@ -261,34 +291,74 @@ class SarvamFormatter:
                 "content": text,
             },
         ]
-        return call_sarvam_chat_completion(client, model, messages)
+        return call_sarvam_chat_completion(
+            client,
+            model,
+            messages,
+            reasoning_effort=self.config.get("reasoning_effort"),
+            max_tokens=self.config.get("max_tokens"),
+        )
 
 
-def call_sarvam_chat_completion(client, model, messages):
+def call_sarvam_chat_completion(
+    client,
+    model,
+    messages,
+    reasoning_effort=None,
+    max_tokens=None,
+):
     chat = getattr(client, "chat", None)
     completions = getattr(chat, "completions", None) if chat is not None else None
 
     if completions is not None:
         create = getattr(completions, "create", None)
         if callable(create):
-            return call_with_optional_response_format(create, model, messages)
+            return call_with_optional_completion_controls(
+                create,
+                model,
+                messages,
+                reasoning_effort,
+                max_tokens,
+            )
         if callable(completions):
-            return call_with_optional_response_format(completions, model, messages)
+            return call_with_optional_completion_controls(
+                completions,
+                model,
+                messages,
+                reasoning_effort,
+                max_tokens,
+            )
 
     create_chat_completion = getattr(client, "create_chat_completion", None)
     if callable(create_chat_completion):
-        return call_with_optional_response_format(create_chat_completion, model, messages)
+        return call_with_optional_completion_controls(
+            create_chat_completion,
+            model,
+            messages,
+            reasoning_effort,
+            max_tokens,
+        )
 
     raise SarvamPermanentError("Unsupported Sarvam client shape for chat completion")
 
 
-def call_with_optional_response_format(callable_obj, model, messages):
+def call_with_optional_completion_controls(
+    callable_obj,
+    model,
+    messages,
+    reasoning_effort,
+    max_tokens,
+):
     kwargs = {
         "model": model,
         "messages": messages,
     }
     if accepts_keyword(callable_obj, "response_format"):
         kwargs["response_format"] = SARVAM_FORMATTING_RESPONSE_SCHEMA
+    if accepts_keyword(callable_obj, "reasoning_effort"):
+        kwargs["reasoning_effort"] = reasoning_effort
+    if accepts_keyword(callable_obj, "max_tokens"):
+        kwargs["max_tokens"] = max_tokens
     return callable_obj(**kwargs)
 
 

@@ -82,7 +82,9 @@ formatting:
     "continue_on_error": true,
     "delay_seconds": 5,
     "max_retries": 3,
-    "regenerate": "when-source-checksum-changes"
+    "regenerate": "when-source-checksum-changes",
+    "reasoning_effort": null,
+    "max_tokens": 4096
   }
 }
 ```
@@ -112,7 +114,9 @@ integration. If the block is omitted, formatting is disabled.
     "continue_on_error": true,
     "delay_seconds": 5,
     "max_retries": 3,
-    "regenerate": "when-source-checksum-changes"
+    "regenerate": "when-source-checksum-changes",
+    "reasoning_effort": null,
+    "max_tokens": 4096
   }
 }
 ```
@@ -162,6 +166,11 @@ current local artifact tree by a future cache or restore step.
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
 enabled. Install the optional Sarvam SDK dependency when you need formatter
 access:
+
+Formatter chat completions default `reasoning_effort` to `null` and
+`max_tokens` to `4096`. This disables Sarvam reasoning output for the formatter
+call when the installed client supports that parameter and reserves the
+completion budget for the JSON formatter response.
 
 ```bash
 pip install -e ".[formatting]"

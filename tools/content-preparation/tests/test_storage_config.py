@@ -133,6 +133,8 @@ class StorageConfigTests(unittest.TestCase):
             "delay_seconds": 5,
             "max_retries": 3,
             "regenerate": "when-source-checksum-changes",
+            "reasoning_effort": None,
+            "max_tokens": 4096,
         }
 
         loaded = load_conversion_job(self.write_config(config))
@@ -140,6 +142,8 @@ class StorageConfigTests(unittest.TestCase):
         self.assertTrue(loaded["formatting"]["enabled"])
         self.assertEqual(loaded["formatting"]["model"], "sarvam-30b")
         self.assertEqual(loaded["formatting"]["fallback_model"], "sarvam-105b")
+        self.assertIsNone(loaded["formatting"]["reasoning_effort"])
+        self.assertEqual(loaded["formatting"]["max_tokens"], 4096)
 
     def test_formatting_rejects_invalid_provider(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -195,6 +199,23 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertIn("formatting.regenerate", str(exc.exception))
 
+    def test_formatting_rejects_invalid_completion_controls(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "reasoning_effort": 1}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.reasoning_effort", str(exc.exception))
+
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "max_tokens": 4097}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.max_tokens", str(exc.exception))
+
     def test_conversion_job_schema_declares_formatting_contract(self):
         schema_path = Path(__file__).parents[1] / "config" / "conversion_job.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -209,6 +230,8 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(formatting["delay_seconds"]["default"], 5)
         self.assertEqual(formatting["max_retries"]["default"], 3)
         self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
+        self.assertEqual(formatting["reasoning_effort"]["default"], None)
+        self.assertEqual(formatting["max_tokens"]["default"], 4096)
 
     def test_migrate_configs_preview_reports_without_writing(self):
         temp_dir = tempfile.TemporaryDirectory()

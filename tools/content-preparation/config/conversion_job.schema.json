@@ -264,6 +264,16 @@
           "type": "string",
           "const": "when-source-checksum-changes",
           "default": "when-source-checksum-changes"
+        },
+        "reasoning_effort": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096,
+          "default": 4096
         }
       },
       "additionalProperties": false

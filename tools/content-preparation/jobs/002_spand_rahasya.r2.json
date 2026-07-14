@@ -31,5 +31,21 @@
     "language": "hi-IN",
     "source_script": "Devanagari",
     "output_text_encoding": "UTF-8"
+  },
+  "formatting": {
+    "enabled": true,
+    "provider": "sarvam",
+    "model": "sarvam-30b",
+    "fallback_model": "sarvam-105b",
+    "output_formats": [
+      "json",
+      "markdown"
+    ],
+    "continue_on_error": false,
+    "delay_seconds": 5,
+    "max_retries": 3,
+    "regenerate": "when-source-checksum-changes",
+    "reasoning_effort": null,
+    "max_tokens": 4096
   }
 }

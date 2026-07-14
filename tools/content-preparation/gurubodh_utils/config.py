@@ -388,6 +388,8 @@ def validate_and_normalize_formatting(config):
     require_number(formatting, "delay_seconds", "formatting", minimum=0)
     require_integer(formatting, "max_retries", "formatting", minimum=0, maximum=MAX_FORMATTING_RETRIES)
     require_enum(formatting, "regenerate", "formatting", SUPPORTED_FORMATTING_REGENERATE_MODES)
+    optional_string_or_null(formatting, "reasoning_effort", "formatting")
+    require_integer(formatting, "max_tokens", "formatting", minimum=1, maximum=4096)
 
     config["formatting"] = formatting
     return formatting

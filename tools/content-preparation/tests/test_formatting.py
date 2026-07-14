@@ -103,9 +103,24 @@ class FormattingTests(unittest.TestCase):
         call = client.chat.completions.calls[0]
         self.assertEqual(call["model"], "sarvam-30b")
         self.assertEqual(call["response_format"], SARVAM_FORMATTING_RESPONSE_SCHEMA)
+        self.assertIsNone(call["reasoning_effort"])
+        self.assertEqual(call["max_tokens"], 4096)
         self.assertEqual(call["messages"][0]["role"], "system")
         self.assertEqual(call["messages"][0]["content"], HINDI_FORMATTING_SYSTEM_PROMPT)
         self.assertEqual(call["messages"][1], {"role": "user", "content": "ॐ"})
+
+    def test_sarvam_chat_request_uses_configured_completion_controls(self):
+        client = FakeSarvamClient(['{"paragraphs": ["ॐ।"]}'])
+        formatter = SarvamFormatter(
+            formatting_config(reasoning_effort="low", max_tokens=2048),
+            client=client,
+        )
+
+        formatter.format_text("ॐ")
+
+        call = client.chat.completions.calls[0]
+        self.assertEqual(call["reasoning_effort"], "low")
+        self.assertEqual(call["max_tokens"], 2048)
 
     def test_sarvam_chat_request_allows_clients_without_response_format(self):
         client = FakeSarvamClientWithoutResponseFormat('{"paragraphs": ["ॐ।"]}')
@@ -118,6 +133,8 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(call["model"], "sarvam-30b")
         self.assertNotIn("response_format", call)
         self.assertEqual(call["messages"][0]["content"], HINDI_FORMATTING_SYSTEM_PROMPT)
+        self.assertNotIn("reasoning_effort", call)
+        self.assertNotIn("max_tokens", call)
 
     def test_parser_accepts_openai_style_choice_response(self):
         response = {
@@ -163,6 +180,29 @@ class FormattingTests(unittest.TestCase):
             parse_sarvam_formatting_response("not-json")
 
         self.assertIn("valid JSON", str(exc.exception))
+
+    def test_parser_explains_length_finish_with_no_content(self):
+        response = {
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "reasoning consumed the budget",
+                    },
+                }
+            ],
+            "usage": {
+                "completion_tokens": 4096,
+            },
+        }
+
+        with self.assertRaises(SarvamResponseError) as exc:
+            parse_sarvam_formatting_response(response)
+
+        message = str(exc.exception)
+        self.assertIn("finish_reason='length'", message)
+        self.assertIn("output-token limit", message)
 
     def test_parser_rejects_unknown_fields(self):
         with self.assertRaises(SarvamResponseError) as exc:

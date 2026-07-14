@@ -33,4 +33,6 @@ DEFAULT_FORMATTING_CONFIG = {
     "delay_seconds": 5,
     "max_retries": 3,
     "regenerate": "when-source-checksum-changes",
+    "reasoning_effort": None,
+    "max_tokens": 4096,
 }
