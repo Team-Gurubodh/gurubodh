@@ -49,6 +49,9 @@ BASE_CONFIG = {
     },
 }
 
+BASE_CONFIG_1_2 = json.loads(json.dumps(BASE_CONFIG))
+BASE_CONFIG_1_2["schema_version"] = "1.2.0"
+
 
 class FakeR2Client:
     def __init__(self, existing_keys=None):
@@ -211,7 +214,7 @@ class StorageConfigTests(unittest.TestCase):
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         path = Path(temp_dir.name) / "job.json"
-        original = '{\n  "schema_version": "1.2.0",\n  "pipeline": "unicode-docx-ingest"\n}\n'
+        original = json.dumps(BASE_CONFIG_1_2, ensure_ascii=False, indent=2) + "\n"
         path.write_text(original, encoding="utf-8")
         stdout = StringIO()
 
@@ -223,21 +226,19 @@ class StorageConfigTests(unittest.TestCase):
                 str(path),
             ])
 
-        self.assertIn("would-migrate", stdout.getvalue())
+        output = stdout.getvalue()
+        self.assertIn("would-migrate", output)
+        self.assertIn("will add the default formatting configuration", output)
+        self.assertIn('"formatting": {', output)
+        self.assertIn('"enabled": false', output)
+        self.assertIn('Set "enabled": true', output)
         self.assertEqual(path.read_text(encoding="utf-8"), original)
 
-    def test_migrate_configs_apply_updates_only_schema_version(self):
+    def test_migrate_configs_apply_adds_disabled_formatting_defaults(self):
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         path = Path(temp_dir.name) / "job.json"
-        path.write_text(
-            '{\n'
-            '  "schema_version": "1.2.0",\n'
-            '  "pipeline": "unicode-docx-ingest",\n'
-            '  "description": "spacing is preserved"\n'
-            '}\n',
-            encoding="utf-8",
-        )
+        path.write_text(json.dumps(BASE_CONFIG_1_2, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         stdout = StringIO()
 
         with redirect_stdout(stdout):
@@ -249,15 +250,115 @@ class StorageConfigTests(unittest.TestCase):
                 str(path),
             ])
 
-        self.assertIn("migrated", stdout.getvalue())
-        self.assertEqual(
-            path.read_text(encoding="utf-8"),
-            '{\n'
-            '  "schema_version": "1.3.0",\n'
-            '  "pipeline": "unicode-docx-ingest",\n'
-            '  "description": "spacing is preserved"\n'
-            '}\n',
-        )
+        output = stdout.getvalue()
+        migrated = json.loads(path.read_text(encoding="utf-8"))
+        self.assertIn("migrated", output)
+        self.assertIn("migrated to 1.3.0 and added default formatting configuration", output)
+        self.assertIn('Set "enabled": true', output)
+        self.assertEqual(migrated["schema_version"], "1.3.0")
+        self.assertEqual(migrated["formatting"], DEFAULT_FORMATTING_CONFIG)
+
+    def test_migrate_configs_preview_adds_formatting_defaults_to_current_config(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        original = json.dumps(BASE_CONFIG, ensure_ascii=False, indent=2) + "\n"
+        path.write_text(original, encoding="utf-8")
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        output = stdout.getvalue()
+        self.assertIn("would-add-formatting-defaults", output)
+        self.assertIn("will add the default formatting configuration", output)
+        self.assertIn('"formatting": {', output)
+        self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+    def test_migrate_configs_apply_adds_formatting_defaults_to_current_config(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        path.write_text(json.dumps(BASE_CONFIG, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                "--apply",
+                str(path),
+            ])
+
+        output = stdout.getvalue()
+        migrated = json.loads(path.read_text(encoding="utf-8"))
+        self.assertIn("added-formatting-defaults", output)
+        self.assertIn("added default formatting configuration", output)
+        self.assertEqual(migrated["schema_version"], "1.3.0")
+        self.assertEqual(migrated["formatting"], DEFAULT_FORMATTING_CONFIG)
+
+    def test_migrate_configs_refuses_invalid_previous_schema_config(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        config = json.loads(json.dumps(BASE_CONFIG_1_2))
+        del config["source"]["relative_path"]
+        path.write_text(json.dumps(config), encoding="utf-8")
+
+        with self.assertRaises(SystemExit) as exc:
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        self.assertIn("not valid schema_version 1.2.0", str(exc.exception))
+        self.assertIn("$.source.relative_path", str(exc.exception))
+
+    def test_migrate_configs_refuses_unexpected_formatting_in_previous_schema(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        config = json.loads(json.dumps(BASE_CONFIG_1_2))
+        config["formatting"] = {"enabled": False}
+        path.write_text(json.dumps(config), encoding="utf-8")
+
+        with self.assertRaises(SystemExit) as exc:
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        self.assertIn("not valid schema_version 1.2.0", str(exc.exception))
+        self.assertIn("$.formatting is not allowed", str(exc.exception))
+
+    def test_migrate_configs_reports_current_configs_unchanged(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = dict(DEFAULT_FORMATTING_CONFIG)
+        path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        self.assertIn("unchanged-current", stdout.getvalue())
 
     def test_migrate_configs_refuses_unsupported_schema_version(self):
         temp_dir = tempfile.TemporaryDirectory()

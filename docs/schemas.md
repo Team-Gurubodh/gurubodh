@@ -6,6 +6,7 @@
 ## Current Schema Locations
 
 - `tools/content-preparation/config/chapter_metadata.schema.json`
+- `tools/content-preparation/config/conversion_job.1.2.0.schema.json`
 - `tools/content-preparation/config/conversion_job.schema.json`
 - `tools/seed-data/config/category_artifact.schema.json`
 - `tools/seed-data/config/glossary_artifact.schema.json`
@@ -20,6 +21,8 @@ None currently recorded.
 ## Ownership Guidance
 
 - Content preparation JSON schemas belong under `tools/content-preparation/config/`.
+- Previous conversion job schemas may be preserved when migration tooling needs
+  to validate older configs before rewriting them.
 - Conversion job configs currently use schema version `1.3.0`, including an
   optional `formatting` block for the Sarvam Hindi formatting configuration
   contract. Omitting the block keeps formatting disabled.
