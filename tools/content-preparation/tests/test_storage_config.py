@@ -133,6 +133,8 @@ class StorageConfigTests(unittest.TestCase):
             "delay_seconds": 5,
             "max_retries": 3,
             "regenerate": "when-source-checksum-changes",
+            "reasoning_effort": None,
+            "max_tokens": 4096,
         }
 
         loaded = load_conversion_job(self.write_config(config))
@@ -140,6 +142,8 @@ class StorageConfigTests(unittest.TestCase):
         self.assertTrue(loaded["formatting"]["enabled"])
         self.assertEqual(loaded["formatting"]["model"], "sarvam-30b")
         self.assertEqual(loaded["formatting"]["fallback_model"], "sarvam-105b")
+        self.assertIsNone(loaded["formatting"]["reasoning_effort"])
+        self.assertEqual(loaded["formatting"]["max_tokens"], 4096)
 
     def test_formatting_rejects_invalid_provider(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -195,6 +199,23 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertIn("formatting.regenerate", str(exc.exception))
 
+    def test_formatting_rejects_invalid_completion_controls(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "reasoning_effort": 1}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.reasoning_effort", str(exc.exception))
+
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {"enabled": True, "max_tokens": 4097}
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn("formatting.max_tokens", str(exc.exception))
+
     def test_conversion_job_schema_declares_formatting_contract(self):
         schema_path = Path(__file__).parents[1] / "config" / "conversion_job.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -209,6 +230,8 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(formatting["delay_seconds"]["default"], 5)
         self.assertEqual(formatting["max_retries"]["default"], 3)
         self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
+        self.assertEqual(formatting["reasoning_effort"]["default"], None)
+        self.assertEqual(formatting["max_tokens"]["default"], 4096)
 
     def test_migrate_configs_preview_reports_without_writing(self):
         temp_dir = tempfile.TemporaryDirectory()
@@ -302,6 +325,78 @@ class StorageConfigTests(unittest.TestCase):
         self.assertIn("added default formatting configuration", output)
         self.assertEqual(migrated["schema_version"], "1.3.0")
         self.assertEqual(migrated["formatting"], DEFAULT_FORMATTING_CONFIG)
+
+    def test_migrate_configs_preview_updates_current_formatting_with_missing_defaults(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {
+            "enabled": True,
+            "provider": "sarvam",
+            "model": "sarvam-30b",
+            "fallback_model": "sarvam-105b",
+            "output_formats": ["json", "markdown"],
+            "continue_on_error": False,
+            "delay_seconds": 5,
+            "max_retries": 3,
+            "regenerate": "when-source-checksum-changes",
+        }
+        original = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
+        path.write_text(original, encoding="utf-8")
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                str(path),
+            ])
+
+        output = stdout.getvalue()
+        self.assertIn("would-update-formatting-defaults", output)
+        self.assertIn("will update the formatting configuration with missing defaults", output)
+        self.assertIn('"reasoning_effort": null', output)
+        self.assertIn('"max_tokens": 4096', output)
+        self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+    def test_migrate_configs_apply_updates_current_formatting_with_missing_defaults(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        path = Path(temp_dir.name) / "job.json"
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["formatting"] = {
+            "enabled": True,
+            "provider": "sarvam",
+            "model": "sarvam-30b",
+            "fallback_model": "sarvam-105b",
+            "output_formats": ["json", "markdown"],
+            "continue_on_error": False,
+            "delay_seconds": 5,
+            "max_retries": 3,
+            "regenerate": "when-source-checksum-changes",
+        }
+        path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            cli_main([
+                "migrate-configs",
+                "--project-root",
+                str(Path(__file__).parents[1]),
+                "--apply",
+                str(path),
+            ])
+
+        output = stdout.getvalue()
+        migrated = json.loads(path.read_text(encoding="utf-8"))
+        expected_formatting = dict(DEFAULT_FORMATTING_CONFIG)
+        expected_formatting.update({"enabled": True, "continue_on_error": False})
+        self.assertIn("updated-formatting-defaults", output)
+        self.assertIn("updated formatting configuration with missing defaults", output)
+        self.assertEqual(migrated["schema_version"], "1.3.0")
+        self.assertEqual(migrated["formatting"], expected_formatting)
 
     def test_migrate_configs_refuses_invalid_previous_schema_config(self):
         temp_dir = tempfile.TemporaryDirectory()

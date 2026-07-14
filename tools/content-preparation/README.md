@@ -82,7 +82,9 @@ formatting:
     "continue_on_error": true,
     "delay_seconds": 5,
     "max_retries": 3,
-    "regenerate": "when-source-checksum-changes"
+    "regenerate": "when-source-checksum-changes",
+    "reasoning_effort": null,
+    "max_tokens": 4096
   }
 }
 ```
@@ -95,6 +97,11 @@ validates `1.2.0` configs
 against `config/conversion_job.1.2.0.schema.json` before previewing or applying
 changes. Unsupported schema versions and invalid `1.2.0` configs are refused
 instead of silently rewritten.
+
+For current `1.3.0` configs that already have a `formatting` block, the
+migration also normalizes missing formatting defaults such as
+`reasoning_effort` and `max_tokens` without changing explicitly configured
+values like `enabled` or `continue_on_error`.
 
 ## Optional Formatting Configuration
 
@@ -112,7 +119,9 @@ integration. If the block is omitted, formatting is disabled.
     "continue_on_error": true,
     "delay_seconds": 5,
     "max_retries": 3,
-    "regenerate": "when-source-checksum-changes"
+    "regenerate": "when-source-checksum-changes",
+    "reasoning_effort": null,
+    "max_tokens": 4096
   }
 }
 ```
@@ -162,6 +171,11 @@ current local artifact tree by a future cache or restore step.
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
 enabled. Install the optional Sarvam SDK dependency when you need formatter
 access:
+
+Formatter chat completions default `reasoning_effort` to `null` and
+`max_tokens` to `4096`. This disables Sarvam reasoning output for the formatter
+call when the installed client supports that parameter and reserves the
+completion budget for the JSON formatter response.
 
 ```bash
 pip install -e ".[formatting]"

@@ -87,6 +87,10 @@ def run_migration(context, args):
                 print("  migrated to 1.3.0 and added default formatting configuration with formatting disabled:")
             elif result["status"] == "added-formatting-defaults":
                 print("  added default formatting configuration with formatting disabled:")
+            elif result["status"] == "updated-formatting-defaults":
+                print("  updated formatting configuration with missing defaults:")
+            elif result["status"] == "would-update-formatting-defaults":
+                print("  this command will update the formatting configuration with missing defaults:")
             else:
                 print("  this command will add the default formatting configuration with formatting disabled:")
             print(result["formatting_block"])
