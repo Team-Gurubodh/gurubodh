@@ -66,8 +66,35 @@ To apply the migration:
 gurubodh-utils migrate-configs --apply jobs/002_spand_rahasya.local.json
 ```
 
-The migration updates the schema version only and preserves existing fields.
-Unsupported schema versions are refused instead of silently rewritten.
+The migration updates the schema version, preserves existing fields, and adds
+the default formatting configuration with formatting disabled, so
+migrated jobs continue to behave like `1.2.0` jobs until you explicitly enable
+formatting:
+
+```json
+{
+  "formatting": {
+    "enabled": false,
+    "provider": "sarvam",
+    "model": "sarvam-30b",
+    "fallback_model": "sarvam-105b",
+    "output_formats": ["json", "markdown"],
+    "continue_on_error": true,
+    "delay_seconds": 5,
+    "max_retries": 3,
+    "regenerate": "when-source-checksum-changes"
+  }
+}
+```
+
+Set `formatting.enabled` to `true` when you want the job to call Sarvam and
+write formatted chapter artifacts. If a `1.3.0` config is already current but
+omits the explicit `formatting` block, `migrate-configs` can also preview or add
+the same disabled defaults without changing the schema version. The migration
+validates `1.2.0` configs
+against `config/conversion_job.1.2.0.schema.json` before previewing or applying
+changes. Unsupported schema versions and invalid `1.2.0` configs are refused
+instead of silently rewritten.
 
 ## Optional Formatting Configuration
 

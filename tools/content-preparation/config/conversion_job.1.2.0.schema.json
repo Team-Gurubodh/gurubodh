@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/conversion_job.1.2.0.schema.json",
+  "title": "Gurubodh DOCX Conversion Job 1.2.0",
+  "type": "object",
+  "required": ["schema_version", "pipeline", "source", "destination", "naming", "chapter_split"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.2.0"
+    },
+    "pipeline": {
+      "type": "string",
+      "enum": ["legacy-docx-to-unicode", "unicode-docx-ingest"]
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["local", "r2"],
+          "default": "local"
+        },
+        "root_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bucket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url_base": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "font_encoding": {
+          "type": "string",
+          "enum": ["aps", "shreelipi", "unicode"]
+        },
+        "file_format": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]+$"
+        }
+      },
+      "required": ["font_encoding", "file_format"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "const": "r2"
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": {
+            "required": ["bucket", "key"]
+          },
+          "else": {
+            "required": ["root_dir", "relative_path"]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "destination": {
+      "type": "object",
+      "required": ["subject_dir"],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["local", "r2"],
+          "default": "local"
+        },
+        "root_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bucket": {
+          "type": "string",
+          "minLength": 1,
+          "default": "gurubodh-library-dev"
+        },
+        "prefix": {
+          "type": "string",
+          "minLength": 1,
+          "default": "cms_library"
+        },
+        "subject_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url_base": {
+          "type": ["string", "null"],
+          "default": null
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "const": "r2"
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": {
+            "required": ["bucket", "prefix"]
+          },
+          "else": {
+            "required": ["root_dir"]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "naming": {
+      "type": "object",
+      "required": [
+        "category_code",
+        "subject_code",
+        "title_slug",
+        "version",
+        "subversion"
+      ],
+      "properties": {
+        "category_code": {
+          "type": "string",
+          "pattern": "^CAT[0-9]{3}$"
+        },
+        "subject_code": {
+          "type": "string",
+          "pattern": "^SUB[0-9]{3}$"
+        },
+        "title_slug": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]{2}$"
+        },
+        "subversion": {
+          "type": "string",
+          "pattern": "^[0-9]{2}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "chapter_split": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "pattern_type": {
+          "type": "string",
+          "enum": ["literal", "regex"]
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["IGNORECASE", "MULTILINE", "DOTALL", "VERBOSE"]
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": ["enabled"]
+          },
+          "then": {
+            "required": ["pattern_type", "pattern"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "pattern_type": {
+                "const": "literal"
+              }
+            },
+            "required": ["pattern_type"]
+          },
+          "then": {
+            "not": {
+              "required": ["flags"]
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "metadata_defaults": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "default": "hi-Deva"
+        },
+        "source_script": {
+          "type": "string",
+          "default": "Devanagari"
+        },
+        "output_text_encoding": {
+          "type": "string",
+          "default": "UTF-8"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "pipeline": {
+            "const": "unicode-docx-ingest"
+          }
+        },
+        "required": ["pipeline"]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "font_encoding": {
+                "const": "unicode"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "pipeline": {
+            "const": "legacy-docx-to-unicode"
+          }
+        },
+        "required": ["pipeline"]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "font_encoding": {
+                "enum": ["aps", "shreelipi"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

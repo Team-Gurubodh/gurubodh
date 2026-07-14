@@ -82,6 +82,15 @@ def run_migration(context, args):
     results = migrate_conversion_job_paths(config_paths, apply=args.apply)
     for result in results:
         print(f"{result['status']}: {result['path']}")
+        if result.get("formatting_block"):
+            if result["status"] == "migrated":
+                print("  migrated to 1.3.0 and added default formatting configuration with formatting disabled:")
+            elif result["status"] == "added-formatting-defaults":
+                print("  added default formatting configuration with formatting disabled:")
+            else:
+                print("  this command will add the default formatting configuration with formatting disabled:")
+            print(result["formatting_block"])
+            print('  Set "enabled": true before running the job when Sarvam chapter formatting is desired.')
 
 
 def main(argv=None):
