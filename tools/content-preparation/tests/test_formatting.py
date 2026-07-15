@@ -31,6 +31,19 @@ def formatting_config(**overrides):
     return config
 
 
+def sarvam_chat_response(content, finish_reason="stop"):
+    return {
+        "choices": [
+            {
+                "finish_reason": finish_reason,
+                "message": {
+                    "content": content,
+                },
+            }
+        ]
+    }
+
+
 class FakeSarvamHttpClient:
     def __init__(self, responses):
         self.responses = list(responses)
@@ -71,7 +84,7 @@ class FakeURLOpener:
 class FormattingTests(unittest.TestCase):
     def test_formatter_import_does_not_require_sarvam_sdk(self):
         formatter = SarvamFormatter(formatting_config(), client=FakeSarvamHttpClient([
-            '{"paragraphs": ["पहला पैराग्राफ।"]}'
+            sarvam_chat_response('{"paragraphs": ["पहला पैराग्राफ।"]}')
         ]))
 
         result = formatter.format_text("पहला पैराग्राफ")
@@ -92,7 +105,7 @@ class FormattingTests(unittest.TestCase):
         self.assertIn("SARVAM_API_KEY", str(exc.exception))
 
     def test_sarvam_chat_request_uses_prompt_and_response_schema(self):
-        client = FakeSarvamHttpClient(['{"paragraphs": ["ॐ।"]}'])
+        client = FakeSarvamHttpClient([sarvam_chat_response('{"paragraphs": ["ॐ।"]}')])
         formatter = SarvamFormatter(formatting_config(), client=client)
 
         formatter.format_text("ॐ")
@@ -100,6 +113,14 @@ class FormattingTests(unittest.TestCase):
         call = client.calls[0]
         self.assertEqual(call["model"], "sarvam-30b")
         self.assertEqual(call["response_format"], SARVAM_FORMATTING_RESPONSE_SCHEMA)
+        self.assertEqual(call["response_format"]["type"], "json_schema")
+        self.assertTrue(call["response_format"]["json_schema"]["strict"])
+        self.assertEqual(
+            call["response_format"]["json_schema"]["schema"]["properties"]["paragraphs"][
+                "minItems"
+            ],
+            1,
+        )
         self.assertIsNone(call["reasoning_effort"])
         self.assertEqual(call["max_tokens"], 4096)
         self.assertEqual(call["messages"][0]["role"], "system")
@@ -107,7 +128,7 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(call["messages"][1], {"role": "user", "content": "ॐ"})
 
     def test_sarvam_chat_request_uses_configured_completion_controls(self):
-        client = FakeSarvamHttpClient(['{"paragraphs": ["ॐ।"]}'])
+        client = FakeSarvamHttpClient([sarvam_chat_response('{"paragraphs": ["ॐ।"]}')])
         formatter = SarvamFormatter(
             formatting_config(reasoning_effort="low", max_tokens=2048),
             client=client,
@@ -162,53 +183,22 @@ class FormattingTests(unittest.TestCase):
 
         self.assertEqual(parse_sarvam_formatting_response(response), ["एक।", "दो।"])
 
-    def test_parser_accepts_json_with_markdown_fence_markers(self):
-        response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": '```json\n{"paragraphs": ["एक।"]}\n```',
-                    }
-                }
-            ]
-        }
+    def test_parser_rejects_json_with_markdown_fence_markers(self):
+        response = sarvam_chat_response('```json\n{"paragraphs": ["एक।"]}\n```')
 
-        self.assertEqual(parse_sarvam_formatting_response(response), ["एक।"])
+        with self.assertRaises(SarvamResponseError) as exc:
+            parse_sarvam_formatting_response(response)
 
-    def test_parser_accepts_json_with_trailing_markdown_fence_marker(self):
-        response = {
-            "choices": [
-                {
-                    "message": {
-                        "content": '{"paragraphs": ["एक।"]}\n```',
-                    }
-                }
-            ]
-        }
-
-        self.assertEqual(parse_sarvam_formatting_response(response), ["एक।"])
+        self.assertIn("valid JSON", str(exc.exception))
 
     def test_parser_rejects_invalid_json(self):
         with self.assertRaises(SarvamResponseError) as exc:
-            parse_sarvam_formatting_response("not-json")
+            parse_sarvam_formatting_response(sarvam_chat_response("not-json"))
 
         self.assertIn("valid JSON", str(exc.exception))
 
     def test_parser_explains_length_finish_with_no_content(self):
-        response = {
-            "choices": [
-                {
-                    "finish_reason": "length",
-                    "message": {
-                        "content": "",
-                        "reasoning_content": "reasoning consumed the budget",
-                    },
-                }
-            ],
-            "usage": {
-                "completion_tokens": 4096,
-            },
-        }
+        response = sarvam_chat_response("", finish_reason="length")
 
         with self.assertRaises(SarvamResponseError) as exc:
             parse_sarvam_formatting_response(response)
@@ -217,15 +207,24 @@ class FormattingTests(unittest.TestCase):
         self.assertIn("finish_reason='length'", message)
         self.assertIn("output-token limit", message)
 
-    def test_parser_rejects_unknown_fields(self):
-        with self.assertRaises(SarvamResponseError) as exc:
-            parse_sarvam_formatting_response('{"paragraphs": ["एक।"], "title": "नया"}')
+    def test_parser_explains_length_finish_with_partial_content(self):
+        response = sarvam_chat_response('{"paragraphs": ["अधूरा।"', finish_reason="length")
 
-        self.assertIn("unsupported fields", str(exc.exception))
+        with self.assertRaises(SarvamResponseError) as exc:
+            parse_sarvam_formatting_response(response)
+
+        message = str(exc.exception)
+        self.assertIn("finish_reason='length'", message)
+        self.assertIn("Partial JSON text", message)
+
+    def test_parser_allows_schema_level_extra_fields_to_be_enforced_by_sarvam(self):
+        response = sarvam_chat_response('{"paragraphs": ["एक।"], "title": "नया"}')
+
+        self.assertEqual(parse_sarvam_formatting_response(response), ["एक।"])
 
     def test_parser_rejects_invalid_paragraph_shape(self):
         with self.assertRaises(SarvamResponseError) as exc:
-            parse_sarvam_formatting_response('{"paragraphs": ["एक।", ""]}')
+            parse_sarvam_formatting_response(sarvam_chat_response('{"paragraphs": ["एक।", ""]}'))
 
         self.assertIn("paragraph 2", str(exc.exception))
 
@@ -233,7 +232,7 @@ class FormattingTests(unittest.TestCase):
         sleeps = []
         client = FakeSarvamHttpClient([
             SarvamRetryableError("rate limited"),
-            '{"paragraphs": ["दूसरा प्रयास।"]}',
+            sarvam_chat_response('{"paragraphs": ["दूसरा प्रयास।"]}'),
         ])
         formatter = SarvamFormatter(
             formatting_config(delay_seconds=1.5, max_retries=1),
@@ -285,7 +284,7 @@ class FormattingTests(unittest.TestCase):
         client = FakeSarvamHttpClient([
             SarvamRetryableError("rate limited"),
             SarvamRetryableError("still rate limited"),
-            '{"paragraphs": ["तीसरा प्रयास।"]}',
+            sarvam_chat_response('{"paragraphs": ["तीसरा प्रयास।"]}'),
         ])
         formatter = SarvamFormatter(
             formatting_config(delay_seconds=2, max_retries=5),

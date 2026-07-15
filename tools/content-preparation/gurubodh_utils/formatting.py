@@ -43,6 +43,7 @@ SARVAM_FORMATTING_RESPONSE_SCHEMA = {
     "type": "json_schema",
     "json_schema": {
         "name": "sarvam_hindi_formatting_response",
+        "strict": True,
         "schema": {
             "type": "object",
             "additionalProperties": False,
@@ -139,18 +140,20 @@ class SarvamChatCompletionHttpClient:
 
 
 def parse_sarvam_formatting_response(raw_response):
+    if response_finished_due_to_length(raw_response):
+        text = extract_response_text(raw_response)
+        partial_note = " Partial JSON text was returned." if isinstance(text, str) and text else ""
+        raise SarvamResponseError(
+            "Sarvam response stopped with finish_reason='length'. The completion "
+            "output-token limit was exhausted; increase formatting.max_tokens if "
+            "the model tier supports it, or reduce the request size."
+            f"{partial_note}"
+        )
+
     text = extract_response_text(raw_response)
     if not isinstance(text, str) or not text.strip():
-        if response_finished_without_content_due_to_length(raw_response):
-            raise SarvamResponseError(
-                "Sarvam response stopped with finish_reason='length' before returning "
-                "JSON text. The completion output-token limit was exhausted; increase "
-                "formatting.max_tokens if the model tier supports it, or reduce the "
-                "request size."
-            )
-        raise SarvamResponseError("Sarvam response did not contain JSON text")
+        raise SarvamResponseError("Sarvam response did not contain chat message content")
 
-    text = normalize_json_response_text(text)
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
@@ -158,10 +161,6 @@ def parse_sarvam_formatting_response(raw_response):
 
     if not isinstance(data, dict):
         raise SarvamResponseError("Sarvam response JSON must be an object")
-    unknown_keys = sorted(set(data) - {"paragraphs"})
-    if unknown_keys:
-        keys = ", ".join(unknown_keys)
-        raise SarvamResponseError(f"Sarvam response contains unsupported fields: {keys}")
     paragraphs = data.get("paragraphs")
     if not isinstance(paragraphs, list) or not paragraphs:
         raise SarvamResponseError("Sarvam response paragraphs must be a non-empty array")
@@ -173,41 +172,17 @@ def parse_sarvam_formatting_response(raw_response):
     return [paragraph.strip() for paragraph in paragraphs]
 
 
-def normalize_json_response_text(text):
-    stripped = text.strip()
-    if stripped.startswith("```json"):
-        stripped = stripped.removeprefix("```json").strip()
-    elif stripped.startswith("```"):
-        stripped = stripped.removeprefix("```").strip()
-
-    if stripped.endswith("```"):
-        stripped = stripped.removesuffix("```").strip()
-    return stripped
-
-
 def extract_response_text(raw_response):
-    if isinstance(raw_response, str):
-        return raw_response
     if isinstance(raw_response, dict):
         return extract_response_text_from_mapping(raw_response)
 
     choices = getattr(raw_response, "choices", None)
     if choices:
         return extract_response_text_from_choice(choices[0])
-    text = getattr(raw_response, "text", None)
-    if text is not None:
-        return text
-    content = getattr(raw_response, "content", None)
-    if content is not None:
-        return content
     return None
 
 
 def extract_response_text_from_mapping(raw_response):
-    if "text" in raw_response:
-        return raw_response["text"]
-    if "content" in raw_response:
-        return raw_response["content"]
     choices = raw_response.get("choices")
     if choices:
         return extract_response_text_from_choice(choices[0])
@@ -219,17 +194,17 @@ def extract_response_text_from_choice(choice):
         message = choice.get("message")
         if isinstance(message, dict):
             return message.get("content")
-        return choice.get("text") or choice.get("content")
+        return None
 
     message = getattr(choice, "message", None)
     if message is not None:
         if isinstance(message, dict):
             return message.get("content")
         return getattr(message, "content", None)
-    return getattr(choice, "text", None) or getattr(choice, "content", None)
+    return None
 
 
-def response_finished_without_content_due_to_length(raw_response):
+def response_finished_due_to_length(raw_response):
     choice = first_response_choice(raw_response)
     if choice is None:
         return False
