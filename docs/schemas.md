@@ -34,8 +34,14 @@ None currently recorded.
   `integrity.artifacts.text` for the SHA-256 checksum of the generated chapter
   `.txt` artifact bytes. When Sarvam formatting writes formatted chapter
   artifacts, metadata also includes formatted artifact filenames, storage
-  references, artifact checksums, and formatting status. It does not checksum
-  the metadata JSON artifact.
+  references, artifact checksums, formatting status, request attempt count,
+  retry count, and throttle sleep seconds. It does not checksum the metadata
+  JSON artifact.
+- Content-preparation run audit reports are emitted under each generated
+  subject tree's `run_reports/` directory with report schema version `1.0.0`.
+  They summarize run-level outcomes from job configuration and chapter metadata
+  without including secrets, request bodies, or full chapter text. No standalone
+  JSON schema file is currently maintained for this report artifact.
 - Seed-data JSON schemas belong under `tools/seed-data/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

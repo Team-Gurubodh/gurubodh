@@ -243,6 +243,9 @@ class SarvamFormatter:
         self.environ = environ
         self.reporter = reporter
         self._has_made_sarvam_request = False
+        self.request_attempt_count = 0
+        self.retry_count = 0
+        self.throttle_sleep_seconds = 0
 
     def format_text(self, text, progress_label=None):
         model = self.config["model"]
@@ -264,6 +267,7 @@ class SarvamFormatter:
 
         for attempt in range(1, attempts + 1):
             if attempt > 1:
+                self.retry_count += 1
                 self._sleep_before_request(
                     progress_label,
                     "retrying after retryable Sarvam error",
@@ -271,6 +275,7 @@ class SarvamFormatter:
             else:
                 self._sleep_before_request(progress_label)
             self._report(progress_label, f"Sarvam attempt {attempt}/{attempts}")
+            self.request_attempt_count += 1
             try:
                 response = self._call_sarvam(text, model)
                 self._has_made_sarvam_request = True
@@ -300,6 +305,7 @@ class SarvamFormatter:
         else:
             self._report(progress_label, message)
         if delay_seconds:
+            self.throttle_sleep_seconds += delay_seconds
             self.sleeper(delay_seconds)
 
     def _report(self, progress_label, message):

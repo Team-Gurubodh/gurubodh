@@ -218,6 +218,9 @@
         "model_used",
         "status",
         "warning",
+        "attempt_count",
+        "retry_count",
+        "throttle_sleep_seconds",
         "source_text_sha256"
       ],
       "properties": {
@@ -246,6 +249,18 @@
         },
         "warning": {
           "type": ["string", "null"]
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "throttle_sleep_seconds": {
+          "type": "number",
+          "minimum": 0
         },
         "source_text_sha256": {
           "type": ["string", "null"],
