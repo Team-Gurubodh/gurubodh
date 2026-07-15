@@ -245,6 +245,7 @@ class SarvamFormatter:
         self.sleeper = sleeper
         self.environ = environ
         self.reporter = reporter
+        self._has_made_sarvam_request = False
 
     def format_text(self, text, progress_label=None):
         model = self.config["model"]
@@ -265,27 +266,42 @@ class SarvamFormatter:
         last_error = None
 
         for attempt in range(1, attempts + 1):
+            if attempt > 1:
+                self._sleep_before_request(
+                    progress_label,
+                    "retrying after retryable Sarvam error",
+                )
+            else:
+                self._sleep_before_request(progress_label)
             self._report(progress_label, f"Sarvam attempt {attempt}/{attempts}")
             try:
                 response = self._call_sarvam(text, model)
+                self._has_made_sarvam_request = True
                 return parse_sarvam_formatting_response(response)
             except Exception as exc:
+                self._has_made_sarvam_request = True
                 if not is_retryable_sarvam_error(exc) or attempt == attempts:
                     raise
                 last_error = exc
-                self._sleep_before_retry(progress_label)
 
         raise last_error
 
-    def _sleep_before_retry(self, progress_label=None):
+    def _sleep_before_request(self, progress_label=None, reason=None):
+        if not self._has_made_sarvam_request:
+            return
+
         delay_seconds = self.config.get("delay_seconds", 0)
+        if not delay_seconds and not reason:
+            return
+
+        message = reason or "waiting before next Sarvam request"
         if delay_seconds:
             self._report(
                 progress_label,
-                f"retrying after retryable Sarvam error; sleeping {delay_seconds:g}s",
+                f"{message}; sleeping {delay_seconds:g}s",
             )
         else:
-            self._report(progress_label, "retrying after retryable Sarvam error")
+            self._report(progress_label, message)
         if delay_seconds:
             self.sleeper(delay_seconds)
 

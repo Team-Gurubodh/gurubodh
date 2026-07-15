@@ -30,7 +30,7 @@ DEFAULT_FORMATTING_CONFIG = {
     "fallback_model": "sarvam-105b",
     "output_formats": ["json", "markdown"],
     "continue_on_error": True,
-    "delay_seconds": 5,
+    "delay_seconds": 4,
     "max_retries": 1,
     "regenerate": "when-source-checksum-changes",
     "reasoning_effort": None,

@@ -80,7 +80,7 @@ formatting:
     "fallback_model": "sarvam-105b",
     "output_formats": ["json", "markdown"],
     "continue_on_error": true,
-    "delay_seconds": 5,
+    "delay_seconds": 4,
     "max_retries": 1,
     "regenerate": "when-source-checksum-changes",
     "reasoning_effort": null,
@@ -117,7 +117,7 @@ integration. If the block is omitted, formatting is disabled.
     "fallback_model": "sarvam-105b",
     "output_formats": ["json", "markdown"],
     "continue_on_error": true,
-    "delay_seconds": 5,
+    "delay_seconds": 4,
     "max_retries": 1,
     "regenerate": "when-source-checksum-changes",
     "reasoning_effort": null,
@@ -178,6 +178,9 @@ repaired JSON as an invalid Sarvam response instead of silently normalizing it.
 Formatter chat completions default `reasoning_effort` to `null` and
 `max_tokens` to `4096`. This disables Sarvam reasoning output for the formatter
 call and reserves the completion budget for the JSON formatter response.
+`delay_seconds` defaults to `4` and is applied before every Sarvam request after
+the first request in a run, including retry attempts. This keeps sequential
+formatter throughput below 20 requests per minute.
 `max_retries` defaults to `1`, which means one retry after the initial call.
 The formatter hard-caps retries at one even when an older config sets a higher
 value.
