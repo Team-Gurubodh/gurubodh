@@ -1,15 +1,17 @@
-# Task-014: Sarvam Formatted Hindi Chapter Artifacts
+# Task-014: Google AI Studio Formatted Hindi Chapter Artifacts
 
 <record_type>task_history</record_type>
-<status>accepted</status>
-<date>2026-07-13</date>
+<status>proposed (draft - to be reviewed) </status>
+<date>2026-07-15</date>
 <owners>Gurubodh maintainers</owners>
-<github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/87</github_issue>
-<stage_6_github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/99</stage_6_github_issue>
+<github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/109</github_issue>
+<baseline_tag>task-013-complete-before-formatting</baseline_tag>
+<baseline_commit>c34d7c6994fd33e7d4fa55110c418383192d241b</baseline_commit>
+<reference_sarvam_tag>task-014-sarvam-implementation</reference_sarvam_tag>
 
 ## Goal
 
-Define the requirements for integrating Sarvam AI Hindi formatting into
+Define the requirements for integrating Google AI Studio Gemini formatting into
 `gurubodh-utils` so prepared chapter artifacts include display-friendly
 formatted Hindi text in addition to the canonical raw chapter text, chapter
 metadata JSON, and chapter MS Word output.
@@ -17,6 +19,12 @@ metadata JSON, and chapter MS Word output.
 The formatted output is intended for quick display and review. It must not
 replace the canonical extracted chapter `.txt` artifact used for ingestion,
 integrity checks, or future processing.
+
+This task is intentionally based on the preserved Task 013 baseline where Task
+014 formatting work is absent. The earlier Sarvam implementation remains
+preserved separately for reference and comparison, but this task should design
+the formatter as a Google AI Studio native implementation rather than carrying
+forward Sarvam-specific API, model, dependency, or metadata names.
 
 ## Context
 
@@ -40,11 +48,17 @@ artifact generation: the formatter can write local/temp files next to the
 existing text and metadata outputs, and the existing R2 publish step can upload
 them without a separate R2 batch processor.
 
-The source Sarvam prototype demonstrates that Sarvam can receive unformatted
-Hindi text and return structured Hindi paragraphs. The production integration
-should keep the useful idea, but should not copy the prototype's standalone R2
-listing, hard-coded bucket paths, direct upload loop, or prompt-only output
-validation.
+The formatting job is deliberately narrow. It should preserve the original
+Hindi Devanagari content, add punctuation where useful, and split the text into
+readable paragraphs. It should not depend on deep semantic interpretation,
+religious commentary, summarization, translation, title generation, or
+metadata-generation behavior.
+
+Google AI Studio / Gemini is suitable for evaluation here because the desired
+task is text normalization and layout, not authoritative doctrinal analysis.
+The implementation should use native Gemini API capabilities, especially
+structured JSON output, while keeping the prompt and post-response validation
+strict.
 
 ## Decisions
 
@@ -58,16 +72,25 @@ validation.
   under `chapters/text_and_metadata/`.
 - Enable formatting only when the conversion job has
   `formatting.enabled: true`.
+- Use Google AI Studio / Gemini as the formatter provider for this task.
+- Prefer the native Google GenAI SDK and Gemini API shape over the
+  OpenAI-compatible endpoint for the first implementation.
+- Use a lightweight Gemini model by default because this task is punctuation
+  and paragraphing, not high-reasoning analysis.
+- Do not configure high thinking effort by default. If a chosen Gemini model
+  supports thinking controls, configure the lowest appropriate value for this
+  workflow, such as `low` or `minimal` when supported by the selected model.
+- Require structured JSON output via Gemini `response_format` with a JSON
+  schema, and still validate the returned JSON defensively in code.
+- Record the number of paragraphs returned by Gemini in both the formatted JSON
+  artifact and the chapter metadata `formatting` section.
 - A formatting failure must not fail the overall content-preparation job.
   Instead, the job should complete with clear warnings and metadata that makes
   the missing or failed formatted artifact state visible.
-- Use `sarvam-30b` as the primary model for punctuation and paragraphing.
-- Use `sarvam-105b` as the fallback model for retry/escalation when configured
-  and appropriate.
-- Do not ask Sarvam to create canonical chapter titles. Chapter identity and
+- Do not ask Gemini to create canonical chapter titles. Chapter identity and
   titles remain owned by Gurubodh naming and metadata.
 - Process one chapter at a time by default.
-- Use pacing between Sarvam requests, with a default delay of 5 seconds unless
+- Use pacing between Gemini requests, with a default delay of 5 seconds unless
   later testing proves a better value.
 - Regenerate formatted output the first time, and on later runs only when the
   raw chapter text checksum changes.
@@ -100,21 +123,23 @@ formatter provenance. At minimum, it should include:
 ```json
 {
   "schema_version": "1.0.0",
-  "provider": "sarvam",
-  "model": "sarvam-30b",
+  "provider": "google-ai-studio",
+  "model": "gemini-2.5-flash-lite",
   "fallback_model_used": null,
+  "thinking_level": "low",
   "source_text_sha256": "...",
   "status": "formatted",
+  "paragraph_count": 2,
   "paragraphs": [
     "..."
   ]
 }
 ```
 
-When formatting fails but the main job continues, the implementation may either
-omit the formatted artifact files or write a failure JSON artifact. The chosen
-behavior must be explicit in the implementation issue. If failure JSON artifacts
-are written, they must not be mistaken for display-ready formatted text.
+When formatting fails but the main job continues, the implementation should
+omit display-ready formatted artifact files and record failure state in chapter
+metadata. Failure JSON artifacts are not part of the first implementation,
+because they are easy to confuse with display-ready formatted text.
 
 `*.formatted.md` should be display-friendly Markdown built from the formatted
 paragraphs:
@@ -136,14 +161,16 @@ Add an optional `formatting` object to the conversion job schema:
 {
   "formatting": {
     "enabled": true,
-    "provider": "sarvam",
-    "model": "sarvam-30b",
-    "fallback_model": "sarvam-105b",
+    "provider": "google-ai-studio",
+    "model": "gemini-2.5-flash-lite",
+    "fallback_model": "gemini-2.5-flash",
     "output_formats": ["json", "markdown"],
     "continue_on_error": true,
     "delay_seconds": 5,
     "max_retries": 3,
-    "regenerate": "when-source-checksum-changes"
+    "regenerate": "when-source-checksum-changes",
+    "thinking_level": "low",
+    "max_output_tokens": 8192
   }
 }
 ```
@@ -153,16 +180,20 @@ Expected validation rules:
 - `formatting` is optional.
 - If omitted, formatting is disabled.
 - `formatting.enabled` must be boolean when present.
-- `provider` must initially support only `sarvam`.
-- `model` should default to `sarvam-30b`.
-- `fallback_model` should default to `sarvam-105b` when fallback behavior is
-  enabled.
+- `provider` must initially support only `google-ai-studio`.
+- `model` should default to `gemini-2.5-flash-lite`.
+- `fallback_model` should default to `gemini-2.5-flash` when fallback behavior
+  is enabled.
 - `output_formats` should initially support `json` and `markdown`.
 - `continue_on_error` should default to `true` for this workflow.
 - `delay_seconds` should default to `5`.
 - `max_retries` should be a small bounded integer.
 - `regenerate` should support the initial value
   `when-source-checksum-changes`.
+- `thinking_level` should default to a low-effort setting for models that
+  support it. The implementation must not default to high thinking effort.
+- `max_output_tokens` should reserve enough generation budget for a near-full
+  copy of the input with punctuation and paragraph breaks.
 
 ## Schema Versioning And Validation
 
@@ -183,6 +214,9 @@ Rationale:
 - Formatted artifact references and formatting status are optional for jobs that
   do not enable formatting, but generated metadata can now carry a richer
   artifact contract.
+- The metadata `formatting.paragraph_count` field gives downstream tools and
+  reviewers a compact signal about formatter behavior without opening the
+  formatted artifact.
 - Downstream tools should be able to identify which schema contract produced or
   validated an artifact.
 
@@ -210,11 +244,14 @@ Validation requirements:
 - Validate `1.3.0` job configs with formatting disabled.
 - Validate `1.3.0` job configs with formatting enabled.
 - Reject invalid formatting providers, invalid output formats, invalid retry
-  values, and invalid regeneration modes.
+  values, invalid thinking levels, invalid output token values, and invalid
+  regeneration modes.
 - Validate chapter metadata with formatting disabled and no formatted artifacts.
 - Validate chapter metadata with successful formatted artifacts.
 - Validate chapter metadata with formatting failure status and no display-ready
   formatted Markdown artifact.
+- Validate `formatting.paragraph_count` as either `null` or a non-negative
+  integer, with successful formatting requiring a positive value.
 - Keep backward compatibility expectations explicit for any consumer that still
   reads `1.2.0` metadata during the transition.
 
@@ -295,20 +332,21 @@ artifact bytes when those artifacts are written:
 ```
 
 Metadata should also expose formatting status without making the entire chapter
-invalid when formatting fails. A future implementation may add a dedicated
-section such as:
+invalid when formatting fails:
 
 ```json
 {
   "formatting": {
     "enabled": true,
-    "provider": "sarvam",
-    "model": "sarvam-30b",
-    "fallback_model": "sarvam-105b",
-    "model_used": "sarvam-30b",
+    "provider": "google-ai-studio",
+    "model": "gemini-2.5-flash-lite",
+    "fallback_model": "gemini-2.5-flash",
+    "model_used": "gemini-2.5-flash-lite",
+    "thinking_level": "low",
     "status": "formatted",
     "warning": null,
-    "source_text_sha256": "..."
+    "source_text_sha256": "...",
+    "paragraph_count": 12
   }
 }
 ```
@@ -320,7 +358,16 @@ Allowed statuses should include at least:
 - `skipped-unchanged`;
 - `failed`.
 
-## Sarvam Prompt Requirements
+`paragraph_count` behavior:
+
+- `disabled`: `paragraph_count` must be `null`.
+- `formatted`: `paragraph_count` must equal the number of returned paragraphs.
+- `skipped-unchanged`: `paragraph_count` should be read from the reusable
+  formatted JSON artifact when available.
+- `failed`: `paragraph_count` must be `null` unless a future retry workflow can
+  safely preserve a valid previous count for the same source checksum.
+
+## Google AI Studio Prompt Requirements
 
 The formatter should use strict Hindi preservation instructions. The system
 instruction should focus only on punctuation and paragraphing:
@@ -353,18 +400,68 @@ instruction should focus only on punctuation and paragraphing:
 आउटपुट में JSON के अलावा कोई अतिरिक्त टेक्स्ट, Markdown, टिप्पणी या ```json बैकटिक्स न दें।
 ```
 
-The implementation should prefer Sarvam's structured-output support when
-available so the JSON contract is enforced by API parameters as well as by the
-prompt.
+The API request must use Gemini structured output support in addition to the
+prompt. The target response format should be equivalent to:
+
+```json
+{
+  "type": "text",
+  "mime_type": "application/json",
+  "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["paragraphs"],
+    "properties": {
+      "paragraphs": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
+```
+
+The implementation should still parse and validate the response after the API
+returns it. Structured output reduces malformed responses, but it does not
+replace defensive validation in `gurubodh-utils`.
+
+## Gemini API Requirements
+
+The first implementation should use the native Google GenAI SDK with Google AI
+Studio API-key authentication.
+
+Expected API behavior:
+
+- Read credentials from `GEMINI_API_KEY` or another explicitly documented
+  Google AI Studio environment variable.
+- Keep the SDK dependency optional so non-formatting jobs do not require Google
+  dependencies at import time.
+- Use a native Gemini call that supports:
+  - model selection;
+  - input text;
+  - `response_format` with `application/json` and JSON schema;
+  - generation configuration for output-token and thinking controls.
+- Configure thinking effort as low, minimal, or model-default-off for this
+  workflow. High thinking effort must require explicit operator configuration.
+- Preserve response usage diagnostics when available, especially input tokens,
+  output tokens, and thought tokens, but do not make usage metadata mandatory
+  for the first artifact contract.
+- Do not use Google Search grounding, URL context, tools, or code execution for
+  this formatter.
 
 ## Token And Rate-Limit Handling
 
-The Sarvam context window must include:
+The Gemini context window must include:
 
 - system instruction tokens;
-- structured-output schema tokens, if used;
+- structured-output schema tokens;
 - input chapter text tokens;
-- generated formatted output tokens.
+- generated formatted output tokens;
+- any thought-token budget used by the configured model.
 
 Because the output is a near-full copy of the input with punctuation and
 paragraph breaks, the implementation must leave enough output budget instead of
@@ -372,18 +469,20 @@ treating the entire model context window as input capacity.
 
 Implementation requirements:
 
-- Estimate request size before calling Sarvam.
+- Estimate request size before calling Gemini.
 - Process one chapter per request when the chapter fits safely.
 - If a chapter is too large for the configured model, either:
-  - use the configured fallback model if it has a larger context window; or
+  - use the configured fallback model if it has a larger safe budget; or
   - split into smaller formatting chunks with deterministic reassembly.
 - Preserve paragraph order across chunks.
 - Warn clearly when formatting is skipped because a chapter cannot be safely
   processed.
-- Sleep between Sarvam calls using the configured `delay_seconds`.
+- Sleep between Gemini calls using the configured `delay_seconds`.
 - Retry retryable API failures such as rate-limit or temporary service errors.
 - Do not retry permanent failures such as invalid credentials or invalid
   response schema beyond the configured validation path.
+- Treat output-token exhaustion as a distinct diagnostic condition rather than
+  a generic invalid JSON error.
 
 ## Checksum And Regeneration Behavior
 
@@ -391,9 +490,9 @@ The raw chapter `.txt` artifact checksum should drive formatting reuse.
 
 Expected behavior:
 
-- First run with formatting enabled writes formatted artifacts when Sarvam
+- First run with formatting enabled writes formatted artifacts when Gemini
   succeeds.
-- Later runs should skip Sarvam formatting for a chapter if:
+- Later runs should skip Gemini formatting for a chapter if:
   - the raw chapter text checksum is unchanged; and
   - matching formatted artifacts already exist; and
   - formatted artifact metadata records the same source text checksum.
@@ -416,12 +515,16 @@ canonical content-preparation outputs.
 
 Required behavior:
 
-- Missing `SARVAM_API_KEY` should warn and skip formatting when
+- Missing Google AI Studio API credentials should warn and skip formatting when
   `formatting.enabled` is true and `continue_on_error` is true.
-- Invalid Sarvam responses should warn, record failure status, and continue
+- Invalid Gemini responses should warn, record failure status, and continue
   when `continue_on_error` is true.
+- Structured-output schema failures should warn, record failure status, and
+  continue when `continue_on_error` is true.
 - Rate-limit exhaustion after retries should warn, record failure status, and
   continue.
+- Output-token exhaustion should include a clear diagnostic and should not write
+  display-ready formatted artifacts.
 - The job should still fail for canonical preparation errors such as invalid
   DOCX input, failed chapter splitting, invalid required config, or R2 upload
   failures.
@@ -439,45 +542,50 @@ Required behavior:
 1. Extend `conversion_job.schema.json` with optional `formatting`.
 2. Bump the conversion job schema version to `1.3.0`.
 3. Extend `config.py` validation for the new formatting block.
-4. Add tests for omitted formatting config, disabled formatting, enabled Sarvam
-   formatting, invalid providers, invalid model names, and defaults.
+4. Add tests for omitted formatting config, disabled formatting, enabled Google
+   formatting, invalid providers, invalid model names, invalid thinking levels,
+   invalid output token values, and defaults.
 5. Add an automatic migration command or equivalent documented command for
    converting `1.2.0` job configs to `1.3.0` without manual editing.
 
 ### Stage 2 - Formatter Module
 
-1. Add a Sarvam formatter module under `gurubodh_utils`.
-2. Keep Sarvam SDK import lazy so existing non-formatting jobs do not require
-   Sarvam dependencies at import time.
-3. Read `SARVAM_API_KEY` from the environment.
-4. Implement strict JSON parsing and validation.
-5. Implement configured delay and retry behavior.
-6. Add unit tests with a fake Sarvam client.
+1. Add a Google AI Studio formatter module under `gurubodh_utils`.
+2. Keep Google GenAI SDK import lazy so existing non-formatting jobs do not
+   require Google dependencies at import time.
+3. Read Google AI Studio credentials from the documented environment variable.
+4. Implement native Gemini structured output with `response_format`.
+5. Implement strict JSON parsing and validation.
+6. Implement `paragraph_count` derivation from validated paragraphs.
+7. Implement configured delay and retry behavior.
+8. Add unit tests with a fake Google GenAI client.
 
 ### Stage 3 - Chapter Artifact Generation
 
 1. Hook formatting into chapter splitting after raw chapter text is written and
    before metadata is finalized.
 2. Generate `*.formatted.json` and `*.formatted.md` when formatting succeeds.
-3. Track formatting status and warnings per chapter.
-4. Ensure R2 upload continues to use the existing publish-all-artifacts flow.
+3. Include `paragraph_count` in the formatted JSON artifact.
+4. Track formatting status, paragraph count, and warnings per chapter.
+5. Ensure R2 upload continues to use the existing publish-all-artifacts flow.
 
 ### Stage 4 - Metadata And Integrity
 
 1. Extend `chapter_metadata.schema.json`.
 2. Bump the chapter metadata schema version to `1.3.0`.
 3. Extend metadata generation to include formatted artifact file names, storage
-   references, checksums, and formatting status.
+   references, checksums, formatting status, and `formatting.paragraph_count`.
 4. Preserve backward compatibility for jobs that do not enable formatting.
 5. Add schema and metadata unit tests.
 
 ### Stage 5 - Reuse And Regeneration
 
 1. Implement source-text-checksum comparison.
-2. Skip Sarvam calls for unchanged chapters when valid formatted artifacts
+2. Skip Gemini calls for unchanged chapters when valid formatted artifacts
    already exist.
-3. Add local reuse tests.
-4. Define and test the R2 reuse strategy before depending on it in production.
+3. Carry `paragraph_count` forward from reusable formatted JSON artifacts.
+4. Add local reuse tests.
+5. Define and test the R2 reuse strategy before depending on it in production.
 
 ### Stage 6 - Documentation And Verification
 
@@ -487,30 +595,33 @@ Required behavior:
 3. Add a small sample job config with formatting disabled or enabled only if it
    is safe for normal local runs.
 4. Run the content-preparation test suite.
-5. Manually test one representative chapter with Sarvam credentials outside CI.
+5. Manually test one representative chapter with Google AI Studio credentials
+   outside CI.
 
-Stage 6 execution is tracked in
-https://github.com/Team-Gurubodh/gurubodh/issues/99. The documentation pass
-adds an explicit formatting-disabled local sample job so normal local runs can
-exercise the `1.3.0` formatting contract without requiring Sarvam credentials.
 Automated verification should use the content-preparation virtual environment:
 
 ```bash
 tools/content-preparation/.venv/bin/python -m unittest discover -s tools/content-preparation/tests
 ```
 
-Manual Sarvam verification remains an operator-run check because it requires
-local source documents and a private `SARVAM_API_KEY`.
+Manual Google AI Studio verification remains an operator-run check because it
+requires local source documents and private Google AI Studio API credentials.
 
 ## Acceptance Criteria
 
 - The future implementation is controlled by `formatting.enabled`.
-- `sarvam-30b` is the default primary model.
-- `sarvam-105b` is configurable as the fallback model.
+- `google-ai-studio` is the configured formatter provider.
+- `gemini-2.5-flash-lite` is the default primary model unless manual
+  verification identifies a better lightweight default.
+- A fallback Gemini model is configurable.
+- High thinking effort is not used by default.
+- Gemini structured JSON output / `response_format` is used for the formatter
+  response contract.
 - The canonical raw chapter `.txt` output remains unchanged.
 - Successful formatting writes both `*.formatted.json` and `*.formatted.md`.
 - Formatted artifacts are referenced from chapter metadata when present.
 - Formatted artifacts include integrity checksums.
+- Formatted JSON and chapter metadata record `paragraph_count`.
 - Conversion job and chapter metadata schemas are bumped to `1.3.0`.
 - Existing `1.2.0` conversion job configs can be migrated to `1.3.0` without
   manual editing.
@@ -522,23 +633,29 @@ local source documents and a private `SARVAM_API_KEY`.
 - The CLI reports formatting warnings and summary counts.
 - Formatting is skipped for unchanged raw chapter text when valid matching
   formatted artifacts already exist.
-- Token-limit and rate-limit handling are covered by tests or documented manual
-  verification.
+- Token-limit, thought-token, structured-output, and rate-limit handling are
+  covered by tests or documented manual verification.
 
 ## Non-Goals
 
 - Do not ingest formatted artifacts into Strapi in the first implementation.
-- Do not replace canonical chapter text with Sarvam output.
-- Do not generate authoritative chapter titles with Sarvam.
+- Do not replace canonical chapter text with Gemini output.
+- Do not generate authoritative chapter titles with Gemini.
 - Do not implement semantic summaries, tags, descriptors, embeddings, or RAG
   chunking in this task.
+- Do not use Google Search grounding, URL context, tools, or code execution for
+  formatting.
 - Do not introduce a separate standalone R2 batch processor for formatted text.
+- Do not keep Sarvam-specific API names, environment variables, dependencies,
+  or model defaults in the Google implementation.
 
 ## Follow-Up
 
-- Create a separate implementation issue after this task brief is approved.
-- Decide whether failed formatting should write explicit failure JSON artifacts
-  or only metadata failure status.
-- Decide the production R2 reuse strategy for previously formatted artifacts.
-- Evaluate `sarvam-30b` versus `sarvam-105b` on representative Gurubodh
-  chapters before enabling formatting broadly.
+- Evaluate `gemini-2.5-flash-lite` versus `gemini-2.5-flash` on representative
+  Gurubodh chapters before enabling formatting broadly.
+- Compare Google AI Studio output with the preserved Sarvam implementation for
+  paragraph quality, punctuation quality, text preservation, JSON reliability,
+  latency, and cost.
+- Add chunked formatting for chapters that hit output-token limits.
+- Add a durable retry workflow for formatter failures after the basic Google
+  implementation is accepted.
