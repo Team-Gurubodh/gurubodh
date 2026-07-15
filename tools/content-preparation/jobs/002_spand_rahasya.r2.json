@@ -43,7 +43,7 @@
     ],
     "continue_on_error": false,
     "delay_seconds": 5,
-    "max_retries": 3,
+    "max_retries": 1,
     "regenerate": "when-source-checksum-changes",
     "reasoning_effort": null,
     "max_tokens": 4096

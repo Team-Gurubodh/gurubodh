@@ -26,8 +26,8 @@ None currently recorded.
 - Conversion job configs currently use schema version `1.3.0`, including an
   optional `formatting` block for the Sarvam Hindi formatting configuration
   contract. Omitting the block keeps formatting disabled. Formatting defaults
-  include `reasoning_effort: null` and `max_tokens: 4096` for Sarvam formatter
-  chat completions.
+  include `max_retries: 1`, `reasoning_effort: null`, and `max_tokens: 4096`
+  for Sarvam formatter chat completions.
 - Conversion job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
 - Chapter metadata uses schema version `1.3.0`. It includes

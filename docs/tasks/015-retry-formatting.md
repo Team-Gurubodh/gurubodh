@@ -41,10 +41,12 @@ Investigation showed two different failure modes:
   the formatter hit the configured completion-token limit while still emitting
   JSON.
 
-The installed `sarvamai==0.1.28` SDK accepts `reasoning_effort` and
-`max_tokens`, but its `chat.completions` callable does not accept
-`response_format`. Therefore the current formatter cannot enforce a JSON schema
-through the SDK and must defensively validate, retry, and record failures.
+Issue #110 Stage 1 replaces formatter chat completions with a direct HTTP
+Sarvam caller because the installed `sarvamai==0.1.28` SDK accepts
+`reasoning_effort` and `max_tokens`, but its `chat.completions` callable does
+not accept `response_format`. Retry formatting should use the same direct HTTP
+formatter path and must continue to defensively validate, retry, and record
+failures.
 
 For R2-backed jobs, the main content-preparation run builds artifacts in a
 temporary local subject tree and uploads those artifacts to R2. The temporary
@@ -201,7 +203,7 @@ Retryable by default:
 Non-retryable by default:
 
 - missing `SARVAM_API_KEY`;
-- missing or unsupported Sarvam SDK client shape;
+- missing or unsupported Sarvam direct HTTP client shape;
 - invalid job config;
 - missing raw chapter `.txt` artifact;
 - malformed chapter metadata that cannot identify the chapter or text artifact.
@@ -284,8 +286,8 @@ Durable outputs:
 
 ## Risks
 
-- Sarvam may continue returning malformed JSON because current SDK calls cannot
-  enforce `response_format`.
+- Sarvam may continue returning malformed JSON or length-limit responses even
+  when direct HTTP calls request structured output.
 - Retrying can increase API cost, especially if repeated against length-limit
   failures.
 - Rewriting metadata in R2 can corrupt the retry ledger if the update logic
@@ -387,11 +389,9 @@ approves the coding scope before changing source files.
   metadata if operational retry history becomes important.
 - Add optional fallback-model behavior for selected retryable failures, with
   clear cost and timeout controls.
-- Explore Sarvam tool-calling as a structured-output substitute while the SDK
-  lacks `response_format`.
-- Revisit SDK support periodically. If Sarvam adds official `response_format`
-  or structured-output support, update the formatter to use it and simplify
-  retry handling.
+- Revisit SDK support periodically. If Sarvam adds official SDK support for
+  structured output, decide whether the direct HTTP formatter path should stay
+  or move back behind the SDK.
 - Add a review/report command that summarizes formatting coverage across an R2
   subject prefix without making Sarvam calls.
 - Add concurrency controls or object precondition support if multiple operators

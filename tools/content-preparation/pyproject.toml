@@ -12,9 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-formatting = [
-    "sarvamai",
-]
+formatting = []
 
 [project.scripts]
 gurubodh-utils = "gurubodh_utils.cli:main"

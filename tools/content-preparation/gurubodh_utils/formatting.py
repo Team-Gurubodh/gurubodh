@@ -1,13 +1,17 @@
 import hashlib
-import inspect
 import json
 import os
 import time
+import urllib.error
+import urllib.request
 
 
 SARVAM_API_KEY_ENV_VAR = "SARVAM_API_KEY"
 SARVAM_API_BASE_URL = "https://api.sarvam.ai"
+SARVAM_CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
 FORMATTED_ARTIFACT_SCHEMA_VERSION = "1.0.0"
+MAX_SARVAM_FORMATTER_RETRIES = 1
+RETRYABLE_HTTP_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
 
 HINDI_FORMATTING_SYSTEM_PROMPT = """आप एक विशेषज्ञ हिंदी संपादक हैं। आपका कार्य दिए गए कच्चे हिंदी देवनागरी पाठ को केवल पढ़ने योग्य बनाना है।
 
@@ -66,10 +70,6 @@ class MissingSarvamApiKeyError(FormattingError):
     """Raised when formatting is requested without SARVAM_API_KEY."""
 
 
-class SarvamDependencyError(FormattingError):
-    """Raised when the Sarvam SDK is required but not installed."""
-
-
 class SarvamResponseError(FormattingError):
     """Raised when Sarvam returns invalid formatter output."""
 
@@ -98,13 +98,44 @@ def sarvam_api_key_from_env(environ=None):
 
 def build_sarvam_client(api_key=None, environ=None):
     api_key = api_key or sarvam_api_key_from_env(environ)
-    try:
-        from sarvamai import SarvamAI
-    except ImportError as exc:
-        raise SarvamDependencyError(
-            "Sarvam formatting requires the optional sarvamai Python package"
-        ) from exc
-    return SarvamAI(api_subscription_key=api_key)
+    return SarvamChatCompletionHttpClient(api_key=api_key)
+
+
+class SarvamChatCompletionHttpClient:
+    def __init__(self, api_key, base_url=SARVAM_API_BASE_URL, opener=None):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.opener = opener or urllib.request.urlopen
+
+    def create_chat_completion(self, body):
+        url = f"{self.base_url}{SARVAM_CHAT_COMPLETIONS_PATH}"
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "api-subscription-key": self.api_key,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with self.opener(request) as response:
+                payload = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            if exc.code in RETRYABLE_HTTP_STATUS_CODES:
+                raise SarvamRetryableError(
+                    f"Sarvam chat completion failed with HTTP {exc.code}"
+                ) from exc
+            raise SarvamPermanentError(
+                f"Sarvam chat completion failed with HTTP {exc.code}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            raise SarvamRetryableError("Sarvam chat completion request failed") from exc
+
+        try:
+            return json.loads(payload)
+        except json.JSONDecodeError as exc:
+            raise SarvamResponseError("Sarvam API response was not valid JSON") from exc
 
 
 def parse_sarvam_formatting_response(raw_response):
@@ -228,12 +259,12 @@ def is_retryable_sarvam_error(exc):
         return False
 
     status_code = getattr(exc, "status_code", None) or getattr(exc, "status", None)
-    if status_code in {408, 409, 425, 429, 500, 502, 503, 504}:
+    if status_code in RETRYABLE_HTTP_STATUS_CODES:
         return True
 
     response = getattr(exc, "response", None)
     response_status = getattr(response, "status_code", None)
-    return response_status in {408, 409, 425, 429, 500, 502, 503, 504}
+    return response_status in RETRYABLE_HTTP_STATUS_CODES
 
 
 class SarvamFormatter:
@@ -257,7 +288,7 @@ class SarvamFormatter:
         }
 
     def _format_with_retries(self, text, model):
-        max_retries = self.config["max_retries"]
+        max_retries = min(self.config["max_retries"], MAX_SARVAM_FORMATTER_RETRIES)
         attempts = max_retries + 1
         last_error = None
 
@@ -307,70 +338,16 @@ def call_sarvam_chat_completion(
     reasoning_effort=None,
     max_tokens=None,
 ):
-    chat = getattr(client, "chat", None)
-    completions = getattr(chat, "completions", None) if chat is not None else None
-
-    if completions is not None:
-        create = getattr(completions, "create", None)
-        if callable(create):
-            return call_with_optional_completion_controls(
-                create,
-                model,
-                messages,
-                reasoning_effort,
-                max_tokens,
-            )
-        if callable(completions):
-            return call_with_optional_completion_controls(
-                completions,
-                model,
-                messages,
-                reasoning_effort,
-                max_tokens,
-            )
-
     create_chat_completion = getattr(client, "create_chat_completion", None)
     if callable(create_chat_completion):
-        return call_with_optional_completion_controls(
-            create_chat_completion,
-            model,
-            messages,
-            reasoning_effort,
-            max_tokens,
+        return create_chat_completion(
+            {
+                "model": model,
+                "messages": messages,
+                "reasoning_effort": reasoning_effort,
+                "max_tokens": max_tokens,
+                "response_format": SARVAM_FORMATTING_RESPONSE_SCHEMA,
+            }
         )
 
-    raise SarvamPermanentError("Unsupported Sarvam client shape for chat completion")
-
-
-def call_with_optional_completion_controls(
-    callable_obj,
-    model,
-    messages,
-    reasoning_effort,
-    max_tokens,
-):
-    kwargs = {
-        "model": model,
-        "messages": messages,
-    }
-    if accepts_keyword(callable_obj, "response_format"):
-        kwargs["response_format"] = SARVAM_FORMATTING_RESPONSE_SCHEMA
-    if accepts_keyword(callable_obj, "reasoning_effort"):
-        kwargs["reasoning_effort"] = reasoning_effort
-    if accepts_keyword(callable_obj, "max_tokens"):
-        kwargs["max_tokens"] = max_tokens
-    return callable_obj(**kwargs)
-
-
-def accepts_keyword(callable_obj, keyword):
-    try:
-        parameters = inspect.signature(callable_obj).parameters
-    except (TypeError, ValueError):
-        return True
-
-    if keyword in parameters:
-        return True
-    return any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD
-        for parameter in parameters.values()
-    )
+    raise SarvamPermanentError("Unsupported Sarvam HTTP client shape for chat completion")
