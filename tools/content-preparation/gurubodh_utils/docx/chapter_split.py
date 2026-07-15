@@ -10,6 +10,7 @@ from gurubodh_utils.docx.validate import validate_docx
 from gurubodh_utils.formatting import SarvamFormatter, source_text_sha256
 from gurubodh_utils.metadata import build_chapter_metadata
 from gurubodh_utils.naming import chapter_output_filename, full_subject_output_filename
+from gurubodh_utils.progress import DEFAULT_PROGRESS_REPORTER
 from gurubodh_utils.text_utils import normalize_spaces, safe_filename
 from gurubodh_utils.time_utils import utc_now
 
@@ -193,7 +194,11 @@ def format_chapter_artifacts(
     chapter_text_value,
     formatting_config,
     formatter,
+    chapter_total=None,
+    reporter=DEFAULT_PROGRESS_REPORTER,
 ):
+    label = f"[{chapter_number}/{chapter_total}]" if chapter_total else f"[{chapter_number}]"
+    base_name = text_name.removesuffix(".txt")
     if not formatting_config or not formatting_config.get("enabled"):
         return {"status": "disabled", "warning": None, "artifacts": {}}
 
@@ -207,19 +212,25 @@ def format_chapter_artifacts(
                 output_formats,
             )
             if artifacts:
+                reporter.report(f"{label} skipped formatting: unchanged source checksum")
                 return {"status": "skipped-unchanged", "warning": None, "artifacts": artifacts}
 
-        formatted_result = formatter.format_text(chapter_text_value)
+        reporter.report(
+            f"{label} formatting with {formatting_config['model']} "
+            f"chars={len(chapter_text_value)} max_tokens={formatting_config.get('max_tokens')}"
+        )
+        formatted_result = formatter.format_text(chapter_text_value, progress_label=label)
         artifacts = write_formatted_artifacts(
             chapter_text_dir,
             text_name,
             formatted_result,
             output_formats,
         )
+        reporter.report(f"{label} formatted paragraphs={len(formatted_result['paragraphs'])}")
         return {"status": "formatted", "warning": None, "artifacts": artifacts}
     except Exception as exc:
-        base_name = text_name.removesuffix(".txt")
         warning = f"formatting failed for chapter {chapter_number:03d} {base_name}: {exc}"
+        reporter.report(f"{label} formatting failed: {exc}")
         if not formatting_config.get("continue_on_error", True):
             raise SystemExit(warning) from exc
         print(f"warning: {warning}")
@@ -271,6 +282,7 @@ def split_docx_into_chapters(
     config=None,
     converter_counts=None,
     entry_point=None,
+    reporter=DEFAULT_PROGRESS_REPORTER,
 ):
     with zipfile.ZipFile(docx_path) as docx:
         document_xml = docx.read("word/document.xml")
@@ -292,8 +304,13 @@ def split_docx_into_chapters(
     outputs = []
     created_at = utc_now()
     formatting_config = config.get("formatting") if config else None
-    formatter = SarvamFormatter(formatting_config) if formatting_config and formatting_config.get("enabled") else None
+    formatter = (
+        SarvamFormatter(formatting_config, reporter=reporter)
+        if formatting_config and formatting_config.get("enabled")
+        else None
+    )
     formatting_summary = {"formatted": 0, "skipped-unchanged": 0, "failed": 0, "disabled": 0}
+    chapter_total = len(chapters)
     for index, blocks in enumerate(chapters, start=1):
         if config:
             docx_name = chapter_output_filename(config, index, ".docx")
@@ -305,6 +322,8 @@ def split_docx_into_chapters(
             text_name = f"{title}.txt"
             metadata_name = None
 
+        base_name = text_name.removesuffix(".txt")
+        reporter.report(f"[{index}/{chapter_total}] writing chapter {base_name}")
         output_path = chapter_docx_dir / docx_name
         text_path = chapter_text_dir / text_name
         xml = chapter_document_xml(document_xml, blocks, subject_blocks, sect_pr)
@@ -319,6 +338,8 @@ def split_docx_into_chapters(
                 text_value,
                 formatting_config,
                 formatter,
+                chapter_total=chapter_total,
+                reporter=reporter,
             )
             formatting_summary[formatting_result["status"]] += 1
         if config:

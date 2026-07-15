@@ -1,6 +1,8 @@
 import copy
 import json
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 
 from gurubodh_utils.constants import DEFAULT_FORMATTING_CONFIG
 from gurubodh_utils.formatting import (
@@ -275,6 +277,28 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(result["paragraphs"], ["दूसरा प्रयास।"])
         self.assertEqual(sleeps, [1.5])
         self.assertEqual(len(client.calls), 2)
+
+    def test_retry_progress_reports_attempts_and_sleep(self):
+        sleeps = []
+        output = StringIO()
+        client = FakeSarvamHttpClient([
+            SarvamRetryableError("rate limited"),
+            sarvam_chat_response('{"paragraphs": ["दूसरा प्रयास।"]}'),
+        ])
+        formatter = SarvamFormatter(
+            formatting_config(delay_seconds=5, max_retries=1),
+            client=client,
+            sleeper=sleeps.append,
+        )
+
+        with redirect_stdout(output):
+            formatter.format_text("दूसरा प्रयास", progress_label="[2/3]")
+
+        progress = output.getvalue()
+        self.assertIn("[2/3] Sarvam attempt 1/2", progress)
+        self.assertIn("[2/3] retrying after retryable Sarvam error; sleeping 5s", progress)
+        self.assertIn("[2/3] Sarvam attempt 2/2", progress)
+        self.assertEqual(sleeps, [5])
 
     def test_non_retryable_failure_does_not_sleep_or_retry(self):
         sleeps = []

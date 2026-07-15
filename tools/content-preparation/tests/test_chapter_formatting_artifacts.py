@@ -1,12 +1,13 @@
 import json
 import tempfile
 import unittest
+import zipfile
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
 from gurubodh_utils.paths import destination_paths_for_job
-from gurubodh_utils.docx.chapter_split import format_chapter_artifacts
+from gurubodh_utils.docx.chapter_split import format_chapter_artifacts, split_docx_into_chapters
 from gurubodh_utils.formatting import source_text_sha256
 from gurubodh_utils.storage import publish_r2_destination
 
@@ -52,7 +53,7 @@ class FakeFormatter:
         self.error = error
         self.calls = []
 
-    def format_text(self, text):
+    def format_text(self, text, progress_label=None):
         self.calls.append(text)
         if self.error:
             raise self.error
@@ -71,6 +72,40 @@ class FakeR2Client:
 
 
 class ChapterFormattingArtifactTests(unittest.TestCase):
+    def write_minimal_docx(self, path):
+        document_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>विषय स्पंद रहस्य</w:t></w:r></w:p>
+    <w:p><w:r><w:t>प्रबोधन क्र. 1</w:t></w:r></w:p>
+    <w:p><w:r><w:t>पहला पाठ</w:t></w:r></w:p>
+    <w:p><w:r><w:t>प्रबोधन क्र. 2</w:t></w:r></w:p>
+    <w:p><w:r><w:t>दूसरा पाठ</w:t></w:r></w:p>
+  </w:body>
+</w:document>"""
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as docx:
+            docx.writestr("word/document.xml", document_xml)
+
+    def test_chapter_split_reports_per_chapter_write_progress(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_docx = root / "source.docx"
+            self.write_minimal_docx(source_docx)
+            output = StringIO()
+
+            with redirect_stdout(output):
+                outputs = split_docx_into_chapters(
+                    source_docx,
+                    {"pattern": "प्रबोधन", "enabled": True},
+                    root / "chapters" / "msword",
+                    root / "chapters" / "text_and_metadata",
+                )
+
+        progress = output.getvalue()
+        self.assertIn("[1/2] writing chapter 001-प्रबोधन-क्र-1", progress)
+        self.assertIn("[2/2] writing chapter 002-प्रबोधन-क्र-2", progress)
+        self.assertEqual(len(outputs), 2)
+
     def test_successful_formatting_writes_json_and_markdown_artifacts(self):
         text = "पहला वाक्य दूसरा वाक्य"
         result = {
@@ -93,6 +128,7 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                 text,
                 FORMATTING_CONFIG,
                 formatter,
+                chapter_total=3,
             )
 
             json_path = output_dir / "CAT020_SUB129_spand-rahasya_001_v01.01.formatted.json"
@@ -107,6 +143,38 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                 markdown_path.read_text(encoding="utf-8"),
                 "पहला वाक्य।\n\nदूसरा वाक्य।\n",
             )
+
+    def test_formatting_progress_reports_start_attempt_and_success(self):
+        text = "पहला वाक्य दूसरा वाक्य"
+        formatter = FakeFormatter(
+            result={
+                "schema_version": "1.0.0",
+                "provider": "sarvam",
+                "model": "sarvam-30b",
+                "fallback_model_used": None,
+                "source_text_sha256": source_text_sha256(text),
+                "status": "formatted",
+                "paragraphs": ["पहला वाक्य।", "दूसरा वाक्य।"],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = StringIO()
+            with redirect_stdout(output):
+                format_chapter_artifacts(
+                    Path(temp_dir),
+                    "chapter.txt",
+                    12,
+                    text,
+                    dict(FORMATTING_CONFIG, max_tokens=4096),
+                    formatter,
+                    chapter_total=39,
+                )
+
+        progress = output.getvalue()
+        self.assertIn("[12/39] formatting with sarvam-30b chars=", progress)
+        self.assertIn("max_tokens=4096", progress)
+        self.assertIn("[12/39] formatted paragraphs=2", progress)
 
     def test_valid_matching_formatted_artifacts_are_reused_without_formatter_call(self):
         text = "पहला वाक्य दूसरा वाक्य"
@@ -141,11 +209,47 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                 text,
                 FORMATTING_CONFIG,
                 formatter,
+                chapter_total=39,
             )
 
             self.assertEqual(result["status"], "skipped-unchanged")
             self.assertEqual(result["artifacts"], {"json": json_path, "markdown": markdown_path})
             self.assertEqual(formatter.calls, [])
+
+    def test_formatting_reuse_progress_reports_skip_reason(self):
+        text = "पहला वाक्य दूसरा वाक्य"
+        formatter = FakeFormatter(error=AssertionError("formatter should not be called"))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            (output_dir / "chapter.formatted.json").write_text(
+                json.dumps(
+                    {
+                        "source_text_sha256": source_text_sha256(text),
+                        "status": "formatted",
+                        "paragraphs": ["पहला वाक्य।"],
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (output_dir / "chapter.formatted.md").write_text("पहला वाक्य।\n", encoding="utf-8")
+
+            output = StringIO()
+            with redirect_stdout(output):
+                format_chapter_artifacts(
+                    output_dir,
+                    "chapter.txt",
+                    12,
+                    text,
+                    FORMATTING_CONFIG,
+                    formatter,
+                    chapter_total=39,
+                )
+
+        self.assertIn("[12/39] skipped formatting: unchanged source checksum", output.getvalue())
+
 
     def test_checksum_mismatch_regenerates_formatted_artifacts(self):
         old_text = "पुराना पाठ"
