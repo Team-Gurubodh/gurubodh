@@ -322,40 +322,32 @@ Allowed statuses should include at least:
 
 ## Sarvam Prompt Requirements
 
+Issue #110 Stage 3 superseded the original prompt-only JSON instructions. The
+formatter now sends the output contract through Sarvam structured output
+`response_format`; the system prompt should stay focused on the editorial task
+and avoid JSON syntax, JSON keys, Markdown fences, examples, or "return only
+JSON" boilerplate.
+
 The formatter should use strict Hindi preservation instructions. The system
 instruction should focus only on punctuation and paragraphing:
 
 ```text
-आप एक विशेषज्ञ हिंदी संपादक हैं। आपका कार्य दिए गए कच्चे हिंदी देवनागरी पाठ को केवल पढ़ने योग्य बनाना है।
+आप एक विशेषज्ञ हिंदी संपादक हैं। दिए गए कच्चे हिंदी देवनागरी पाठ को केवल पढ़ने योग्य बनाएं।
 
 मुख्य नियम:
-1. मूल पाठ का अर्थ, भाषा, क्रम और शब्दावली सुरक्षित रखें।
+1. मूल अर्थ, भाषा, क्रम, शब्दावली, नाम, मंत्र, श्लोक, उद्धरण और धार्मिक/दार्शनिक शब्द सुरक्षित रखें।
 2. अनुवाद न करें।
 3. संक्षेप न करें।
 4. नया विचार, व्याख्या, शीर्षक, टिप्पणी या निष्कर्ष न जोड़ें।
-5. किसी भी वाक्य, पंक्ति, नाम, मंत्र, श्लोक, उद्धरण या धार्मिक/दार्शनिक शब्द को हटाएँ नहीं।
-6. जहाँ आवश्यक हो वहाँ केवल विराम चिन्ह जोड़ें: पूर्ण विराम (।), अल्पविराम (,), प्रश्नवाचक चिन्ह (?), द्विबिंदु (:), अर्धविराम (;), उद्धरण चिह्न।
-7. विषय या भाव में स्वाभाविक बदलाव के आधार पर पाठ को छोटे, पठनीय पैराग्राफों में बाँटें।
-8. पैराग्राफ बनाने के लिए पाठ का क्रम न बदलें।
-9. वर्तनी या व्याकरण सुधार केवल तभी करें जब वह स्पष्ट टाइपिंग/OCR त्रुटि हो और अर्थ न बदले।
-10. संस्कृत, हिंदी, मराठी, पारिभाषिक, धार्मिक और नाम-संबंधी शब्दों को यथावत रखें।
-11. यदि पाठ में क्रमांक, प्रबोधन संख्या, अध्याय संकेत, वक्ता संकेत या शीर्षक जैसा भाग हो, तो उसे सुरक्षित रखें।
-
-आपको केवल एक वैध JSON ऑब्जेक्ट लौटाना है। JSON में बिल्कुल ये कुंजियाँ हों:
-
-{
-  "paragraphs": [
-    "पहला पैराग्राफ",
-    "दूसरा पैराग्राफ"
-  ]
-}
-
-आउटपुट में JSON के अलावा कोई अतिरिक्त टेक्स्ट, Markdown, टिप्पणी या ```json बैकटिक्स न दें।
+5. जहाँ आवश्यक हो केवल विराम चिन्ह जोड़ें।
+6. विषय या भाव के स्वाभाविक बदलाव के आधार पर छोटे, पठनीय पैराग्राफ बनाएं।
+7. पाठ का क्रम न बदलें।
+8. स्पष्ट टाइपिंग/OCR त्रुटि ही सुधारें, वह भी अर्थ बदले बिना।
+9. क्रमांक, प्रबोधन संख्या, अध्याय संकेत, वक्ता संकेत, शीर्षक जैसे भाग और अन्य संरचनात्मक संकेत सुरक्षित रखें।
 ```
 
-The implementation should prefer Sarvam's structured-output support when
-available so the JSON contract is enforced by API parameters as well as by the
-prompt.
+The implementation should use Sarvam's structured-output support so the output
+contract is enforced by API parameters, not by prose in the prompt.
 
 ## Token And Rate-Limit Handling
 
