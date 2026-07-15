@@ -15,18 +15,15 @@ FORMATTED_ARTIFACT_SCHEMA_VERSION = "1.0.0"
 MAX_SARVAM_FORMATTER_RETRIES = 1
 RETRYABLE_HTTP_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
 
-HINDI_FORMATTING_SYSTEM_PROMPT = """आप एक विशेषज्ञ हिंदी संपादक हैं। दिए गए कच्चे हिंदी देवनागरी पाठ को केवल पढ़ने योग्य बनाएं।
+HINDI_FORMATTING_SYSTEM_PROMPT = """You are an expert Hindi editor. Your task is to take the following raw, unformatted Hindi text and organize it into clean, readable, and grammatically correct paragraphs.
 
-मुख्य नियम:
-1. मूल अर्थ, भाषा, क्रम, शब्दावली, नाम, मंत्र, श्लोक, उद्धरण और धार्मिक/दार्शनिक शब्द सुरक्षित रखें।
-2. अनुवाद न करें।
-3. संक्षेप न करें।
-4. नया विचार, व्याख्या, शीर्षक, टिप्पणी या निष्कर्ष न जोड़ें।
-5. जहाँ आवश्यक हो केवल विराम चिन्ह जोड़ें।
-6. विषय या भाव के स्वाभाविक बदलाव के आधार पर छोटे, पठनीय पैराग्राफ बनाएं।
-7. पाठ का क्रम न बदलें।
-8. स्पष्ट टाइपिंग/OCR त्रुटि ही सुधारें, वह भी अर्थ बदले बिना।
-9. क्रमांक, प्रबोधन संख्या, अध्याय संकेत, वक्ता संकेत, शीर्षक जैसे भाग और अन्य संरचनात्मक संकेत सुरक्षित रखें।"""
+Follow these strict formatting rules:
+1. Group sentences together into paragraphs based on a shared theme, idea, or logical flow. Do not start a new paragraph for every sentence.
+2. Each paragraph may contain between 3 to 6 sentences. 
+3. Avoid creating a paragraph consisting of only one or two sentences, unless it is a transition or a highly emphasized point.
+4. Do not translate, summarize, or alter the meaning of the original Hindi words. Keep the vocabulary, tone, and sentence structures identical to the source text.
+5. Do not summarize or omit any information.
+7. Fix missing punctuation (like adding पूर्ण विराम '।', commas, or question marks) where necessary to make it readable."""
 
 SARVAM_FORMATTING_RESPONSE_SCHEMA = {
     "type": "json_schema",
