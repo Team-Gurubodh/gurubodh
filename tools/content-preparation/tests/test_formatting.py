@@ -127,6 +127,36 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(call["messages"][0]["content"], HINDI_FORMATTING_SYSTEM_PROMPT)
         self.assertEqual(call["messages"][1], {"role": "user", "content": "ॐ"})
 
+    def test_hindi_prompt_keeps_output_contract_out_of_prompt_text(self):
+        forbidden_terms = [
+            "JSON",
+            "json",
+            "Markdown",
+            "बैकटिक्स",
+            "paragraphs",
+            "वैध JSON",
+            "```",
+        ]
+
+        for term in forbidden_terms:
+            self.assertNotIn(term, HINDI_FORMATTING_SYSTEM_PROMPT)
+
+    def test_hindi_prompt_keeps_editorial_safeguards(self):
+        expected_terms = [
+            "मूल अर्थ",
+            "अनुवाद न करें",
+            "संक्षेप न करें",
+            "नया विचार",
+            "विराम चिन्ह",
+            "छोटे, पठनीय पैराग्राफ",
+            "क्रम न बदलें",
+            "टाइपिंग/OCR त्रुटि",
+            "संरचनात्मक संकेत",
+        ]
+
+        for term in expected_terms:
+            self.assertIn(term, HINDI_FORMATTING_SYSTEM_PROMPT)
+
     def test_sarvam_chat_request_uses_configured_completion_controls(self):
         client = FakeSarvamHttpClient([sarvam_chat_response('{"paragraphs": ["ॐ।"]}')])
         formatter = SarvamFormatter(
