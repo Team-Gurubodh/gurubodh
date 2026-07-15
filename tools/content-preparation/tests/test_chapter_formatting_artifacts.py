@@ -1,4 +1,5 @@
 import json
+import re
 import tempfile
 import unittest
 import zipfile
@@ -9,6 +10,7 @@ from pathlib import Path
 from gurubodh_utils.paths import destination_paths_for_job
 from gurubodh_utils.docx.chapter_split import format_chapter_artifacts, split_docx_into_chapters
 from gurubodh_utils.formatting import source_text_sha256
+from gurubodh_utils.run_report import write_run_reports
 from gurubodh_utils.storage import publish_r2_destination
 
 
@@ -372,7 +374,10 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                 formatter,
             )
 
-            self.assertEqual(result, {"status": "disabled", "warning": None, "artifacts": {}})
+            self.assertEqual(result["status"], "disabled")
+            self.assertIsNone(result["warning"])
+            self.assertEqual(result["artifacts"], {})
+            self.assertEqual(result["attempt_count"], 0)
             self.assertEqual(list(Path(temp_dir).iterdir()), [])
 
     def test_formatting_failure_warns_and_continues_when_configured(self):
@@ -435,6 +440,167 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
         )
         self.assertIn(
             "cms_library/129_spand_rahasya/chapters/text_and_metadata/chapter.formatted.md",
+            uploaded_keys,
+        )
+
+    def test_run_report_generation_covers_success_and_failed_formatting_chapters(self):
+        config = json.loads(json.dumps(LOCAL_CONFIG))
+        config.update(
+            {
+                "schema_version": "1.3.0",
+                "source": {
+                    "backend": "local",
+                    "root_dir": "/source",
+                    "relative_path": "source.docx",
+                    "font_encoding": "unicode",
+                    "file_format": "docx",
+                },
+                "naming": {
+                    "category_code": "CAT020",
+                    "subject_code": "SUB129",
+                    "title_slug": "spand-rahasya",
+                    "version": "01",
+                    "subversion": "01",
+                },
+                "chapter_split": {
+                    "enabled": True,
+                    "pattern": "प्रबोधन\\s+क्र",
+                    "pattern_type": "regex",
+                    "_compiled_pattern": re.compile("प्रबोधन\\s+क्र"),
+                },
+                "pipeline": "unicode-docx-ingest",
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            config["destination"]["root_dir"] = temp_dir
+            metadata_dir = subject_dir / "chapters" / "text_and_metadata"
+            metadata_dir.mkdir(parents=True)
+            success_metadata = {
+                "document": {"chapter_number": "001"},
+                "files": {
+                    "text_filename": "CAT020_SUB129_spand-rahasya_001_v01.01.txt",
+                    "formatted_json_filename": "CAT020_SUB129_spand-rahasya_001_v01.01.formatted.json",
+                    "formatted_markdown_filename": "CAT020_SUB129_spand-rahasya_001_v01.01.formatted.md",
+                },
+                "integrity": {
+                    "artifacts": {
+                        "text": {"value": "text-checksum"},
+                        "formatted_json": {"value": "json-checksum"},
+                    }
+                },
+                "formatting": {
+                    "enabled": True,
+                    "status": "formatted",
+                    "model_used": "sarvam-30b",
+                    "attempt_count": 1,
+                    "retry_count": 0,
+                    "throttle_sleep_seconds": 0,
+                    "source_text_sha256": "raw-success",
+                    "warning": None,
+                },
+            }
+            failed_metadata = {
+                "document": {"chapter_number": "002"},
+                "files": {
+                    "text_filename": "CAT020_SUB129_spand-rahasya_002_v01.01.txt",
+                },
+                "integrity": {"artifacts": {"text": {"value": "failed-text-checksum"}}},
+                "formatting": {
+                    "enabled": True,
+                    "status": "failed",
+                    "model_used": None,
+                    "attempt_count": 2,
+                    "retry_count": 1,
+                    "throttle_sleep_seconds": 4,
+                    "source_text_sha256": "raw-failed",
+                    "warning": "formatting failed for chapter 002: rate limit",
+                },
+            }
+            (metadata_dir / "chapter-001.json").write_text(
+                json.dumps(success_metadata, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (metadata_dir / "chapter-002.json").write_text(
+                json.dumps(failed_metadata, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            paths = {
+                "subject": subject_dir,
+                "text_and_metadata": metadata_dir,
+            }
+            result = {
+                "output_path": subject_dir / "full_subject" / "subject.docx",
+                "text_path": subject_dir / "full_subject" / "subject.txt",
+                "total_chars": 100,
+            }
+
+            with redirect_stdout(StringIO()):
+                written = write_run_reports(
+                    config,
+                    paths,
+                    result,
+                    "python3 -m gurubodh_utils run",
+                    Path("jobs/test.json"),
+                    False,
+                    Path(temp_dir),
+                    reporter=type("Reporter", (), {"report": lambda self, message: None})(),
+                )
+
+            report = json.loads(written["json"].read_text(encoding="utf-8"))
+            markdown = written["markdown"].read_text(encoding="utf-8")
+            report_json_text = written["json"].read_text(encoding="utf-8")
+
+        self.assertEqual(report["processing_summary"]["formatting_summary"]["formatted"], 1)
+        self.assertNotIn("_compiled_pattern", report["configuration_snapshot"]["chapter_split"])
+        self.assertEqual(
+            report["configuration_snapshot"]["chapter_split"]["pattern_type"],
+            "regex",
+        )
+        self.assertEqual(report["processing_summary"]["formatting_summary"]["failed"], 1)
+        self.assertEqual(report["rate_limit_throttle"]["sarvam_requests_attempted"], 3)
+        self.assertEqual(report["rate_limit_throttle"]["retry_count"], 1)
+        self.assertEqual(report["rate_limit_throttle"]["total_throttle_sleep_seconds"], 4)
+        self.assertEqual(report["final_outcome"]["failed_chapters"], ["002"])
+        self.assertEqual(
+            report["final_outcome"]["retry_candidates"],
+            [
+                {
+                    "chapter_number": "002",
+                    "artifact_base_name": "CAT020_SUB129_spand-rahasya_002_v01.01",
+                    "warning": "formatting failed for chapter 002: rate limit",
+                }
+            ],
+        )
+        self.assertNotIn("पहला पाठ", report_json_text)
+        self.assertIn("completed-with-formatting-failures", markdown)
+
+    def test_r2_publish_includes_run_report_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            report_dir = subject_dir / "run_reports"
+            report_dir.mkdir(parents=True)
+            (report_dir / "CAT020_SUB129_spand-rahasya_run_20260101T000000Z.json").write_text(
+                "{}\n",
+                encoding="utf-8",
+            )
+            (report_dir / "CAT020_SUB129_spand-rahasya_run_20260101T000000Z.md").write_text(
+                "# report\n",
+                encoding="utf-8",
+            )
+            client = FakeR2Client()
+
+            with redirect_stdout(StringIO()):
+                publish_r2_destination(R2_CONFIG, subject_dir, overwrite=True, r2_client=client)
+
+        uploaded_keys = {upload[2] for upload in client.uploads}
+        self.assertIn(
+            "cms_library/129_spand_rahasya/run_reports/CAT020_SUB129_spand-rahasya_run_20260101T000000Z.json",
+            uploaded_keys,
+        )
+        self.assertIn(
+            "cms_library/129_spand_rahasya/run_reports/CAT020_SUB129_spand-rahasya_run_20260101T000000Z.md",
             uploaded_keys,
         )
 

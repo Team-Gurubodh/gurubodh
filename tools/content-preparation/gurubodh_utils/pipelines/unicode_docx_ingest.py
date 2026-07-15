@@ -3,7 +3,12 @@ import shutil
 from gurubodh_utils.config import validate_pipeline_matches_source
 from gurubodh_utils.constants import PIPELINE_UNICODE_DOCX_INGEST
 from gurubodh_utils.docx.text import extract_docx_text
-from gurubodh_utils.pipelines.common import prepare_job_output, publish_job_output, validate_and_split
+from gurubodh_utils.pipelines.common import (
+    prepare_job_output,
+    publish_job_output,
+    validate_and_split,
+    write_job_run_reports,
+)
 
 
 def copy_unicode_docx(path, output_path, text_path):
@@ -26,10 +31,11 @@ def copy_unicode_docx(path, output_path, text_path):
     }
 
 
-def run_unicode_docx_ingest(context, config, entry_point, overwrite=False):
+def run_unicode_docx_ingest(context, config, entry_point, config_path, overwrite=False):
     validate_pipeline_matches_source(config, PIPELINE_UNICODE_DOCX_INGEST)
     job = prepare_job_output(config, overwrite)
     result = copy_unicode_docx(job["source_path"], job["full_docx"], job["full_text"])
     validate_and_split(config, result, job["paths"], entry_point)
+    write_job_run_reports(config, job, result, entry_point, config_path, overwrite, context.root)
     publish_job_output(config, job, overwrite)
     return result

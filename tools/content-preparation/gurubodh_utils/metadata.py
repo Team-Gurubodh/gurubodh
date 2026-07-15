@@ -93,16 +93,31 @@ def formatting_status_metadata(config, formatting_result, chapter_text_value):
         status = formatting_result.get("status", status)
         warning = formatting_result.get("warning")
 
+    model_used = (
+        formatting_config.get("model")
+        if status in {"formatted", "skipped-unchanged"}
+        else None
+    )
+    if formatting_result and formatting_result.get("model_used") is not None:
+        model_used = formatting_result["model_used"]
+
     return {
         "enabled": bool(formatting_config.get("enabled")),
         "provider": formatting_config.get("provider"),
         "model": formatting_config.get("model"),
         "fallback_model": formatting_config.get("fallback_model"),
-        "model_used": formatting_config.get("model")
-        if status in {"formatted", "skipped-unchanged"}
-        else None,
+        "model_used": model_used,
         "status": status,
         "warning": warning,
+        "attempt_count": formatting_result.get("attempt_count", 0)
+        if formatting_result
+        else 0,
+        "retry_count": formatting_result.get("retry_count", 0)
+        if formatting_result
+        else 0,
+        "throttle_sleep_seconds": formatting_result.get("throttle_sleep_seconds", 0)
+        if formatting_result
+        else 0,
         "source_text_sha256": source_text_sha256(chapter_text_value)
         if formatting_config.get("enabled")
         else None,

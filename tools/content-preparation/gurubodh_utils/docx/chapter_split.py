@@ -200,8 +200,17 @@ def format_chapter_artifacts(
     label = f"[{chapter_number}/{chapter_total}]" if chapter_total else f"[{chapter_number}]"
     base_name = text_name.removesuffix(".txt")
     if not formatting_config or not formatting_config.get("enabled"):
-        return {"status": "disabled", "warning": None, "artifacts": {}}
+        return {
+            "status": "disabled",
+            "warning": None,
+            "artifacts": {},
+            "attempt_count": 0,
+            "retry_count": 0,
+            "throttle_sleep_seconds": 0,
+            "model_used": None,
+        }
 
+    stats_before = formatter_stats(formatter)
     try:
         output_formats = set(formatting_config["output_formats"])
         if formatting_config.get("regenerate") == "when-source-checksum-changes":
@@ -213,13 +222,22 @@ def format_chapter_artifacts(
             )
             if artifacts:
                 reporter.report(f"{label} skipped formatting: unchanged source checksum")
-                return {"status": "skipped-unchanged", "warning": None, "artifacts": artifacts}
+                return {
+                    "status": "skipped-unchanged",
+                    "warning": None,
+                    "artifacts": artifacts,
+                    "attempt_count": 0,
+                    "retry_count": 0,
+                    "throttle_sleep_seconds": 0,
+                    "model_used": formatting_config.get("model"),
+                }
 
         reporter.report(
             f"{label} formatting with {formatting_config['model']} "
             f"chars={len(chapter_text_value)} max_tokens={formatting_config.get('max_tokens')}"
         )
         formatted_result = formatter.format_text(chapter_text_value, progress_label=label)
+        stats_delta = formatter_stats_delta(stats_before, formatter_stats(formatter))
         artifacts = write_formatted_artifacts(
             chapter_text_dir,
             text_name,
@@ -227,14 +245,52 @@ def format_chapter_artifacts(
             output_formats,
         )
         reporter.report(f"{label} formatted paragraphs={len(formatted_result['paragraphs'])}")
-        return {"status": "formatted", "warning": None, "artifacts": artifacts}
+        return {
+            "status": "formatted",
+            "warning": None,
+            "artifacts": artifacts,
+            "attempt_count": stats_delta["request_attempt_count"],
+            "retry_count": stats_delta["retry_count"],
+            "throttle_sleep_seconds": stats_delta["throttle_sleep_seconds"],
+            "model_used": formatted_result.get("model") or formatting_config.get("model"),
+        }
     except Exception as exc:
+        stats_delta = formatter_stats_delta(stats_before, formatter_stats(formatter))
         warning = f"formatting failed for chapter {chapter_number:03d} {base_name}: {exc}"
         reporter.report(f"{label} formatting failed: {exc}")
         if not formatting_config.get("continue_on_error", True):
             raise SystemExit(warning) from exc
         print(f"warning: {warning}")
-        return {"status": "failed", "warning": warning, "artifacts": {}}
+        return {
+            "status": "failed",
+            "warning": warning,
+            "artifacts": {},
+            "attempt_count": stats_delta["request_attempt_count"],
+            "retry_count": stats_delta["retry_count"],
+            "throttle_sleep_seconds": stats_delta["throttle_sleep_seconds"],
+            "model_used": None,
+        }
+
+
+def formatter_stats(formatter):
+    if formatter is None:
+        return {
+            "request_attempt_count": 0,
+            "retry_count": 0,
+            "throttle_sleep_seconds": 0,
+        }
+    return {
+        "request_attempt_count": getattr(formatter, "request_attempt_count", 0),
+        "retry_count": getattr(formatter, "retry_count", 0),
+        "throttle_sleep_seconds": getattr(formatter, "throttle_sleep_seconds", 0),
+    }
+
+
+def formatter_stats_delta(before, after):
+    return {
+        key: after.get(key, 0) - before.get(key, 0)
+        for key in ("request_attempt_count", "retry_count", "throttle_sleep_seconds")
+    }
 
 
 def print_formatting_summary(summary):

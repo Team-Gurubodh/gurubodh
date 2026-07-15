@@ -208,6 +208,24 @@ completion, destination prefix availability, and byte counts during artifact
 uploads. These messages are intended for normal operator runs and never include
 API keys, request bodies, or full chapter text.
 
+Every successful content-preparation run writes JSON and Markdown audit reports
+under the generated subject tree:
+
+```text
+run_reports/
+  CAT020_SUB129_spand-rahasya_run_<timestamp>.json
+  CAT020_SUB129_spand-rahasya_run_<timestamp>.md
+```
+
+The JSON report is the tooling source of truth. The Markdown report is the
+operator-readable view. Reports summarize run identity, job configuration,
+copy/extraction and validation status, chapter counts, formatting outcomes,
+retry candidates based only on `formatting.status == "failed"`, and
+rate-limit/throttle evidence. Reports intentionally exclude secrets, API keys,
+request bodies, and full chapter text. For R2 destinations, the reports are
+uploaded with the rest of the subject artifacts under the configured subject
+prefix.
+
 The sample job `jobs/002_spand_rahasya.formatting-disabled.local.json` includes
 an explicit disabled formatting block:
 

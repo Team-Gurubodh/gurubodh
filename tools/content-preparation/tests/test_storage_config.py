@@ -639,6 +639,9 @@ class StorageConfigTests(unittest.TestCase):
                 "model_used": None,
                 "status": "disabled",
                 "warning": None,
+                "attempt_count": 0,
+                "retry_count": 0,
+                "throttle_sleep_seconds": 0,
                 "source_text_sha256": None,
             },
         )
@@ -734,6 +737,9 @@ class StorageConfigTests(unittest.TestCase):
                 "model_used": "sarvam-30b",
                 "status": "formatted",
                 "warning": None,
+                "attempt_count": 0,
+                "retry_count": 0,
+                "throttle_sleep_seconds": 0,
                 "source_text_sha256": source_text_sha256(text),
             },
         )
@@ -851,6 +857,9 @@ class StorageConfigTests(unittest.TestCase):
             formatting["status"]["enum"],
             ["disabled", "formatted", "skipped-unchanged", "failed"],
         )
+        self.assertEqual(formatting["attempt_count"]["minimum"], 0)
+        self.assertEqual(formatting["retry_count"]["minimum"], 0)
+        self.assertEqual(formatting["throttle_sleep_seconds"]["minimum"], 0)
         self.assertEqual(
             text_schema["required"],
             ["algorithm", "encoding", "line_endings", "scope", "value"],

@@ -6,6 +6,7 @@ from gurubodh_utils.paths import (
     ensure_job_dirs,
 )
 from gurubodh_utils.progress import DEFAULT_PROGRESS_REPORTER
+from gurubodh_utils.run_report import write_run_reports
 from gurubodh_utils.storage import ensure_r2_destination_available, is_r2, materialize_source, publish_r2_destination
 
 
@@ -62,3 +63,26 @@ def publish_job_output(config, job, overwrite=False, reporter=DEFAULT_PROGRESS_R
         reporter.report("publishing artifacts to R2")
         publish_r2_destination(config, job["paths"]["subject"], overwrite, reporter=reporter)
         reporter.report("published artifacts to R2")
+
+
+def write_job_run_reports(
+    config,
+    job,
+    result,
+    entry_point,
+    config_path,
+    overwrite,
+    project_root,
+    reporter=DEFAULT_PROGRESS_REPORTER,
+):
+    reporter.report("writing run audit reports")
+    return write_run_reports(
+        config,
+        job["paths"],
+        result,
+        entry_point,
+        config_path,
+        overwrite,
+        project_root,
+        reporter,
+    )
