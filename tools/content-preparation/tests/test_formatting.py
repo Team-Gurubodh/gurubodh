@@ -278,6 +278,26 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(sleeps, [1.5])
         self.assertEqual(len(client.calls), 2)
 
+    def test_successive_formatting_calls_wait_after_first_request(self):
+        sleeps = []
+        client = FakeSarvamHttpClient([
+            sarvam_chat_response('{"paragraphs": ["पहला।"]}'),
+            sarvam_chat_response('{"paragraphs": ["दूसरा।"]}'),
+        ])
+        formatter = SarvamFormatter(
+            formatting_config(delay_seconds=4, max_retries=0),
+            client=client,
+            sleeper=sleeps.append,
+        )
+
+        first = formatter.format_text("पहला")
+        second = formatter.format_text("दूसरा")
+
+        self.assertEqual(first["paragraphs"], ["पहला।"])
+        self.assertEqual(second["paragraphs"], ["दूसरा।"])
+        self.assertEqual(sleeps, [4])
+        self.assertEqual(len(client.calls), 2)
+
     def test_retry_progress_reports_attempts_and_sleep(self):
         sleeps = []
         output = StringIO()

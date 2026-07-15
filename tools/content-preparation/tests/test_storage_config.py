@@ -131,7 +131,7 @@ class StorageConfigTests(unittest.TestCase):
             "fallback_model": "sarvam-105b",
             "output_formats": ["json", "markdown"],
             "continue_on_error": True,
-            "delay_seconds": 5,
+            "delay_seconds": 4,
             "max_retries": 1,
             "regenerate": "when-source-checksum-changes",
             "reasoning_effort": None,
@@ -251,7 +251,7 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(formatting["fallback_model"]["default"], "sarvam-105b")
         self.assertEqual(formatting["output_formats"]["items"]["enum"], ["json", "markdown"])
         self.assertEqual(formatting["continue_on_error"]["default"], True)
-        self.assertEqual(formatting["delay_seconds"]["default"], 5)
+        self.assertEqual(formatting["delay_seconds"]["default"], 4)
         self.assertEqual(formatting["max_retries"]["default"], 1)
         self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
         self.assertEqual(formatting["reasoning_effort"]["default"], None)
@@ -362,7 +362,7 @@ class StorageConfigTests(unittest.TestCase):
             "fallback_model": "sarvam-105b",
             "output_formats": ["json", "markdown"],
             "continue_on_error": False,
-            "delay_seconds": 5,
+            "delay_seconds": 4,
             "max_retries": 1,
             "regenerate": "when-source-checksum-changes",
         }
@@ -397,7 +397,7 @@ class StorageConfigTests(unittest.TestCase):
             "fallback_model": "sarvam-105b",
             "output_formats": ["json", "markdown"],
             "continue_on_error": False,
-            "delay_seconds": 5,
+            "delay_seconds": 4,
             "max_retries": 1,
             "regenerate": "when-source-checksum-changes",
         }

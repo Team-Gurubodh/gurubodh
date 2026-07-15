@@ -252,7 +252,7 @@
         "delay_seconds": {
           "type": "number",
           "minimum": 0,
-          "default": 5
+          "default": 4
         },
         "max_retries": {
           "type": "integer",
