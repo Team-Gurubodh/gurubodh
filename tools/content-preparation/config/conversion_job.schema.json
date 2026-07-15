@@ -258,7 +258,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 5,
-          "default": 3
+          "default": 1
         },
         "regenerate": {
           "type": "string",

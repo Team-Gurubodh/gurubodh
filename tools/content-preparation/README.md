@@ -81,7 +81,7 @@ formatting:
     "output_formats": ["json", "markdown"],
     "continue_on_error": true,
     "delay_seconds": 5,
-    "max_retries": 3,
+    "max_retries": 1,
     "regenerate": "when-source-checksum-changes",
     "reasoning_effort": null,
     "max_tokens": 4096
@@ -118,7 +118,7 @@ integration. If the block is omitted, formatting is disabled.
     "output_formats": ["json", "markdown"],
     "continue_on_error": true,
     "delay_seconds": 5,
-    "max_retries": 3,
+    "max_retries": 1,
     "regenerate": "when-source-checksum-changes",
     "reasoning_effort": null,
     "max_tokens": 4096
@@ -169,16 +169,18 @@ jobs only reuse formatted artifacts that have already been materialized into the
 current local artifact tree by a future cache or restore step.
 
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
-enabled. Install the optional Sarvam SDK dependency when you need formatter
-access:
+enabled. Formatter chat completions use Sarvam's direct HTTP chat-completions
+endpoint and send a structured `response_format` request body.
 
 Formatter chat completions default `reasoning_effort` to `null` and
 `max_tokens` to `4096`. This disables Sarvam reasoning output for the formatter
-call when the installed client supports that parameter and reserves the
-completion budget for the JSON formatter response.
+call and reserves the completion budget for the JSON formatter response.
+`max_retries` defaults to `1`, which means one retry after the initial call.
+The formatter hard-caps retries at one even when an older config sets a higher
+value.
 
 ```bash
-pip install -e ".[formatting]"
+pip install -e .
 ```
 
 Put the key in your shell environment before running the tool:
@@ -189,8 +191,8 @@ export SARVAM_API_KEY=...
 
 You may also keep it in a local untracked `.env` file for your own shell setup,
 but do not commit API keys. Sarvam's API base URL is `https://api.sarvam.ai`;
-normal formatter usage goes through the official Sarvam SDK, so you should not
-need to configure the URL separately.
+normal formatter usage does not require the Sarvam Python SDK, so you should
+not need to configure the URL separately.
 
 The sample job `jobs/002_spand_rahasya.formatting-disabled.local.json` includes
 an explicit disabled formatting block:

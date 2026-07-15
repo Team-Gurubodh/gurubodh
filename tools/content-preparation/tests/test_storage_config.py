@@ -131,7 +131,7 @@ class StorageConfigTests(unittest.TestCase):
             "output_formats": ["json", "markdown"],
             "continue_on_error": True,
             "delay_seconds": 5,
-            "max_retries": 3,
+            "max_retries": 1,
             "regenerate": "when-source-checksum-changes",
             "reasoning_effort": None,
             "max_tokens": 4096,
@@ -228,7 +228,7 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(formatting["output_formats"]["items"]["enum"], ["json", "markdown"])
         self.assertEqual(formatting["continue_on_error"]["default"], True)
         self.assertEqual(formatting["delay_seconds"]["default"], 5)
-        self.assertEqual(formatting["max_retries"]["default"], 3)
+        self.assertEqual(formatting["max_retries"]["default"], 1)
         self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
         self.assertEqual(formatting["reasoning_effort"]["default"], None)
         self.assertEqual(formatting["max_tokens"]["default"], 4096)
@@ -339,7 +339,7 @@ class StorageConfigTests(unittest.TestCase):
             "output_formats": ["json", "markdown"],
             "continue_on_error": False,
             "delay_seconds": 5,
-            "max_retries": 3,
+            "max_retries": 1,
             "regenerate": "when-source-checksum-changes",
         }
         original = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
@@ -374,7 +374,7 @@ class StorageConfigTests(unittest.TestCase):
             "output_formats": ["json", "markdown"],
             "continue_on_error": False,
             "delay_seconds": 5,
-            "max_retries": 3,
+            "max_retries": 1,
             "regenerate": "when-source-checksum-changes",
         }
         path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

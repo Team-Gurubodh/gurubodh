@@ -1,11 +1,14 @@
 import copy
+import json
 import unittest
 
 from gurubodh_utils.constants import DEFAULT_FORMATTING_CONFIG
 from gurubodh_utils.formatting import (
     HINDI_FORMATTING_SYSTEM_PROMPT,
     MissingSarvamApiKeyError,
+    SARVAM_CHAT_COMPLETIONS_PATH,
     SARVAM_FORMATTING_RESPONSE_SCHEMA,
+    SarvamChatCompletionHttpClient,
     SarvamFormatter,
     SarvamPermanentError,
     SarvamResponseError,
@@ -28,52 +31,46 @@ def formatting_config(**overrides):
     return config
 
 
-class FakeCompletions:
+class FakeSarvamHttpClient:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = []
 
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
+    def create_chat_completion(self, body):
+        self.calls.append(body)
         response = self.responses.pop(0)
         if isinstance(response, Exception):
             raise response
         return response
 
 
-class FakeChat:
-    def __init__(self, responses):
-        self.completions = FakeCompletions(responses)
+class FakeHTTPResponse:
+    def __init__(self, body):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return self.body.encode("utf-8")
 
 
-class FakeSarvamClient:
-    def __init__(self, responses):
-        self.chat = FakeChat(responses)
-
-
-class FakeCompletionsWithoutResponseFormat:
-    def __init__(self, response):
-        self.response = response
+class FakeURLOpener:
+    def __init__(self, response_body):
+        self.response_body = response_body
         self.calls = []
 
-    def __call__(self, *, model, messages):
-        self.calls.append({"model": model, "messages": messages})
-        return self.response
-
-
-class FakeChatWithoutResponseFormat:
-    def __init__(self, response):
-        self.completions = FakeCompletionsWithoutResponseFormat(response)
-
-
-class FakeSarvamClientWithoutResponseFormat:
-    def __init__(self, response):
-        self.chat = FakeChatWithoutResponseFormat(response)
+    def __call__(self, request):
+        self.calls.append(request)
+        return FakeHTTPResponse(self.response_body)
 
 
 class FormattingTests(unittest.TestCase):
     def test_formatter_import_does_not_require_sarvam_sdk(self):
-        formatter = SarvamFormatter(formatting_config(), client=FakeSarvamClient([
+        formatter = SarvamFormatter(formatting_config(), client=FakeSarvamHttpClient([
             '{"paragraphs": ["पहला पैराग्राफ।"]}'
         ]))
 
@@ -95,12 +92,12 @@ class FormattingTests(unittest.TestCase):
         self.assertIn("SARVAM_API_KEY", str(exc.exception))
 
     def test_sarvam_chat_request_uses_prompt_and_response_schema(self):
-        client = FakeSarvamClient(['{"paragraphs": ["ॐ।"]}'])
+        client = FakeSarvamHttpClient(['{"paragraphs": ["ॐ।"]}'])
         formatter = SarvamFormatter(formatting_config(), client=client)
 
         formatter.format_text("ॐ")
 
-        call = client.chat.completions.calls[0]
+        call = client.calls[0]
         self.assertEqual(call["model"], "sarvam-30b")
         self.assertEqual(call["response_format"], SARVAM_FORMATTING_RESPONSE_SCHEMA)
         self.assertIsNone(call["reasoning_effort"])
@@ -110,7 +107,7 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(call["messages"][1], {"role": "user", "content": "ॐ"})
 
     def test_sarvam_chat_request_uses_configured_completion_controls(self):
-        client = FakeSarvamClient(['{"paragraphs": ["ॐ।"]}'])
+        client = FakeSarvamHttpClient(['{"paragraphs": ["ॐ।"]}'])
         formatter = SarvamFormatter(
             formatting_config(reasoning_effort="low", max_tokens=2048),
             client=client,
@@ -118,23 +115,39 @@ class FormattingTests(unittest.TestCase):
 
         formatter.format_text("ॐ")
 
-        call = client.chat.completions.calls[0]
+        call = client.calls[0]
         self.assertEqual(call["reasoning_effort"], "low")
         self.assertEqual(call["max_tokens"], 2048)
 
-    def test_sarvam_chat_request_allows_clients_without_response_format(self):
-        client = FakeSarvamClientWithoutResponseFormat('{"paragraphs": ["ॐ।"]}')
-        formatter = SarvamFormatter(formatting_config(), client=client)
+    def test_sarvam_chat_request_rejects_non_http_client_shape(self):
+        formatter = SarvamFormatter(formatting_config(), client=object())
 
-        result = formatter.format_text("ॐ")
+        with self.assertRaises(SarvamPermanentError) as exc:
+            formatter.format_text("ॐ")
 
-        self.assertEqual(result["paragraphs"], ["ॐ।"])
-        call = client.chat.completions.calls[0]
-        self.assertEqual(call["model"], "sarvam-30b")
-        self.assertNotIn("response_format", call)
-        self.assertEqual(call["messages"][0]["content"], HINDI_FORMATTING_SYSTEM_PROMPT)
-        self.assertNotIn("reasoning_effort", call)
-        self.assertNotIn("max_tokens", call)
+        self.assertIn("Unsupported Sarvam HTTP client shape", str(exc.exception))
+
+    def test_direct_http_client_sends_expected_request(self):
+        response = {"choices": [{"message": {"content": '{"paragraphs": ["ॐ।"]}'}}]}
+        opener = FakeURLOpener(json.dumps(response))
+        client = SarvamChatCompletionHttpClient(api_key="test-key", opener=opener)
+        body = {
+            "model": "sarvam-30b",
+            "messages": [{"role": "user", "content": "ॐ"}],
+            "reasoning_effort": None,
+            "max_tokens": 4096,
+            "response_format": SARVAM_FORMATTING_RESPONSE_SCHEMA,
+        }
+
+        result = client.create_chat_completion(body)
+
+        request = opener.calls[0]
+        self.assertEqual(request.full_url, f"https://api.sarvam.ai{SARVAM_CHAT_COMPLETIONS_PATH}")
+        self.assertEqual(request.get_method(), "POST")
+        self.assertEqual(request.headers["Api-subscription-key"], "test-key")
+        self.assertEqual(request.headers["Content-type"], "application/json")
+        self.assertEqual(json.loads(request.data.decode("utf-8")), body)
+        self.assertEqual(result, response)
 
     def test_parser_accepts_openai_style_choice_response(self):
         response = {
@@ -218,7 +231,7 @@ class FormattingTests(unittest.TestCase):
 
     def test_retryable_failure_retries_after_configured_delay(self):
         sleeps = []
-        client = FakeSarvamClient([
+        client = FakeSarvamHttpClient([
             SarvamRetryableError("rate limited"),
             '{"paragraphs": ["दूसरा प्रयास।"]}',
         ])
@@ -232,11 +245,11 @@ class FormattingTests(unittest.TestCase):
 
         self.assertEqual(result["paragraphs"], ["दूसरा प्रयास।"])
         self.assertEqual(sleeps, [1.5])
-        self.assertEqual(len(client.chat.completions.calls), 2)
+        self.assertEqual(len(client.calls), 2)
 
     def test_non_retryable_failure_does_not_sleep_or_retry(self):
         sleeps = []
-        client = FakeSarvamClient([SarvamPermanentError("bad credentials")])
+        client = FakeSarvamHttpClient([SarvamPermanentError("bad credentials")])
         formatter = SarvamFormatter(
             formatting_config(delay_seconds=1, max_retries=3),
             client=client,
@@ -247,11 +260,11 @@ class FormattingTests(unittest.TestCase):
             formatter.format_text("प्रबोधन")
 
         self.assertEqual(sleeps, [])
-        self.assertEqual(len(client.chat.completions.calls), 1)
+        self.assertEqual(len(client.calls), 1)
 
     def test_retryable_failure_raises_after_retries_exhausted(self):
         sleeps = []
-        client = FakeSarvamClient([
+        client = FakeSarvamHttpClient([
             SarvamRetryableError("rate limited"),
             SarvamRetryableError("still rate limited"),
         ])
@@ -265,7 +278,26 @@ class FormattingTests(unittest.TestCase):
             formatter.format_text("प्रबोधन")
 
         self.assertEqual(sleeps, [2])
-        self.assertEqual(len(client.chat.completions.calls), 2)
+        self.assertEqual(len(client.calls), 2)
+
+    def test_retryable_failure_is_hard_capped_at_one_retry(self):
+        sleeps = []
+        client = FakeSarvamHttpClient([
+            SarvamRetryableError("rate limited"),
+            SarvamRetryableError("still rate limited"),
+            '{"paragraphs": ["तीसरा प्रयास।"]}',
+        ])
+        formatter = SarvamFormatter(
+            formatting_config(delay_seconds=2, max_retries=5),
+            client=client,
+            sleeper=sleeps.append,
+        )
+
+        with self.assertRaises(SarvamRetryableError):
+            formatter.format_text("प्रबोधन")
+
+        self.assertEqual(sleeps, [2])
+        self.assertEqual(len(client.calls), 2)
 
 
 if __name__ == "__main__":
