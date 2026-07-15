@@ -3,6 +3,8 @@ import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
 
+from gurubodh_utils.progress import DEFAULT_PROGRESS_REPORTER
+
 
 LOCAL_BACKEND = "local"
 R2_BACKEND = "r2"
@@ -172,7 +174,7 @@ def local_source_path(config):
     return root_dir / relative_path
 
 
-def materialize_source(config, r2_client=None):
+def materialize_source(config, r2_client=None, reporter=DEFAULT_PROGRESS_REPORTER):
     source = config["source"]
     if is_local(source):
         path = local_source_path(config)
@@ -182,8 +184,9 @@ def materialize_source(config, r2_client=None):
     filename = PurePosixPath(source["key"]).name
     path = Path(temp_dir.name) / filename
     client = r2_client or R2StorageClient.from_env()
-    print(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
+    reporter.report(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
     client.download_file(source["bucket"], source["key"], path)
+    reporter.report(f"downloaded R2 source to {path}")
     return path, temp_dir
 
 
@@ -217,25 +220,37 @@ def restore_formatted_artifacts(subject_dir, artifacts):
         path.write_bytes(content)
 
 
-def ensure_r2_destination_available(config, overwrite, r2_client=None):
+def ensure_r2_destination_available(
+    config,
+    overwrite,
+    r2_client=None,
+    reporter=DEFAULT_PROGRESS_REPORTER,
+):
     if overwrite or not is_r2(config["destination"]):
         return
     destination = config["destination"]
     prefix = destination_subject_prefix(config)
     client = r2_client or R2StorageClient.from_env()
-    print(f"checking R2 destination prefix r2://{destination['bucket']}/{prefix}")
+    reporter.report(f"checking R2 destination prefix r2://{destination['bucket']}/{prefix}")
     if client.prefix_has_objects(destination["bucket"], prefix):
         raise SystemExit(
             "R2 destination prefix already contains objects. Re-run with --overwrite to replace:\n"
             f"r2://{destination['bucket']}/{prefix}"
         )
+    reporter.report(f"R2 destination prefix is available: r2://{destination['bucket']}/{prefix}")
 
 
 def iter_subject_files(subject_dir):
     return sorted(path for path in subject_dir.rglob("*") if path.is_file())
 
 
-def publish_r2_destination(config, subject_dir, overwrite, r2_client=None):
+def publish_r2_destination(
+    config,
+    subject_dir,
+    overwrite,
+    r2_client=None,
+    reporter=DEFAULT_PROGRESS_REPORTER,
+):
     destination = config["destination"]
     client = r2_client or R2StorageClient.from_env()
     uploads = []
@@ -245,12 +260,14 @@ def publish_r2_destination(config, subject_dir, overwrite, r2_client=None):
         uploads.append((path, key))
 
     total = len(uploads)
-    print(f"prepared {total} artifact file(s) for R2 upload")
-    print(f"checking target object keys in r2://{destination['bucket']}/{destination['prefix']}")
+    reporter.report(f"prepared {total} artifact file(s) for R2 upload")
+    reporter.report(
+        f"checking target object keys in r2://{destination['bucket']}/{destination['prefix']}"
+    )
 
     existing = []
     for index, (_, key) in enumerate(uploads, start=1):
-        print(f"[{index}/{total}] checking {key}")
+        reporter.report(f"[{index}/{total}] checking {key}")
         if client.exists(destination["bucket"], key):
             existing.append(key)
     if existing and not overwrite:
@@ -261,9 +278,14 @@ def publish_r2_destination(config, subject_dir, overwrite, r2_client=None):
             f"{sample}{extra}"
         )
 
-    print(f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}")
+    reporter.report(
+        f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}"
+    )
     for index, (path, key) in enumerate(uploads, start=1):
-        print(f"[{index}/{total}] uploading {key}")
+        size = path.stat().st_size
+        reporter.report(f"[{index}/{total}] uploading {key} bytes={size}")
         client.upload_file(path, destination["bucket"], key)
-    print(f"uploaded {len(uploads)} artifact files to r2://{destination['bucket']}/{destination['prefix']}")
+    reporter.report(
+        f"uploaded {len(uploads)} artifact files to r2://{destination['bucket']}/{destination['prefix']}"
+    )
     return uploads

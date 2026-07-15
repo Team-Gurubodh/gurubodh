@@ -5,6 +5,8 @@ import time
 import urllib.error
 import urllib.request
 
+from gurubodh_utils.progress import DEFAULT_PROGRESS_REPORTER
+
 
 SARVAM_API_KEY_ENV_VAR = "SARVAM_API_KEY"
 SARVAM_API_BASE_URL = "https://api.sarvam.ai"
@@ -230,15 +232,23 @@ def is_retryable_sarvam_error(exc):
 
 
 class SarvamFormatter:
-    def __init__(self, formatting_config, client=None, sleeper=time.sleep, environ=None):
+    def __init__(
+        self,
+        formatting_config,
+        client=None,
+        sleeper=time.sleep,
+        environ=None,
+        reporter=DEFAULT_PROGRESS_REPORTER,
+    ):
         self.config = formatting_config
         self.client = client
         self.sleeper = sleeper
         self.environ = environ
+        self.reporter = reporter
 
-    def format_text(self, text):
+    def format_text(self, text, progress_label=None):
         model = self.config["model"]
-        paragraphs = self._format_with_retries(text, model)
+        paragraphs = self._format_with_retries(text, model, progress_label=progress_label)
         return {
             "schema_version": FORMATTED_ARTIFACT_SCHEMA_VERSION,
             "provider": "sarvam",
@@ -249,14 +259,13 @@ class SarvamFormatter:
             "paragraphs": paragraphs,
         }
 
-    def _format_with_retries(self, text, model):
+    def _format_with_retries(self, text, model, progress_label=None):
         max_retries = min(self.config["max_retries"], MAX_SARVAM_FORMATTER_RETRIES)
         attempts = max_retries + 1
         last_error = None
 
         for attempt in range(1, attempts + 1):
-            if attempt > 1:
-                self._sleep_before_retry()
+            self._report(progress_label, f"Sarvam attempt {attempt}/{attempts}")
             try:
                 response = self._call_sarvam(text, model)
                 return parse_sarvam_formatting_response(response)
@@ -264,13 +273,25 @@ class SarvamFormatter:
                 if not is_retryable_sarvam_error(exc) or attempt == attempts:
                     raise
                 last_error = exc
+                self._sleep_before_retry(progress_label)
 
         raise last_error
 
-    def _sleep_before_retry(self):
+    def _sleep_before_retry(self, progress_label=None):
         delay_seconds = self.config.get("delay_seconds", 0)
         if delay_seconds:
+            self._report(
+                progress_label,
+                f"retrying after retryable Sarvam error; sleeping {delay_seconds:g}s",
+            )
+        else:
+            self._report(progress_label, "retrying after retryable Sarvam error")
+        if delay_seconds:
             self.sleeper(delay_seconds)
+
+    def _report(self, progress_label, message):
+        prefix = f"{progress_label} " if progress_label else ""
+        self.reporter.report(f"{prefix}{message}")
 
     def _call_sarvam(self, text, model):
         client = self.client or build_sarvam_client(environ=self.environ)

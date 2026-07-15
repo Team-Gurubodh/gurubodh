@@ -197,6 +197,14 @@ but do not commit API keys. Sarvam's API base URL is `https://api.sarvam.ai`;
 normal formatter usage does not require the Sarvam Python SDK, so you should
 not need to configure the URL separately.
 
+Formatting runs print chapter-level progress while they work. For each chapter,
+the command reports the chapter index and artifact base name, whether formatting
+was reused or regenerated, Sarvam attempt counts, retry sleeps, and the final
+formatted paragraph count. R2-backed runs also report source download
+completion, destination prefix availability, and byte counts during artifact
+uploads. These messages are intended for normal operator runs and never include
+API keys, request bodies, or full chapter text.
+
 The sample job `jobs/002_spand_rahasya.formatting-disabled.local.json` includes
 an explicit disabled formatting block:
 

@@ -16,6 +16,7 @@ from gurubodh_utils.metadata import (
     source_text_sha256,
     text_artifact_integrity,
 )
+from gurubodh_utils.pipelines.common import prepare_job_output
 from gurubodh_utils.storage import (
     R2StorageClient,
     ensure_r2_destination_available,
@@ -144,6 +145,29 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(loaded["formatting"]["fallback_model"], "sarvam-105b")
         self.assertIsNone(loaded["formatting"]["reasoning_effort"])
         self.assertEqual(loaded["formatting"]["max_tokens"], 4096)
+
+    def test_prepare_job_output_reports_pipeline_phases(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_root = Path(temp_dir) / "source"
+            destination_root = Path(temp_dir) / "destination"
+            source_docx = source_root / "subject" / "source.docx"
+            source_docx.parent.mkdir(parents=True)
+            source_docx.write_bytes(b"docx bytes")
+            config["source"]["root_dir"] = str(source_root)
+            config["destination"]["root_dir"] = str(destination_root)
+
+            output = StringIO()
+            with redirect_stdout(output):
+                job = prepare_job_output(config, overwrite=False)
+
+        progress = output.getvalue()
+        self.assertIn("preparing destination", progress)
+        self.assertIn("prepared destination at", progress)
+        self.assertIn("materializing source", progress)
+        self.assertIn("materialized source at", progress)
+        self.assertEqual(job["source_path"], source_docx)
 
     def test_formatting_rejects_invalid_provider(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -848,10 +872,17 @@ class StorageConfigTests(unittest.TestCase):
         }
         client = FakeR2Client()
 
-        with redirect_stdout(StringIO()):
+        output = StringIO()
+        with redirect_stdout(output):
             path, temp_dir = materialize_source(config, r2_client=client)
         self.addCleanup(temp_dir.cleanup)
 
+        progress = output.getvalue()
+        self.assertIn(
+            "downloading R2 source r2://gurubodh-library-dev/source_library/129_spand_rahasya/source.docx",
+            progress,
+        )
+        self.assertIn("downloaded R2 source to", progress)
         self.assertEqual(path.name, "source.docx")
         self.assertTrue(path.exists())
         self.assertEqual(
@@ -922,6 +953,30 @@ class StorageConfigTests(unittest.TestCase):
             ("gurubodh-library-dev", "cms_library/129_spand_rahasya/"),
         )
 
+    def test_r2_preflight_reports_available_prefix(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["destination"] = {
+            "backend": "r2",
+            "bucket": "gurubodh-library-dev",
+            "prefix": "cms_library",
+            "subject_dir": "129_spand_rahasya",
+        }
+        client = FakeR2Client()
+
+        output = StringIO()
+        with redirect_stdout(output):
+            ensure_r2_destination_available(config, overwrite=False, r2_client=client)
+
+        progress = output.getvalue()
+        self.assertIn(
+            "checking R2 destination prefix r2://gurubodh-library-dev/cms_library/129_spand_rahasya/",
+            progress,
+        )
+        self.assertIn(
+            "R2 destination prefix is available: r2://gurubodh-library-dev/cms_library/129_spand_rahasya/",
+            progress,
+        )
+
     def test_r2_preflight_skips_prefix_check_with_overwrite(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["destination"] = {
@@ -959,6 +1014,7 @@ class StorageConfigTests(unittest.TestCase):
             self.assertIn("prepared 1 artifact file(s) for R2 upload", progress)
             self.assertIn("[1/1] checking cms_library/129_spand_rahasya/full_subject/full.txt", progress)
             self.assertIn("[1/1] uploading cms_library/129_spand_rahasya/full_subject/full.txt", progress)
+            self.assertIn("bytes=7", progress)
             self.assertEqual(
                 client.uploads,
                 [
