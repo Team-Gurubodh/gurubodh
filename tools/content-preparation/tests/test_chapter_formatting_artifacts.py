@@ -50,10 +50,11 @@ LOCAL_CONFIG = {
 
 
 class FakeFormatter:
-    def __init__(self, result=None, error=None):
+    def __init__(self, result=None, error=None, last_token_usage=None):
         self.result = result
         self.error = error
         self.calls = []
+        self.last_token_usage = last_token_usage
 
     def format_text(self, text, progress_label=None):
         self.calls.append(text)
@@ -118,6 +119,11 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
             "source_text_sha256": source_text_sha256(text),
             "status": "formatted",
             "paragraphs": ["पहला वाक्य।", "दूसरा वाक्य।"],
+            "token_usage": {
+                "completion_tokens": 12,
+                "prompt_tokens": 34,
+                "total_tokens": 46,
+            },
         }
         formatter = FakeFormatter(result=result)
 
@@ -137,13 +143,26 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
             markdown_path = output_dir / "CAT020_SUB129_spand-rahasya_001_v01.01.formatted.md"
 
             self.assertEqual(formatting_result["status"], "formatted")
+            self.assertEqual(
+                formatting_result["token_usage"],
+                {
+                    "completion_tokens": 12,
+                    "prompt_tokens": 34,
+                    "total_tokens": 46,
+                },
+            )
             self.assertEqual(formatter.calls, [text])
             self.assertTrue(json_path.exists())
             self.assertTrue(markdown_path.exists())
-            self.assertEqual(json.loads(json_path.read_text(encoding="utf-8")), result)
             self.assertEqual(
                 markdown_path.read_text(encoding="utf-8"),
                 "पहला वाक्य।\n\nदूसरा वाक्य।\n",
+            )
+            expected_artifact_json = dict(result)
+            expected_artifact_json.pop("token_usage")
+            self.assertEqual(
+                json.loads(json_path.read_text(encoding="utf-8")),
+                expected_artifact_json,
             )
 
     def test_formatting_progress_reports_start_attempt_and_success(self):
@@ -401,6 +420,31 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
             self.assertIn("warning: formatting failed", stdout.getvalue())
             self.assertEqual(list(Path(temp_dir).iterdir()), [])
 
+    def test_formatting_failure_preserves_sarvam_token_usage_when_available(self):
+        token_usage = {
+            "completion_tokens": 4096,
+            "prompt_tokens": 1200,
+            "total_tokens": 5296,
+        }
+        formatter = FakeFormatter(
+            error=RuntimeError("finish_reason='length'"),
+            last_token_usage=token_usage,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with redirect_stdout(StringIO()):
+                result = format_chapter_artifacts(
+                    Path(temp_dir),
+                    "chapter.txt",
+                    2,
+                    "प्रबोधन",
+                    FORMATTING_CONFIG,
+                    formatter,
+                )
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["token_usage"], token_usage)
+
     def test_formatting_failure_raises_when_continue_on_error_is_false(self):
         formatter = FakeFormatter(error=RuntimeError("bad credentials"))
         config = dict(FORMATTING_CONFIG)
@@ -498,6 +542,11 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                     "retry_count": 0,
                     "throttle_sleep_seconds": 0,
                     "source_text_sha256": "raw-success",
+                    "token_usage": {
+                        "completion_tokens": 12,
+                        "prompt_tokens": 34,
+                        "total_tokens": 46,
+                    },
                     "warning": None,
                 },
             }
@@ -515,6 +564,11 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                     "retry_count": 1,
                     "throttle_sleep_seconds": 4,
                     "source_text_sha256": "raw-failed",
+                    "token_usage": {
+                        "completion_tokens": None,
+                        "prompt_tokens": None,
+                        "total_tokens": None,
+                    },
                     "warning": "formatting failed for chapter 002: rate limit",
                 },
             }
@@ -562,6 +616,22 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
         self.assertEqual(report["rate_limit_throttle"]["sarvam_requests_attempted"], 3)
         self.assertEqual(report["rate_limit_throttle"]["retry_count"], 1)
         self.assertEqual(report["rate_limit_throttle"]["total_throttle_sleep_seconds"], 4)
+        self.assertEqual(
+            report["token_usage"],
+            {
+                "completion_tokens": 12,
+                "prompt_tokens": 34,
+                "total_tokens": 46,
+            },
+        )
+        self.assertEqual(
+            report["chapters"][0]["token_usage"],
+            {
+                "completion_tokens": 12,
+                "prompt_tokens": 34,
+                "total_tokens": 46,
+            },
+        )
         self.assertEqual(report["final_outcome"]["failed_chapters"], ["002"])
         self.assertEqual(
             report["final_outcome"]["retry_candidates"],
@@ -574,6 +644,12 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("पहला पाठ", report_json_text)
+        self.assertIn("- Completion tokens: 12", markdown)
+        self.assertIn(
+            "| 001 | CAT020_SUB129_spand-rahasya_001_v01.01 | "
+            "formatted | 1 | 0 | 12 | 34 | 46 |  |",
+            markdown,
+        )
         self.assertIn("completed-with-formatting-failures", markdown)
 
     def test_r2_publish_includes_run_report_files(self):
