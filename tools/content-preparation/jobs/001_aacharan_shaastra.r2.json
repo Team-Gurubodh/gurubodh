@@ -35,7 +35,7 @@
   "formatting": {
     "enabled": true,
     "provider": "sarvam",
-    "model": "sarvam-30b",
+    "model": "sarvam-105b",
     "fallback_model": "sarvam-105b",
     "output_formats": [
       "json",
