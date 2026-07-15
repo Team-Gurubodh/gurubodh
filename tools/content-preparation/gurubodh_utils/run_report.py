@@ -95,6 +95,9 @@ def chapter_audit_entry(chapter):
     files = chapter.get("files", {})
     formatting = chapter.get("formatting", {})
     integrity_artifacts = chapter.get("integrity", {}).get("artifacts", {})
+    token_usage = formatting.get("token_usage", {})
+    if not isinstance(token_usage, dict):
+        token_usage = {}
 
     formatted_filenames = {}
     if files.get("formatted_json_filename"):
@@ -117,6 +120,11 @@ def chapter_audit_entry(chapter):
         "model_used": formatting.get("model_used"),
         "attempt_count": formatting.get("attempt_count", 0),
         "retry_count": formatting.get("retry_count", 0),
+        "token_usage": {
+            "completion_tokens": token_usage.get("completion_tokens"),
+            "prompt_tokens": token_usage.get("prompt_tokens"),
+            "total_tokens": token_usage.get("total_tokens"),
+        },
         "warning": formatting.get("warning"),
         "formatted_artifact_filenames": formatted_filenames,
         "artifact_checksums": formatted_checksums,
@@ -221,6 +229,11 @@ def build_run_report(
             ),
             "request_timestamps": [],
         },
+        "token_usage": {
+            "completion_tokens": sum_token_usage(chapters, "completion_tokens"),
+            "prompt_tokens": sum_token_usage(chapters, "prompt_tokens"),
+            "total_tokens": sum_token_usage(chapters, "total_tokens"),
+        },
         "final_outcome": {
             "result": "completed-with-formatting-failures" if failed_chapters else "success",
             "failed_chapters": [
@@ -248,6 +261,7 @@ def render_markdown_report(report):
     summary = report["processing_summary"]
     outcome = report["final_outcome"]
     throttle = report["rate_limit_throttle"]
+    token_usage = report["token_usage"]
     r2_artifact_count = summary["r2_publish"]["artifact_count"]
     r2_artifact_text = "n/a" if r2_artifact_count is None else str(r2_artifact_count)
 
@@ -281,21 +295,33 @@ def render_markdown_report(report):
         f"- Retry count: {throttle['retry_count']}",
         f"- Total throttle sleep seconds: {throttle['total_throttle_sleep_seconds']}",
         "",
+        "## Token Usage",
+        "",
+        f"- Completion tokens: {token_usage_text(token_usage.get('completion_tokens'))}",
+        f"- Prompt tokens: {token_usage_text(token_usage.get('prompt_tokens'))}",
+        f"- Total tokens: {token_usage_text(token_usage.get('total_tokens'))}",
+        "",
         "## Per-Chapter Audit",
         "",
-        "| Chapter | Artifact | Formatting | Attempts | Retries | Warning |",
-        "| --- | --- | --- | ---: | ---: | --- |",
+        "| Chapter | Artifact | Formatting | Attempts | Retries | Completion tokens | Prompt tokens | Total tokens | Warning |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
 
     for chapter in report["chapters"]:
         warning = chapter.get("warning") or ""
+        chapter_token_usage = chapter.get("token_usage") or {}
         lines.append(
-            "| {chapter} | {artifact} | {status} | {attempts} | {retries} | {warning} |".format(
+            "| {chapter} | {artifact} | {status} | {attempts} | {retries} | {completion_tokens} | {prompt_tokens} | {total_tokens} | {warning} |".format(
                 chapter=chapter.get("chapter_number") or "",
                 artifact=chapter.get("artifact_base_name") or "",
                 status=chapter.get("formatting_status") or "",
                 attempts=chapter.get("attempt_count", 0),
                 retries=chapter.get("retry_count", 0),
+                completion_tokens=token_usage_text(
+                    chapter_token_usage.get("completion_tokens")
+                ),
+                prompt_tokens=token_usage_text(chapter_token_usage.get("prompt_tokens")),
+                total_tokens=token_usage_text(chapter_token_usage.get("total_tokens")),
                 warning=markdown_table_text(warning),
             )
         )
@@ -321,6 +347,22 @@ def formatting_counts_text(counts):
         f"failed={counts.get('failed', 0)}, "
         f"disabled={counts.get('disabled', 0)}"
     )
+
+
+def sum_token_usage(chapters, key):
+    values = []
+    for chapter in chapters:
+        usage = chapter.get("formatting", {}).get("token_usage", {})
+        if not isinstance(usage, dict):
+            continue
+        value = usage.get(key)
+        if isinstance(value, int):
+            values.append(value)
+    return sum(values) if values else None
+
+
+def token_usage_text(value):
+    return str(value) if isinstance(value, int) else "n/a"
 
 
 def markdown_table_text(value):

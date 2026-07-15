@@ -265,6 +265,25 @@
         "source_text_sha256": {
           "type": ["string", "null"],
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "token_usage": {
+          "type": "object",
+          "required": ["completion_tokens", "prompt_tokens", "total_tokens"],
+          "properties": {
+            "completion_tokens": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "prompt_tokens": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "total_tokens": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

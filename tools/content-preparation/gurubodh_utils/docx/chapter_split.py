@@ -130,6 +130,14 @@ def formatted_markdown(paragraphs):
     return "\n\n".join(paragraph.strip() for paragraph in paragraphs if paragraph.strip()) + "\n"
 
 
+def formatted_json_artifact_payload(formatted_result):
+    return {
+        key: value
+        for key, value in formatted_result.items()
+        if key != "token_usage"
+    }
+
+
 def write_formatted_artifacts(chapter_text_dir, text_name, formatted_result, output_formats):
     names = formatted_artifact_names(text_name)
     written = {}
@@ -137,7 +145,12 @@ def write_formatted_artifacts(chapter_text_dir, text_name, formatted_result, out
     if "json" in output_formats:
         json_path = chapter_text_dir / names["json"]
         json_path.write_text(
-            json.dumps(formatted_result, ensure_ascii=False, indent=2) + "\n",
+            json.dumps(
+                formatted_json_artifact_payload(formatted_result),
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
         )
         written["json"] = json_path
@@ -253,6 +266,7 @@ def format_chapter_artifacts(
             "retry_count": stats_delta["retry_count"],
             "throttle_sleep_seconds": stats_delta["throttle_sleep_seconds"],
             "model_used": formatted_result.get("model") or formatting_config.get("model"),
+            "token_usage": formatted_result.get("token_usage"),
         }
     except Exception as exc:
         stats_delta = formatter_stats_delta(stats_before, formatter_stats(formatter))
@@ -269,6 +283,7 @@ def format_chapter_artifacts(
             "retry_count": stats_delta["retry_count"],
             "throttle_sleep_seconds": stats_delta["throttle_sleep_seconds"],
             "model_used": None,
+            "token_usage": stats_delta.get("last_token_usage"),
         }
 
 
@@ -278,19 +293,23 @@ def formatter_stats(formatter):
             "request_attempt_count": 0,
             "retry_count": 0,
             "throttle_sleep_seconds": 0,
+            "last_token_usage": None,
         }
     return {
         "request_attempt_count": getattr(formatter, "request_attempt_count", 0),
         "retry_count": getattr(formatter, "retry_count", 0),
         "throttle_sleep_seconds": getattr(formatter, "throttle_sleep_seconds", 0),
+        "last_token_usage": getattr(formatter, "last_token_usage", None),
     }
 
 
 def formatter_stats_delta(before, after):
-    return {
+    delta = {
         key: after.get(key, 0) - before.get(key, 0)
         for key in ("request_attempt_count", "retry_count", "throttle_sleep_seconds")
     }
+    delta["last_token_usage"] = after.get("last_token_usage")
+    return delta
 
 
 def print_formatting_summary(summary):

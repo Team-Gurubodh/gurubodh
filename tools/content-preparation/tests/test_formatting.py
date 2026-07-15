@@ -1,8 +1,9 @@
 import copy
 import json
 import unittest
+import urllib.error
 from contextlib import redirect_stdout
-from io import StringIO
+from io import BytesIO, StringIO
 
 from gurubodh_utils.constants import DEFAULT_FORMATTING_CONFIG
 from gurubodh_utils.formatting import (
@@ -15,6 +16,7 @@ from gurubodh_utils.formatting import (
     SarvamPermanentError,
     SarvamResponseError,
     SarvamRetryableError,
+    extract_response_usage,
     parse_sarvam_formatting_response,
     source_text_sha256,
 )
@@ -33,8 +35,8 @@ def formatting_config(**overrides):
     return config
 
 
-def sarvam_chat_response(content, finish_reason="stop"):
-    return {
+def sarvam_chat_response(content, finish_reason="stop", usage=None):
+    response = {
         "choices": [
             {
                 "finish_reason": finish_reason,
@@ -44,6 +46,9 @@ def sarvam_chat_response(content, finish_reason="stop"):
             }
         ]
     }
+    if usage is not None:
+        response["usage"] = usage
+    return response
 
 
 class FakeSarvamHttpClient:
@@ -83,6 +88,23 @@ class FakeURLOpener:
         return FakeHTTPResponse(self.response_body)
 
 
+class FakeHTTPErrorOpener:
+    def __init__(self, status_code, response_body):
+        self.status_code = status_code
+        self.response_body = response_body
+        self.calls = []
+
+    def __call__(self, request):
+        self.calls.append(request)
+        raise urllib.error.HTTPError(
+            request.full_url,
+            self.status_code,
+            "Bad Request",
+            {},
+            BytesIO(self.response_body.encode("utf-8")),
+        )
+
+
 class FormattingTests(unittest.TestCase):
     def test_formatter_import_does_not_require_sarvam_sdk(self):
         formatter = SarvamFormatter(formatting_config(), client=FakeSarvamHttpClient([
@@ -97,6 +119,58 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(result["status"], "formatted")
         self.assertEqual(result["paragraphs"], ["पहला पैराग्राफ।"])
         self.assertEqual(result["source_text_sha256"], source_text_sha256("पहला पैराग्राफ"))
+        self.assertEqual(
+            result["token_usage"],
+            {
+                "completion_tokens": None,
+                "prompt_tokens": None,
+                "total_tokens": None,
+            },
+        )
+
+    def test_formatter_records_sarvam_usage_from_response(self):
+        formatter = SarvamFormatter(formatting_config(), client=FakeSarvamHttpClient([
+            sarvam_chat_response(
+                '{"paragraphs": ["पहला पैराग्राफ।"]}',
+                usage={
+                    "completion_tokens": 12,
+                    "prompt_tokens": 34,
+                    "total_tokens": 46,
+                },
+            )
+        ]))
+
+        result = formatter.format_text("पहला पैराग्राफ")
+
+        self.assertEqual(
+            result["token_usage"],
+            {
+                "completion_tokens": 12,
+                "prompt_tokens": 34,
+                "total_tokens": 46,
+            },
+        )
+
+    def test_extract_response_usage_supports_object_response_shape(self):
+        usage = type(
+            "Usage",
+            (),
+            {
+                "completion_tokens": 5,
+                "prompt_tokens": 7,
+                "total_tokens": 12,
+            },
+        )()
+        response = type("Response", (), {"usage": usage})()
+
+        self.assertEqual(
+            extract_response_usage(response),
+            {
+                "completion_tokens": 5,
+                "prompt_tokens": 7,
+                "total_tokens": 12,
+            },
+        )
 
     def test_missing_sarvam_api_key_has_clear_error(self):
         formatter = SarvamFormatter(formatting_config(), environ={})
@@ -201,6 +275,34 @@ class FormattingTests(unittest.TestCase):
         self.assertEqual(json.loads(request.data.decode("utf-8")), body)
         self.assertEqual(result, response)
 
+    def test_direct_http_client_includes_bad_request_response_body(self):
+        opener = FakeHTTPErrorOpener(
+            400,
+            '{"error":{"message":"max_tokens must be less than or equal to 4096"}}',
+        )
+        client = SarvamChatCompletionHttpClient(api_key="test-key", opener=opener)
+
+        with self.assertRaises(SarvamPermanentError) as exc:
+            client.create_chat_completion({"model": "sarvam-105b", "max_tokens": 8192})
+
+        message = str(exc.exception)
+        self.assertIn("HTTP 400", message)
+        self.assertIn("max_tokens must be less than or equal to 4096", message)
+
+    def test_direct_http_client_includes_retryable_response_body(self):
+        opener = FakeHTTPErrorOpener(
+            429,
+            '{"error":{"message":"rate limit exceeded"}}',
+        )
+        client = SarvamChatCompletionHttpClient(api_key="test-key", opener=opener)
+
+        with self.assertRaises(SarvamRetryableError) as exc:
+            client.create_chat_completion({"model": "sarvam-105b"})
+
+        message = str(exc.exception)
+        self.assertIn("HTTP 429", message)
+        self.assertIn("rate limit exceeded", message)
+
     def test_parser_accepts_openai_style_choice_response(self):
         response = {
             "choices": [
@@ -247,6 +349,31 @@ class FormattingTests(unittest.TestCase):
         message = str(exc.exception)
         self.assertIn("finish_reason='length'", message)
         self.assertIn("Partial JSON text", message)
+
+    def test_formatter_preserves_usage_when_response_parsing_fails(self):
+        formatter = SarvamFormatter(formatting_config(), client=FakeSarvamHttpClient([
+            sarvam_chat_response(
+                '{"paragraphs": ["अधूरा।"',
+                finish_reason="length",
+                usage={
+                    "completion_tokens": 4096,
+                    "prompt_tokens": 1200,
+                    "total_tokens": 5296,
+                },
+            )
+        ]))
+
+        with self.assertRaises(SarvamResponseError):
+            formatter.format_text("अधूरा")
+
+        self.assertEqual(
+            formatter.last_token_usage,
+            {
+                "completion_tokens": 4096,
+                "prompt_tokens": 1200,
+                "total_tokens": 5296,
+            },
+        )
 
     def test_parser_allows_schema_level_extra_fields_to_be_enforced_by_sarvam(self):
         response = sarvam_chat_response('{"paragraphs": ["एक।"], "title": "नया"}')

@@ -256,6 +256,7 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
         self.assertEqual(formatting["reasoning_effort"]["default"], None)
         self.assertEqual(formatting["max_tokens"]["default"], 4096)
+        self.assertEqual(formatting["max_tokens"]["maximum"], 4096)
 
     def test_migrate_configs_preview_reports_without_writing(self):
         temp_dir = tempfile.TemporaryDirectory()
@@ -643,6 +644,11 @@ class StorageConfigTests(unittest.TestCase):
                 "retry_count": 0,
                 "throttle_sleep_seconds": 0,
                 "source_text_sha256": None,
+                "token_usage": {
+                    "completion_tokens": None,
+                    "prompt_tokens": None,
+                    "total_tokens": None,
+                },
             },
         )
         self.assertNotIn("formatted_json_filename", metadata["files"])
@@ -741,6 +747,11 @@ class StorageConfigTests(unittest.TestCase):
                 "retry_count": 0,
                 "throttle_sleep_seconds": 0,
                 "source_text_sha256": source_text_sha256(text),
+                "token_usage": {
+                    "completion_tokens": None,
+                    "prompt_tokens": None,
+                    "total_tokens": None,
+                },
             },
         )
 
@@ -860,6 +871,11 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(formatting["attempt_count"]["minimum"], 0)
         self.assertEqual(formatting["retry_count"]["minimum"], 0)
         self.assertEqual(formatting["throttle_sleep_seconds"]["minimum"], 0)
+        self.assertEqual(formatting["token_usage"]["required"], [
+            "completion_tokens",
+            "prompt_tokens",
+            "total_tokens",
+        ])
         self.assertEqual(
             text_schema["required"],
             ["algorithm", "encoding", "line_endings", "scope", "value"],

@@ -101,6 +101,10 @@ def formatting_status_metadata(config, formatting_result, chapter_text_value):
     if formatting_result and formatting_result.get("model_used") is not None:
         model_used = formatting_result["model_used"]
 
+    token_usage = {}
+    if formatting_result and isinstance(formatting_result.get("token_usage"), dict):
+        token_usage = formatting_result["token_usage"]
+
     return {
         "enabled": bool(formatting_config.get("enabled")),
         "provider": formatting_config.get("provider"),
@@ -121,6 +125,11 @@ def formatting_status_metadata(config, formatting_result, chapter_text_value):
         "source_text_sha256": source_text_sha256(chapter_text_value)
         if formatting_config.get("enabled")
         else None,
+        "token_usage": {
+            "completion_tokens": token_usage.get("completion_tokens"),
+            "prompt_tokens": token_usage.get("prompt_tokens"),
+            "total_tokens": token_usage.get("total_tokens"),
+        },
     }
 
 

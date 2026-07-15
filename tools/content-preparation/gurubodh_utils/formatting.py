@@ -14,6 +14,7 @@ SARVAM_CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
 FORMATTED_ARTIFACT_SCHEMA_VERSION = "1.0.0"
 MAX_SARVAM_FORMATTER_RETRIES = 1
 RETRYABLE_HTTP_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
+MAX_HTTP_ERROR_BODY_CHARS = 500
 
 HINDI_FORMATTING_SYSTEM_PROMPT = """You are an expert Hindi editor. Your task is to take the following raw, unformatted Hindi text and organize it into clean, readable, and grammatically correct paragraphs.
 
@@ -109,13 +110,10 @@ class SarvamChatCompletionHttpClient:
             with self.opener(request) as response:
                 payload = response.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
+            message = sarvam_http_error_message(exc)
             if exc.code in RETRYABLE_HTTP_STATUS_CODES:
-                raise SarvamRetryableError(
-                    f"Sarvam chat completion failed with HTTP {exc.code}"
-                ) from exc
-            raise SarvamPermanentError(
-                f"Sarvam chat completion failed with HTTP {exc.code}"
-            ) from exc
+                raise SarvamRetryableError(message) from exc
+            raise SarvamPermanentError(message) from exc
         except urllib.error.URLError as exc:
             raise SarvamRetryableError("Sarvam chat completion request failed") from exc
 
@@ -123,6 +121,37 @@ class SarvamChatCompletionHttpClient:
             return json.loads(payload)
         except json.JSONDecodeError as exc:
             raise SarvamResponseError("Sarvam API response was not valid JSON") from exc
+
+
+def sarvam_http_error_message(exc):
+    body = http_error_body(exc)
+    message = f"Sarvam chat completion failed with HTTP {exc.code}"
+    if body:
+        message = f"{message}: {body}"
+    return message
+
+
+def http_error_body(exc):
+    try:
+        raw_body = exc.read()
+    except (OSError, AttributeError):
+        return None
+    finally:
+        close = getattr(exc, "close", None)
+        if callable(close):
+            close()
+    if not raw_body:
+        return None
+    if isinstance(raw_body, bytes):
+        body = raw_body.decode("utf-8", errors="replace")
+    else:
+        body = str(raw_body)
+    body = " ".join(body.split())
+    if not body:
+        return None
+    if len(body) > MAX_HTTP_ERROR_BODY_CHARS:
+        return f"{body[:MAX_HTTP_ERROR_BODY_CHARS]}..."
+    return body
 
 
 def parse_sarvam_formatting_response(raw_response):
@@ -156,6 +185,34 @@ def parse_sarvam_formatting_response(raw_response):
                 f"Sarvam response paragraph {index} must be a non-empty string"
             )
     return [paragraph.strip() for paragraph in paragraphs]
+
+
+def extract_response_usage(raw_response):
+    if isinstance(raw_response, dict):
+        usage = raw_response.get("usage")
+    else:
+        usage = getattr(raw_response, "usage", None)
+
+    if usage is None:
+        return {
+            "completion_tokens": None,
+            "prompt_tokens": None,
+            "total_tokens": None,
+        }
+
+    return {
+        "completion_tokens": usage_value(usage, "completion_tokens"),
+        "prompt_tokens": usage_value(usage, "prompt_tokens"),
+        "total_tokens": usage_value(usage, "total_tokens"),
+    }
+
+
+def usage_value(usage, key):
+    if isinstance(usage, dict):
+        value = usage.get(key)
+    else:
+        value = getattr(usage, key, None)
+    return value if isinstance(value, int) else None
 
 
 def extract_response_text(raw_response):
@@ -246,10 +303,15 @@ class SarvamFormatter:
         self.request_attempt_count = 0
         self.retry_count = 0
         self.throttle_sleep_seconds = 0
+        self.last_token_usage = None
 
     def format_text(self, text, progress_label=None):
         model = self.config["model"]
-        paragraphs = self._format_with_retries(text, model, progress_label=progress_label)
+        formatted_response = self._format_with_retries(
+            text,
+            model,
+            progress_label=progress_label,
+        )
         return {
             "schema_version": FORMATTED_ARTIFACT_SCHEMA_VERSION,
             "provider": "sarvam",
@@ -257,7 +319,8 @@ class SarvamFormatter:
             "fallback_model_used": None,
             "source_text_sha256": source_text_sha256(text),
             "status": "formatted",
-            "paragraphs": paragraphs,
+            "paragraphs": formatted_response["paragraphs"],
+            "token_usage": formatted_response["token_usage"],
         }
 
     def _format_with_retries(self, text, model, progress_label=None):
@@ -279,7 +342,11 @@ class SarvamFormatter:
             try:
                 response = self._call_sarvam(text, model)
                 self._has_made_sarvam_request = True
-                return parse_sarvam_formatting_response(response)
+                self.last_token_usage = extract_response_usage(response)
+                return {
+                    "paragraphs": parse_sarvam_formatting_response(response),
+                    "token_usage": self.last_token_usage,
+                }
             except Exception as exc:
                 self._has_made_sarvam_request = True
                 if not is_retryable_sarvam_error(exc) or attempt == attempts:

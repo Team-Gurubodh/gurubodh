@@ -35,8 +35,8 @@ None currently recorded.
   `.txt` artifact bytes. When Sarvam formatting writes formatted chapter
   artifacts, metadata also includes formatted artifact filenames, storage
   references, artifact checksums, formatting status, request attempt count,
-  retry count, and throttle sleep seconds. It does not checksum the metadata
-  JSON artifact.
+  retry count, throttle sleep seconds, and Sarvam response token usage. It does
+  not checksum the metadata JSON artifact.
 - Content-preparation run audit reports are emitted under each generated
   subject tree's `run_reports/` directory with report schema version `1.0.0`.
   They summarize run-level outcomes from job configuration and chapter metadata
