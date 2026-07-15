@@ -135,7 +135,6 @@ class FormattingTests(unittest.TestCase):
             "json",
             "Markdown",
             "बैकटिक्स",
-            "paragraphs",
             "वैध JSON",
             "```",
         ]
@@ -145,15 +144,15 @@ class FormattingTests(unittest.TestCase):
 
     def test_hindi_prompt_keeps_editorial_safeguards(self):
         expected_terms = [
-            "मूल अर्थ",
-            "अनुवाद न करें",
-            "संक्षेप न करें",
-            "नया विचार",
-            "विराम चिन्ह",
-            "छोटे, पठनीय पैराग्राफ",
-            "क्रम न बदलें",
-            "टाइपिंग/OCR त्रुटि",
-            "संरचनात्मक संकेत",
+            "expert Hindi editor",
+            "clean, readable",
+            "shared theme, idea, or logical flow",
+            "Do not start a new paragraph for every sentence",
+            "3 to 6 sentences",
+            "Do not translate",
+            "Do not summarize or omit",
+            "Fix missing punctuation",
+            "पूर्ण विराम",
         ]
 
         for term in expected_terms:
