@@ -170,7 +170,10 @@ current local artifact tree by a future cache or restore step.
 
 Sarvam formatting reads the API key from `SARVAM_API_KEY` when formatting is
 enabled. Formatter chat completions use Sarvam's direct HTTP chat-completions
-endpoint and send a structured `response_format` request body.
+endpoint and send a structured `response_format` request body with
+`type: "json_schema"` and `strict: true`. The schema requires a non-empty
+`paragraphs` array, and the formatter treats Markdown-fenced or otherwise
+repaired JSON as an invalid Sarvam response instead of silently normalizing it.
 
 Formatter chat completions default `reasoning_effort` to `null` and
 `max_tokens` to `4096`. This disables Sarvam reasoning output for the formatter
