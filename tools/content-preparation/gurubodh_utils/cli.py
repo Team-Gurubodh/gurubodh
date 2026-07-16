@@ -1,20 +1,8 @@
 import argparse
 
-from gurubodh_utils.config import load_conversion_job, migrate_conversion_job_paths
 from gurubodh_utils.docx.namespaces import register_namespaces
 from gurubodh_utils.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
 from gurubodh_utils.project import resolve_project_context, resolve_project_path
-from gurubodh_utils.retry_formatting import retry_formatting
-
-
-def add_project_root_option(parser):
-    parser.add_argument(
-        "--project-root",
-        help=(
-            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_UTILS_ROOT "
-            "or walks upward from the current directory."
-        ),
-    )
 
 
 def add_common_options(parser):
@@ -24,7 +12,13 @@ def add_common_options(parser):
         action="store_true",
         help="Replace existing local output or R2 objects instead of failing.",
     )
-    add_project_root_option(parser)
+    parser.add_argument(
+        "--project-root",
+        help=(
+            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_UTILS_ROOT "
+            "or walks upward from the current directory."
+        ),
+    )
 
 
 def build_parser():
@@ -55,93 +49,22 @@ def build_parser():
     )
     add_common_options(legacy_parser)
 
-    migrate_parser = subparsers.add_parser(
-        "migrate-configs",
-        help="Migrate conversion job configs to the current schema version.",
-        description=(
-            "Preview or apply conversion job schema migrations. By default this command "
-            "only reports files that would change."
-        ),
-    )
-    add_project_root_option(migrate_parser)
-    migrate_parser.add_argument(
-        "--apply",
-        action="store_true",
-        help="Write migrated config files. Without this flag, only preview changes.",
-    )
-    migrate_parser.add_argument(
-        "configs",
-        nargs="+",
-        help="Conversion job JSON files to migrate.",
-    )
-
-    retry_parser = subparsers.add_parser(
-        "retry-formatting",
-        help="Retry Sarvam formatting for failed R2-backed chapter artifacts.",
-        description=(
-            "Retry formatting for failed chapters discovered from R2 chapter metadata. "
-            "By default, failed chapters with retry_attempts >= 3 are reported but not retried."
-        ),
-    )
-    retry_parser.add_argument("--config", required=True, help="Path to a Gurubodh CMS conversion job JSON file.")
-    retry_parser.add_argument("--dry-run", action="store_true", help="Report retry candidates without Sarvam calls or R2 writes.")
-    retry_parser.add_argument("--chapter", help="Retry one chapter number, such as 034.")
-    retry_parser.add_argument("--chapters", help="Retry comma-separated chapter numbers, such as 034,038.")
-    retry_parser.add_argument(
-        "--failed-only",
-        action="store_true",
-        help="Retry failed chapters only. This is the default selection mode.",
-    )
-    add_project_root_option(retry_parser)
-
     return parser
-
-
-def run_migration(context, args):
-    config_paths = [resolve_project_path(context, config) for config in args.configs]
-    results = migrate_conversion_job_paths(config_paths, apply=args.apply)
-    for result in results:
-        print(f"{result['status']}: {result['path']}")
-        if result.get("formatting_block"):
-            if result["status"] == "migrated":
-                print("  migrated to 1.3.0 and added default formatting configuration with formatting disabled:")
-            elif result["status"] == "added-formatting-defaults":
-                print("  added default formatting configuration with formatting disabled:")
-            elif result["status"] == "updated-formatting-defaults":
-                print("  updated formatting configuration with missing defaults:")
-            elif result["status"] == "would-update-formatting-defaults":
-                print("  this command will update the formatting configuration with missing defaults:")
-            else:
-                print("  this command will add the default formatting configuration with formatting disabled:")
-            print(result["formatting_block"])
-            print('  Set "enabled": true before running the job when Sarvam chapter formatting is desired.')
 
 
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
     context = resolve_project_context(args.project_root)
+    config_path = resolve_project_path(context, args.config)
     register_namespaces()
 
     if args.command == "run":
-        config_path = resolve_project_path(context, args.config)
         run_configured_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "unicode-ingest":
-        config_path = resolve_project_path(context, args.config)
         run_unicode_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "legacy-convert":
-        config_path = resolve_project_path(context, args.config)
         run_legacy_job(context, config_path, overwrite=args.overwrite)
-    elif args.command == "migrate-configs":
-        run_migration(context, args)
-    elif args.command == "retry-formatting":
-        config_path = resolve_project_path(context, args.config)
-        retry_formatting(
-            load_conversion_job(config_path),
-            dry_run=args.dry_run,
-            chapter=args.chapter,
-            chapters=args.chapters,
-        )
     else:
         parser.error(f"Unsupported command: {args.command}")
 

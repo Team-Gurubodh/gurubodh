@@ -8,15 +8,8 @@ from pathlib import Path
 
 from botocore.exceptions import ClientError
 
-from gurubodh_utils.cli import main as cli_main
 from gurubodh_utils.config import load_conversion_job
-from gurubodh_utils.constants import DEFAULT_FORMATTING_CONFIG
-from gurubodh_utils.metadata import (
-    build_chapter_metadata,
-    source_text_sha256,
-    text_artifact_integrity,
-)
-from gurubodh_utils.pipelines.common import prepare_job_output
+from gurubodh_utils.metadata import build_chapter_metadata, text_artifact_integrity
 from gurubodh_utils.storage import (
     R2StorageClient,
     ensure_r2_destination_available,
@@ -26,7 +19,7 @@ from gurubodh_utils.storage import (
 
 
 BASE_CONFIG = {
-    "schema_version": "1.3.0",
+    "schema_version": "1.2.0",
     "pipeline": "unicode-docx-ingest",
     "source": {
         "root_dir": "/tmp/source",
@@ -49,9 +42,6 @@ BASE_CONFIG = {
         "enabled": False,
     },
 }
-
-BASE_CONFIG_1_2 = json.loads(json.dumps(BASE_CONFIG))
-BASE_CONFIG_1_2["schema_version"] = "1.2.0"
 
 
 class FakeR2Client:
@@ -82,24 +72,6 @@ class FakeMissingR2ObjectClient:
         )
 
 
-class FakePaginatedS3Client:
-    def __init__(self):
-        self.requests = []
-
-    def list_objects_v2(self, **request):
-        self.requests.append(request)
-        if "ContinuationToken" not in request:
-            return {
-                "IsTruncated": True,
-                "NextContinuationToken": "next-page",
-                "Contents": [{"Key": "prefix/001.json"}],
-            }
-        return {
-            "IsTruncated": False,
-            "Contents": [{"Key": "prefix/002.json"}],
-        }
-
-
 class StorageConfigTests(unittest.TestCase):
     def write_config(self, config):
         temp_dir = tempfile.TemporaryDirectory()
@@ -113,406 +85,6 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
         self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya")
-
-    def test_omitted_formatting_defaults_to_disabled(self):
-        config = load_conversion_job(self.write_config(BASE_CONFIG))
-
-        self.assertEqual(config["formatting"], DEFAULT_FORMATTING_CONFIG)
-        self.assertFalse(config["formatting"]["enabled"])
-
-    def test_disabled_formatting_block_receives_defaults(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": False}
-
-        loaded = load_conversion_job(self.write_config(config))
-
-        self.assertEqual(loaded["formatting"], DEFAULT_FORMATTING_CONFIG)
-
-    def test_formatting_disabled_sample_job_loads_without_credentials(self):
-        sample_path = (
-            Path(__file__).parents[1]
-            / "jobs"
-            / "002_spand_rahasya.formatting-disabled.local.json"
-        )
-
-        loaded = load_conversion_job(sample_path)
-
-        self.assertEqual(loaded["formatting"], DEFAULT_FORMATTING_CONFIG)
-        self.assertFalse(loaded["formatting"]["enabled"])
-
-    def test_enabled_sarvam_formatting_shape_loads(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {
-            "enabled": True,
-            "provider": "sarvam",
-            "model": "sarvam-30b",
-            "fallback_model": "sarvam-105b",
-            "output_formats": ["json", "markdown"],
-            "continue_on_error": True,
-            "delay_seconds": 4,
-            "max_retries": 1,
-            "regenerate": "when-source-checksum-changes",
-            "reasoning_effort": None,
-            "max_tokens": 4096,
-        }
-
-        loaded = load_conversion_job(self.write_config(config))
-
-        self.assertTrue(loaded["formatting"]["enabled"])
-        self.assertEqual(loaded["formatting"]["model"], "sarvam-30b")
-        self.assertEqual(loaded["formatting"]["fallback_model"], "sarvam-105b")
-        self.assertIsNone(loaded["formatting"]["reasoning_effort"])
-        self.assertEqual(loaded["formatting"]["max_tokens"], 4096)
-
-    def test_prepare_job_output_reports_pipeline_phases(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            source_root = Path(temp_dir) / "source"
-            destination_root = Path(temp_dir) / "destination"
-            source_docx = source_root / "subject" / "source.docx"
-            source_docx.parent.mkdir(parents=True)
-            source_docx.write_bytes(b"docx bytes")
-            config["source"]["root_dir"] = str(source_root)
-            config["destination"]["root_dir"] = str(destination_root)
-
-            output = StringIO()
-            with redirect_stdout(output):
-                job = prepare_job_output(config, overwrite=False)
-
-        progress = output.getvalue()
-        self.assertIn("preparing destination", progress)
-        self.assertIn("prepared destination at", progress)
-        self.assertIn("materializing source", progress)
-        self.assertIn("materialized source at", progress)
-        self.assertEqual(job["source_path"], source_docx)
-
-    def test_formatting_rejects_invalid_provider(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "provider": "other"}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.provider", str(exc.exception))
-
-    def test_formatting_rejects_non_boolean_enabled(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": "yes"}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.enabled", str(exc.exception))
-
-    def test_formatting_rejects_invalid_model_name(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "model": "not-a-sarvam-model"}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.model", str(exc.exception))
-
-    def test_formatting_rejects_invalid_output_format(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "output_formats": ["json", "html"]}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.output_formats", str(exc.exception))
-
-    def test_formatting_rejects_invalid_retry_values(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "max_retries": 99}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.max_retries", str(exc.exception))
-
-    def test_formatting_rejects_invalid_regeneration_mode(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "regenerate": "always"}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.regenerate", str(exc.exception))
-
-    def test_formatting_rejects_invalid_completion_controls(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "reasoning_effort": 1}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.reasoning_effort", str(exc.exception))
-
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True, "max_tokens": 4097}
-
-        with self.assertRaises(SystemExit) as exc:
-            load_conversion_job(self.write_config(config))
-
-        self.assertIn("formatting.max_tokens", str(exc.exception))
-
-    def test_conversion_job_schema_declares_formatting_contract(self):
-        schema_path = Path(__file__).parents[1] / "config" / "conversion_job.schema.json"
-        schema = json.loads(schema_path.read_text(encoding="utf-8"))
-        formatting = schema["properties"]["formatting"]["properties"]
-
-        self.assertEqual(schema["properties"]["schema_version"]["const"], "1.3.0")
-        self.assertEqual(formatting["provider"]["const"], "sarvam")
-        self.assertEqual(formatting["model"]["default"], "sarvam-30b")
-        self.assertEqual(formatting["fallback_model"]["default"], "sarvam-105b")
-        self.assertEqual(formatting["output_formats"]["items"]["enum"], ["json", "markdown"])
-        self.assertEqual(formatting["continue_on_error"]["default"], True)
-        self.assertEqual(formatting["delay_seconds"]["default"], 4)
-        self.assertEqual(formatting["max_retries"]["default"], 1)
-        self.assertEqual(formatting["regenerate"]["const"], "when-source-checksum-changes")
-        self.assertEqual(formatting["reasoning_effort"]["default"], None)
-        self.assertEqual(formatting["max_tokens"]["default"], 4096)
-        self.assertEqual(formatting["max_tokens"]["maximum"], 4096)
-
-    def test_migrate_configs_preview_reports_without_writing(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        original = json.dumps(BASE_CONFIG_1_2, ensure_ascii=False, indent=2) + "\n"
-        path.write_text(original, encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        output = stdout.getvalue()
-        self.assertIn("would-migrate", output)
-        self.assertIn("will add the default formatting configuration", output)
-        self.assertIn('"formatting": {', output)
-        self.assertIn('"enabled": false', output)
-        self.assertIn('Set "enabled": true', output)
-        self.assertEqual(path.read_text(encoding="utf-8"), original)
-
-    def test_migrate_configs_apply_adds_disabled_formatting_defaults(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        path.write_text(json.dumps(BASE_CONFIG_1_2, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                "--apply",
-                str(path),
-            ])
-
-        output = stdout.getvalue()
-        migrated = json.loads(path.read_text(encoding="utf-8"))
-        self.assertIn("migrated", output)
-        self.assertIn("migrated to 1.3.0 and added default formatting configuration", output)
-        self.assertIn('Set "enabled": true', output)
-        self.assertEqual(migrated["schema_version"], "1.3.0")
-        self.assertEqual(migrated["formatting"], DEFAULT_FORMATTING_CONFIG)
-
-    def test_migrate_configs_preview_adds_formatting_defaults_to_current_config(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        original = json.dumps(BASE_CONFIG, ensure_ascii=False, indent=2) + "\n"
-        path.write_text(original, encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        output = stdout.getvalue()
-        self.assertIn("would-add-formatting-defaults", output)
-        self.assertIn("will add the default formatting configuration", output)
-        self.assertIn('"formatting": {', output)
-        self.assertEqual(path.read_text(encoding="utf-8"), original)
-
-    def test_migrate_configs_apply_adds_formatting_defaults_to_current_config(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        path.write_text(json.dumps(BASE_CONFIG, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                "--apply",
-                str(path),
-            ])
-
-        output = stdout.getvalue()
-        migrated = json.loads(path.read_text(encoding="utf-8"))
-        self.assertIn("added-formatting-defaults", output)
-        self.assertIn("added default formatting configuration", output)
-        self.assertEqual(migrated["schema_version"], "1.3.0")
-        self.assertEqual(migrated["formatting"], DEFAULT_FORMATTING_CONFIG)
-
-    def test_migrate_configs_preview_updates_current_formatting_with_missing_defaults(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {
-            "enabled": True,
-            "provider": "sarvam",
-            "model": "sarvam-30b",
-            "fallback_model": "sarvam-105b",
-            "output_formats": ["json", "markdown"],
-            "continue_on_error": False,
-            "delay_seconds": 4,
-            "max_retries": 1,
-            "regenerate": "when-source-checksum-changes",
-        }
-        original = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
-        path.write_text(original, encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        output = stdout.getvalue()
-        self.assertIn("would-update-formatting-defaults", output)
-        self.assertIn("will update the formatting configuration with missing defaults", output)
-        self.assertIn('"reasoning_effort": null', output)
-        self.assertIn('"max_tokens": 4096', output)
-        self.assertEqual(path.read_text(encoding="utf-8"), original)
-
-    def test_migrate_configs_apply_updates_current_formatting_with_missing_defaults(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {
-            "enabled": True,
-            "provider": "sarvam",
-            "model": "sarvam-30b",
-            "fallback_model": "sarvam-105b",
-            "output_formats": ["json", "markdown"],
-            "continue_on_error": False,
-            "delay_seconds": 4,
-            "max_retries": 1,
-            "regenerate": "when-source-checksum-changes",
-        }
-        path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                "--apply",
-                str(path),
-            ])
-
-        output = stdout.getvalue()
-        migrated = json.loads(path.read_text(encoding="utf-8"))
-        expected_formatting = dict(DEFAULT_FORMATTING_CONFIG)
-        expected_formatting.update({"enabled": True, "continue_on_error": False})
-        self.assertIn("updated-formatting-defaults", output)
-        self.assertIn("updated formatting configuration with missing defaults", output)
-        self.assertEqual(migrated["schema_version"], "1.3.0")
-        self.assertEqual(migrated["formatting"], expected_formatting)
-
-    def test_migrate_configs_refuses_invalid_previous_schema_config(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        config = json.loads(json.dumps(BASE_CONFIG_1_2))
-        del config["source"]["relative_path"]
-        path.write_text(json.dumps(config), encoding="utf-8")
-
-        with self.assertRaises(SystemExit) as exc:
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        self.assertIn("not valid schema_version 1.2.0", str(exc.exception))
-        self.assertIn("$.source.relative_path", str(exc.exception))
-
-    def test_migrate_configs_refuses_unexpected_formatting_in_previous_schema(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        config = json.loads(json.dumps(BASE_CONFIG_1_2))
-        config["formatting"] = {"enabled": False}
-        path.write_text(json.dumps(config), encoding="utf-8")
-
-        with self.assertRaises(SystemExit) as exc:
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        self.assertIn("not valid schema_version 1.2.0", str(exc.exception))
-        self.assertIn("$.formatting is not allowed", str(exc.exception))
-
-    def test_migrate_configs_reports_current_configs_unchanged(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = dict(DEFAULT_FORMATTING_CONFIG)
-        path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
-        stdout = StringIO()
-
-        with redirect_stdout(stdout):
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        self.assertIn("unchanged-current", stdout.getvalue())
-
-    def test_migrate_configs_refuses_unsupported_schema_version(self):
-        temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(temp_dir.cleanup)
-        path = Path(temp_dir.name) / "job.json"
-        path.write_text('{"schema_version": "0.9.0"}', encoding="utf-8")
-
-        with self.assertRaises(SystemExit) as exc:
-            cli_main([
-                "migrate-configs",
-                "--project-root",
-                str(Path(__file__).parents[1]),
-                str(path),
-            ])
-
-        self.assertIn("unsupported schema_version", str(exc.exception))
 
     def test_r2_source_and_destination_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -627,189 +199,6 @@ class StorageConfigTests(unittest.TestCase):
         )
         self.assertNotIn("metadata", metadata["integrity"]["artifacts"])
 
-    def test_chapter_metadata_records_disabled_formatting_without_formatted_artifacts(self):
-        metadata = build_chapter_metadata(
-            BASE_CONFIG,
-            1,
-            {
-                "metadata": "chapter.json",
-                "text": "chapter.txt",
-                "msword": "chapter.docx",
-                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
-                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
-                "msword_relative_path": Path("chapters/msword/chapter.docx"),
-                "full_msword_relative_path": Path("full_subject/full.docx"),
-                "full_text_relative_path": Path("full_subject/full.txt"),
-            },
-            "प्रबोधन",
-            {},
-            "2026-07-08T00:00:00Z",
-            "python3 -m gurubodh_utils run",
-        )
-
-        self.assertEqual(metadata["schema_version"], "1.3.0")
-        self.assertEqual(
-            metadata["formatting"],
-            {
-                "enabled": False,
-                "provider": "sarvam",
-                "model": "sarvam-30b",
-                "fallback_model": "sarvam-105b",
-                "model_used": None,
-                "status": "disabled",
-                "warning": None,
-                "attempt_count": 0,
-                "retry_count": 0,
-                "retry_attempts": 0,
-                "throttle_sleep_seconds": 0,
-                "source_text_sha256": None,
-                "token_usage": {
-                    "completion_tokens": None,
-                    "prompt_tokens": None,
-                    "total_tokens": None,
-                },
-            },
-        )
-        self.assertNotIn("formatted_json_filename", metadata["files"])
-        self.assertNotIn("formatted_json", metadata["storage"]["artifacts"])
-        self.assertNotIn("formatted_json", metadata["integrity"]["artifacts"])
-
-    def test_chapter_metadata_records_successful_formatted_artifacts(self):
-        text = "पहला वाक्य दूसरा वाक्य"
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {
-            "enabled": True,
-            "provider": "sarvam",
-            "model": "sarvam-30b",
-            "fallback_model": "sarvam-105b",
-            "output_formats": ["json", "markdown"],
-            "continue_on_error": True,
-            "delay_seconds": 0,
-            "max_retries": 0,
-            "regenerate": "when-source-checksum-changes",
-        }
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            subject_dir = Path(temp_dir) / "129_spand_rahasya"
-            artifact_dir = subject_dir / "chapters" / "text_and_metadata"
-            artifact_dir.mkdir(parents=True)
-            formatted_json_path = artifact_dir / "chapter.formatted.json"
-            formatted_markdown_path = artifact_dir / "chapter.formatted.md"
-            formatted_json = '{"paragraphs": ["पहला।"]}\n'
-            formatted_markdown = "पहला।\n"
-            formatted_json_path.write_text(formatted_json, encoding="utf-8")
-            formatted_markdown_path.write_text(formatted_markdown, encoding="utf-8")
-            expected_json_digest = hashlib.sha256(formatted_json.encode("utf-8")).hexdigest()
-            expected_markdown_digest = hashlib.sha256(
-                formatted_markdown.encode("utf-8")
-            ).hexdigest()
-
-            metadata = build_chapter_metadata(
-                config,
-                1,
-                {
-                    "metadata": "chapter.json",
-                    "text": "chapter.txt",
-                    "msword": "chapter.docx",
-                    "formatted_json": "chapter.formatted.json",
-                    "formatted_markdown": "chapter.formatted.md",
-                    "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
-                    "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
-                    "msword_relative_path": Path("chapters/msword/chapter.docx"),
-                    "full_msword_relative_path": Path("full_subject/full.docx"),
-                    "full_text_relative_path": Path("full_subject/full.txt"),
-                    "formatted_json_relative_path": Path(
-                        "chapters/text_and_metadata/chapter.formatted.json"
-                    ),
-                    "formatted_markdown_relative_path": Path(
-                        "chapters/text_and_metadata/chapter.formatted.md"
-                    ),
-                    "formatted_json_path": formatted_json_path,
-                    "formatted_markdown_path": formatted_markdown_path,
-                },
-                text,
-                {},
-                "2026-07-08T00:00:00Z",
-                "python3 -m gurubodh_utils run",
-                {"status": "formatted", "warning": None, "artifacts": {}},
-            )
-
-        self.assertEqual(metadata["files"]["formatted_json_filename"], "chapter.formatted.json")
-        self.assertEqual(metadata["files"]["formatted_markdown_filename"], "chapter.formatted.md")
-        self.assertEqual(
-            metadata["storage"]["artifacts"]["formatted_json"]["path"],
-            "chapters/text_and_metadata/chapter.formatted.json",
-        )
-        self.assertEqual(
-            metadata["storage"]["artifacts"]["formatted_markdown"]["path"],
-            "chapters/text_and_metadata/chapter.formatted.md",
-        )
-        self.assertEqual(
-            metadata["integrity"]["artifacts"]["formatted_json"]["value"],
-            expected_json_digest,
-        )
-        self.assertEqual(
-            metadata["integrity"]["artifacts"]["formatted_markdown"]["value"],
-            expected_markdown_digest,
-        )
-        self.assertEqual(
-            metadata["formatting"],
-            {
-                "enabled": True,
-                "provider": "sarvam",
-                "model": "sarvam-30b",
-                "fallback_model": "sarvam-105b",
-                "model_used": "sarvam-30b",
-                "status": "formatted",
-                "warning": None,
-                "attempt_count": 0,
-                "retry_count": 0,
-                "retry_attempts": 0,
-                "throttle_sleep_seconds": 0,
-                "source_text_sha256": source_text_sha256(text),
-                "token_usage": {
-                    "completion_tokens": None,
-                    "prompt_tokens": None,
-                    "total_tokens": None,
-                },
-            },
-        )
-
-    def test_chapter_metadata_records_failed_formatting_without_display_artifacts(self):
-        text = "प्रबोधन"
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["formatting"] = {"enabled": True}
-
-        metadata = build_chapter_metadata(
-            config,
-            1,
-            {
-                "metadata": "chapter.json",
-                "text": "chapter.txt",
-                "msword": "chapter.docx",
-                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
-                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
-                "msword_relative_path": Path("chapters/msword/chapter.docx"),
-                "full_msword_relative_path": Path("full_subject/full.docx"),
-                "full_text_relative_path": Path("full_subject/full.txt"),
-            },
-            text,
-            {},
-            "2026-07-08T00:00:00Z",
-            "python3 -m gurubodh_utils run",
-            {
-                "status": "failed",
-                "warning": "formatting failed for chapter 001 chapter: rate limit",
-                "artifacts": {},
-            },
-        )
-
-        self.assertEqual(metadata["formatting"]["status"], "failed")
-        self.assertEqual(metadata["formatting"]["source_text_sha256"], source_text_sha256(text))
-        self.assertNotIn("formatted_markdown_filename", metadata["files"])
-        self.assertNotIn("formatted_markdown", metadata["storage"]["artifacts"])
-        self.assertNotIn("formatted_markdown", metadata["integrity"]["artifacts"])
-
     def test_text_artifact_integrity_changes_when_text_changes(self):
         original = text_artifact_integrity("प्रबोधन")
         changed = text_artifact_integrity("प्रबोधन बदलले")
@@ -866,38 +255,8 @@ class StorageConfigTests(unittest.TestCase):
         schema_path = Path(__file__).parents[1] / "config" / "chapter_metadata.schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
-        self.assertEqual(schema["properties"]["schema_version"]["const"], "1.3.0")
         self.assertIn("integrity", schema["required"])
-        self.assertIn("formatting", schema["required"])
-        files = schema["properties"]["files"]["properties"]
-        storage_artifacts = schema["properties"]["storage"]["properties"]["artifacts"]["properties"]
-        integrity_artifacts = schema["properties"]["integrity"]["properties"]["artifacts"]["properties"]
-        formatting = schema["properties"]["formatting"]["properties"]
-        text_schema = schema["$defs"]["artifact_integrity"]
-
-        self.assertIn("formatted_json_filename", files)
-        self.assertIn("formatted_markdown_filename", files)
-        self.assertIn("formatted_json", storage_artifacts)
-        self.assertIn("formatted_markdown", storage_artifacts)
-        self.assertEqual(integrity_artifacts["text"]["$ref"], "#/$defs/artifact_integrity")
-        self.assertEqual(
-            integrity_artifacts["formatted_json"]["$ref"],
-            "#/$defs/artifact_integrity",
-        )
-        self.assertEqual(
-            formatting["status"]["enum"],
-            ["disabled", "formatted", "skipped-unchanged", "failed"],
-        )
-        self.assertEqual(formatting["attempt_count"]["minimum"], 0)
-        self.assertEqual(formatting["retry_count"]["minimum"], 0)
-        self.assertEqual(formatting["retry_attempts"]["minimum"], 0)
-        self.assertNotIn("retry_attempts", schema["properties"]["formatting"]["required"])
-        self.assertEqual(formatting["throttle_sleep_seconds"]["minimum"], 0)
-        self.assertEqual(formatting["token_usage"]["required"], [
-            "completion_tokens",
-            "prompt_tokens",
-            "total_tokens",
-        ])
+        text_schema = schema["properties"]["integrity"]["properties"]["artifacts"]["properties"]["text"]
         self.assertEqual(
             text_schema["required"],
             ["algorithm", "encoding", "line_endings", "scope", "value"],
@@ -907,25 +266,6 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(text_schema["properties"]["line_endings"]["const"], "LF")
         self.assertEqual(text_schema["properties"]["scope"]["const"], "artifact-bytes")
         self.assertEqual(text_schema["properties"]["value"]["pattern"], "^[a-f0-9]{64}$")
-
-    def test_r2_list_keys_handles_paginated_results(self):
-        client = object.__new__(R2StorageClient)
-        client.client = FakePaginatedS3Client()
-
-        keys = client.list_keys("gurubodh-library-dev", "prefix/")
-
-        self.assertEqual(keys, ["prefix/001.json", "prefix/002.json"])
-        self.assertEqual(
-            client.client.requests,
-            [
-                {"Bucket": "gurubodh-library-dev", "Prefix": "prefix/"},
-                {
-                    "Bucket": "gurubodh-library-dev",
-                    "Prefix": "prefix/",
-                    "ContinuationToken": "next-page",
-                },
-            ],
-        )
 
     def test_r2_source_materializes_to_temporary_docx(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -938,17 +278,10 @@ class StorageConfigTests(unittest.TestCase):
         }
         client = FakeR2Client()
 
-        output = StringIO()
-        with redirect_stdout(output):
+        with redirect_stdout(StringIO()):
             path, temp_dir = materialize_source(config, r2_client=client)
         self.addCleanup(temp_dir.cleanup)
 
-        progress = output.getvalue()
-        self.assertIn(
-            "downloading R2 source r2://gurubodh-library-dev/source_library/129_spand_rahasya/source.docx",
-            progress,
-        )
-        self.assertIn("downloaded R2 source to", progress)
         self.assertEqual(path.name, "source.docx")
         self.assertTrue(path.exists())
         self.assertEqual(
@@ -1019,30 +352,6 @@ class StorageConfigTests(unittest.TestCase):
             ("gurubodh-library-dev", "cms_library/129_spand_rahasya/"),
         )
 
-    def test_r2_preflight_reports_available_prefix(self):
-        config = json.loads(json.dumps(BASE_CONFIG))
-        config["destination"] = {
-            "backend": "r2",
-            "bucket": "gurubodh-library-dev",
-            "prefix": "cms_library",
-            "subject_dir": "129_spand_rahasya",
-        }
-        client = FakeR2Client()
-
-        output = StringIO()
-        with redirect_stdout(output):
-            ensure_r2_destination_available(config, overwrite=False, r2_client=client)
-
-        progress = output.getvalue()
-        self.assertIn(
-            "checking R2 destination prefix r2://gurubodh-library-dev/cms_library/129_spand_rahasya/",
-            progress,
-        )
-        self.assertIn(
-            "R2 destination prefix is available: r2://gurubodh-library-dev/cms_library/129_spand_rahasya/",
-            progress,
-        )
-
     def test_r2_preflight_skips_prefix_check_with_overwrite(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["destination"] = {
@@ -1080,7 +389,6 @@ class StorageConfigTests(unittest.TestCase):
             self.assertIn("prepared 1 artifact file(s) for R2 upload", progress)
             self.assertIn("[1/1] checking cms_library/129_spand_rahasya/full_subject/full.txt", progress)
             self.assertIn("[1/1] uploading cms_library/129_spand_rahasya/full_subject/full.txt", progress)
-            self.assertIn("bytes=7", progress)
             self.assertEqual(
                 client.uploads,
                 [

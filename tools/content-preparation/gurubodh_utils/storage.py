@@ -3,8 +3,6 @@ import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
 
-from gurubodh_utils.progress import DEFAULT_PROGRESS_REPORTER
-
 
 LOCAL_BACKEND = "local"
 R2_BACKEND = "r2"
@@ -94,42 +92,8 @@ class R2StorageClient:
         response = self.client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
         return response.get("KeyCount", 0) > 0
 
-    def list_keys(self, bucket, prefix):
-        keys = []
-        continuation_token = None
-        while True:
-            request = {"Bucket": bucket, "Prefix": prefix}
-            if continuation_token:
-                request["ContinuationToken"] = continuation_token
-            response = self.client.list_objects_v2(**request)
-            keys.extend(item["Key"] for item in response.get("Contents", []))
-            if not response.get("IsTruncated"):
-                return keys
-            continuation_token = response.get("NextContinuationToken")
-            if not continuation_token:
-                return keys
-
     def upload_file(self, path, bucket, key):
         self.client.upload_file(str(path), bucket, key)
-
-    def put_object_bytes(self, bucket, key, data):
-        self.client.put_object(Bucket=bucket, Key=key, Body=data)
-
-    def get_object_bytes(self, bucket, key):
-        try:
-            response = self.client.get_object(Bucket=bucket, Key=key)
-            body = response["Body"]
-            try:
-                return body.read()
-            finally:
-                close = getattr(body, "close", None)
-                if callable(close):
-                    close()
-        except self._client_error as exc:
-            code = exc.response.get("Error", {}).get("Code")
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise FileNotFoundError(f"r2://{bucket}/{key}") from exc
-            raise
 
     def download_file(self, bucket, key, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -208,7 +172,7 @@ def local_source_path(config):
     return root_dir / relative_path
 
 
-def materialize_source(config, r2_client=None, reporter=DEFAULT_PROGRESS_REPORTER):
+def materialize_source(config, r2_client=None):
     source = config["source"]
     if is_local(source):
         path = local_source_path(config)
@@ -218,9 +182,8 @@ def materialize_source(config, r2_client=None, reporter=DEFAULT_PROGRESS_REPORTE
     filename = PurePosixPath(source["key"]).name
     path = Path(temp_dir.name) / filename
     client = r2_client or R2StorageClient.from_env()
-    reporter.report(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
+    print(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
     client.download_file(source["bucket"], source["key"], path)
-    reporter.report(f"downloaded R2 source to {path}")
     return path, temp_dir
 
 
@@ -234,57 +197,25 @@ def ensure_local_destination(subject_dir, overwrite):
     subject_dir.mkdir(parents=True, exist_ok=True)
 
 
-def collect_formatted_artifacts(subject_dir):
-    chapter_text_dir = subject_dir / "chapters" / "text_and_metadata"
-    if not chapter_text_dir.exists():
-        return {}
-
-    artifacts = {}
-    for path in chapter_text_dir.glob("*.formatted.*"):
-        if path.suffix not in {".json", ".md"}:
-            continue
-        artifacts[path.relative_to(subject_dir)] = path.read_bytes()
-    return artifacts
-
-
-def restore_formatted_artifacts(subject_dir, artifacts):
-    for relative_path, content in artifacts.items():
-        path = subject_dir / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
-
-
-def ensure_r2_destination_available(
-    config,
-    overwrite,
-    r2_client=None,
-    reporter=DEFAULT_PROGRESS_REPORTER,
-):
+def ensure_r2_destination_available(config, overwrite, r2_client=None):
     if overwrite or not is_r2(config["destination"]):
         return
     destination = config["destination"]
     prefix = destination_subject_prefix(config)
     client = r2_client or R2StorageClient.from_env()
-    reporter.report(f"checking R2 destination prefix r2://{destination['bucket']}/{prefix}")
+    print(f"checking R2 destination prefix r2://{destination['bucket']}/{prefix}")
     if client.prefix_has_objects(destination["bucket"], prefix):
         raise SystemExit(
             "R2 destination prefix already contains objects. Re-run with --overwrite to replace:\n"
             f"r2://{destination['bucket']}/{prefix}"
         )
-    reporter.report(f"R2 destination prefix is available: r2://{destination['bucket']}/{prefix}")
 
 
 def iter_subject_files(subject_dir):
     return sorted(path for path in subject_dir.rglob("*") if path.is_file())
 
 
-def publish_r2_destination(
-    config,
-    subject_dir,
-    overwrite,
-    r2_client=None,
-    reporter=DEFAULT_PROGRESS_REPORTER,
-):
+def publish_r2_destination(config, subject_dir, overwrite, r2_client=None):
     destination = config["destination"]
     client = r2_client or R2StorageClient.from_env()
     uploads = []
@@ -294,14 +225,12 @@ def publish_r2_destination(
         uploads.append((path, key))
 
     total = len(uploads)
-    reporter.report(f"prepared {total} artifact file(s) for R2 upload")
-    reporter.report(
-        f"checking target object keys in r2://{destination['bucket']}/{destination['prefix']}"
-    )
+    print(f"prepared {total} artifact file(s) for R2 upload")
+    print(f"checking target object keys in r2://{destination['bucket']}/{destination['prefix']}")
 
     existing = []
     for index, (_, key) in enumerate(uploads, start=1):
-        reporter.report(f"[{index}/{total}] checking {key}")
+        print(f"[{index}/{total}] checking {key}")
         if client.exists(destination["bucket"], key):
             existing.append(key)
     if existing and not overwrite:
@@ -312,14 +241,9 @@ def publish_r2_destination(
             f"{sample}{extra}"
         )
 
-    reporter.report(
-        f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}"
-    )
+    print(f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}")
     for index, (path, key) in enumerate(uploads, start=1):
-        size = path.stat().st_size
-        reporter.report(f"[{index}/{total}] uploading {key} bytes={size}")
+        print(f"[{index}/{total}] uploading {key}")
         client.upload_file(path, destination["bucket"], key)
-    reporter.report(
-        f"uploaded {len(uploads)} artifact files to r2://{destination['bucket']}/{destination['prefix']}"
-    )
+    print(f"uploaded {len(uploads)} artifact files to r2://{destination['bucket']}/{destination['prefix']}")
     return uploads
