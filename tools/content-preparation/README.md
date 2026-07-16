@@ -221,10 +221,40 @@ The JSON report is the tooling source of truth. The Markdown report is the
 operator-readable view. Reports summarize run identity, job configuration,
 copy/extraction and validation status, chapter counts, formatting outcomes,
 Sarvam response token usage, retry candidates based only on
-`formatting.status == "failed"`, and rate-limit/throttle evidence. Reports
+`formatting.status == "failed"` and `formatting.retry_attempts < 3`,
+retry-exhausted chapters with `formatting.retry_attempts >= 3`, and
+rate-limit/throttle evidence. Reports
 intentionally exclude secrets, API keys, request bodies, and full chapter text.
 For R2 destinations, the reports are uploaded with the rest of the subject
 artifacts under the configured subject prefix.
+
+### Retry Formatting
+
+For R2-backed jobs, failed Sarvam formatting can be retried without rerunning
+DOCX conversion, chapter splitting, or the full content-preparation job:
+
+```bash
+gurubodh-utils retry-formatting --config jobs/001_aacharan_shaastra.r2.json
+```
+
+The retry command lists chapter metadata from the configured R2 subject prefix,
+selects failed chapters with `formatting.retry_attempts < 3`, downloads each
+selected chapter's canonical raw `.txt` artifact, and calls Sarvam again. A
+successful retry uploads `*.formatted.json`, `*.formatted.md`, and updated
+chapter metadata. A failed retry uploads updated metadata only and leaves
+`formatting.status` as `failed`.
+
+Use `--dry-run` to see selected and retry-exhausted chapters without making
+Sarvam calls or writing R2 objects:
+
+```bash
+gurubodh-utils retry-formatting --config jobs/001_aacharan_shaastra.r2.json --dry-run
+```
+
+Optional `--chapter 034` and `--chapters 034,038` filters limit retries to
+specific failed chapters. The first implementation has no `--force` override;
+chapters with `formatting.retry_attempts >= 3` are reported as retry-exhausted
+and skipped.
 
 The sample job `jobs/002_spand_rahasya.formatting-disabled.local.json` includes
 an explicit disabled formatting block:

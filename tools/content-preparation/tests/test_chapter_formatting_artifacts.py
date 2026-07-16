@@ -640,6 +640,7 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
                     "chapter_number": "002",
                     "artifact_base_name": "CAT020_SUB129_spand-rahasya_002_v01.01",
                     "warning": "formatting failed for chapter 002: rate limit",
+                    "retry_attempts": 0,
                 }
             ],
         )
@@ -647,7 +648,7 @@ class ChapterFormattingArtifactTests(unittest.TestCase):
         self.assertIn("- Completion tokens: 12", markdown)
         self.assertIn(
             "| 001 | CAT020_SUB129_spand-rahasya_001_v01.01 | "
-            "formatted | 1 | 0 | 12 | 34 | 46 |  |",
+            "formatted | 1 | 0 | 0 | 12 | 34 | 46 |  |",
             markdown,
         )
         self.assertIn("completed-with-formatting-failures", markdown)

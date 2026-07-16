@@ -94,8 +94,42 @@ class R2StorageClient:
         response = self.client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
         return response.get("KeyCount", 0) > 0
 
+    def list_keys(self, bucket, prefix):
+        keys = []
+        continuation_token = None
+        while True:
+            request = {"Bucket": bucket, "Prefix": prefix}
+            if continuation_token:
+                request["ContinuationToken"] = continuation_token
+            response = self.client.list_objects_v2(**request)
+            keys.extend(item["Key"] for item in response.get("Contents", []))
+            if not response.get("IsTruncated"):
+                return keys
+            continuation_token = response.get("NextContinuationToken")
+            if not continuation_token:
+                return keys
+
     def upload_file(self, path, bucket, key):
         self.client.upload_file(str(path), bucket, key)
+
+    def put_object_bytes(self, bucket, key, data):
+        self.client.put_object(Bucket=bucket, Key=key, Body=data)
+
+    def get_object_bytes(self, bucket, key):
+        try:
+            response = self.client.get_object(Bucket=bucket, Key=key)
+            body = response["Body"]
+            try:
+                return body.read()
+            finally:
+                close = getattr(body, "close", None)
+                if callable(close):
+                    close()
+        except self._client_error as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                raise FileNotFoundError(f"r2://{bucket}/{key}") from exc
+            raise
 
     def download_file(self, bucket, key, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)

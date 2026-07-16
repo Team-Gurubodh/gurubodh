@@ -119,6 +119,9 @@ def formatting_status_metadata(config, formatting_result, chapter_text_value):
         "retry_count": formatting_result.get("retry_count", 0)
         if formatting_result
         else 0,
+        "retry_attempts": formatting_result.get("retry_attempts", 0)
+        if formatting_result
+        else 0,
         "throttle_sleep_seconds": formatting_result.get("throttle_sleep_seconds", 0)
         if formatting_result
         else 0,

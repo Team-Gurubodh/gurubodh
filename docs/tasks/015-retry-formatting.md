@@ -1,86 +1,79 @@
-# Task-015: Retry Formatting From R2 Artifacts
+# Task-015: Retry Formatting Failed Chapters
 
 <record_type>task_history</record_type>
 <status>proposed</status>
-<date>2026-07-14</date>
+<date>2026-07-16</date>
 <owners>Gurubodh maintainers</owners>
 <github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/105</github_issue>
+<implementation_github_issue>https://github.com/Team-Gurubodh/gurubodh/issues/123</implementation_github_issue>
 
 ## Goal
 
-Define a simple, durable retry workflow for Sarvam Hindi formatting failures in
-`gurubodh-utils`.
+Add an operator workflow in `gurubodh-utils` that retries Sarvam formatting only
+for chapters whose formatting failed after the main content-preparation job
+finished.
 
-The retry workflow should allow maintainers to rerun formatting only for
-chapters that need it, without rerunning DOCX conversion, chapter splitting, or
-the full content-preparation job. It must not rely on local generated artifact
-directories. All durable retry state and all required chapter inputs must be
-stored in and discovered from Cloudflare R2.
+The workflow must use the durable audit trail and chapter artifacts already
+written by R2-backed jobs. It must not rerun DOCX conversion, chapter splitting,
+or the full content-preparation job, and it must not depend on any local
+generated artifact directory still existing after the original run.
 
 ## Context
 
-Task 014 introduced Sarvam formatted Hindi artifacts and issue #103 improved
-Sarvam formatter calls by disabling reasoning output and reserving the output
-budget with `max_tokens: 4096`.
+Task 014 introduced Sarvam formatted Hindi artifacts, chapter-level formatting
+metadata, and run audit reports. Repeated testing against the Sarvam API has
+shown that formatting calls do fail in normal use. When
+`formatting.continue_on_error` is true, the content-preparation job completes
+and leaves the affected chapters unformatted.
 
-Live formatting of `jobs/001_aacharan_shaastra.r2.json` still produced two
-formatter failures:
+The current audit trail records enough information to discover and diagnose
+these failed chapters:
 
-```text
-warning: formatting failed for chapter 034 CAT004_SUB039_aacharan-shastra_034_v01.01: Sarvam response was not valid JSON: Unterminated string starting at: line 6 column 5 (char 8393)
+- chapter metadata includes `formatting.enabled`, `formatting.status`,
+  `formatting.warning`, `formatting.source_text_sha256`, formatter token usage,
+  and per-call attempt/throttle counts;
+- run audit reports summarize formatting outcomes and retry candidates based on
+  failed chapter status;
+- R2-backed jobs upload raw chapter `.txt` artifacts, chapter metadata JSON,
+  and any successful formatted artifacts under the subject artifact prefix.
 
-warning: formatting failed for chapter 038 CAT004_SUB039_aacharan-shastra_038_v01.01: Sarvam response was not valid JSON: Unterminated string starting at: line 5 column 5 (char 86)
-```
+Task 015 was originally drafted before that audit trail existed. The retry
+workflow should now be built around the metadata ledger instead of introducing a
+separate retry state file.
 
-Investigation showed two different failure modes:
-
-- Chapter 034 succeeded when called again later with the same formatter
-  settings. This indicates a transient malformed model response.
-- Chapter 038 reproduced as a partial response with `finish_reason='length'`,
-  `completion_tokens=4096`, `reasoning_len=0`, and invalid JSON. This indicates
-  the formatter hit the configured completion-token limit while still emitting
-  JSON.
-
-Issue #110 Stage 1 replaces formatter chat completions with a direct HTTP
-Sarvam caller because the installed `sarvamai==0.1.28` SDK accepts
-`reasoning_effort` and `max_tokens`, but its `chat.completions` callable does
-not accept `response_format`. Retry formatting should use the same direct HTTP
-formatter path and must continue to defensively validate, retry, and record
-failures.
-
-For R2-backed jobs, the main content-preparation run builds artifacts in a
-temporary local subject tree and uploads those artifacts to R2. The temporary
-tree is not durable and must not be required for later retry. A retry workflow
-must treat R2 metadata and chapter text artifacts as the source of truth.
+The retry workflow also needs a durable cap. Add `formatting.retry_attempts` to
+chapter metadata so the command can skip chapters that have already had three
+operator retry attempts while preserving `formatting.status: "failed"` and the
+latest failure diagnostic.
 
 ## Decisions
 
-- Add retry formatting as a separate operator workflow, not as an automatic
-  rerun of the whole content-preparation job.
-- Do not rerun DOCX conversion or chapter splitting during formatting retry.
-- Support R2 destinations first. Local destination retry can be considered
-  later, but this task is driven by R2 durability requirements.
-- Discover retry candidates from chapter metadata JSON files in R2.
-- Use the canonical raw chapter `.txt` artifact in R2 as the formatter input.
-- Use chapter metadata in R2 as the durable retry ledger.
-- Upload formatted artifacts to R2 only after the formatter returns valid,
-  validated output.
-- Update the chapter metadata JSON in R2 after each retry attempt so the latest
-  formatting status, warning, and artifact references are durable.
-- Preserve explicitly configured formatting settings from the conversion job.
-- Treat malformed JSON responses as retryable when they are not clearly caused
-  by the output-token limit.
-- Treat `finish_reason='length'` as a clear diagnostic condition. Retrying the
-  same full chapter may be allowed by operator request, but the default workflow
-  should not hide that the request likely needs chunking or a smaller response.
-- Keep `*.formatted.json` and `*.formatted.md` display-ready only. Failure
-  state belongs in chapter metadata, not in misleading display artifacts.
-- Do not introduce chunking in the first retry-formatting implementation.
-  Chunking is a follow-up improvement.
+- Implement retry formatting as a separate command for maintainers.
+- Support R2 destinations first.
+- Discover candidates from chapter metadata JSON in R2. Run audit reports may
+  be used for operator reporting, but chapter metadata is the source of truth
+  for retry eligibility.
+- Use the canonical raw chapter `.txt` artifact from R2 as the formatter input.
+- Store durable retry state in the chapter metadata `formatting` block.
+- Add `formatting.retry_attempts` as the cross-run retry counter.
+- Treat existing `formatting.attempt_count` as the number of Sarvam request
+  attempts made during the most recent formatting operation.
+- Treat existing `formatting.retry_count` as the formatter's internal retry
+  count within that most recent operation.
+- Default retry cap is three operator retry attempts per chapter.
+- Skip failed chapters with `formatting.retry_attempts >= 3` by default.
+- Continue to record exhausted chapters as failed; do not mark them formatted,
+  skipped-unchanged, or successful.
+- Upload formatted artifacts only after Sarvam returns valid, validated output.
+- Upload updated metadata after each attempted retry so failure state and
+  retry-attempt counts remain durable.
+- Do not write failure-shaped `*.formatted.json` or `*.formatted.md` artifacts.
+- Do not introduce chunking in this implementation. Length-limit failures
+  remain failed and count toward `retry_attempts`.
 
 ## Target Command Contract
 
-Add a command focused on R2-backed formatting retry:
+Add a command focused on failed R2-backed formatting:
 
 ```bash
 gurubodh-utils retry-formatting --config jobs/001_aacharan_shaastra.r2.json
@@ -89,15 +82,17 @@ gurubodh-utils retry-formatting --config jobs/001_aacharan_shaastra.r2.json
 Default behavior:
 
 - require `destination.backend: "r2"`;
-- list chapter metadata JSON artifacts from the configured R2 destination
-  prefix;
-- select chapters whose metadata has `formatting.status: "failed"`;
-- download each selected chapter's metadata JSON and raw `.txt` artifact;
-- retry Sarvam formatting for the raw chapter text;
-- upload `*.formatted.json`, `*.formatted.md`, and updated metadata JSON when
+- list chapter metadata JSON artifacts from the configured R2 subject prefix;
+- select chapters where `formatting.enabled` is true,
+  `formatting.status == "failed"`, and `formatting.retry_attempts < 3`;
+- download each selected chapter metadata JSON and raw chapter `.txt` artifact;
+- retry Sarvam formatting using the job's current formatting configuration;
+- upload `*.formatted.json`, `*.formatted.md`, and updated metadata when
   formatting succeeds;
-- update metadata JSON with the latest failure warning when formatting fails;
-- print a final retry summary.
+- upload updated metadata when formatting fails, without writing display-ready
+  formatted artifacts;
+- print a final retry summary that separates formatted, failed, skipped, and
+  retry-exhausted chapters.
 
 Recommended first flags:
 
@@ -108,29 +103,72 @@ gurubodh-utils retry-formatting --config jobs/001_aacharan_shaastra.r2.json --ch
 gurubodh-utils retry-formatting --config jobs/001_aacharan_shaastra.r2.json --failed-only
 ```
 
-`--failed-only` should be the default selection mode. A future `--all` flag may
-retry every chapter, but it should not be part of the minimum implementation
-unless there is a concrete operator need.
+`--failed-only` should be the default selection mode. A future `--all` or
+`--force` flag may be considered later, but the first implementation should
+avoid bypassing the retry cap unless a concrete operator need is approved.
 
-Dry-run output should report what would be retried and why, without making
-Sarvam calls and without writing R2 objects:
+Dry-run output should report selected and skipped chapters without making Sarvam
+calls and without writing R2 objects:
 
 ```text
 retry-formatting dry run:
-selected=2 skipped=37
+selected=2 skipped=37 retry_exhausted=1
 selected chapters:
-- 034 formatting.status=failed
-- 038 formatting.status=failed
+- 034 formatting.status=failed retry_attempts=0
+- 038 formatting.status=failed retry_attempts=2
+retry exhausted:
+- 041 formatting.status=failed retry_attempts=3
 ```
 
-Normal execution summary should include enough signal to decide whether another
-retry, chunking, or manual review is needed:
+Normal execution summary should make it clear whether another retry, chunking,
+or manual review is needed:
 
 ```text
-retry-formatting summary: formatted=1 failed=1 skipped=37
+retry-formatting summary: formatted=1 failed=1 skipped=37 retry_exhausted=1
 failed chapters:
-- 038 finish_reason=length max_tokens=4096
+- 038 retry_attempts=3 finish_reason=length max_tokens=4096
+retry exhausted:
+- 041 retry_attempts=3 warning="..."
 ```
+
+## Metadata Contract
+
+Extend the chapter metadata `formatting` object with:
+
+```json
+{
+  "retry_attempts": 0
+}
+```
+
+Semantics:
+
+- `retry_attempts` is an integer with minimum `0`.
+- Missing `retry_attempts` in existing metadata should be treated as `0` for
+  backward compatibility.
+- A retry attempt means the `retry-formatting` command selected the chapter and
+  attempted a fresh formatting operation after the original content-preparation
+  job.
+- The counter should increment once per selected chapter per retry command run,
+  regardless of whether Sarvam succeeds, returns invalid output, hits a
+  length-limit failure, or raises a retryable request error.
+- Do not increment `retry_attempts` during the original chapter-splitting
+  formatting pass.
+- Do not increment `retry_attempts` for dry-run.
+- Do not increment `retry_attempts` when a chapter is skipped before a formatter
+  call because formatting is disabled, the chapter is already formatted, the raw
+  text artifact is missing, metadata is malformed, or the retry cap has already
+  been reached.
+- When a retry succeeds, metadata should keep the updated `retry_attempts` value
+  and set `formatting.status: "formatted"` with `formatting.warning: null`.
+- When a retry fails, metadata should keep `formatting.status: "failed"`, store
+  the latest warning, update token usage when available, and persist the updated
+  `retry_attempts` value.
+- When `retry_attempts >= 3`, default candidate selection should skip the
+  chapter but continue reporting it as a failed/retry-exhausted chapter.
+
+The implementation will need to update `chapter_metadata.schema.json`,
+metadata generation, tests, and documentation for this new field.
 
 ## Defensive Implementation Plan
 
@@ -146,10 +184,10 @@ List objects under that prefix and select metadata files:
 
 - include `*.json`;
 - exclude `*.formatted.json`;
-- ignore non-chapter files defensively.
+- ignore non-chapter JSON files defensively.
 
-The storage layer may need a paginated `list_keys` helper for R2. The helper
-must handle more than one page of objects.
+The storage layer may need a paginated `list_keys` helper for R2. It must handle
+more than one page of objects.
 
 ### Candidate Selection
 
@@ -157,12 +195,16 @@ For each metadata JSON object:
 
 1. Download and parse metadata.
 2. Confirm `formatting.enabled` is true.
-3. Confirm the metadata identifies the chapter number and expected text file.
-4. Select the chapter when:
-   - `formatting.status` is `failed`; or
-   - metadata says `formatted` but expected formatted artifacts are missing; or
-   - operator explicitly selected the chapter with `--chapter` or `--chapters`.
-5. Skip when:
+3. Confirm the metadata identifies the chapter number and raw text artifact.
+4. Normalize missing `formatting.retry_attempts` to `0` in memory.
+5. Select the chapter when:
+   - `formatting.status` is `failed`;
+   - `formatting.retry_attempts < 3`;
+   - the chapter matches any explicit `--chapter` or `--chapters` filter.
+6. Skip and report the chapter as retry-exhausted when:
+   - `formatting.status` is `failed`;
+   - `formatting.retry_attempts >= 3`.
+7. Skip other chapters when:
    - formatting is disabled;
    - formatting status is `formatted` and formatted artifacts exist;
    - formatting status is `skipped-unchanged` and formatted artifacts exist;
@@ -179,159 +221,136 @@ Before calling Sarvam:
 - download the raw chapter text;
 - compute `source_text_sha256`;
 - compare it with metadata `formatting.source_text_sha256` when present;
-- if an existing `*.formatted.json` exists, reuse it only if it is valid,
-  `status: "formatted"`, and has the same `source_text_sha256`.
+- validate any existing formatted JSON before treating it as reusable;
+- warn when raw text and metadata checksums disagree.
 
-If the raw text checksum differs from the metadata checksum, the retry command
-should continue using the raw `.txt` as canonical input and update metadata on
-success or failure. It should also include a warning in command output because
-the metadata and text were out of sync.
+If raw text and metadata disagree, the retry command should continue using the
+raw `.txt` as canonical input. On success or failure, updated metadata should
+record the checksum for the raw text that was actually retried.
 
-### Formatter Retry Semantics
+### Formatter Semantics
 
-The formatter should distinguish retryable and non-retryable failures more
-precisely than the current generic `SarvamResponseError` behavior.
+Reuse the existing Sarvam HTTP formatter path and validation behavior.
 
-Retryable by default:
+The retry command should preserve specific diagnostics for:
 
-- malformed JSON with `finish_reason` absent or `finish_reason='stop'`;
-- empty content without an explicit length-limit diagnostic;
-- transient network failures;
+- malformed JSON;
+- empty content;
+- transient HTTP/network failures;
 - HTTP 408, 409, 425, 429, 500, 502, 503, and 504;
-- SDK timeout errors.
-
-Non-retryable by default:
-
 - missing `SARVAM_API_KEY`;
-- missing or unsupported Sarvam direct HTTP client shape;
-- invalid job config;
-- missing raw chapter `.txt` artifact;
-- malformed chapter metadata that cannot identify the chapter or text artifact.
+- unsupported Sarvam client shape;
+- `finish_reason='length'` and output-token exhaustion.
 
-Length-limit failures:
-
-- detect `finish_reason='length'` even when partial content exists;
-- include `max_tokens`, completion token usage when available, and a clear
-  explanation in the warning;
-- do not report this as a generic JSON parse error;
-- allow the normal retry loop to stop early for this condition unless future
-  diagnostics show retrying length failures has value.
+Length-limit failures should not be hidden as generic JSON parse failures. They
+should remain failed, increment `retry_attempts`, and be visible in command
+output and metadata warnings.
 
 ### R2 Write Order
 
 On successful formatting:
 
-1. Build `*.formatted.json` in memory or a temporary file.
-2. Build `*.formatted.md` in memory or a temporary file.
-3. Validate the formatted JSON artifact shape.
-4. Upload `*.formatted.json`.
-5. Upload `*.formatted.md`.
-6. Update metadata fields:
-   - `files.formatted_json_filename`;
-   - `files.formatted_markdown_filename`;
-   - `storage.artifacts.formatted_json`;
-   - `storage.artifacts.formatted_markdown`;
-   - `integrity.artifacts.formatted_json`;
-   - `integrity.artifacts.formatted_markdown`;
-   - `formatting.status: "formatted"`;
-   - `formatting.warning: null`;
-   - `formatting.model_used`;
-   - `formatting.source_text_sha256`.
-7. Upload the updated metadata JSON last.
-
-Uploading metadata last makes the durable ledger point to formatted artifacts
-only after those artifacts have been written.
+1. Build `*.formatted.json` and `*.formatted.md`.
+2. Validate the formatted JSON artifact shape.
+3. Upload `*.formatted.json`.
+4. Upload `*.formatted.md`.
+5. Update metadata fields for formatted file names, storage references,
+   integrity checksums, `formatting.status`, `formatting.warning`,
+   `formatting.model_used`, `formatting.source_text_sha256`,
+   `formatting.attempt_count`, `formatting.retry_count`,
+   `formatting.throttle_sleep_seconds`, `formatting.token_usage`, and
+   `formatting.retry_attempts`.
+6. Upload metadata JSON last.
 
 On failed formatting:
 
 1. Do not upload display-ready formatted artifacts.
-2. Update metadata:
-   - `formatting.status: "failed"`;
-   - `formatting.warning` with the latest diagnostic;
-   - `formatting.source_text_sha256`.
+2. Update metadata with `formatting.status: "failed"`, the latest warning,
+   `formatting.source_text_sha256`, the latest per-call attempt/throttle fields,
+   token usage when available, and the incremented `formatting.retry_attempts`.
 3. Preserve existing formatted artifact references only when those artifacts are
    still valid for the current raw text checksum. Otherwise remove stale
    formatted references from metadata.
-4. Upload the updated metadata JSON.
+4. Upload metadata JSON.
+
+Uploading metadata last makes the durable ledger point to formatted artifacts
+only after those artifacts have been written.
 
 ### Idempotency
 
 The command should be safe to run repeatedly.
 
-- If a chapter is already formatted and the formatted artifacts are valid for
-  the current raw text checksum, skip it.
+- Already formatted chapters with valid formatted artifacts are skipped.
+- Failed chapters below the cap are retried by default.
+- Failed chapters at or above the cap are reported as retry-exhausted.
 - If a previous retry uploaded formatted artifacts but failed before metadata
-  upload, the next retry should detect and reuse or repair the metadata.
-- If a previous retry updated metadata to failed, the next retry should select
-  it again by default.
-- If `--dry-run` is used, no Sarvam calls and no R2 writes should occur.
+  upload, the next retry should detect and repair the metadata when possible.
+- If `--dry-run` is used, no Sarvam calls and no R2 writes occur.
 
 ### Local Storage Boundary
 
-The command may use temporary files as implementation detail, but must not
-require any pre-existing local generated artifact directory. It must work from a
-clean checkout with credentials and R2 access.
+The command may use temporary files as an implementation detail, but it must
+work from a clean checkout with only the job config, credentials, and R2 access.
 
 Durable inputs:
 
 - conversion job config;
 - R2 chapter metadata JSON;
 - R2 raw chapter `.txt`;
-- R2 formatted artifacts when present.
+- R2 formatted artifacts when present;
+- R2 run audit reports for operator visibility.
 
 Durable outputs:
 
-- R2 formatted artifacts;
-- R2 updated chapter metadata JSON.
+- R2 formatted artifacts for successful retries;
+- R2 updated chapter metadata JSON for every attempted retry.
 
 ## Risks
 
-- Sarvam may continue returning malformed JSON or length-limit responses even
-  when direct HTTP calls request structured output.
-- Retrying can increase API cost, especially if repeated against length-limit
-  failures.
-- Rewriting metadata in R2 can corrupt the retry ledger if the update logic
-  removes valid artifact references incorrectly.
+- Retrying can increase Sarvam API cost, especially for deterministic
+  length-limit failures.
+- A retry cap can leave chapters unformatted until chunking or manual review is
+  implemented.
+- Rewriting metadata in R2 can corrupt the retry ledger if update logic removes
+  valid artifact references incorrectly.
 - R2 object listing must be paginated; incomplete listing would silently miss
-  retry candidates.
+  candidates.
 - Concurrent retry runs could race and overwrite metadata. The first version may
   accept this operational risk, but it should be documented.
-- `sarvam-105b` fallback may time out or have different latency/cost behavior.
-- Length-limit failures are unlikely to be fixed by simple retry and may
-  require chunking or a different response contract.
-- If raw chapter text and metadata disagree, retry may repair formatting while
-  exposing a deeper artifact consistency issue.
+- Existing metadata without `retry_attempts` must be handled carefully so old
+  artifacts remain readable.
 
 ## Verification Plan
 
 Unit tests:
 
-- R2 key discovery selects metadata JSON files and excludes
-  `*.formatted.json`.
-- Candidate selection includes `formatting.status: "failed"`.
-- Candidate selection skips formatted chapters with valid formatted artifacts.
-- Candidate selection includes formatted chapters whose formatted artifacts are
-  missing.
-- Dry-run performs no Sarvam calls and no R2 uploads.
-- Successful retry uploads formatted JSON, formatted Markdown, and metadata in
-  the expected order.
-- Failed retry uploads updated metadata but no display-ready formatted
-  artifacts.
-- Length-limit responses produce a specific diagnostic rather than a generic
-  invalid JSON warning.
-- Malformed JSON with `finish_reason='stop'` is retryable.
-- Existing valid formatted artifacts can repair metadata after a partial
+- metadata schema accepts `formatting.retry_attempts` and rejects negative
+  values;
+- metadata generation writes `retry_attempts: 0` for original formatting runs;
+- candidate selection includes failed chapters with `retry_attempts < 3`;
+- candidate selection reports failed chapters with `retry_attempts >= 3` as
+  retry-exhausted;
+- missing `retry_attempts` is treated as `0`;
+- dry-run performs no Sarvam calls and no R2 uploads;
+- successful retry increments `retry_attempts`, uploads formatted JSON,
+  formatted Markdown, and metadata in the expected order;
+- failed retry increments `retry_attempts`, uploads updated metadata, and does
+  not upload display-ready formatted artifacts;
+- length-limit responses produce a specific diagnostic and increment
+  `retry_attempts`;
+- existing valid formatted artifacts can repair metadata after a partial
   previous retry.
 
 Integration-style tests with fake R2:
 
 - Build a fake R2 object map containing metadata and raw text for several
   chapters.
-- Mark one chapter failed, one formatted, one disabled, and one formatted with
-  missing artifacts.
+- Include one failed chapter with `retry_attempts: 0`, one failed chapter with
+  `retry_attempts: 2`, one failed chapter with `retry_attempts: 3`, one
+  formatted chapter, and one disabled chapter.
 - Run retry-formatting against the fake R2 client.
-- Assert that only the correct chapters are retried and only the expected R2
-  objects are written.
+- Assert that only the below-cap failed chapters are retried and only the
+  expected R2 objects are written.
 
 Manual verification:
 
@@ -341,8 +360,8 @@ gurubodh-utils retry-formatting \
   --dry-run
 ```
 
-Expected: command lists chapters `034` and `038` as retry candidates when their
-metadata remains failed.
+Expected: command lists failed chapters below the cap as retry candidates and
+failed chapters at three attempts as retry-exhausted.
 
 ```bash
 gurubodh-utils retry-formatting \
@@ -351,8 +370,8 @@ gurubodh-utils retry-formatting \
 ```
 
 Expected: chapter `034` can succeed without rerunning the full job, uploads
-formatted artifacts, and updates chapter metadata to `formatting.status:
-"formatted"`.
+formatted artifacts, updates chapter metadata to `formatting.status:
+"formatted"`, and records the updated `formatting.retry_attempts`.
 
 ```bash
 gurubodh-utils retry-formatting \
@@ -361,8 +380,8 @@ gurubodh-utils retry-formatting \
 ```
 
 Expected: if the model still hits `finish_reason='length'`, metadata records a
-clear length-limit diagnostic and the command does not upload invalid formatted
-artifacts.
+clear length-limit diagnostic, increments `formatting.retry_attempts`, keeps
+`formatting.status: "failed"`, and does not upload invalid formatted artifacts.
 
 Regression verification:
 
@@ -372,28 +391,16 @@ tools/content-preparation/.venv/bin/python -m unittest discover -s tools/content
 
 ## Execution Results
 
-No implementation has been started for this task.
-
-This task records the proposed design for a future issue. The implementation
-should create a new GitHub issue or use an existing issue that explicitly
-approves the coding scope before changing source files.
+Implementation started under issue #123 on 2026-07-16.
 
 ## Follow-Up Improvements
 
 - Add chunked formatting for chapters that hit `finish_reason='length'`.
-- Store chunk-level provenance in formatted JSON so reviewers can understand how
-  a formatted artifact was assembled.
-- Add a configurable maximum retry-attempt count per chapter in metadata to
-  avoid endless retries of deterministic failures.
-- Add `last_attempted_at`, `attempt_count`, and `last_error_kind` to formatting
-  metadata if operational retry history becomes important.
-- Add optional fallback-model behavior for selected retryable failures, with
-  clear cost and timeout controls.
-- Revisit SDK support periodically. If Sarvam adds official SDK support for
-  structured output, decide whether the direct HTTP formatter path should stay
-  or move back behind the SDK.
-- Add a review/report command that summarizes formatting coverage across an R2
-  subject prefix without making Sarvam calls.
+- Add an explicit review/report command that summarizes formatting coverage and
+  retry-exhausted chapters across an R2 subject prefix.
+- Consider a guarded `--force` flag for maintainers who need to retry chapters
+  after the cap is reached.
+- Store richer retry history such as `last_attempted_at` and
+  `last_error_kind` if a single counter and latest warning are not enough.
 - Add concurrency controls or object precondition support if multiple operators
   may retry the same subject at the same time.
-- Add a command to retry only length-limit failures once chunking is available.

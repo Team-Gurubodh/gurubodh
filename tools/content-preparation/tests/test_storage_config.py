@@ -82,6 +82,24 @@ class FakeMissingR2ObjectClient:
         )
 
 
+class FakePaginatedS3Client:
+    def __init__(self):
+        self.requests = []
+
+    def list_objects_v2(self, **request):
+        self.requests.append(request)
+        if "ContinuationToken" not in request:
+            return {
+                "IsTruncated": True,
+                "NextContinuationToken": "next-page",
+                "Contents": [{"Key": "prefix/001.json"}],
+            }
+        return {
+            "IsTruncated": False,
+            "Contents": [{"Key": "prefix/002.json"}],
+        }
+
+
 class StorageConfigTests(unittest.TestCase):
     def write_config(self, config):
         temp_dir = tempfile.TemporaryDirectory()
@@ -642,6 +660,7 @@ class StorageConfigTests(unittest.TestCase):
                 "warning": None,
                 "attempt_count": 0,
                 "retry_count": 0,
+                "retry_attempts": 0,
                 "throttle_sleep_seconds": 0,
                 "source_text_sha256": None,
                 "token_usage": {
@@ -745,6 +764,7 @@ class StorageConfigTests(unittest.TestCase):
                 "warning": None,
                 "attempt_count": 0,
                 "retry_count": 0,
+                "retry_attempts": 0,
                 "throttle_sleep_seconds": 0,
                 "source_text_sha256": source_text_sha256(text),
                 "token_usage": {
@@ -870,6 +890,8 @@ class StorageConfigTests(unittest.TestCase):
         )
         self.assertEqual(formatting["attempt_count"]["minimum"], 0)
         self.assertEqual(formatting["retry_count"]["minimum"], 0)
+        self.assertEqual(formatting["retry_attempts"]["minimum"], 0)
+        self.assertNotIn("retry_attempts", schema["properties"]["formatting"]["required"])
         self.assertEqual(formatting["throttle_sleep_seconds"]["minimum"], 0)
         self.assertEqual(formatting["token_usage"]["required"], [
             "completion_tokens",
@@ -885,6 +907,25 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(text_schema["properties"]["line_endings"]["const"], "LF")
         self.assertEqual(text_schema["properties"]["scope"]["const"], "artifact-bytes")
         self.assertEqual(text_schema["properties"]["value"]["pattern"], "^[a-f0-9]{64}$")
+
+    def test_r2_list_keys_handles_paginated_results(self):
+        client = object.__new__(R2StorageClient)
+        client.client = FakePaginatedS3Client()
+
+        keys = client.list_keys("gurubodh-library-dev", "prefix/")
+
+        self.assertEqual(keys, ["prefix/001.json", "prefix/002.json"])
+        self.assertEqual(
+            client.client.requests,
+            [
+                {"Bucket": "gurubodh-library-dev", "Prefix": "prefix/"},
+                {
+                    "Bucket": "gurubodh-library-dev",
+                    "Prefix": "prefix/",
+                    "ContinuationToken": "next-page",
+                },
+            ],
+        )
 
     def test_r2_source_materializes_to_temporary_docx(self):
         config = json.loads(json.dumps(BASE_CONFIG))
