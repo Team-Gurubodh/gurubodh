@@ -120,6 +120,7 @@ def chapter_audit_entry(chapter):
         "model_used": formatting.get("model_used"),
         "attempt_count": formatting.get("attempt_count", 0),
         "retry_count": formatting.get("retry_count", 0),
+        "retry_attempts": formatting.get("retry_attempts", 0),
         "token_usage": {
             "completion_tokens": token_usage.get("completion_tokens"),
             "prompt_tokens": token_usage.get("prompt_tokens"),
@@ -223,6 +224,10 @@ def build_run_report(
                 chapter.get("formatting", {}).get("retry_count", 0)
                 for chapter in chapters
             ),
+            "retry_attempts": sum(
+                chapter.get("formatting", {}).get("retry_attempts", 0)
+                for chapter in chapters
+            ),
             "total_throttle_sleep_seconds": sum(
                 chapter.get("formatting", {}).get("throttle_sleep_seconds", 0)
                 for chapter in chapters
@@ -247,8 +252,28 @@ def build_run_report(
                     .get("text_filename", "")
                     .removesuffix(".txt"),
                     "warning": chapter.get("formatting", {}).get("warning"),
+                    "retry_attempts": chapter.get("formatting", {}).get(
+                        "retry_attempts",
+                        0,
+                    ),
                 }
                 for chapter in failed_chapters
+                if chapter.get("formatting", {}).get("retry_attempts", 0) < 3
+            ],
+            "retry_exhausted": [
+                {
+                    "chapter_number": chapter.get("document", {}).get("chapter_number"),
+                    "artifact_base_name": chapter.get("files", {})
+                    .get("text_filename", "")
+                    .removesuffix(".txt"),
+                    "warning": chapter.get("formatting", {}).get("warning"),
+                    "retry_attempts": chapter.get("formatting", {}).get(
+                        "retry_attempts",
+                        0,
+                    ),
+                }
+                for chapter in failed_chapters
+                if chapter.get("formatting", {}).get("retry_attempts", 0) >= 3
             ],
             "notes": [],
         },
@@ -293,6 +318,7 @@ def render_markdown_report(report):
         f"- Configured delay seconds: {throttle['delay_seconds']}",
         f"- Sarvam requests attempted: {throttle['sarvam_requests_attempted']}",
         f"- Retry count: {throttle['retry_count']}",
+        f"- Retry attempts: {throttle['retry_attempts']}",
         f"- Total throttle sleep seconds: {throttle['total_throttle_sleep_seconds']}",
         "",
         "## Token Usage",
@@ -303,20 +329,21 @@ def render_markdown_report(report):
         "",
         "## Per-Chapter Audit",
         "",
-        "| Chapter | Artifact | Formatting | Attempts | Retries | Completion tokens | Prompt tokens | Total tokens | Warning |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+        "| Chapter | Artifact | Formatting | Attempts | Retries | Retry attempts | Completion tokens | Prompt tokens | Total tokens | Warning |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
     ]
 
     for chapter in report["chapters"]:
         warning = chapter.get("warning") or ""
         chapter_token_usage = chapter.get("token_usage") or {}
         lines.append(
-            "| {chapter} | {artifact} | {status} | {attempts} | {retries} | {completion_tokens} | {prompt_tokens} | {total_tokens} | {warning} |".format(
+            "| {chapter} | {artifact} | {status} | {attempts} | {retries} | {retry_attempts} | {completion_tokens} | {prompt_tokens} | {total_tokens} | {warning} |".format(
                 chapter=chapter.get("chapter_number") or "",
                 artifact=chapter.get("artifact_base_name") or "",
                 status=chapter.get("formatting_status") or "",
                 attempts=chapter.get("attempt_count", 0),
                 retries=chapter.get("retry_count", 0),
+                retry_attempts=chapter.get("retry_attempts", 0),
                 completion_tokens=token_usage_text(
                     chapter_token_usage.get("completion_tokens")
                 ),
@@ -334,6 +361,7 @@ def render_markdown_report(report):
             f"- Result: {outcome['result']}",
             f"- Failed chapters: {', '.join(outcome['failed_chapters']) if outcome['failed_chapters'] else 'none'}",
             f"- Retry candidates: {', '.join(candidate['chapter_number'] for candidate in outcome['retry_candidates']) if outcome['retry_candidates'] else 'none'}",
+            f"- Retry exhausted: {', '.join(candidate['chapter_number'] for candidate in outcome['retry_exhausted']) if outcome['retry_exhausted'] else 'none'}",
             "",
         ]
     )

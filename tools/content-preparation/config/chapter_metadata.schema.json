@@ -258,6 +258,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "retry_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
         "throttle_sleep_seconds": {
           "type": "number",
           "minimum": 0

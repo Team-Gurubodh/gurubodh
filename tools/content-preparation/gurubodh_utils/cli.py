@@ -1,9 +1,10 @@
 import argparse
 
-from gurubodh_utils.config import migrate_conversion_job_paths
+from gurubodh_utils.config import load_conversion_job, migrate_conversion_job_paths
 from gurubodh_utils.docx.namespaces import register_namespaces
 from gurubodh_utils.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
 from gurubodh_utils.project import resolve_project_context, resolve_project_path
+from gurubodh_utils.retry_formatting import retry_formatting
 
 
 def add_project_root_option(parser):
@@ -74,6 +75,25 @@ def build_parser():
         help="Conversion job JSON files to migrate.",
     )
 
+    retry_parser = subparsers.add_parser(
+        "retry-formatting",
+        help="Retry Sarvam formatting for failed R2-backed chapter artifacts.",
+        description=(
+            "Retry formatting for failed chapters discovered from R2 chapter metadata. "
+            "By default, failed chapters with retry_attempts >= 3 are reported but not retried."
+        ),
+    )
+    retry_parser.add_argument("--config", required=True, help="Path to a Gurubodh CMS conversion job JSON file.")
+    retry_parser.add_argument("--dry-run", action="store_true", help="Report retry candidates without Sarvam calls or R2 writes.")
+    retry_parser.add_argument("--chapter", help="Retry one chapter number, such as 034.")
+    retry_parser.add_argument("--chapters", help="Retry comma-separated chapter numbers, such as 034,038.")
+    retry_parser.add_argument(
+        "--failed-only",
+        action="store_true",
+        help="Retry failed chapters only. This is the default selection mode.",
+    )
+    add_project_root_option(retry_parser)
+
     return parser
 
 
@@ -114,6 +134,14 @@ def main(argv=None):
         run_legacy_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "migrate-configs":
         run_migration(context, args)
+    elif args.command == "retry-formatting":
+        config_path = resolve_project_path(context, args.config)
+        retry_formatting(
+            load_conversion_job(config_path),
+            dry_run=args.dry_run,
+            chapter=args.chapter,
+            chapters=args.chapters,
+        )
     else:
         parser.error(f"Unsupported command: {args.command}")
 
