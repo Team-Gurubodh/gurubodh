@@ -1,12 +1,6 @@
 from pathlib import Path
 
-from gurubodh_utils.storage import (
-    collect_formatted_artifacts,
-    ensure_local_destination,
-    is_local,
-    restore_formatted_artifacts,
-    subject_output_root,
-)
+from gurubodh_utils.storage import ensure_local_destination, is_local, subject_output_root
 
 
 def destination_paths_for_subject(subject_dir):
@@ -32,16 +26,7 @@ def destination_paths_for_job(config, overwrite=False):
         subject_dir = output_root
 
     if is_local(config["destination"]):
-        preserved_formatted_artifacts = {}
-        formatting_config = config.get("formatting", {})
-        if (
-            overwrite
-            and formatting_config.get("enabled")
-            and formatting_config.get("regenerate") == "when-source-checksum-changes"
-        ):
-            preserved_formatted_artifacts = collect_formatted_artifacts(subject_dir)
         ensure_local_destination(subject_dir, overwrite)
-        restore_formatted_artifacts(subject_dir, preserved_formatted_artifacts)
 
     paths = destination_paths_for_subject(subject_dir)
     return paths, temp_dir

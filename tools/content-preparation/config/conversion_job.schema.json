@@ -7,7 +7,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.3.0"
+      "const": "1.2.0"
     },
     "pipeline": {
       "type": "string",
@@ -211,71 +211,6 @@
           }
         }
       ],
-      "additionalProperties": false
-    },
-    "formatting": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "provider": {
-          "type": "string",
-          "const": "sarvam",
-          "default": "sarvam"
-        },
-        "model": {
-          "type": "string",
-          "enum": ["sarvam-30b", "sarvam-105b"],
-          "default": "sarvam-30b"
-        },
-        "fallback_model": {
-          "type": "string",
-          "enum": ["sarvam-30b", "sarvam-105b"],
-          "default": "sarvam-105b"
-        },
-        "output_formats": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["json", "markdown"]
-          },
-          "minItems": 1,
-          "uniqueItems": true,
-          "default": ["json", "markdown"]
-        },
-        "continue_on_error": {
-          "type": "boolean",
-          "default": true
-        },
-        "delay_seconds": {
-          "type": "number",
-          "minimum": 0,
-          "default": 4
-        },
-        "max_retries": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 5,
-          "default": 1
-        },
-        "regenerate": {
-          "type": "string",
-          "const": "when-source-checksum-changes",
-          "default": "when-source-checksum-changes"
-        },
-        "reasoning_effort": {
-          "type": ["string", "null"],
-          "default": null
-        },
-        "max_tokens": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 4096,
-          "default": 4096
-        }
-      },
       "additionalProperties": false
     },
     "metadata_defaults": {

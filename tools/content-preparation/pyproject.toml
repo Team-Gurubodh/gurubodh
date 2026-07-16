@@ -11,9 +11,6 @@ dependencies = [
     "boto3>=1.34,<2",
 ]
 
-[project.optional-dependencies]
-formatting = []
-
 [project.scripts]
 gurubodh-utils = "gurubodh_utils.cli:main"
 
