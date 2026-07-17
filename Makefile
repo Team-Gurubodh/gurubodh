@@ -10,7 +10,7 @@ cms-build:
 	cd apps/gurubodh-cms && npm run build
 
 content-prep-venv:
-	cd tools/content-preparation && python3 -m venv .venv
+	cd tools/content-preparation && python3.12 -m venv .venv
 
 content-prep-install:
 	cd tools/content-preparation && pip install -e .
