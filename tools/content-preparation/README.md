@@ -8,7 +8,7 @@ Run these commands from the monorepo root:
 
 ```bash
 cd tools/content-preparation
-python3 -m venv .venv
+python3.12 -m venv .venv
 . .venv/bin/activate
 pip install -e .
 gurubodh-utils run --config jobs/002_spand_rahasya.local.json
@@ -18,11 +18,12 @@ gurubodh-utils run --config jobs/002_spand_rahasya.local.json
 
 `cd tools/content-preparation` moves into this Python tool project.
 
-`python3 -m venv .venv` creates a local virtual environment named `.venv`.
+`python3.12 -m venv .venv` creates a local virtual environment named `.venv`.
+The content-preparation package is standardized on Python `>=3.12,<3.13`.
 
 `. .venv/bin/activate` activates the virtual environment so dependencies and console commands are isolated to this project.
 
-`pip install -e .` installs the package in editable mode. This exposes the `gurubodh-utils` command while keeping it linked to the source files in this directory.
+`pip install -e .` installs the package in editable mode. This exposes the `gurubodh-utils` command while keeping it linked to the source files in this directory. It also installs semantic chunking dependencies (`numpy`, `transformers`, and `sentence-transformers`) for future paragraphing and RAG preparation work. The first semantic chunking run may download the configured embedding model into the local Hugging Face cache.
 
 `gurubodh-utils run --config jobs/002_spand_rahasya.local.json` runs a sample local content-preparation job.
 
@@ -164,3 +165,37 @@ export CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
 ```
 
 Do not commit these values to the repository.
+
+## Semantic Chunking
+
+Semantic chunking is integrated as an internal `gurubodh_utils` module:
+
+```python
+from gurubodh_utils.semantic_chunking import SemanticChunkConfig, SemanticChunker
+
+config = SemanticChunkConfig(
+    threshold_percentile=82,
+    min_chars=700,
+    window_size=3,
+)
+
+chunker = SemanticChunker(config)
+document = chunker.chunk_text(raw_text, source_name="chapter.txt")
+```
+
+The module is intentionally not called by the existing DOCX preparation
+pipelines yet. Issue #130 integrates the package structure so modified Task 014
+work can evaluate semantic chunking for paragraph display and later RAG chunk
+generation.
+
+For standalone local evaluation, run:
+
+```bash
+python -m gurubodh_utils.semantic_chunking.cli \
+  --source-dir path/to/text-files \
+  --output-dir path/to/semantic-chunks
+```
+
+Current behavior returns chunk text and sentence ranges. Future Task 014 work
+should add exact character spans into canonical chapter text before storing
+semantic chunking output as durable chapter metadata or CMS-ingestion artifacts.

@@ -54,7 +54,7 @@ Use this to check that the CMS can compile for production.
 
 `make content-prep-venv`
 
-Creates a Python virtual environment at `tools/content-preparation/.venv`.
+Creates a Python 3.12 virtual environment at `tools/content-preparation/.venv`.
 
 Before installing or running the content-preparation CLI, activate the virtual
 environment:
@@ -68,8 +68,10 @@ environment:
 Installs the content-preparation Python package in editable mode by running
 `pip install -e .` in `tools/content-preparation`. This exposes the
 `gurubodh-utils` command while keeping it linked to the source files in this
-repository. After the virtual environment is activated and this install has
-completed, `gurubodh-utils` is available from any directory in that shell.
+repository. The content-preparation package requires Python `>=3.12,<3.13` and
+includes local semantic chunking dependencies for future paragraphing and RAG
+preparation work. After the virtual environment is activated and this install
+has completed, `gurubodh-utils` is available from any directory in that shell.
 
 For commands that read content-preparation project files, the CLI still needs
 to locate `tools/content-preparation`. It does this by walking upward from the
