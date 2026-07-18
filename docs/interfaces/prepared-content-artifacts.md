@@ -8,14 +8,14 @@
 ## Purpose
 
 This document defines the handoff contract for artifacts produced by
-`tools/content` and consumed later by content ingestion, metadata
+`tools/gurubodh-cli` and consumed later by content ingestion, metadata
 generation, metadata ingestion, and CMS-backed application workflows.
 
 ## Boundary
 
 ```text
 Source DOCX storage
--> tools/content
+-> tools/gurubodh-cli
 -> prepared artifact storage
 -> future ingestion and metadata workflows
 ```

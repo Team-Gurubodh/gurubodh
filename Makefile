@@ -10,13 +10,13 @@ cms-build:
 	cd apps/gurubodh-cms && npm run build
 
 content-venv:
-	cd tools/content && python3.12 -m venv .venv
+	cd tools/gurubodh-cli && python3.12 -m venv .venv
 
 content-install:
-	tools/content/.venv/bin/python -m pip install -e tools/content
+	tools/gurubodh-cli/.venv/bin/python -m pip install -e tools/gurubodh-cli
 
 content-help:
-	tools/content/.venv/bin/gurubodh --help
+	tools/gurubodh-cli/.venv/bin/gurubodh --help
 
 content-run-sample:
-	tools/content/.venv/bin/gurubodh prep-subject --project-root tools/content --config jobs/002_spand_rahasya.local.json
+	tools/gurubodh-cli/.venv/bin/gurubodh prep-subject --project-root tools/gurubodh-cli --config jobs/002_spand_rahasya.local.json
