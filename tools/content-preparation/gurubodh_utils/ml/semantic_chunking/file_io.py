@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-from gurubodh_utils.semantic_chunking.chunker import SemanticChunker
-from gurubodh_utils.semantic_chunking.config import SemanticChunkConfig
-from gurubodh_utils.semantic_chunking.models import ChunkedDocument
+from gurubodh_utils.ml.semantic_chunking.chunker import SemanticChunker
+from gurubodh_utils.ml.semantic_chunking.config import SemanticChunkConfig
+from gurubodh_utils.ml.semantic_chunking.models import ChunkedDocument
 
 
 def iter_text_files(source_dir: Path) -> Iterable[Path]:

@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
-from gurubodh_utils.semantic_chunking.config import SemanticChunkConfig
-from gurubodh_utils.semantic_chunking.models import Chunk, ChunkedDocument
-from gurubodh_utils.semantic_chunking.sentence_splitter import split_sentences
+from gurubodh_utils.ml.semantic_chunking.config import SemanticChunkConfig
+from gurubodh_utils.ml.semantic_chunking.models import Chunk, ChunkedDocument
+from gurubodh_utils.ml.semantic_chunking.sentence_splitter import split_sentences
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer

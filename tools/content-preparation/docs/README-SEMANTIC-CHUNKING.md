@@ -7,7 +7,7 @@ models.
 The module lives under:
 
 ```text
-gurubodh_utils/semantic_chunking/
+gurubodh_utils/ml/semantic_chunking/
 ```
 
 It is installable as part of the `gurubodh-utils` Python package. It is not yet
@@ -46,7 +46,7 @@ Use one `SemanticChunker` instance across many documents so the embedding model
 is loaded only once:
 
 ```python
-from gurubodh_utils.semantic_chunking import SemanticChunkConfig, SemanticChunker
+from gurubodh_utils.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
 
 config = SemanticChunkConfig(
     threshold_percentile=82,
@@ -66,7 +66,7 @@ for chunk in document.chunks:
 For local experiments with `.txt` files:
 
 ```bash
-python -m gurubodh_utils.semantic_chunking.cli \
+python -m gurubodh_utils.ml.semantic_chunking.cli \
   --source-dir source \
   --output-dir semantic_chunks_bge_m3
 ```
