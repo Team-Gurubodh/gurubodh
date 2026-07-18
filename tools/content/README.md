@@ -10,7 +10,7 @@ Run these commands from the monorepo root:
 cd tools/content
 python3.12 -m venv .venv
 . .venv/bin/activate
-pip install -e .
+python -m pip install -e .
 gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
 ```
 
@@ -23,7 +23,13 @@ The content package is standardized on Python `>=3.12,<3.13`.
 
 `. .venv/bin/activate` activates the virtual environment so dependencies and console commands are isolated to this project.
 
-`pip install -e .` installs the package in editable mode. This exposes the `gurubodh` command while keeping it linked to the source files in this directory. It also installs semantic chunking dependencies (`numpy`, `transformers`, and `sentence-transformers`) for future paragraphing and RAG preparation work. The first semantic chunking run may download the configured embedding model into the local Hugging Face cache.
+`python -m pip install -e .` installs the package in editable mode. This exposes the `gurubodh` command while keeping it linked to the source files in this directory. It also installs semantic chunking dependencies (`numpy`, `transformers`, and `sentence-transformers`) for future paragraphing and RAG preparation work. The first semantic chunking run may download the configured embedding model into the local Hugging Face cache.
+
+If this virtual environment was moved from the old content-preparation path,
+generated wrappers such as `.venv/bin/pip` may still point to that old absolute
+path. In that case, run `python -m pip install -e .` after activation, or run
+`.venv/bin/python -m pip install -e .` without activation, to refresh the
+editable install.
 
 `gurubodh prep-subject --config jobs/002_spand_rahasya.local.json` runs a sample local content job.
 

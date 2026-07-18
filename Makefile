@@ -13,10 +13,10 @@ content-venv:
 	cd tools/content && python3.12 -m venv .venv
 
 content-install:
-	cd tools/content && pip install -e .
+	tools/content/.venv/bin/python -m pip install -e tools/content
 
 content-help:
-	cd tools/content && gurubodh --help
+	tools/content/.venv/bin/gurubodh --help
 
 content-run-sample:
-	cd tools/content && gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+	tools/content/.venv/bin/gurubodh prep-subject --project-root tools/content --config jobs/002_spand_rahasya.local.json

@@ -66,12 +66,17 @@ environment:
 `make content-install`
 
 Installs the content Python package in editable mode by running
-`pip install -e .` in `tools/content`. This exposes the
+`tools/content/.venv/bin/python -m pip install -e tools/content`. This exposes the
 `gurubodh` command while keeping it linked to the source files in this
 repository. The content package requires Python `>=3.12,<3.13` and
 includes local semantic chunking dependencies for future paragraphing and RAG
 preparation work. After the virtual environment is activated and this install
 has completed, `gurubodh` is available from any directory in that shell.
+
+If an existing virtual environment was moved from the old content-preparation
+path, its generated `pip` wrapper may still point to that old path. Use
+`python -m pip` through the venv interpreter, or recreate the venv, before
+running content commands.
 
 For commands that read content project files, the CLI still needs
 to locate `tools/content`. It does this by walking upward from the
