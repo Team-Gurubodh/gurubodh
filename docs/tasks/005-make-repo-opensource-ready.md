@@ -46,7 +46,7 @@
 5. Add automation in a follow-up scoped change.
    - Add Commitlint and Husky for local Conventional Commit enforcement.
    - Add GitHub Actions for commit linting and secret scanning.
-   - Postpone broader CMS and content-preparation CI until the desired CI strategy is clear.
+   - Postpone broader CMS and content CI until the desired CI strategy is clear.
 6. Invite team members after contribution docs exist and `main` is protected.
 7. Document semantic versioning expectations now and postpone release automation until release boundaries are clear.
 
@@ -72,7 +72,7 @@
 - Added a GitHub Actions Commitlint workflow for pull request titles and commits.
 - Added a GitHub Actions Gitleaks workflow for secret scanning.
 - Documented automation setup in `docs/development/automation.md`.
-- Postponed broader CMS and content-preparation CI checks until the team decides the desired CI strategy.
+- Postponed broader CMS and content CI checks until the team decides the desired CI strategy.
 - Confirmed `GITLEAKS_LICENSE` exists as a repository-level GitHub Actions secret.
 - Added `Commitlint` and `Gitleaks` as required status checks in the `main` branch ruleset.
 - Enabled the ruleset requirement for branches to be up to date before merging.
@@ -82,5 +82,5 @@
 
 ## Follow-Up
 
-- Create a separate CI strategy task before regular team code contributions begin. The CI strategy should decide which checks to run for the Strapi CMS, content-preparation tooling, schema files, documentation, and database scripts. Candidate checks include `make cms-build`, content-preparation install/help/sample runs, schema validation, and non-destructive database script validation.
-- Create a separate release/versioning decision before introducing automated releases. That decision should define whether Gurubodh releases apply to the whole monorepo or separately to the CMS, content-preparation tooling, future frontend, documentation, and infrastructure assets.
+- Create a separate CI strategy task before regular team code contributions begin. The CI strategy should decide which checks to run for the Strapi CMS, content tooling, schema files, documentation, and database scripts. Candidate checks include `make cms-build`, content install/help/sample runs, schema validation, and non-destructive database script validation.
+- Create a separate release/versioning decision before introducing automated releases. That decision should define whether Gurubodh releases apply to the whole monorepo or separately to the CMS, content tooling, future frontend, documentation, and infrastructure assets.

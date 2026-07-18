@@ -1,4 +1,4 @@
-.PHONY: cms-install cms-dev cms-build content-prep-venv content-prep-install content-prep-help content-prep-run-sample
+.PHONY: cms-install cms-dev cms-build content-venv content-install content-help content-run-sample
 
 cms-install:
 	cd apps/gurubodh-cms && npm ci
@@ -9,14 +9,14 @@ cms-dev:
 cms-build:
 	cd apps/gurubodh-cms && npm run build
 
-content-prep-venv:
-	cd tools/content-preparation && python3.12 -m venv .venv
+content-venv:
+	cd tools/content && python3.12 -m venv .venv
 
-content-prep-install:
-	cd tools/content-preparation && pip install -e .
+content-install:
+	tools/content/.venv/bin/python -m pip install -e tools/content
 
-content-prep-help:
-	cd tools/content-preparation && gurubodh-utils --help
+content-help:
+	tools/content/.venv/bin/gurubodh --help
 
-content-prep-run-sample:
-	cd tools/content-preparation && gurubodh-utils run --config jobs/002_spand_rahasya.local.json
+content-run-sample:
+	tools/content/.venv/bin/gurubodh prep-subject --project-root tools/content --config jobs/002_spand_rahasya.local.json

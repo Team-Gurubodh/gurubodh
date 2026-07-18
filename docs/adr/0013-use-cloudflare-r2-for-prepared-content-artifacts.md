@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The content-preparation workflow produces CMS-ingestion-ready artifacts from
+The content workflow produces CMS-ingestion-ready artifacts from
 source DOCX files. Local filesystem paths are useful for development, but they
 are not durable enough to become the long-term handoff contract between
 preparation, ingestion, CMS-backed applications, and future metadata workflows.

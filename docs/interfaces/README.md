@@ -11,7 +11,7 @@ artifacts, CMS APIs, or downstream ingestion.
 
 Current records:
 
-- `prepared-content-artifacts.md` - content-preparation outputs in local
+- `prepared-content-artifacts.md` - content outputs in local
   storage and Cloudflare R2 for future ingestion and metadata workflows.
 - `seed-data-artifacts.md` - external seed-data CSV files, generated JSON
   artifacts, and future Strapi 5 ingestion.

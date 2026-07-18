@@ -32,7 +32,7 @@ Use scopes when they help readers understand the affected area.
 Recommended scopes include:
 
 - `cms`
-- `content-prep`
+- `content`
 - `database`
 - `docs`
 - `github`
@@ -44,7 +44,7 @@ Recommended scopes include:
 ```text
 docs(github): add issue-first workflow
 ci(commitlint): validate pull request titles
-feat(content-prep): add metadata validation command
+feat(content): add metadata validation command
 fix(cms): correct category route config
 chore(deps): update strapi dependencies
 ```

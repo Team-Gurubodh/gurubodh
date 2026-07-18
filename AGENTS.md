@@ -65,7 +65,7 @@ This workflow is mandatory unless the user explicitly instructs otherwise.
 
 <verification>
 - For CMS changes, prefer the commands documented in `README.md` and `apps/gurubodh-cms/README.md`.
-- For content preparation changes, prefer the commands documented in `tools/content-preparation/README.md`.
+- For content preparation changes, prefer the commands documented in `tools/content/README.md`.
 - If verification cannot be run, report exactly what was skipped and why.
 </verification>
 

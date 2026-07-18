@@ -5,8 +5,8 @@
 
 ## Current Schema Locations
 
-- `tools/content-preparation/config/chapter_metadata.schema.json`
-- `tools/content-preparation/config/conversion_job.schema.json`
+- `tools/content/config/chapter_metadata.schema.json`
+- `tools/content/config/conversion_job.schema.json`
 - `tools/seed-data/config/category_artifact.schema.json`
 - `tools/seed-data/config/glossary_artifact.schema.json`
 - `tools/seed-data/config/seed_data_sources.schema.json`
@@ -19,7 +19,7 @@ None currently recorded.
 
 ## Ownership Guidance
 
-- Content preparation JSON schemas belong under `tools/content-preparation/config/`.
+- Content preparation JSON schemas belong under `tools/content/config/`.
 - Conversion job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
