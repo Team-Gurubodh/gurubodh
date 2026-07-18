@@ -9,7 +9,7 @@ Proposed
 The RAG layer needs an embedding model to vectorize content and queries, and
 an LLM to generate grounded answers from retrieved content. The source text is in devanagari, with repeated usage of important terms and concepts from the spiritual domain, more specifically, Sanatana Dharma and/or Indian Knowledge System. Present LLM models are mostly trained in English language without much training in the domain of Sanatana Dharma and Indian Knowledge System.
 
-The content-preparation workspace also has local semantic chunking experiments
+The content workspace also has local semantic chunking experiments
 that use `BAAI/bge-m3` through `sentence-transformers`. This model may be useful
 for local dense embeddings and future RAG experiments, but the architecture
 should not make a specific embedding model the integration boundary. Embedding
@@ -23,7 +23,7 @@ Embeddings for vectorization and a Claude model for answer generation — to
 keep the RAG stack AWS-native and consistent with the platform's overall
 hosting decision (ADR-0003).
 
-For local content-preparation and RAG prototyping, `BAAI/bge-m3` may be used as
+For local content and RAG prototyping, `BAAI/bge-m3` may be used as
 the default local embedding model. This is a model choice, not an architecture
 boundary.
 

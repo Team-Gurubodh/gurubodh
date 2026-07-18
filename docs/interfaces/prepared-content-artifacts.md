@@ -8,14 +8,14 @@
 ## Purpose
 
 This document defines the handoff contract for artifacts produced by
-`tools/content-preparation` and consumed later by content ingestion, metadata
+`tools/content` and consumed later by content ingestion, metadata
 generation, metadata ingestion, and CMS-backed application workflows.
 
 ## Boundary
 
 ```text
 Source DOCX storage
--> tools/content-preparation
+-> tools/content
 -> prepared artifact storage
 -> future ingestion and metadata workflows
 ```

@@ -10,14 +10,14 @@
 ## Goal
 
 Implement an economical Sarvam-backed paragraph segmentation workflow for
-`gurubodh-utils`.
+`gurubodh`.
 
 The goal is only to divide canonical raw Hindi chapter text into readable
 paragraphs. Sarvam must not return rewritten chapter text, formatted chapter
 text, summaries, translations, titles, tags, or any other derived prose.
 
 Instead, Sarvam should return a compact paragraph span map: character index
-ranges into the original raw chapter text. The content-preparation metadata can
+ranges into the original raw chapter text. The content metadata can
 store those spans, and downstream readers can render display paragraphs on
 demand by slicing the canonical raw chapter `.txt` artifact.
 
@@ -43,7 +43,7 @@ For each chapter, when paragraph segmentation is enabled:
 5. Store the validated span map inside the chapter metadata JSON.
 6. Do not write separate `*.formatted.json` or `*.formatted.md` files.
 7. Do not store Sarvam-returned document text anywhere.
-8. Continue the content-preparation job when segmentation fails and
+8. Continue the content job when segmentation fails and
    `continue_on_error` is true.
 9. Record segmentation failures, request attempts, throttling, token usage, and
    retry eligibility in metadata and run audit reports.
@@ -106,7 +106,7 @@ Span semantics must be precise and stable.
 
 - Indices are zero-based.
 - Indices are Python string indices into the exact UTF-8-decoded raw chapter
-  text value used by `gurubodh-utils`.
+  text value used by `gurubodh`.
 - End indices are exclusive.
 - Each span is `[start, end)`.
 - Rendering uses `chapter_text[start:end]`.
@@ -465,7 +465,7 @@ Carry forward the retry-command pattern, redesigned for segmentation.
 Recommended command:
 
 ```bash
-gurubodh-utils retry-paragraph-segmentation --config jobs/001_aacharan_shaastra.r2.json
+gurubodh retry-paragraph-segmentation --config jobs/001_aacharan_shaastra.r2.json
 ```
 
 The command should:
@@ -549,7 +549,7 @@ Add the optional `paragraph_segmentation` conversion job config block.
 ### Verification
 
 - Focused config and migration tests.
-- Full content-preparation test suite if available.
+- Full content test suite if available.
 
 ## Stage 3: Sarvam Paragraph Segmenter Module
 
@@ -560,7 +560,7 @@ chapter splitting yet.
 
 ### Scope
 
-- Add a module such as `gurubodh_utils/paragraph_segmentation.py`.
+- Add a module such as `gurubodh/paragraph_segmentation.py`.
 - Implement direct HTTP chat-completion caller or reuse a shared Sarvam HTTP
   helper if one exists.
 - Read `SARVAM_API_KEY` from the environment.
@@ -647,7 +647,7 @@ unchanged raw chapter text.
 
 ### Recommended R2 Behavior
 
-For normal R2 content-preparation runs, do not claim reuse from remote metadata
+For normal R2 content runs, do not claim reuse from remote metadata
 unless previous metadata has been intentionally materialized into the current
 local subject tree or a dedicated future cache exists.
 
@@ -717,7 +717,7 @@ outcomes and cost evidence.
 
 ### Acceptance Criteria
 
-- Each successful content-preparation run writes audit reports under
+- Each successful content run writes audit reports under
   `run_reports/`.
 - Reports summarize paragraph segmentation outcomes.
 - Reports include token usage sufficient to evaluate output-token economy.
@@ -740,7 +740,7 @@ DOCX conversion or full content preparation.
 
 ### Scope
 
-- Add `gurubodh-utils retry-paragraph-segmentation`.
+- Add `gurubodh retry-paragraph-segmentation`.
 - Require R2 destination for first implementation.
 - List chapter metadata JSON objects from the configured R2 subject prefix.
 - Select failed chapters with `retry_attempts < 3`.
@@ -768,7 +768,7 @@ DOCX conversion or full content preparation.
 
 - Fake-R2 tests for discovery, selection, dry-run, success, failure, retry cap,
   missing raw text, invalid metadata, and metadata upload order.
-- Full content-preparation tests.
+- Full content tests.
 
 ## Stage 9: Documentation And Manual Verification
 
@@ -779,7 +779,7 @@ representative Sarvam-backed run.
 
 ### Scope
 
-- Update `tools/content-preparation/README.md`.
+- Update `tools/content/README.md`.
 - Update `docs/schemas.md`.
 - Add or update safe sample configs with segmentation disabled by default.
 - Document enabling segmentation with `SARVAM_API_KEY`.
@@ -801,15 +801,15 @@ representative Sarvam-backed run.
 ### Verification
 
 ```bash
-tools/content-preparation/.venv/bin/python -m unittest discover -s tools/content-preparation/tests
+tools/content/.venv/bin/python -m unittest discover -s tools/content/tests
 git diff --check
 ```
 
 Manual verification, when credentials are available:
 
 ```bash
-gurubodh-utils run --config jobs/001_aacharan_shaastra.r2.json --overwrite
-gurubodh-utils retry-paragraph-segmentation --config jobs/001_aacharan_shaastra.r2.json --dry-run
+gurubodh prep-subject --config jobs/001_aacharan_shaastra.r2.json --overwrite
+gurubodh retry-paragraph-segmentation --config jobs/001_aacharan_shaastra.r2.json --dry-run
 ```
 
 Expected manual checks:
@@ -848,14 +848,14 @@ Expected manual checks:
 ## Suggested GitHub Issue Breakdown
 
 1. `docs(tasks): define Sarvam paragraph segmentation metadata task`
-2. `feat(content-prep): add paragraph segmentation config schema contract`
-3. `feat(content-prep): add Sarvam paragraph segmenter module`
-4. `feat(content-prep): store paragraph spans in chapter metadata`
-5. `feat(content-prep): reuse paragraph spans for unchanged chapter text`
-6. `feat(content-prep): add paragraph segmentation progress reporting`
-7. `feat(content-prep): add paragraph segmentation audit reports and token usage`
-8. `feat(content-prep): add retry command for failed paragraph segmentation`
-9. `docs(content-prep): document paragraph segmentation workflow and verification`
+2. `feat(content): add paragraph segmentation config schema contract`
+3. `feat(content): add Sarvam paragraph segmenter module`
+4. `feat(content): store paragraph spans in chapter metadata`
+5. `feat(content): reuse paragraph spans for unchanged chapter text`
+6. `feat(content): add paragraph segmentation progress reporting`
+7. `feat(content): add paragraph segmentation audit reports and token usage`
+8. `feat(content): add retry command for failed paragraph segmentation`
+9. `docs(content): document paragraph segmentation workflow and verification`
 
 ## Definition Of Done
 

@@ -19,7 +19,7 @@
 
 - There are over 7000 lectures on 'Sanatan Dharma' captured in audio format that is the starting source material for this project. All the lectures are in traditional Hindi language, not English.
 - People have been employed to convert the audio to MS Word using MS Word 2007. 60% to 70% of the content is already converted, but they use non-unicode encoding while saving the documents.
-- About 50% to 60% of the raw content is stored as MS Word 2007 documents in legacy, non-Unicode font encodings such as APS Prakash and APS Priyanka. These documents must be converted to Unicode-compatible text. The `gurubodh_utils` Python tool handles detected APS-family source fonts, but this conversion has not yet been tested against all source documents that use APS-family fonts.
+- About 50% to 60% of the raw content is stored as MS Word 2007 documents in legacy, non-Unicode font encodings such as APS Prakash and APS Priyanka. These documents must be converted to Unicode-compatible text. The `gurubodh` Python tool handles detected APS-family source fonts, but this conversion has not yet been tested against all source documents that use APS-family fonts.
 - About 10% of the raw content, stored in more recent documents, uses
   Shri-Lipi-family legacy font encodings. Current Shri-Lipi conversion attempts
   fail because the project does not yet have verified character mapping tables

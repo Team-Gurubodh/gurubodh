@@ -12,7 +12,7 @@ The repository currently has automation for:
 - Conventional Commit enforcement.
 - Secret scanning.
 
-Broader CI for the CMS, content-preparation tools, and other project areas is intentionally postponed until the team decides which checks should run and when.
+Broader CI for the CMS, content tools, and other project areas is intentionally postponed until the team decides which checks should run and when.
 
 ## Local Commit Linting
 

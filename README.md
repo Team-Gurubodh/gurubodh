@@ -5,9 +5,9 @@ Gurubodh is a monorepo for the CMS application, content preparation tools, futur
 ## Structure
 
 - `apps/gurubodh-cms` - Strapi 5 CMS application.
-- `tools/content-preparation` - Python utility for preprocessing and preparing
+- `tools/content` - Python utility for preprocessing and preparing
   MS Word 2007 content and metadata artifacts. Future content ingestion and
-  metadata workflow commands are expected to live in the `gurubodh-utils`
+  metadata workflow commands are expected to live in the `gurubodh`
   command structure here.
 - `tools/seed-data` - Seed-data preparation and ingestion tooling, starting with glossary terms.
 - `database/postgres/gurubodh-cms` - PostgreSQL infrastructure scripts for the CMS.
@@ -52,47 +52,47 @@ Use this to check that the CMS can compile for production.
 
 ### Content Preparation
 
-`make content-prep-venv`
+`make content-venv`
 
-Creates a Python 3.12 virtual environment at `tools/content-preparation/.venv`.
+Creates a Python 3.12 virtual environment at `tools/content/.venv`.
 
-Before installing or running the content-preparation CLI, activate the virtual
+Before installing or running the content CLI, activate the virtual
 environment:
 
 ```bash
-. tools/content-preparation/.venv/bin/activate
+. tools/content/.venv/bin/activate
 ```
 
-`make content-prep-install`
+`make content-install`
 
-Installs the content-preparation Python package in editable mode by running
-`pip install -e .` in `tools/content-preparation`. This exposes the
-`gurubodh-utils` command while keeping it linked to the source files in this
-repository. The content-preparation package requires Python `>=3.12,<3.13` and
+Installs the content Python package in editable mode by running
+`pip install -e .` in `tools/content`. This exposes the
+`gurubodh` command while keeping it linked to the source files in this
+repository. The content package requires Python `>=3.12,<3.13` and
 includes local semantic chunking dependencies for future paragraphing and RAG
 preparation work. After the virtual environment is activated and this install
-has completed, `gurubodh-utils` is available from any directory in that shell.
+has completed, `gurubodh` is available from any directory in that shell.
 
-For commands that read content-preparation project files, the CLI still needs
-to locate `tools/content-preparation`. It does this by walking upward from the
+For commands that read content project files, the CLI still needs
+to locate `tools/content`. It does this by walking upward from the
 current directory until it finds `config/conversion_job.schema.json` and
 `jobs/`. If you run it from the monorepo root instead of from
-`tools/content-preparation`, pass the root explicitly:
+`tools/content`, pass the root explicitly:
 
 ```bash
-gurubodh-utils run \
-  --project-root tools/content-preparation \
+gurubodh prep-subject \
+  --project-root tools/content \
   --config jobs/002_spand_rahasya.local.json
 ```
 
-`make content-prep-help`
+`make content-help`
 
-Shows the command-line help for `gurubodh-utils`, the content-preparation CLI.
+Shows the command-line help for `gurubodh`, the content CLI.
 
-`make content-prep-run-sample`
+`make content-run-sample`
 
-Runs the sample content-preparation job using
-`tools/content-preparation/jobs/002_spand_rahasya.local.json`.
+Runs the sample content job using
+`tools/content/jobs/002_spand_rahasya.local.json`.
 
 ### Repository Tooling
 
