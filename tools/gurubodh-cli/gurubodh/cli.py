@@ -5,6 +5,15 @@ from gurubodh.pipelines.dispatcher import run_configured_job, run_legacy_job, ru
 from gurubodh.project import resolve_project_context, resolve_project_path
 
 
+PLANNED_COMMANDS = {
+    "download-subject": "Download subject source files and existing artifacts from configured storage.",
+    "delete-subject": "Delete a subject and its generated artifacts from configured storage.",
+    "generate-chunks": "Generate semantic text chunks from prepared chapter text files.",
+    "generate-embeddings": "Generate vector embeddings for prepared semantic chunks.",
+    "update-metadata": "Update subject and chapter metadata from the configured metadata source.",
+}
+
+
 def add_common_options(parser):
     parser.add_argument("--config", required=True, help="Path to a Gurubodh CMS conversion job JSON file.")
     parser.add_argument(
@@ -37,17 +46,24 @@ def build_parser():
 
     unicode_parser = subparsers.add_parser(
         "unicode-ingest",
-        help="Run only the Unicode DOCX ingest pipeline.",
-        description="Copy Unicode DOCX input, extract text, split chapters, and reject non-Unicode jobs.",
+        help="[deprecated] Run only the Unicode DOCX ingest pipeline.",
+        description="[deprecated] Copy Unicode DOCX input, extract text, split chapters, and reject non-Unicode jobs.",
     )
     add_common_options(unicode_parser)
 
     legacy_parser = subparsers.add_parser(
         "legacy-convert",
-        help="Run only the legacy DOCX to Unicode pipeline.",
-        description="Convert supported legacy-font DOCX input to Unicode, then split chapters.",
+        help="[deprecated] Run only the legacy DOCX to Unicode pipeline.",
+        description="[deprecated] Convert supported legacy-font DOCX input to Unicode, then split chapters.",
     )
     add_common_options(legacy_parser)
+
+    for command, help_text in PLANNED_COMMANDS.items():
+        subparsers.add_parser(
+            command,
+            help=f"[planned] {help_text}",
+            description=f"[planned] {help_text}",
+        )
 
     return parser
 
@@ -55,6 +71,10 @@ def build_parser():
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command in PLANNED_COMMANDS:
+        parser.error(f"{args.command} is planned but not implemented yet.")
+
     context = resolve_project_context(args.project_root)
     config_path = resolve_project_path(context, args.config)
     register_namespaces()
