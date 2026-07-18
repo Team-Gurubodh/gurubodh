@@ -11,6 +11,8 @@ cms-build:
 
 content-venv:
 	cd tools/gurubodh-cli && python3.12 -m venv .venv
+	# Python 3.12 can generate a doubled prompt for ".venv"; keep activation tidy.
+	perl -0pi -e 's/    PS1=.*\$$\{PS1:-\}.*\n/    PS1="\$$\{VIRTUAL_ENV_PROMPT\}\$$\{PS1:-\}"\n/' tools/gurubodh-cli/.venv/bin/activate
 
 content-install:
 	tools/gurubodh-cli/.venv/bin/python -m pip install -e tools/gurubodh-cli
