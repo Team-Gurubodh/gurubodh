@@ -50,39 +50,40 @@ Starts the Strapi CMS development server from `apps/gurubodh-cms` using
 Builds the Strapi CMS from `apps/gurubodh-cms` using `npm run build`.
 Use this to check that the CMS can compile for production.
 
-### Content Preparation
+### Gurubodh CLI
 
-`make content-venv`
+`make cli-venv`
 
-Creates a Python 3.12 virtual environment at `tools/gurubodh-cli/.venv`.
+Creates a Python 3.12 virtual environment for the Gurubodh CLI at
+`tools/gurubodh-cli/.venv`.
 
-Before installing or running the content CLI, activate the virtual
+Before installing or running the `gurubodh` CLI, activate the virtual
 environment:
 
 ```bash
 . tools/gurubodh-cli/.venv/bin/activate
 ```
 
-`make content-install`
+`make cli-install`
 
-Installs the content Python package in editable mode by running
+Installs the Gurubodh CLI Python package in editable mode by running
 `tools/gurubodh-cli/.venv/bin/python -m pip install -e tools/gurubodh-cli`. This exposes the
 `gurubodh` command while keeping it linked to the source files in this
-repository. The content package requires Python `>=3.12,<3.13` and
+repository. The CLI package requires Python `>=3.12,<3.13` and
 includes local semantic chunking dependencies for future paragraphing and RAG
 preparation work. After the virtual environment is activated and this install
 has completed, `gurubodh` is available from any directory in that shell.
 
-If an existing virtual environment was moved from the old content-preparation
-path, its generated `pip` wrapper may still point to that old path. Use
+If an existing virtual environment was moved from an older tool path, its
+generated `pip` wrapper may still point to that old path. Use
 `python -m pip` through the venv interpreter, or recreate the venv, before
-running content commands.
+running `gurubodh` commands.
 
-For commands that read content project files, the CLI still needs
-to locate `tools/gurubodh-cli`. It does this by walking upward from the
-current directory until it finds `config/conversion_job.schema.json` and
-`jobs/`. If you run it from the monorepo root instead of from
-`tools/gurubodh-cli`, pass the root explicitly:
+For commands that read Gurubodh CLI project files, the CLI needs to locate
+`tools/gurubodh-cli`. It does this by walking upward from the current
+directory until it finds `config/conversion_job.schema.json` and `jobs/`.
+If you run it from the monorepo root instead of from `tools/gurubodh-cli`,
+pass the root explicitly:
 
 ```bash
 gurubodh prep-subject \
@@ -90,13 +91,13 @@ gurubodh prep-subject \
   --config jobs/002_spand_rahasya.local.json
 ```
 
-`make content-help`
+`make cli-help`
 
-Shows the command-line help for `gurubodh`, the content CLI.
+Shows the command-line help for `gurubodh`.
 
-`make content-run-sample`
+`make cli-run-sample`
 
-Runs the sample content job using
+Runs the sample Gurubodh CLI job using
 `tools/gurubodh-cli/jobs/002_spand_rahasya.local.json`.
 
 ### Repository Tooling
