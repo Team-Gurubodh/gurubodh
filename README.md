@@ -5,7 +5,7 @@ Gurubodh is a monorepo for the CMS application, content preparation tools, futur
 ## Structure
 
 - `apps/gurubodh-cms` - Strapi 5 CMS application.
-- `tools/content` - Python utility for preprocessing and preparing
+- `tools/gurubodh-cli` - Python utility for preprocessing and preparing
   MS Word 2007 content and metadata artifacts. Future content ingestion and
   metadata workflow commands are expected to live in the `gurubodh`
   command structure here.
@@ -54,19 +54,19 @@ Use this to check that the CMS can compile for production.
 
 `make content-venv`
 
-Creates a Python 3.12 virtual environment at `tools/content/.venv`.
+Creates a Python 3.12 virtual environment at `tools/gurubodh-cli/.venv`.
 
 Before installing or running the content CLI, activate the virtual
 environment:
 
 ```bash
-. tools/content/.venv/bin/activate
+. tools/gurubodh-cli/.venv/bin/activate
 ```
 
 `make content-install`
 
 Installs the content Python package in editable mode by running
-`tools/content/.venv/bin/python -m pip install -e tools/content`. This exposes the
+`tools/gurubodh-cli/.venv/bin/python -m pip install -e tools/gurubodh-cli`. This exposes the
 `gurubodh` command while keeping it linked to the source files in this
 repository. The content package requires Python `>=3.12,<3.13` and
 includes local semantic chunking dependencies for future paragraphing and RAG
@@ -79,14 +79,14 @@ path, its generated `pip` wrapper may still point to that old path. Use
 running content commands.
 
 For commands that read content project files, the CLI still needs
-to locate `tools/content`. It does this by walking upward from the
+to locate `tools/gurubodh-cli`. It does this by walking upward from the
 current directory until it finds `config/conversion_job.schema.json` and
 `jobs/`. If you run it from the monorepo root instead of from
-`tools/content`, pass the root explicitly:
+`tools/gurubodh-cli`, pass the root explicitly:
 
 ```bash
 gurubodh prep-subject \
-  --project-root tools/content \
+  --project-root tools/gurubodh-cli \
   --config jobs/002_spand_rahasya.local.json
 ```
 
@@ -97,7 +97,7 @@ Shows the command-line help for `gurubodh`, the content CLI.
 `make content-run-sample`
 
 Runs the sample content job using
-`tools/content/jobs/002_spand_rahasya.local.json`.
+`tools/gurubodh-cli/jobs/002_spand_rahasya.local.json`.
 
 ### Repository Tooling
 

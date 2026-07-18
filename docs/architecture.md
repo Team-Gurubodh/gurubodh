@@ -97,7 +97,7 @@ flowchart LR
   - Render or serve content to end users.
   - Own the published content lifecycle.
 - **Current implementation**: Python utility under
-  `tools/content/`, currently used for legacy DOCX Unicode
+  `tools/gurubodh-cli/`, currently used for legacy DOCX Unicode
   conversion, Unicode DOCX ingest, chapter splitting, and preparation artifact
   publication to local storage or Cloudflare R2. See
   [ADR-0013](./adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md).
@@ -118,7 +118,7 @@ flowchart LR
   - Know anything about how content is rendered or consumed downstream.
 - **Current implementation**: not implemented yet. Future CMS ingestion
   commands are expected to be added under the existing
-  `tools/content/` Python package and exposed through the
+  `tools/gurubodh-cli/` Python package and exposed through the
   `gurubodh` command structure.
 - **Planned/recommended direction**: AWS-based ingestion workers or adapters may
   be introduced later, but no ingestion ADR has been accepted yet.
@@ -137,7 +137,7 @@ flowchart LR
   - Know anything about how content is rendered or consumed downstream.
 - **Current implementation**: not implemented yet. Future metadata generation
   commands are expected to be added under the existing
-  `tools/content/` Python package and exposed through the
+  `tools/gurubodh-cli/` Python package and exposed through the
   `gurubodh` command structure.
 - **Planned/recommended direction**: No metadata generation ADR has been accepted yet.
 
@@ -155,7 +155,7 @@ flowchart LR
   - Know anything about how content is rendered or consumed downstream.
 - **Current implementation**: not implemented yet. Future metadata ingestion
   commands are expected to be added under the existing
-  `tools/content/` Python package and exposed through the
+  `tools/gurubodh-cli/` Python package and exposed through the
   `gurubodh` command structure.
 - **Planned/recommended direction**: No metadata ingestion ADR has been accepted yet.
 

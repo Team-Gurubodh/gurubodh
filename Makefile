@@ -10,13 +10,15 @@ cms-build:
 	cd apps/gurubodh-cms && npm run build
 
 content-venv:
-	cd tools/content && python3.12 -m venv .venv
+	cd tools/gurubodh-cli && python3.12 -m venv .venv
+	# Python 3.12 can generate a doubled prompt for ".venv"; keep activation tidy.
+	perl -0pi -e 's/    PS1=.*\$$\{PS1:-\}.*\n/    PS1="\$$\{VIRTUAL_ENV_PROMPT\}\$$\{PS1:-\}"\n/' tools/gurubodh-cli/.venv/bin/activate
 
 content-install:
-	tools/content/.venv/bin/python -m pip install -e tools/content
+	tools/gurubodh-cli/.venv/bin/python -m pip install -e tools/gurubodh-cli
 
 content-help:
-	tools/content/.venv/bin/gurubodh --help
+	tools/gurubodh-cli/.venv/bin/gurubodh --help
 
 content-run-sample:
-	tools/content/.venv/bin/gurubodh prep-subject --project-root tools/content --config jobs/002_spand_rahasya.local.json
+	tools/gurubodh-cli/.venv/bin/gurubodh prep-subject --project-root tools/gurubodh-cli --config jobs/002_spand_rahasya.local.json

@@ -779,7 +779,7 @@ representative Sarvam-backed run.
 
 ### Scope
 
-- Update `tools/content/README.md`.
+- Update `tools/gurubodh-cli/README.md`.
 - Update `docs/schemas.md`.
 - Add or update safe sample configs with segmentation disabled by default.
 - Document enabling segmentation with `SARVAM_API_KEY`.
@@ -801,7 +801,7 @@ representative Sarvam-backed run.
 ### Verification
 
 ```bash
-tools/content/.venv/bin/python -m unittest discover -s tools/content/tests
+tools/gurubodh-cli/.venv/bin/python -m unittest discover -s tools/gurubodh-cli/tests
 git diff --check
 ```
 

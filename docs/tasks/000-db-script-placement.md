@@ -14,7 +14,7 @@ Place existing PostgreSQL database scripts within the new Gurubodh monorepo.
 The monorepo has these working areas:
 
 - `apps/gurubodh-cms` - Strapi 5 CMS application.
-- `tools/content` - Python content preparation scripts.
+- `tools/gurubodh-cli` - Python content preparation scripts.
 
 The Strapi 5 application uses a local PostgreSQL 18 database.
 

@@ -7,7 +7,7 @@ Python utilities for preparing Gurubodh CMS-ready content from DOCX source files
 Run these commands from the monorepo root:
 
 ```bash
-cd tools/content
+cd tools/gurubodh-cli
 python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
@@ -16,7 +16,7 @@ gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
 
 ## What These Commands Do
 
-`cd tools/content` moves into this Python tool project.
+`cd tools/gurubodh-cli` moves into this Python tool project.
 
 `python3.12 -m venv .venv` creates a local virtual environment named `.venv`.
 The content package is standardized on Python `>=3.12,<3.13`.
@@ -54,7 +54,7 @@ If running from another directory, pass the root explicitly:
 
 ```bash
 gurubodh prep-subject \
-  --project-root /Users/rajeev/Applications/gurubodh/tools/content \
+  --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
   --config jobs/002_spand_rahasya.local.json
 ```
 

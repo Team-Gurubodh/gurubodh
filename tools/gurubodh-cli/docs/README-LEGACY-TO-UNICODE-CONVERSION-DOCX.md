@@ -74,9 +74,9 @@ If you run from another directory before installing the package, Python also
 needs the project on its import path:
 
 ```bash
-PYTHONPATH=/path/to/gurubodh/tools/content \
+PYTHONPATH=/path/to/gurubodh/tools/gurubodh-cli \
   python3 -m gurubodh prep-subject \
-  --project-root /path/to/gurubodh/tools/content \
+  --project-root /path/to/gurubodh/tools/gurubodh-cli \
   --config jobs/002_spand_rahasya.local.json
 ```
 
@@ -95,8 +95,8 @@ Examples:
 
 ```bash
 python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
-python3 -m gurubodh prep-subject --project-root /path/to/gurubodh/tools/content --config jobs/002_spand_rahasya.local.json
-GURUBODH_CONTENT_ROOT=/path/to/gurubodh/tools/content python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh prep-subject --project-root /path/to/gurubodh/tools/gurubodh-cli --config jobs/002_spand_rahasya.local.json
+GURUBODH_CONTENT_ROOT=/path/to/gurubodh/tools/gurubodh-cli python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
 ```
 
 Relative config paths are resolved from the current directory when possible,
