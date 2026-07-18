@@ -171,7 +171,7 @@ Do not commit these values to the repository.
 Semantic chunking is integrated as an internal `gurubodh_utils` module:
 
 ```python
-from gurubodh_utils.semantic_chunking import SemanticChunkConfig, SemanticChunker
+from gurubodh_utils.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
 
 config = SemanticChunkConfig(
     threshold_percentile=82,
@@ -191,7 +191,7 @@ generation.
 For standalone local evaluation, run:
 
 ```bash
-python -m gurubodh_utils.semantic_chunking.cli \
+python -m gurubodh_utils.ml.semantic_chunking.cli \
   --source-dir path/to/text-files \
   --output-dir path/to/semantic-chunks
 ```

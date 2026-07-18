@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from gurubodh_utils.semantic_chunking.config import SemanticChunkConfig
-from gurubodh_utils.semantic_chunking.file_io import chunk_folder
+from gurubodh_utils.ml.semantic_chunking.config import SemanticChunkConfig
+from gurubodh_utils.ml.semantic_chunking.file_io import chunk_folder
 
 
 def build_parser() -> argparse.ArgumentParser:
