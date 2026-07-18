@@ -52,6 +52,13 @@ gurubodh-utils run \
   --config jobs/002_spand_rahasya.local.json
 ```
 
+## Future Command Surface
+
+Future content ingestion, metadata generation, and metadata ingestion workflows
+are expected to be added to this Python package and exposed through the
+`gurubodh-utils` command structure instead of separate placeholder tool
+directories.
+
 ## Storage Configuration
 
 The conversion job supports `local` and `r2` source/destination storage

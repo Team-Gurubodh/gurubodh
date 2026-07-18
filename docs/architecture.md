@@ -116,8 +116,10 @@ flowchart LR
   - Perform DOCX Unicode conversion, chapter splitting, or artifact generation.
   - Bypass the CMS's own validation/hooks by writing to its database directly.
   - Know anything about how content is rendered or consumed downstream.
-- **Current implementation**: not implemented yet. `tools/content-ingestion/`
-  is a placeholder for future CMS ingestion tooling.
+- **Current implementation**: not implemented yet. Future CMS ingestion
+  commands are expected to be added under the existing
+  `tools/content-preparation/` Python package and exposed through the
+  `gurubodh-utils` command structure.
 - **Planned/recommended direction**: AWS-based ingestion workers or adapters may
   be introduced later, but no ingestion ADR has been accepted yet.
 
@@ -133,7 +135,10 @@ flowchart LR
   - Does NOT update generated metadata for content already present in the CMS via its API
   - Bypass the CMS's own validation/hooks by writing to its database directly.
   - Know anything about how content is rendered or consumed downstream.
-- **Current implementation**: not implemented yet. `tools/metadata-generation/` is a placeholder for future metadata generation tooling.
+- **Current implementation**: not implemented yet. Future metadata generation
+  commands are expected to be added under the existing
+  `tools/content-preparation/` Python package and exposed through the
+  `gurubodh-utils` command structure.
 - **Planned/recommended direction**: No metadata generation ADR has been accepted yet.
 
 ### 4.4 Metadata Ingestion Layer
@@ -148,7 +153,10 @@ flowchart LR
   - Bypass the CMS API when updating generated metadata for content already present in the CMS.
   - Bypass the CMS's own validation/hooks by writing to its database directly.
   - Know anything about how content is rendered or consumed downstream.
-- **Current implementation**: not implemented yet. `tools/metadata-ingestion/` is a placeholder for future metadata ingestion tooling.
+- **Current implementation**: not implemented yet. Future metadata ingestion
+  commands are expected to be added under the existing
+  `tools/content-preparation/` Python package and exposed through the
+  `gurubodh-utils` command structure.
 - **Planned/recommended direction**: No metadata ingestion ADR has been accepted yet.
 
 ### 4.5 Headless CMS (System of Record)
@@ -204,7 +212,7 @@ flowchart LR
   - Generate or own content — it only derives vectors from what the CMS already
     holds.
   - Serve queries directly (that's the RAG Query Service).
-- **Current implementation**: not yet decided; we need to work on how the generated embeddings work with "content descriptors metadata" prepared by metadata-generation tool to make search effective and efficient. See
+- **Current implementation**: not yet decided; we need to work on how the generated embeddings work with "content descriptors metadata" prepared by future metadata generation commands to make search effective and efficient. See
   [ADR-0009](./adr/0009-embedding-model-and-llm-provider.md).
 
 ### 4.9 Vector Store — *Phase 3*

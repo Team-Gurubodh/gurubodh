@@ -125,7 +125,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
    - Validate required headers, required fields, code format/range, duplicate
      glossary terms within each glossary source, and malformed rows.
    - Include the glossary source identity in the generated artifact so
-     downstream ingestion and future metadata-generation workflows can
+     downstream ingestion and future metadata generation workflows can
      distinguish `Sanatan Glossary` from `Prabodhan Glossary`.
    - Produce clear validation errors that a maintainer can map back to the
      spreadsheet row.
