@@ -86,7 +86,7 @@ After package installation, `python3 -m gurubodh ...` and the optional
 Root detection order:
 
 1. `--project-root`, if supplied.
-2. `GURUBODH_CONTENT_ROOT`, if set.
+2. `GURUBODH_CLI_ROOT`, if set.
 3. Walk upward from the current directory until both are found:
    - `config/conversion_job.schema.json`
    - `jobs/`
@@ -96,7 +96,7 @@ Examples:
 ```bash
 python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
 python3 -m gurubodh prep-subject --project-root /path/to/gurubodh/tools/gurubodh-cli --config jobs/002_spand_rahasya.local.json
-GURUBODH_CONTENT_ROOT=/path/to/gurubodh/tools/gurubodh-cli python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+GURUBODH_CLI_ROOT=/path/to/gurubodh/tools/gurubodh-cli python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
 ```
 
 Relative config paths are resolved from the current directory when possible,

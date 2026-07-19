@@ -24,9 +24,9 @@ future needs:
 
 ## Runtime
 
-The content project now requires Python `>=3.12,<3.13`.
+The Gurubodh CLI project now requires Python `>=3.12,<3.13`.
 
-Semantic chunking dependencies are installed with the main content
+Semantic chunking dependencies are installed with the main Gurubodh CLI
 package:
 
 ```text

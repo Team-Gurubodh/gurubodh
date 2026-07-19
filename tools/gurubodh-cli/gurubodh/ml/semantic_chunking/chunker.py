@@ -82,7 +82,7 @@ class SemanticChunker:
         except ImportError as exc:
             raise RuntimeError(
                 "Semantic chunking requires sentence-transformers. "
-                "Install the content package dependencies before creating a SemanticChunker."
+                "Install the Gurubodh CLI package dependencies before creating a SemanticChunker."
             ) from exc
 
         kwargs = {}
