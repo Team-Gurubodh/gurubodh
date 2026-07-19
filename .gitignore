@@ -48,10 +48,6 @@ apps/gurubodh-cms/license.txt
 apps/gurubodh-cms/public/uploads/*
 !apps/gurubodh-cms/public/uploads/.gitkeep
 
-# Content preparation local input/output
-tools/content-preparation/input_word/
-tools/content-preparation/converted_word/
-
 
 # Temp / backup
 *.tmp

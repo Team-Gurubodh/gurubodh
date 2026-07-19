@@ -1,4 +1,4 @@
-# Content Preparation
+# Gurubodh CLI
 
 Python utilities for preparing Gurubodh CMS-ready content from DOCX source files.
 
