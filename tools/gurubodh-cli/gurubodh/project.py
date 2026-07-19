@@ -30,17 +30,17 @@ def resolve_project_context(project_root=None):
         if not _looks_like_project_root(root):
             raise SystemExit(f"Project root does not contain config/ and jobs/: {root}")
     else:
-        env_root = os.environ.get("GURUBODH_CONTENT_ROOT")
+        env_root = os.environ.get("GURUBODH_CLI_ROOT")
         if env_root:
             root = Path(env_root).expanduser().resolve()
             if not _looks_like_project_root(root):
-                raise SystemExit(f"GURUBODH_CONTENT_ROOT is not a Gurubodh CMS project root: {root}")
+                raise SystemExit(f"GURUBODH_CLI_ROOT is not a Gurubodh CLI project root: {root}")
         else:
             root = _find_project_root(Path.cwd())
             if root is None:
                 raise SystemExit(
                     "Could not find project root. Run from the project tree, set "
-                    "GURUBODH_CONTENT_ROOT, or pass --project-root."
+                    "GURUBODH_CLI_ROOT, or pass --project-root."
                 )
 
     return ProjectContext(
@@ -57,4 +57,3 @@ def resolve_project_path(context, path):
     if cwd_path.exists():
         return cwd_path
     return (context.root / path).resolve()
-

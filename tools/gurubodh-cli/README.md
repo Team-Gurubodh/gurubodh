@@ -19,7 +19,7 @@ gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
 `cd tools/gurubodh-cli` moves into this Python tool project.
 
 `python3.12 -m venv .venv` creates a local virtual environment named `.venv`.
-The content package is standardized on Python `>=3.12,<3.13`.
+The Gurubodh CLI package is standardized on Python `>=3.12,<3.13`.
 
 `. .venv/bin/activate` activates the virtual environment so dependencies and console commands are isolated to this project.
 

@@ -24,7 +24,7 @@ def add_common_options(parser):
     parser.add_argument(
         "--project-root",
         help=(
-            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_CONTENT_ROOT "
+            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_CLI_ROOT "
             "or walks upward from the current directory."
         ),
     )

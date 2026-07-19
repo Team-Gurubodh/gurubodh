@@ -56,7 +56,7 @@ class R2StorageClient:
             from botocore.exceptions import ClientError
         except ImportError as exc:
             raise SystemExit(
-                "R2 storage requires boto3. Install content dependencies with pip install -e ."
+                "R2 storage requires boto3. Install Gurubodh CLI dependencies with pip install -e ."
             ) from exc
 
         self._client_error = ClientError
