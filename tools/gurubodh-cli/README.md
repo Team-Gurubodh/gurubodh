@@ -187,8 +187,8 @@ Semantic chunking is integrated as an internal `gurubodh` module:
 from gurubodh.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
 
 config = SemanticChunkConfig(
-    threshold_percentile=80,
-    min_chars=650,
+    threshold_percentile=78,
+    min_chars=550,
     window_size=3,
 )
 
@@ -215,8 +215,8 @@ gurubodh generate-chunks \
   --source-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata \
   --output-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters \
   --model-name BAAI/bge-m3 \
-  --threshold-percentile 82 \
-  --min-chars 700 \
+  --threshold-percentile 78 \
+  --min-chars 550 \
   --window-size 3 \
   --batch-size 16 \
   --device cpu
