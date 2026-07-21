@@ -1,9 +1,13 @@
 import hashlib
 import re
+import unicodedata
 
 from gurubodh.constants import CHAPTER_METADATA_SCHEMA_VERSION
 from gurubodh.naming import version_label
 from gurubodh.storage import destination_artifact_reference, source_reference
+
+SUMMARY_TAG_MARKER = "उपसंहार"
+SUMMARY_CHAPTER_TAGS = ["summary_chapter", SUMMARY_TAG_MARKER]
 
 
 def chapter_storage_references(config, file_names):
@@ -58,6 +62,20 @@ def text_artifact_integrity(text):
     }
 
 
+def summary_chapter_markers(config):
+    defaults = config.get("metadata_defaults", {})
+    return defaults.get("summary_chapter_markers", [])
+
+
+def automated_tags(text, summary_markers=None):
+    normalized_text = unicodedata.normalize("NFC", text)
+    markers = [] if summary_markers is None else summary_markers
+    normalized_markers = [unicodedata.normalize("NFC", marker) for marker in markers]
+    if any(marker in normalized_text for marker in normalized_markers):
+        return list(SUMMARY_CHAPTER_TAGS)
+    return []
+
+
 def build_chapter_metadata(
     config,
     chapter_number,
@@ -100,7 +118,10 @@ def build_chapter_metadata(
         "content": {
             "title": None,
             "summary": None,
-            "automated_tags": [],
+            "automated_tags": automated_tags(
+                chapter_text_value,
+                summary_chapter_markers(config),
+            ),
             "scriptural_terms": [],
         },
         "annotations": {

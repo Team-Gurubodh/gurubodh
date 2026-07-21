@@ -29,6 +29,13 @@
   "metadata_defaults": {
     "language": "hi-IN",
     "source_script": "Devanagari",
-    "output_text_encoding": "UTF-8"
+    "output_text_encoding": "UTF-8",
+    "summary_chapter_markers": [
+      "उपसंहार",
+      "उपसंहारात्मक",
+      "उपसंभारात्मक",
+      "उपसंभारात्त्मक",
+      "उपसंभार"
+    ]
   }
 }

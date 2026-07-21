@@ -162,6 +162,37 @@ skip unchanged text artifacts, detect source text changes across local and
 R2-backed jobs, and decide when future chunks, embeddings, or RAG indexes need
 to be rebuilt.
 
+## Summary Chapter Tags
+
+Chapter metadata automatically adds summary tags when generated chapter text
+contains a configured summary marker. Matching chapters include:
+
+```json
+"content": {
+  "automated_tags": ["summary_chapter", "उपसंहार"]
+}
+```
+
+Jobs configure the marker terms under `metadata_defaults`:
+
+```json
+"metadata_defaults": {
+  "language": "hi-IN",
+  "source_script": "Devanagari",
+  "output_text_encoding": "UTF-8",
+  "summary_chapter_markers": [
+    "उपसंहार",
+    "उपसंहारात्मक",
+    "उपसंभारात्मक",
+    "उपसंभारात्त्मक",
+    "उपसंभार"
+  ]
+}
+```
+
+If `summary_chapter_markers` is omitted, the CLI does not run summary chapter
+detection for that job.
+
 For R2 destinations, the tool checks the destination subject prefix before
 processing starts. If objects already exist and `--overwrite` is not supplied,
 the job fails before doing DOCX conversion or chapter splitting. During upload,

@@ -22,6 +22,11 @@ None currently recorded.
 - Content preparation JSON schemas belong under `tools/gurubodh-cli/config/`.
 - Conversion job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
+- Conversion job `metadata_defaults.summary_chapter_markers` explicitly
+  configures Devanagari search terms that add `summary_chapter` and
+  `उपसंहार` to chapter metadata `content.automated_tags` when found in
+  generated chapter text. If omitted, summary chapter detection is disabled for
+  that job.
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
   of the generated chapter `.txt` artifact bytes. It does not checksum the
   metadata JSON artifact.

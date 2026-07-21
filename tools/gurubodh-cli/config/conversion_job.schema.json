@@ -227,6 +227,13 @@
         "output_text_encoding": {
           "type": "string",
           "default": "UTF-8"
+        },
+        "summary_chapter_markers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": true
