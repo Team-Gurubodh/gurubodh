@@ -231,6 +231,10 @@ segmentation, validation, write steps, and final file/chunk totals.
 
 The standalone output includes provider/model metadata, explicit chunking
 parameters, zero-based end-exclusive Python character spans, per-chunk SHA-256
-checksums, and a source/chunks checksum round trip. The checksum round trip
-removes whitespace using Python `str.isspace()` before hashing so formatting
-differences in chapter whitespace do not affect content validation.
+checksums, per-chunk `estimated_embedding_token_count`, and a source/chunks
+checksum round trip. The token estimate is counted with the BGE-M3 tokenizer
+without special tokens and represents the BGE-M3 input token size if the chunk
+were embedded as one standalone input; it is not an API billing metric for the
+local chunking workflow. The checksum round trip removes whitespace using
+Python `str.isspace()` before hashing so formatting differences in chapter
+whitespace do not affect content validation.

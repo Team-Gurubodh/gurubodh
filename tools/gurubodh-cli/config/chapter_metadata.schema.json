@@ -346,6 +346,29 @@
           "type": "string",
           "const": "zero-based-end-exclusive"
         },
+        "estimated_embedding_token_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_counting": {
+          "type": "object",
+          "required": ["tokenizer", "unit", "includes_special_tokens"],
+          "properties": {
+            "tokenizer": {
+              "type": "string",
+              "const": "BAAI/bge-m3"
+            },
+            "unit": {
+              "type": "string",
+              "const": "model-token"
+            },
+            "includes_special_tokens": {
+              "type": "boolean",
+              "const": false
+            }
+          },
+          "additionalProperties": false
+        },
         "parameters": {
           "type": "object",
           "required": [
@@ -399,6 +422,10 @@
                 "minimum": 0
               },
               "char_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "estimated_embedding_token_count": {
                 "type": "integer",
                 "minimum": 0
               },

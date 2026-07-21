@@ -26,6 +26,7 @@ from gurubodh.ml.semantic_chunking.segmenter import SemanticChunkingParagraphSeg
 class FakeEmbeddingModel:
     def __init__(self):
         self.calls = []
+        self.tokenizer = FakeTokenizer()
 
     def encode(self, windows, batch_size, normalize_embeddings, show_progress_bar):
         self.calls.append(
@@ -37,6 +38,15 @@ class FakeEmbeddingModel:
             }
         )
         return [[1.0, 0.0] if index % 2 == 0 else [0.0, 1.0] for index, _ in enumerate(windows)]
+
+
+class FakeTokenizer:
+    def __init__(self):
+        self.calls = []
+
+    def encode(self, text, add_special_tokens=False):
+        self.calls.append({"text": text, "add_special_tokens": add_special_tokens})
+        return text.split()
 
 
 def make_document(source_name, chunks, source_text):
@@ -118,6 +128,9 @@ class SemanticChunkingTests(unittest.TestCase):
         self.assertEqual(document.chunks[0].start_char, 0)
         self.assertEqual(document.chunks[0].end_char, len("पहला वाक्य।"))
         self.assertEqual(document.chunks[0].chunk_text_sha256, text_sha256("पहला वाक्य।"))
+        self.assertEqual(document.chunks[0].estimated_embedding_token_count, 2)
+        self.assertEqual(document.estimated_embedding_token_count, 4)
+        self.assertFalse(model.tokenizer.calls[0]["add_special_tokens"])
         self.assertEqual(model.calls[0]["batch_size"], 16)
 
     def test_chunk_folder_writes_json_markdown_and_summary(self):
@@ -135,9 +148,15 @@ class SemanticChunkingTests(unittest.TestCase):
 
             output_dir = output_parent / "semantic_chunks_bge_m3"
             payload = json.loads((output_dir / "001.chunks.json").read_text(encoding="utf-8"))
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(len(documents), 1)
             self.assertEqual(payload["provider"], "semantic-chunking")
             self.assertEqual(payload["model"], "BAAI/bge-m3")
+            self.assertEqual(payload["token_counting"]["tokenizer"], "BAAI/bge-m3")
+            self.assertFalse(payload["token_counting"]["includes_special_tokens"])
+            self.assertEqual(payload["chunks"][0]["estimated_embedding_token_count"], 2)
+            self.assertEqual(payload["estimated_embedding_token_count"], 4)
+            self.assertEqual(summary["files"][0]["estimated_embedding_token_count"], 4)
             self.assertEqual(payload["source_text_sha256"], payload["concatenated_chunks_sha256"])
             self.assertTrue((output_dir / "001.chunks.md").exists())
             self.assertTrue((output_dir / "summary.json").exists())
@@ -198,6 +217,7 @@ class SemanticChunkingTests(unittest.TestCase):
             text="पहला।",
             sentence_count=1,
             char_count=len("पहला।"),
+            estimated_embedding_token_count=1,
             start_sentence=0,
             end_sentence=0,
             start_char=0,
