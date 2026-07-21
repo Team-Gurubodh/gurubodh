@@ -1,7 +1,9 @@
 import argparse
+import sys
 
 from gurubodh.docx.namespaces import register_namespaces
 from gurubodh.ml.semantic_chunking.cli import add_generate_chunks_options, run_generate_chunks
+from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
 from gurubodh.project import resolve_project_context, resolve_project_path
 
@@ -65,6 +67,13 @@ def build_parser():
     )
     add_generate_chunks_options(generate_chunks_parser)
 
+    compare_tokenizers_parser = subparsers.add_parser(
+        "compare-tokenizers",
+        help="Compare BGE-M3 and optional Sarvam token counts for chapter text.",
+        description="Estimate local BGE-M3 token counts and optionally compare them with Sarvam prompt token counts.",
+    )
+    add_compare_tokenizers_options(compare_tokenizers_parser)
+
     for command, help_text in PLANNED_COMMANDS.items():
         subparsers.add_parser(
             command,
@@ -89,6 +98,14 @@ def main(argv=None):
             parser.error(str(exc))
         for document in documents:
             print(f"{document.source_name}: {document.chunk_count} chunks")
+        return
+
+    if args.command == "compare-tokenizers":
+        try:
+            comparisons = run_compare_tokenizers(args, progress=lambda message: print(message, file=sys.stderr))
+        except Exception as exc:
+            parser.error(str(exc))
+        print(format_json(comparisons) if args.format == "json" else format_text(comparisons))
         return
 
     context = resolve_project_context(args.project_root)

@@ -238,3 +238,44 @@ were embedded as one standalone input; it is not an API billing metric for the
 local chunking workflow. The checksum round trip removes whitespace using
 Python `str.isspace()` before hashing so formatting differences in chapter
 whitespace do not affect content validation.
+
+## Tokenizer Comparison
+
+Use `compare-tokenizers` to estimate how prepared chapter text maps to local
+BGE-M3 embedding tokens and, when explicitly approved, Sarvam chat prompt
+tokens:
+
+```bash
+gurubodh compare-tokenizers \
+  --source-file /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata/001.txt
+```
+
+For a directory of prepared chapter text files:
+
+```bash
+gurubodh compare-tokenizers \
+  --source-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata \
+  --chapter 001 \
+  --chapters 002 003.txt \
+  --model-name BAAI/bge-m3
+```
+
+The command removes all Unicode whitespace before token counting, while keeping
+the original whitespace-delimited word count for ratio reporting. Progress is
+printed to stderr so text and JSON results on stdout can still be redirected to
+a file.
+
+Sarvam comparison sends source text to an external API and is disabled by
+default. To enable it, set the API key and pass both explicit flags:
+
+```bash
+export SARVAM_API_KEY=...
+
+gurubodh compare-tokenizers \
+  --source-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata \
+  --include-sarvam \
+  --approve-external-api \
+  --sarvam-model sarvam-105b
+```
+
+Machine-readable output is available with `--format json`.
