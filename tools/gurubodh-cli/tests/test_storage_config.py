@@ -199,6 +199,224 @@ class StorageConfigTests(unittest.TestCase):
         )
         self.assertNotIn("metadata", metadata["integrity"]["artifacts"])
 
+    def test_chapter_metadata_tags_summary_markers(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"] = {
+            "summary_chapter_markers": [
+                "उपसंहार",
+                "उपसंहारात्मक",
+                "उपसंभारात्मक",
+                "उपसंभारात्त्मक",
+                "उपसंभार",
+            ],
+        }
+
+        for marker in [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार",
+        ]:
+            with self.subTest(marker=marker):
+                metadata = build_chapter_metadata(
+                    config,
+                    9,
+                    {
+                        "metadata": "chapter.json",
+                        "text": "chapter.txt",
+                        "msword": "chapter.docx",
+                        "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                        "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                        "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                        "full_msword_relative_path": Path("full_subject/full.docx"),
+                        "full_text_relative_path": Path("full_subject/full.txt"),
+                    },
+                    f"।।{marker}।।\n\nया प्रकरणाचा सारांश येथे आहे.",
+                    {},
+                    "2026-07-08T00:00:00Z",
+                    "python3 -m gurubodh prep-subject",
+                )
+
+                self.assertEqual(
+                    metadata["content"]["automated_tags"],
+                    ["summary_chapter", "उपसंहार"],
+                )
+
+    def test_chapter_metadata_keeps_automated_tags_empty_without_summary_marker(self):
+        metadata = build_chapter_metadata(
+            BASE_CONFIG,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            "श्री स्वामी समर्थ\n\nया प्रकरणात आचरणाचे विवेचन आहे.",
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh prep-subject",
+        )
+
+        self.assertEqual(metadata["content"]["automated_tags"], [])
+
+    def test_chapter_metadata_uses_configured_summary_markers(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"] = {
+            "summary_chapter_markers": ["समाप्ति-सूत्र"],
+        }
+
+        metadata = build_chapter_metadata(
+            config,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            "यह समाप्ति-सूत्र प्रकरण का सारांश बताता है.",
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh prep-subject",
+        )
+
+        self.assertEqual(
+            metadata["content"]["automated_tags"],
+            ["summary_chapter", "उपसंहार"],
+        )
+
+    def test_chapter_metadata_omitted_summary_markers_disable_detection(self):
+        metadata = build_chapter_metadata(
+            BASE_CONFIG,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            "यह उपसंहार प्रकरण का सारांश बताता है.",
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh prep-subject",
+        )
+
+        self.assertEqual(metadata["content"]["automated_tags"], [])
+
+    def test_chapter_metadata_configured_summary_markers_use_only_configured_terms(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"] = {
+            "summary_chapter_markers": ["समाप्ति-सूत्र"],
+        }
+
+        metadata = build_chapter_metadata(
+            config,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            "यह उपसंहार प्रकरण का सारांश बताता है.",
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh prep-subject",
+        )
+
+        self.assertEqual(metadata["content"]["automated_tags"], [])
+
+    def test_chapter_metadata_honors_empty_summary_markers(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"] = {
+            "summary_chapter_markers": [],
+        }
+
+        metadata = build_chapter_metadata(
+            config,
+            1,
+            {
+                "metadata": "chapter.json",
+                "text": "chapter.txt",
+                "msword": "chapter.docx",
+                "metadata_relative_path": Path("chapters/text_and_metadata/chapter.json"),
+                "text_relative_path": Path("chapters/text_and_metadata/chapter.txt"),
+                "msword_relative_path": Path("chapters/msword/chapter.docx"),
+                "full_msword_relative_path": Path("full_subject/full.docx"),
+                "full_text_relative_path": Path("full_subject/full.txt"),
+            },
+            "यह उपसंहार प्रकरण का सारांश बताता है.",
+            {},
+            "2026-07-08T00:00:00Z",
+            "python3 -m gurubodh prep-subject",
+        )
+
+        self.assertEqual(metadata["content"]["automated_tags"], [])
+
+    def test_conversion_job_schema_defines_summary_chapter_markers(self):
+        schema_path = Path(__file__).parents[1] / "config" / "conversion_job.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+        markers_schema = schema["properties"]["metadata_defaults"]["properties"]["summary_chapter_markers"]
+
+        self.assertEqual(markers_schema["type"], "array")
+        self.assertEqual(markers_schema["items"]["type"], "string")
+        self.assertNotIn("default", markers_schema)
+
+    def test_load_conversion_job_accepts_summary_chapter_markers(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"] = {
+            "summary_chapter_markers": ["समाप्ति-सूत्र"],
+        }
+
+        loaded = load_conversion_job(self.write_config(config))
+
+        self.assertEqual(
+            loaded["metadata_defaults"]["summary_chapter_markers"],
+            ["समाप्ति-सूत्र"],
+        )
+
+    def test_sample_jobs_declare_summary_chapter_markers(self):
+        jobs_dir = Path(__file__).parents[1] / "jobs"
+
+        for job_path in jobs_dir.glob("*.json"):
+            with self.subTest(job=job_path.name):
+                config = load_conversion_job(job_path)
+
+                self.assertIn("summary_chapter_markers", config["metadata_defaults"])
+
+    def test_load_conversion_job_rejects_invalid_summary_chapter_markers(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"] = {
+            "summary_chapter_markers": "उपसंहार",
+        }
+
+        with self.assertRaises(SystemExit) as exc:
+            load_conversion_job(self.write_config(config))
+
+        self.assertIn(
+            "metadata_defaults.summary_chapter_markers must be an array of strings",
+            str(exc.exception),
+        )
+
     def test_text_artifact_integrity_changes_when_text_changes(self):
         original = text_artifact_integrity("प्रबोधन")
         changed = text_artifact_integrity("प्रबोधन बदलले")

@@ -49,6 +49,18 @@ def optional_string_or_null(data, key, context):
     return value
 
 
+def optional_string_array(data, key, context):
+    value = data.get(key)
+    if value is None:
+        return value
+    if not isinstance(value, list):
+        raise SystemExit(f"Config error: {context}.{key} must be an array of strings")
+    for item in value:
+        if not isinstance(item, str) or not item:
+            raise SystemExit(f"Config error: {context}.{key} must contain only non-empty strings")
+    return value
+
+
 def chapter_split_regex_flags(chapter_split):
     flags = chapter_split.get("flags", [])
     if not isinstance(flags, list):
@@ -177,5 +189,6 @@ def load_conversion_job(path):
     metadata_defaults = config.get("metadata_defaults", {})
     if metadata_defaults and not isinstance(metadata_defaults, dict):
         raise SystemExit("Config error: metadata_defaults must be an object")
+    optional_string_array(metadata_defaults, "summary_chapter_markers", "metadata_defaults")
     validate_pipeline_matches_source(config)
     return config
