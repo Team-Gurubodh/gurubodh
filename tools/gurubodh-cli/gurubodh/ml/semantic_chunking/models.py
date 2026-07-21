@@ -6,6 +6,10 @@ from dataclasses import asdict, dataclass
 import hashlib
 
 
+TOKEN_COUNT_UNIT = "model-token"
+TOKEN_COUNT_INCLUDES_SPECIAL_TOKENS = False
+
+
 @dataclass(frozen=True)
 class Chunk:
     """One semantically coherent chunk of source text."""
@@ -14,6 +18,7 @@ class Chunk:
     text: str
     sentence_count: int
     char_count: int
+    estimated_embedding_token_count: int
     start_sentence: int
     end_sentence: int
     start_char: int
@@ -52,6 +57,10 @@ class ChunkedDocument:
     def chunk_count(self) -> int:
         return len(self.chunks)
 
+    @property
+    def estimated_embedding_token_count(self) -> int:
+        return sum(chunk.estimated_embedding_token_count for chunk in self.chunks)
+
     def to_dict(self) -> dict:
         return {
             "source_name": self.source_name,
@@ -74,6 +83,12 @@ class ChunkedDocument:
             "source_text_sha256": self.source_text_sha256,
             "concatenated_chunks_sha256": self.concatenated_chunks_sha256,
             "chunk_count": self.chunk_count,
+            "estimated_embedding_token_count": self.estimated_embedding_token_count,
+            "token_counting": {
+                "tokenizer": self.model_name,
+                "unit": TOKEN_COUNT_UNIT,
+                "includes_special_tokens": TOKEN_COUNT_INCLUDES_SPECIAL_TOKENS,
+            },
             "chunks": [chunk.to_dict() for chunk in self.chunks],
             "diagnostics": {
                 "breakpoint_threshold": self.breakpoint_threshold,

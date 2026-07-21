@@ -193,8 +193,7 @@ class SemanticChunker:
 
         return merged
 
-    @staticmethod
-    def _build_chunk(index: int, sentence_spans: list[SentenceSpan], source_text: str) -> Chunk:
+    def _build_chunk(self, index: int, sentence_spans: list[SentenceSpan], source_text: str) -> Chunk:
         start_char = sentence_spans[0].start_char
         end_char = sentence_spans[-1].end_char
         text = source_text[start_char:end_char]
@@ -203,12 +202,30 @@ class SemanticChunker:
             text=text,
             sentence_count=len(sentence_spans),
             char_count=len(text),
+            estimated_embedding_token_count=self._count_embedding_tokens(text),
             start_sentence=sentence_spans[0].source_index,
             end_sentence=sentence_spans[-1].source_index,
             start_char=start_char,
             end_char=end_char,
             chunk_text_sha256=text_sha256(text),
         )
+
+    def _count_embedding_tokens(self, text: str) -> int:
+        tokenizer = self._embedding_tokenizer()
+        try:
+            token_ids = tokenizer.encode(text, add_special_tokens=False)
+        except TypeError:
+            token_ids = tokenizer.encode(text)
+        return len(token_ids)
+
+    def _embedding_tokenizer(self) -> Any:
+        tokenizer = getattr(self.model, "tokenizer", None)
+        if tokenizer is None:
+            raise RuntimeError(
+                "Semantic chunking requires the embedding model to expose a tokenizer "
+                "for estimated_embedding_token_count."
+            )
+        return tokenizer
 
     def _build_document(
         self,

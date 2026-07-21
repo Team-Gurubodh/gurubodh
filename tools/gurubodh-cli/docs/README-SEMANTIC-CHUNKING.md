@@ -66,7 +66,7 @@ chunker = SemanticChunker(config)
 document = chunker.chunk_text(raw_text, source_name="chapter.txt")
 
 for chunk in document.chunks:
-    print(chunk.index, chunk.char_count, chunk.text)
+    print(chunk.index, chunk.char_count, chunk.estimated_embedding_token_count, chunk.text)
 ```
 
 ## Standalone Evaluation
@@ -97,9 +97,15 @@ final file/chunk totals.
 
 Current behavior returns chunk text, sentence ranges, exact zero-based
 end-exclusive character spans into the source text, provider/model metadata,
-and per-chunk checksums. Before writing a chapter's outputs, the command removes
-Python-recognized Unicode whitespace with `str.isspace()`, hashes the source
-text, hashes the ordered chunks, and requires those checksums to match.
+per-chunk checksums, and `estimated_embedding_token_count` for each chunk. The
+token estimate is counted with the BGE-M3 tokenizer, without special tokens, and
+means roughly "how many BGE-M3 input tokens this chunk would use if embedded as
+one standalone input." It is not an API billing metric, and it is not exactly the
+token count used by the chunking algorithm, because breakpoint detection embeds
+overlapping contextual sentence windows. Before writing a chapter's outputs, the
+command removes Python-recognized Unicode whitespace with `str.isspace()`, hashes
+the source text, hashes the ordered chunks, and requires those checksums to
+match.
 
 The existing DOCX preparation pipelines do not call semantic chunking yet.
 Future Task 014 integration should use the `ParagraphSegmenter` boundary rather

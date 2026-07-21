@@ -28,7 +28,8 @@ None currently recorded.
 - Chapter metadata also reserves an optional `paragraph_segmentation` shape for
   later semantic chunking integration. The standalone `generate-chunks` POC uses
   separate JSON/Markdown outputs and does not write this field into generated
-  chapter metadata yet.
+  chapter metadata yet. The reserved chunk shape allows BGE-M3
+  `estimated_embedding_token_count` values and token-counting basis metadata.
 - Seed-data JSON schemas belong under `tools/seed-data/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by
