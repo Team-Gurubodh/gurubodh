@@ -25,6 +25,10 @@ None currently recorded.
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
   of the generated chapter `.txt` artifact bytes. It does not checksum the
   metadata JSON artifact.
+- Chapter metadata also reserves an optional `paragraph_segmentation` shape for
+  later semantic chunking integration. The standalone `generate-chunks` POC uses
+  separate JSON/Markdown outputs and does not write this field into generated
+  chapter metadata yet.
 - Seed-data JSON schemas belong under `tools/seed-data/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

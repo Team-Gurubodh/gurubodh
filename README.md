@@ -100,6 +100,15 @@ Shows the command-line help for `gurubodh`.
 Runs the sample Gurubodh CLI job using
 `tools/gurubodh-cli/jobs/002_spand_rahasya.local.json`.
 
+Standalone semantic chunk generation requires a local model cache directory:
+
+```bash
+export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
+gurubodh generate-chunks \
+  --source-dir /path/to/chapters/text_and_metadata \
+  --output-dir /path/to/chapters
+```
+
 ### Repository Tooling
 
 `npm ci`

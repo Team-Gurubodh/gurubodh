@@ -1,6 +1,7 @@
 import argparse
 
 from gurubodh.docx.namespaces import register_namespaces
+from gurubodh.ml.semantic_chunking.cli import add_generate_chunks_options, run_generate_chunks
 from gurubodh.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
 from gurubodh.project import resolve_project_context, resolve_project_path
 
@@ -8,7 +9,6 @@ from gurubodh.project import resolve_project_context, resolve_project_path
 PLANNED_COMMANDS = {
     "download-subject": "Download subject source files and existing artifacts from configured storage.",
     "delete-subject": "Delete a subject and its generated artifacts from configured storage.",
-    "generate-chunks": "Generate semantic text chunks from prepared chapter text files.",
     "generate-embeddings": "Generate vector embeddings for prepared semantic chunks.",
     "update-metadata": "Update subject and chapter metadata from the configured metadata source.",
 }
@@ -58,6 +58,13 @@ def build_parser():
     )
     add_common_options(legacy_parser)
 
+    generate_chunks_parser = subparsers.add_parser(
+        "generate-chunks",
+        help="Generate semantic text chunks from prepared chapter text files.",
+        description="Generate standalone semantic chunk JSON and Markdown outputs from prepared chapter .txt files.",
+    )
+    add_generate_chunks_options(generate_chunks_parser)
+
     for command, help_text in PLANNED_COMMANDS.items():
         subparsers.add_parser(
             command,
@@ -74,6 +81,15 @@ def main(argv=None):
 
     if args.command in PLANNED_COMMANDS:
         parser.error(f"{args.command} is planned but not implemented yet.")
+
+    if args.command == "generate-chunks":
+        try:
+            documents = run_generate_chunks(args, progress=print)
+        except Exception as exc:
+            parser.error(str(exc))
+        for document in documents:
+            print(f"{document.source_name}: {document.chunk_count} chunks")
+        return
 
     context = resolve_project_context(args.project_root)
     config_path = resolve_project_path(context, args.config)

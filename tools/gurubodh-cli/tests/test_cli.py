@@ -22,6 +22,9 @@ class CliTests(unittest.TestCase):
             self.assertIn(command, help_text)
             self.assertIn(f"[planned] {command_help}", normalized_help)
 
+        self.assertIn("generate-chunks", help_text)
+        self.assertNotIn("[planned] Generate semantic text chunks from prepared chapter text files.", normalized_help)
+
     def test_planned_command_exits_with_clear_message(self):
         stderr = StringIO()
 
