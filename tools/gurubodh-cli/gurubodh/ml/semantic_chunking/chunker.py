@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
-from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument
-from gurubodh.ml.semantic_chunking.sentence_splitter import split_sentences
+from gurubodh.ml.semantic_chunking.models import (
+    Chunk,
+    ChunkedDocument,
+    text_sha256,
+    whitespace_insensitive_sha256,
+)
+from gurubodh.ml.semantic_chunking.sentence_splitter import SentenceSpan, split_sentence_spans
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
@@ -20,31 +26,32 @@ class SemanticChunker:
         self,
         config: SemanticChunkConfig | None = None,
         model: "SentenceTransformer | None" = None,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config or SemanticChunkConfig()
-        self.model = model or self._load_model()
+        self._model = model
+        self._progress = progress
 
     def chunk_text(self, text: str, source_name: str | None = None) -> ChunkedDocument:
-        sentences = split_sentences(text)
-        if not sentences:
-            return ChunkedDocument(
+        sentence_spans = split_sentence_spans(text)
+        if not sentence_spans:
+            return self._build_document(
+                text=text,
                 source_name=source_name,
-                model_name=self.config.model_name,
-                threshold_percentile=self.config.threshold_percentile,
                 breakpoint_threshold=None,
                 chunks=[],
             )
 
-        if len(sentences) == 1:
-            chunk = self._build_chunk(index=1, sentences=sentences, start_sentence=0)
-            return ChunkedDocument(
+        if len(sentence_spans) == 1:
+            chunk = self._build_chunk(index=1, sentence_spans=sentence_spans, source_text=text)
+            return self._build_document(
+                text=text,
                 source_name=source_name,
-                model_name=self.config.model_name,
-                threshold_percentile=self.config.threshold_percentile,
                 breakpoint_threshold=None,
                 chunks=[chunk],
             )
 
+        sentences = [span.text for span in sentence_spans]
         windows = self._contextual_windows(sentences)
         embeddings = self.model.encode(
             windows,
@@ -56,25 +63,36 @@ class SemanticChunker:
         threshold = self._percentile(distances, self.config.threshold_percentile)
         breakpoints = self._initial_breakpoints(distances, threshold)
 
-        raw_chunks = self._chunks_from_breakpoints(sentences, breakpoints)
+        raw_chunks = self._chunks_from_breakpoints(sentence_spans, breakpoints)
         raw_chunks = self._merge_small_chunks(raw_chunks, self.config.min_chars)
 
         chunks = [
             self._build_chunk(
                 index=index,
-                sentences=chunk_sentences,
-                start_sentence=start_sentence,
+                sentence_spans=chunk_sentence_spans,
+                source_text=text,
             )
-            for index, (start_sentence, chunk_sentences) in enumerate(raw_chunks, 1)
+            for index, chunk_sentence_spans in enumerate(raw_chunks, 1)
         ]
 
-        return ChunkedDocument(
+        return self._build_document(
+            text=text,
             source_name=source_name,
-            model_name=self.config.model_name,
-            threshold_percentile=self.config.threshold_percentile,
             breakpoint_threshold=None if math.isinf(threshold) else threshold,
             chunks=chunks,
         )
+
+    @property
+    def model(self) -> "SentenceTransformer":
+        if self._model is None:
+            self._emit_progress(f"Loading embedding model {self.config.model_name}...")
+            self._model = self._load_model()
+            self._emit_progress("Embedding model ready.")
+        return self._model
+
+    def _emit_progress(self, message: str) -> None:
+        if self._progress:
+            self._progress(message)
 
     def _load_model(self) -> "SentenceTransformer":
         try:
@@ -82,12 +100,17 @@ class SemanticChunker:
         except ImportError as exc:
             raise RuntimeError(
                 "Semantic chunking requires sentence-transformers. "
-                "Install the Gurubodh CLI package dependencies before creating a SemanticChunker."
+                "Install the Gurubodh CLI package dependencies before running semantic chunking."
             ) from exc
 
-        kwargs = {}
+        kwargs: dict[str, Any] = {
+            "cache_folder": str(self.config.resolved_cache_dir()),
+            "local_files_only": self.config.local_files_only,
+        }
         if self.config.device:
             kwargs["device"] = self.config.device
+        if self.config.model_revision:
+            kwargs["revision"] = self.config.model_revision
         return SentenceTransformer(self.config.model_name, **kwargs)
 
     def _contextual_windows(self, sentences: list[str]) -> list[str]:
@@ -128,63 +151,88 @@ class SemanticChunker:
 
     @staticmethod
     def _chunks_from_breakpoints(
-        sentences: list[str],
+        sentence_spans: list[SentenceSpan],
         breakpoints: set[int],
-    ) -> list[tuple[int, list[str]]]:
-        chunks: list[tuple[int, list[str]]] = []
-        current: list[str] = []
-        current_start = 0
+    ) -> list[list[SentenceSpan]]:
+        chunks: list[list[SentenceSpan]] = []
+        current: list[SentenceSpan] = []
 
-        for index, sentence in enumerate(sentences):
+        for index, sentence in enumerate(sentence_spans):
             if index in breakpoints and current:
-                chunks.append((current_start, current))
+                chunks.append(current)
                 current = []
-                current_start = index
             current.append(sentence)
 
         if current:
-            chunks.append((current_start, current))
+            chunks.append(current)
 
         return chunks
 
     @staticmethod
     def _merge_small_chunks(
-        chunks: list[tuple[int, list[str]]],
+        chunks: list[list[SentenceSpan]],
         min_chars: int,
-    ) -> list[tuple[int, list[str]]]:
+    ) -> list[list[SentenceSpan]]:
         if min_chars <= 0 or len(chunks) <= 1:
             return chunks
 
-        merged: list[tuple[int, list[str]]] = []
-        pending_sentences: list[str] = []
-        pending_start: int | None = None
+        merged: list[list[SentenceSpan]] = []
+        pending_sentences: list[SentenceSpan] = []
 
-        for start, chunk_sentences in chunks:
-            if pending_start is None:
-                pending_start = start
+        for chunk_sentences in chunks:
             pending_sentences.extend(chunk_sentences)
-            if len(" ".join(pending_sentences)) >= min_chars:
-                merged.append((pending_start, pending_sentences))
+            if len(" ".join(sentence.text for sentence in pending_sentences)) >= min_chars:
+                merged.append(pending_sentences)
                 pending_sentences = []
-                pending_start = None
 
         if pending_sentences:
             if merged:
-                previous_start, previous_sentences = merged[-1]
-                merged[-1] = (previous_start, previous_sentences + pending_sentences)
+                merged[-1] = merged[-1] + pending_sentences
             else:
-                merged.append((pending_start or 0, pending_sentences))
+                merged.append(pending_sentences)
 
         return merged
 
     @staticmethod
-    def _build_chunk(index: int, sentences: list[str], start_sentence: int) -> Chunk:
-        text = " ".join(sentences).strip()
+    def _build_chunk(index: int, sentence_spans: list[SentenceSpan], source_text: str) -> Chunk:
+        start_char = sentence_spans[0].start_char
+        end_char = sentence_spans[-1].end_char
+        text = source_text[start_char:end_char]
         return Chunk(
             index=index,
             text=text,
-            sentence_count=len(sentences),
+            sentence_count=len(sentence_spans),
             char_count=len(text),
-            start_sentence=start_sentence,
-            end_sentence=start_sentence + len(sentences) - 1,
+            start_sentence=sentence_spans[0].source_index,
+            end_sentence=sentence_spans[-1].source_index,
+            start_char=start_char,
+            end_char=end_char,
+            chunk_text_sha256=text_sha256(text),
+        )
+
+    def _build_document(
+        self,
+        text: str,
+        source_name: str | None,
+        breakpoint_threshold: float | None,
+        chunks: list[Chunk],
+    ) -> ChunkedDocument:
+        concatenated = "".join(chunk.text for chunk in sorted(chunks, key=lambda chunk: chunk.index))
+        return ChunkedDocument(
+            source_name=source_name,
+            provider=self.config.provider,
+            model_name=self.config.model_name,
+            embedding_mode=self.config.embedding_mode,
+            embedding_dimension=self.config.embedding_dimension,
+            strategy_version=self.config.strategy_version,
+            threshold_percentile=self.config.threshold_percentile,
+            min_chars=self.config.min_chars,
+            window_size=self.config.window_size,
+            batch_size=self.config.batch_size,
+            normalize_embeddings=self.config.normalize_embeddings,
+            device=self.config.device,
+            breakpoint_threshold=breakpoint_threshold,
+            chunks=chunks,
+            source_text_sha256=whitespace_insensitive_sha256(text),
+            concatenated_chunks_sha256=whitespace_insensitive_sha256(concatenated),
         )

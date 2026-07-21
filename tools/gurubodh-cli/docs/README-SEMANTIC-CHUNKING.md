@@ -35,10 +35,18 @@ transformers>=4.41,<4.50
 sentence-transformers>=3.0,<4
 ```
 
-`sentence-transformers` also brings heavier ML runtime dependencies. The first
-run with the default model may download model files into the local Hugging Face
-cache. This makes setup heavier than the earlier DOCX-only utility, but avoids a
-remote paragraphing API call when local chunking quality is acceptable.
+`sentence-transformers` also brings heavier ML runtime dependencies. Semantic
+chunking requires `GURUBODH_MODEL_CACHE_DIR` to point at the local model cache
+before a command is run:
+
+```bash
+export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
+```
+
+The BGE-M3 model is not loaded at import time or when lightweight config/parser
+objects are constructed. It is loaded lazily only when semantic chunking needs
+embeddings, and one `SemanticChunker` instance reuses the loaded model across
+files in a run.
 
 ## Python API
 
@@ -49,8 +57,8 @@ is loaded only once:
 from gurubodh.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
 
 config = SemanticChunkConfig(
-    threshold_percentile=82,
-    min_chars=700,
+    threshold_percentile=80,
+    min_chars=650,
     window_size=3,
 )
 
@@ -66,22 +74,33 @@ for chunk in document.chunks:
 For local experiments with `.txt` files:
 
 ```bash
-python -m gurubodh.ml.semantic_chunking.cli \
-  --source-dir source \
-  --output-dir semantic_chunks_bge_m3
+gurubodh generate-chunks \
+  --source-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata \
+  --output-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters \
+  --model-name BAAI/bge-m3 \
+  --threshold-percentile 82 \
+  --min-chars 700 \
+  --window-size 3 \
+  --batch-size 16 \
+  --device cpu
 ```
 
-This command writes exploratory JSON and Markdown outputs. These outputs are not
-part of the existing content artifact contract.
+This command writes exploratory JSON and Markdown outputs under
+`semantic_chunks_bge_m3/` inside the requested output directory. These outputs
+are not part of the existing content artifact contract. If that output directory
+already contains files, the command fails unless `--overwrite` is supplied.
+The command prints line-based progress while it runs, including model-cache
+resolution, model loading, per-chapter read/segment/validate/write steps, and
+final file/chunk totals.
 
 ## Integration Boundary
 
-Current behavior returns reconstructed chunk text and sentence ranges. This is
-useful for evaluating quality, but it is not yet the durable representation
-Gurubodh should store for paragraph metadata.
+Current behavior returns chunk text, sentence ranges, exact zero-based
+end-exclusive character spans into the source text, provider/model metadata,
+and per-chunk checksums. Before writing a chapter's outputs, the command removes
+Python-recognized Unicode whitespace with `str.isspace()`, hashes the source
+text, hashes the ordered chunks, and requires those checksums to match.
 
-Before semantic chunking output is written into chapter metadata or used for CMS
-ingestion, modified Task 014 work should add exact `[start, end)` character
-spans into the canonical chapter `.txt` string. Spans make the chunks verifiable
-against the source text and preserve the existing Gurubodh principle that
-prepared text artifacts remain authoritative.
+The existing DOCX preparation pipelines do not call semantic chunking yet.
+Future Task 014 integration should use the `ParagraphSegmenter` boundary rather
+than directly constructing a model-specific `SentenceTransformer`.

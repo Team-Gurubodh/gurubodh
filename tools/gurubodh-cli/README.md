@@ -187,8 +187,8 @@ Semantic chunking is integrated as an internal `gurubodh` module:
 from gurubodh.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
 
 config = SemanticChunkConfig(
-    threshold_percentile=82,
-    min_chars=700,
+    threshold_percentile=78,
+    min_chars=550,
     window_size=3,
 )
 
@@ -201,14 +201,36 @@ pipelines yet. Issue #130 integrates the package structure so modified Task 014
 work can evaluate semantic chunking for paragraph display and later RAG chunk
 generation.
 
+Before running standalone semantic chunking, set the Gurubodh model cache
+environment variable. The command fails clearly if this variable is omitted:
+
+```bash
+export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
+```
+
 For standalone local evaluation, run:
 
 ```bash
-python -m gurubodh.ml.semantic_chunking.cli \
-  --source-dir path/to/text-files \
-  --output-dir path/to/semantic-chunks
+gurubodh generate-chunks \
+  --source-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata \
+  --output-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters \
+  --model-name BAAI/bge-m3 \
+  --threshold-percentile 78 \
+  --min-chars 550 \
+  --window-size 3 \
+  --batch-size 16 \
+  --device cpu
 ```
 
-Current behavior returns chunk text and sentence ranges. Future Task 014 work
-should add exact character spans into canonical chapter text before storing
-semantic chunking output as durable chapter metadata or CMS-ingestion artifacts.
+Outputs are written under `semantic_chunks_bge_m3/` inside the requested output
+directory. Existing output causes the command to fail unless `--overwrite` is
+supplied. Use `--chapter` or `--chapters` to process a smaller evaluation set.
+During processing, the command prints line-based progress with the resolved
+source/output paths, model cache, number of chapter files, per-chapter read,
+segmentation, validation, write steps, and final file/chunk totals.
+
+The standalone output includes provider/model metadata, explicit chunking
+parameters, zero-based end-exclusive Python character spans, per-chunk SHA-256
+checksums, and a source/chunks checksum round trip. The checksum round trip
+removes whitespace using Python `str.isspace()` before hashing so formatting
+differences in chapter whitespace do not affect content validation.

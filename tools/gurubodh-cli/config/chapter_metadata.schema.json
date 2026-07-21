@@ -297,9 +297,184 @@
         }
       },
       "additionalProperties": false
+    },
+    "paragraph_segmentation": {
+      "$ref": "#/$defs/paragraph_segmentation"
     }
   },
   "$defs": {
+    "paragraph_segmentation": {
+      "type": "object",
+      "required": ["enabled", "status"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string",
+          "const": "semantic-chunking"
+        },
+        "model": {
+          "type": "string",
+          "const": "BAAI/bge-m3"
+        },
+        "embedding_mode": {
+          "type": "string",
+          "const": "dense"
+        },
+        "embedding_dimension": {
+          "type": "integer",
+          "const": 1024
+        },
+        "strategy_version": {
+          "type": "string",
+          "const": "semantic-window-v1"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["disabled", "segmented", "skipped-unchanged", "failed"]
+        },
+        "source_text_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "index_unit": {
+          "type": "string",
+          "const": "python-codepoint"
+        },
+        "span_semantics": {
+          "type": "string",
+          "const": "zero-based-end-exclusive"
+        },
+        "parameters": {
+          "type": "object",
+          "required": [
+            "threshold_percentile",
+            "min_chars",
+            "window_size",
+            "batch_size",
+            "normalize_embeddings",
+            "device"
+          ],
+          "properties": {
+            "threshold_percentile": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "min_chars": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "window_size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "batch_size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "normalize_embeddings": {
+              "type": "boolean"
+            },
+            "device": {
+              "type": ["string", "null"],
+              "enum": ["cpu", "mps", "cuda", null]
+            }
+          },
+          "additionalProperties": false
+        },
+        "chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "sentence_count", "char_count", "chunk_text_sha256"],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sentence_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "char_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "start_char": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_char": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "chunk_text_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "diagnostics": {
+          "type": "object",
+          "properties": {
+            "breakpoint_threshold": {
+              "type": ["number", "null"]
+            },
+            "warning": {
+              "type": ["string", "null"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "disabled"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "segmented"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "provider",
+              "model",
+              "embedding_mode",
+              "embedding_dimension",
+              "strategy_version",
+              "source_text_sha256",
+              "index_unit",
+              "span_semantics",
+              "parameters",
+              "chunks",
+              "diagnostics"
+            ]
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
     "storage_reference": {
       "type": "object",
       "required": ["backend", "url"],
