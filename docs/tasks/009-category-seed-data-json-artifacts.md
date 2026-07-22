@@ -55,7 +55,7 @@ relative to:
   compatibility checks out of this task.
 - Keep actual Strapi ingestion out of this task.
 - Define a formal category artifact JSON Schema under:
-  - `tools/seed-data/config/category_artifact.schema.json`
+  - `tools/seed-data-cli/config/category_artifact.schema.json`
 - Record the durable category artifact contract in:
   - `docs/interfaces/seed-data-artifacts.md`
 - Treat the generated category artifact as reviewable project data, consistent
@@ -94,17 +94,17 @@ relative to:
    - `strapi`
    - `records`
 5. Add a formal category artifact JSON Schema:
-   - `tools/seed-data/config/category_artifact.schema.json`
+   - `tools/seed-data-cli/config/category_artifact.schema.json`
 6. Validate generated category artifacts against the category artifact schema.
 7. Generate:
-   - `tools/seed-data/artifacts/category/categories.json`
+   - `tools/seed-data-cli/artifacts/category/categories.json`
 8. Ensure artifact generation runs CSV validation first and does not write an
    artifact when CSV validation or artifact validation fails.
 9. Add tests for category source lookup, path display, CSV validation, artifact
    generation, and artifact-schema validation.
 10. Update `docs/interfaces/seed-data-artifacts.md` with the finalized category
    artifact contract.
-11. Update `tools/seed-data/README.md` with category validation and generation
+11. Update `tools/seed-data-cli/README.md` with category validation and generation
    commands.
 
 ## Out of Scope
@@ -130,12 +130,12 @@ relative to:
 - Added Category source helpers, path display support, CSV validation, artifact
   generation, and artifact-schema validation.
 - Added a formal Category artifact schema:
-  - `tools/seed-data/config/category_artifact.schema.json`
+  - `tools/seed-data-cli/config/category_artifact.schema.json`
 - Generated the reviewable Category artifact:
-  - `tools/seed-data/artifacts/category/categories.json`
+  - `tools/seed-data-cli/artifacts/category/categories.json`
 - Updated `docs/interfaces/seed-data-artifacts.md` with the durable Category
   artifact contract.
-- Updated `tools/seed-data/README.md` with Category validation and generation
+- Updated `tools/seed-data-cli/README.md` with Category validation and generation
   commands.
 
 #### What Works
@@ -151,11 +151,11 @@ relative to:
 
 #### Verification
 
-- `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data category validate --source categories`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data category generate --source categories`
-- `python3 -m json.tool tools/seed-data/config/category_artifact.schema.json`
-- `python3 -m json.tool tools/seed-data/artifacts/category/categories.json`
+- `tools/seed-data-cli/.venv/bin/python -m unittest discover -s tools/seed-data-cli/tests`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data category validate --source categories`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data category generate --source categories`
+- `python3 -m json.tool tools/seed-data-cli/config/category_artifact.schema.json`
+- `python3 -m json.tool tools/seed-data-cli/artifacts/category/categories.json`
 
 ## Follow-Up
 

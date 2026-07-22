@@ -35,7 +35,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 3. I fixed the typo with the task: "Sr No should validate the term code". Please confirm.
 
 ## My second response to proposed plan
-1. I like the idea: Build `tools/seed-data` as the canonical seed-data preparation and ingestion tool.
+1. I like the idea: Build `tools/seed-data-cli` as the canonical seed-data preparation and ingestion tool.
 2. One primary reason for Glossary to be maintained externally in a Google Sheet is that other experts in the domain of Sanatana Dharma or other volunteers can contribute without having to know Strapi based new User Interface. Spreadsheets are common and easy to use.
 3. I wnat to confirm that when we ingest seed data using Strapi 5's APIs, Strapi is capable of generating necessary internal IDs. In other words, by bypassing Strapi's own seed-data ingestion, we are not creating a new problems such as non-native strapi content type and such.
 4. My final response is around tools crossing boundaries... Given the project architecture, it is necessary now to consider Interface Control Documents? 
@@ -57,7 +57,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 
 1. Treat glossary maintenance as the first use case of a broader seed-data
    workflow.
-   - Create a canonical seed-data tooling boundary under `tools/seed-data`
+   - Create a canonical seed-data tooling boundary under `tools/seed-data-cli`
      instead of creating a one-off `tools/glossary` implementation.
    - Keep glossary-specific CSV handling as the first implemented workflow
      inside that tool.
@@ -118,7 +118,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 5. Build a staged seed-data artifact workflow.
    - Convert manually downloaded glossary CSV files into reviewed JSON
      artifacts.
-   - Store generated artifacts in a predictable location under `tools/seed-data`
+   - Store generated artifacts in a predictable location under `tools/seed-data-cli`
      so they can be inspected before ingestion.
    - Keep the JSON shape compatible with the Strapi content type, but avoid
      embedding Strapi-generated identifiers in the source artifact.
@@ -135,7 +135,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
      interface records.
    - Start with a concise seed-data interface document, likely
      `docs/interfaces/seed-data-artifacts.md`.
-   - Define the contract between external source files, `tools/seed-data`, JSON
+   - Define the contract between external source files, `tools/seed-data-cli`, JSON
      staging artifacts, and the Strapi CMS API.
    - Include source columns, supported glossary sources, generated JSON shape,
      stable keys, validation rules, endpoint mapping, idempotency behavior, and
@@ -148,7 +148,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
    - Update `docs/README.md` so `docs/interfaces/` is discoverable.
    - Update `docs/schemas.md` if new schema locations or Strapi content types
      are added.
-   - Add `tools/seed-data/README.md` explaining the seed-data workflow, Google
+   - Add `tools/seed-data-cli/README.md` explaining the seed-data workflow, Google
      Sheet usage, manual CSV download, validation, JSON generation, and Strapi
      ingestion.
    - Record the Google Sheet link in the seed-data README once it is available.
@@ -176,7 +176,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 ### State Summary - 2026-07-01
 
 #### What Was Built
-- Created the canonical seed-data tooling boundary under `tools/seed-data`.
+- Created the canonical seed-data tooling boundary under `tools/seed-data-cli`.
 - Added a Python package named `gurubodh-seed-data` with the console command
   `gurubodh-seed-data`.
 - Added the initial top-level seed-data workflows:
@@ -193,14 +193,14 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   - `artifacts/glossary/prabodhan-glossary.json`
 - Added source-key validation for glossary path lookup. Unsupported source keys
   fail with accepted values listed.
-- Added `tools/seed-data/README.md` with setup, command, and local file-location
+- Added `tools/seed-data-cli/README.md` with setup, command, and local file-location
   guidance.
-- Updated the top-level `README.md` to include `tools/seed-data` in the project
+- Updated the top-level `README.md` to include `tools/seed-data-cli` in the project
   map.
 - Updated `.gitignore` so early-development local seed-data CSV sources and JSON
   artifacts are not committed:
-  - `tools/seed-data/sources/`
-  - `tools/seed-data/artifacts/`
+  - `tools/seed-data-cli/sources/`
+  - `tools/seed-data-cli/artifacts/`
 - Merged PR #16, `chore(seed-data): scaffold glossary workflow`, into `main`.
   This brought in both the task-history record and the seed-data scaffold.
 
@@ -219,7 +219,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   `2` and reports:
   `Accepted values: sanatan-glossary, prabodhan-glossary`.
 - Python syntax verification passed with:
-  `python3 -m compileall tools/seed-data/gurubodh_seed_data`.
+  `python3 -m compileall tools/seed-data-cli/gurubodh_seed_data`.
 - Local downloaded glossary CSV files are present but ignored by git. Their
   current headers were confirmed as:
   `Sr No,Term Code,Term,Definition`.
@@ -260,7 +260,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
   - blank rows
   - leading or trailing whitespace in `Term` values
 - Added standard-library regression tests for glossary CSV validation.
-- Updated `tools/seed-data/README.md` with the validation command and behavior.
+- Updated `tools/seed-data-cli/README.md` with the validation command and behavior.
 
 #### What Works
 - `gurubodh-seed-data glossary validate --source sanatan-glossary` validates the
@@ -270,9 +270,9 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 - `gurubodh-seed-data glossary validate --source wrong-name` still fails with
   exit code `2` and lists the accepted source keys.
 - Python syntax verification passed with:
-  `python3 -m compileall tools/seed-data/gurubodh_seed_data tools/seed-data/tests`.
+  `python3 -m compileall tools/seed-data-cli/gurubodh_seed_data tools/seed-data-cli/tests`.
 - Unit tests passed with:
-  `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`.
+  `tools/seed-data-cli/.venv/bin/python -m unittest discover -s tools/seed-data-cli/tests`.
 
 #### Important Clarifications
 - Leading or trailing `Term` whitespace is reported separately as an error.
@@ -304,7 +304,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 - The generation command should run validation before writing any artifact.
 - The generation command must abort before writing an artifact when validation
   reports any errors.
-- Generate reviewable JSON artifacts under `tools/seed-data/artifacts/glossary/`.
+- Generate reviewable JSON artifacts under `tools/seed-data-cli/artifacts/glossary/`.
 - Keep generated artifacts free of Strapi internal `id` and `documentId` values.
 - Include glossary source identity in the generated artifact.
 - Decide the first JSON artifact shape before implementing Strapi ingestion.
@@ -314,7 +314,7 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 This task is closed as superseded by the broader seed-data planning and
 implementation task series.
 
-The glossary-only workflow established the initial `tools/seed-data` boundary,
+The glossary-only workflow established the initial `tools/seed-data-cli` boundary,
 the Google Sheets/CSV authoring model, the first glossary source definitions,
 and repeatable glossary CSV validation. The next work now covers `glossary`,
 `category`, and `subject` seed data together, with a shared interface contract,

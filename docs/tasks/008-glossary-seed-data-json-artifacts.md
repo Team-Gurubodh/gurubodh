@@ -42,7 +42,7 @@ the actual Strapi CMS content-type schema files.
   globally across both glossary sources.
 - Keep glossary artifacts independent of glossary relationships for now.
 - Define a formal glossary artifact JSON Schema under
-  `tools/seed-data/config/glossary_artifact.schema.json`.
+  `tools/seed-data-cli/config/glossary_artifact.schema.json`.
 - Record the durable artifact and intended Strapi Collection Type contract in
   `docs/interfaces/seed-data-artifacts.md`.
 - Keep actual Strapi Collection Type schema creation in a separate future
@@ -61,17 +61,17 @@ the actual Strapi CMS content-type schema files.
    - `gurubodh-seed-data glossary generate --source sanatan-glossary`
    - `gurubodh-seed-data glossary generate --source prabodhan-glossary`
 4. Generate artifacts under:
-   - `tools/seed-data/artifacts/glossary/sanatan-glossary.json`
-   - `tools/seed-data/artifacts/glossary/prabodhan-glossary.json`
+   - `tools/seed-data-cli/artifacts/glossary/sanatan-glossary.json`
+   - `tools/seed-data-cli/artifacts/glossary/prabodhan-glossary.json`
 5. Define and test the first glossary artifact shape.
 6. Add a glossary artifact JSON Schema under:
-   - `tools/seed-data/config/glossary_artifact.schema.json`
+   - `tools/seed-data-cli/config/glossary_artifact.schema.json`
 7. Validate generated glossary artifacts against the glossary artifact schema.
 8. Update `.gitignore` so generated seed-data artifacts can be reviewed and
    committed directly, while local seed-data sources remain ignored.
 9. Update `docs/interfaces/seed-data-artifacts.md` with the finalized glossary
    artifact contract and intended Strapi Collection Type contract.
-10. Update `tools/seed-data/README.md` with generation commands and artifact
+10. Update `tools/seed-data-cli/README.md` with generation commands and artifact
    behavior.
 
 ## Planning Notes
@@ -116,7 +116,7 @@ while the interface document gives future tasks a stable place to find the
 contract.
 
 Generated artifacts should be treated as reviewable project data for this
-workflow. The current `.gitignore` ignores `tools/seed-data/artifacts/`; Task
+workflow. The current `.gitignore` ignores `tools/seed-data-cli/artifacts/`; Task
 008 should revise that rule directly instead of relying on exception-heavy
 ignore patterns.
 
@@ -129,13 +129,13 @@ ignore patterns.
 - Created GitHub issue #41 for this implementation slice.
 - Created branch `issue-41-glossary-json-artifacts`.
 - Added a formal glossary artifact schema:
-  - `tools/seed-data/config/glossary_artifact.schema.json`
+  - `tools/seed-data-cli/config/glossary_artifact.schema.json`
 - Added glossary artifact generation helpers.
 - Added the CLI command:
   - `gurubodh-seed-data glossary generate --source <source-key>`
 - Generated reviewable glossary artifacts:
-  - `tools/seed-data/artifacts/glossary/sanatan-glossary.json`
-  - `tools/seed-data/artifacts/glossary/prabodhan-glossary.json`
+  - `tools/seed-data-cli/artifacts/glossary/sanatan-glossary.json`
+  - `tools/seed-data-cli/artifacts/glossary/prabodhan-glossary.json`
 - Updated `.gitignore` so generated seed-data artifacts can be tracked while
   local seed-data source files remain ignored.
 - Updated `docs/interfaces/seed-data-artifacts.md` with the durable glossary
@@ -162,15 +162,15 @@ ignore patterns.
 
 #### Verification
 
-- `python3 -m compileall tools/seed-data/gurubodh_seed_data tools/seed-data/tests`
-- `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary validate --source sanatan-glossary`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary validate --source prabodhan-glossary`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary generate --source sanatan-glossary`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary generate --source prabodhan-glossary`
-- `python3 -m json.tool tools/seed-data/config/glossary_artifact.schema.json`
-- `python3 -m json.tool tools/seed-data/artifacts/glossary/sanatan-glossary.json`
-- `python3 -m json.tool tools/seed-data/artifacts/glossary/prabodhan-glossary.json`
+- `python3 -m compileall tools/seed-data-cli/gurubodh_seed_data tools/seed-data-cli/tests`
+- `tools/seed-data-cli/.venv/bin/python -m unittest discover -s tools/seed-data-cli/tests`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary validate --source sanatan-glossary`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary validate --source prabodhan-glossary`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary generate --source sanatan-glossary`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary generate --source prabodhan-glossary`
+- `python3 -m json.tool tools/seed-data-cli/config/glossary_artifact.schema.json`
+- `python3 -m json.tool tools/seed-data-cli/artifacts/glossary/sanatan-glossary.json`
+- `python3 -m json.tool tools/seed-data-cli/artifacts/glossary/prabodhan-glossary.json`
 
 ## Follow-Up
 

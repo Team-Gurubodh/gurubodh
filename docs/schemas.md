@@ -7,10 +7,10 @@
 
 - `tools/gurubodh-cli/config/chapter_metadata.schema.json`
 - `tools/gurubodh-cli/config/conversion_job.schema.json`
-- `tools/seed-data/config/category_artifact.schema.json`
-- `tools/seed-data/config/glossary_artifact.schema.json`
-- `tools/seed-data/config/seed_data_sources.schema.json`
-- `tools/seed-data/config/subject_artifact.schema.json`
+- `tools/seed-data-cli/config/category_artifact.schema.json`
+- `tools/seed-data-cli/config/glossary_artifact.schema.json`
+- `tools/seed-data-cli/config/seed_data_sources.schema.json`
+- `tools/seed-data-cli/config/subject_artifact.schema.json`
 - `apps/gurubodh-cms/src/api/**/content-types/**/schema.json`
 
 ## Planned Schema Locations
@@ -35,16 +35,16 @@ None currently recorded.
   separate JSON/Markdown outputs and does not write this field into generated
   chapter metadata yet. The reserved chunk shape allows BGE-M3
   `estimated_embedding_token_count` values and token-counting basis metadata.
-- Seed-data JSON schemas belong under `tools/seed-data/config/` once the
+- Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by
-  `tools/seed-data/config/glossary_artifact.schema.json` before they are used by
+  `tools/seed-data-cli/config/glossary_artifact.schema.json` before they are used by
   later ingestion tooling.
 - Category seed-data artifacts are validated by
-  `tools/seed-data/config/category_artifact.schema.json` before they are used by
+  `tools/seed-data-cli/config/category_artifact.schema.json` before they are used by
   later ingestion tooling.
 - Subject seed-data artifacts are validated by
-  `tools/seed-data/config/subject_artifact.schema.json` before they are used by
+  `tools/seed-data-cli/config/subject_artifact.schema.json` before they are used by
   later ingestion tooling.
 - Strapi content type schemas belong under the relevant Strapi API directory.
 - Sanatan Glossary and Prabodhan Glossary Strapi content types store glossary

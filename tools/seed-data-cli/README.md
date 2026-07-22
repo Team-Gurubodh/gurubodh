@@ -76,10 +76,29 @@ and future Strapi ingestion is documented in
 Run these commands from the monorepo root:
 
 ```bash
-cd tools/seed-data
+cd tools/seed-data-cli
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -e .
+python -m pip install "setuptools>=68"
+python -m pip install -e .
+gurubodh-seed-data --help
+```
+
+## Refreshing an Existing Virtual Environment
+
+If this workspace was previously installed from `tools/seed-data`, recreate the
+virtual environment after the directory rename. Editable installs and generated
+console scripts can retain old absolute paths.
+
+From the monorepo root:
+
+```bash
+rm -rf tools/seed-data-cli/.venv
+cd tools/seed-data-cli
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install "setuptools>=68"
+python -m pip install -e .
 gurubodh-seed-data --help
 ```
 
@@ -556,7 +575,7 @@ Use this checklist for local or staging verification:
 1. Activate the seed-data virtual environment:
 
    ```bash
-   cd tools/seed-data
+   cd tools/seed-data-cli
    . .venv/bin/activate
    ```
 
@@ -807,7 +826,7 @@ Use this checklist for local or staging verification:
 1. Activate the seed-data virtual environment:
 
    ```bash
-   cd tools/seed-data
+   cd tools/seed-data-cli
    . .venv/bin/activate
    ```
 

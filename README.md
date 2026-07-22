@@ -16,7 +16,7 @@ housed in the Gurubodh CLI.
   MS Word 2007 content and metadata artifacts, including semantic chunking and
   ML/RAG preparation utilities. Future content ingestion and metadata workflow
   commands are expected to live in the `gurubodh` command structure here.
-- `tools/seed-data` - Seed-data preparation and ingestion tooling, starting with glossary terms.
+- `tools/seed-data-cli` - Seed-data preparation and ingestion tooling, starting with glossary terms.
 - `database/postgres/gurubodh-cms` - PostgreSQL infrastructure scripts for the CMS.
 - `docs` - Project documentation, architecture notes, decisions, templates, and AI agent-facing guidance.
 
