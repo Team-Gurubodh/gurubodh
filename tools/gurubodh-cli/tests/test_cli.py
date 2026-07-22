@@ -6,6 +6,25 @@ from gurubodh.cli import PLANNED_COMMANDS, build_parser, main
 
 
 class CliTests(unittest.TestCase):
+    def test_help_lists_commands_in_workflow_order(self):
+        parser = build_parser()
+        help_text = parser.format_help()
+        expected_order = [
+            "prep-subject",
+            "generate-chunks",
+            "generate-embeddings",
+            "compare-tokenizers",
+            "update-metadata",
+            "download-subject",
+            "delete-subject",
+            "legacy-convert",
+            "unicode-ingest",
+        ]
+
+        positions = [help_text.index(f"    {command}") for command in expected_order]
+
+        self.assertEqual(positions, sorted(positions))
+
     def test_help_marks_legacy_commands_deprecated(self):
         parser = build_parser()
         normalized_help = " ".join(parser.format_help().split())
