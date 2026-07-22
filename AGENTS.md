@@ -8,7 +8,7 @@ Follow it before planning, editing, generating code, refactoring, or updating do
 <repository_summary>
 Gurubodh is a monorepo for a Strapi CMS application, content preparation tools,
 future ingestion and metadata utilities, PostgreSQL infrastructure scripts, and
-ML research workspace.
+ML/RAG preparation utilities housed in the Gurubodh CLI.
 </repository_summary>
 
 <routing>

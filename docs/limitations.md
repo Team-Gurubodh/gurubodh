@@ -11,7 +11,7 @@
   - Allowing Strapi app scaffolding command to populate Schema in the database created in previous step
   - Granting privileges on objects created by the app scaffolding command to roles created in the first step
   - Possible locking of the Public schema for better security
-- Several monorepo areas are placeholders for future work: content ingestion, metadata generation, metadata ingestion, and ML research.
+- Several monorepo areas are placeholders for future work: content ingestion, metadata generation, and metadata ingestion.
 - AI agents may not automatically discover every Markdown file unless rooted through `AGENTS.md`, `README.md`, or explicit user instructions.
 
 
