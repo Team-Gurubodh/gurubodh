@@ -11,7 +11,7 @@ cd tools/gurubodh-cli
 python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
-gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 ## What These Commands Do
@@ -31,14 +31,15 @@ path. In that case, run `python -m pip install -e .` after activation, or run
 `.venv/bin/python -m pip install -e .` without activation, to refresh the
 editable install.
 
-`gurubodh prep-subject --config jobs/002_spand_rahasya.local.json` runs a sample local content job.
+`gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`
+runs a sample local content job.
 
 Existing output is not archived. If the configured local output directory or R2
 objects already exist, re-run with `--overwrite` when you intentionally want to
 replace them:
 
 ```bash
-gurubodh prep-subject --config jobs/002_spand_rahasya.local.json --overwrite
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
 ```
 
 ## Project Root Detection
@@ -46,8 +47,8 @@ gurubodh prep-subject --config jobs/002_spand_rahasya.local.json --overwrite
 The CLI detects this tool's root by finding both:
 
 ```text
-config/conversion_job.schema.json
-jobs/
+config/jobs/prep_subject_job.schema.json
+jobs/subjects/
 ```
 
 If running from another directory, pass the root explicitly:
@@ -55,7 +56,7 @@ If running from another directory, pass the root explicitly:
 ```bash
 gurubodh prep-subject \
   --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
-  --config jobs/002_spand_rahasya.local.json
+  --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 ## Future Command Surface
@@ -67,16 +68,16 @@ directories.
 
 ## Storage Configuration
 
-The conversion job supports `local` and `r2` source/destination storage
+The prep-subject job supports `local` and `r2` source/destination storage
 backends. Existing jobs that omit `backend` are treated as local jobs.
 
-Sample jobs are split by backend:
+Sample jobs are grouped by subject and split by backend:
 
 ```text
-jobs/001_aacharan_shaastra.local.json
-jobs/001_aacharan_shaastra.r2-output.json
-jobs/002_spand_rahasya.local.json
-jobs/002_spand_rahasya.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
+jobs/subjects/sub039_aacharan_shastra/prep-subject.r2-output.json
+jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+jobs/subjects/sub123_spand_rahasya/prep-subject.r2-output.json
 ```
 
 Use `.local.json` for local source and local output. Use `.r2-output.json` for

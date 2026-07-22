@@ -18,7 +18,7 @@ full-subject output, chapter output, and metadata.
 From the project root, use the Python package CLI:
 
 ```bash
-python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 `prep-subject` is the normal command for job execution. It reads the job config,
@@ -28,8 +28,8 @@ pipeline.
 You can also call a strict pipeline command:
 
 ```bash
-python3 -m gurubodh unicode-ingest --config jobs/002_spand_rahasya.local.json
-python3 -m gurubodh legacy-convert --config jobs/001_aacharan_shaastra.local.json
+python3 -m gurubodh unicode-ingest --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+python3 -m gurubodh legacy-convert --config jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
 ```
 
 Strict commands are useful when you want the command itself to assert the
@@ -41,21 +41,21 @@ writing output.
 Use `prep-subject` for normal operations:
 
 ```bash
-python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
-python3 -m gurubodh prep-subject --config jobs/001_aacharan_shaastra.local.json
+python3 -m gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+python3 -m gurubodh prep-subject --config jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
 ```
 
 Use `unicode-ingest` when the source DOCX is already Unicode:
 
 ```bash
-python3 -m gurubodh unicode-ingest --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh unicode-ingest --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 Use `legacy-convert` when the source DOCX contains a supported legacy font
 encoding:
 
 ```bash
-python3 -m gurubodh legacy-convert --config jobs/001_aacharan_shaastra.local.json
+python3 -m gurubodh legacy-convert --config jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
 ```
 
 ## Project Root Detection
@@ -67,7 +67,7 @@ When running from a source checkout without installing the package, run commands
 from the project root:
 
 ```bash
-python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 If you run from another directory before installing the package, Python also
@@ -77,7 +77,7 @@ needs the project on its import path:
 PYTHONPATH=/path/to/gurubodh/tools/gurubodh-cli \
   python3 -m gurubodh prep-subject \
   --project-root /path/to/gurubodh/tools/gurubodh-cli \
-  --config jobs/002_spand_rahasya.local.json
+  --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 After package installation, `python3 -m gurubodh ...` and the optional
@@ -88,15 +88,15 @@ Root detection order:
 1. `--project-root`, if supplied.
 2. `GURUBODH_CLI_ROOT`, if set.
 3. Walk upward from the current directory until both are found:
-   - `config/conversion_job.schema.json`
-   - `jobs/`
+   - `config/jobs/prep_subject_job.schema.json`
+   - `jobs/subjects/`
 
 Examples:
 
 ```bash
-python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
-python3 -m gurubodh prep-subject --project-root /path/to/gurubodh/tools/gurubodh-cli --config jobs/002_spand_rahasya.local.json
-GURUBODH_CLI_ROOT=/path/to/gurubodh/tools/gurubodh-cli python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+python3 -m gurubodh prep-subject --project-root /path/to/gurubodh/tools/gurubodh-cli --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+GURUBODH_CLI_ROOT=/path/to/gurubodh/tools/gurubodh-cli python3 -m gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 Relative config paths are resolved from the current directory when possible,
@@ -107,14 +107,14 @@ then from the detected project root.
 Job configs live in:
 
 ```text
-jobs/
+jobs/subjects/<subject>/
 ```
 
 The current schemas live in:
 
 ```text
-config/conversion_job.schema.json
-config/chapter_metadata.schema.json
+config/jobs/prep_subject_job.schema.json
+config/artifacts/chapter_metadata.schema.json
 ```
 
 Each job config declares:
@@ -250,7 +250,7 @@ from conversion facts.
 When a job is run through the dispatcher:
 
 ```bash
-python3 -m gurubodh prep-subject --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 metadata records:
@@ -265,7 +265,7 @@ metadata records:
 When a job is run through the strict Unicode command:
 
 ```bash
-python3 -m gurubodh unicode-ingest --config jobs/002_spand_rahasya.local.json
+python3 -m gurubodh unicode-ingest --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 metadata records:

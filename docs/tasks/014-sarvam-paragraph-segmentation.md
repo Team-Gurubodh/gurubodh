@@ -218,7 +218,7 @@ portable across structured-output implementations.
 Do not reuse the old `formatting` name unless maintainers explicitly prefer it.
 This capability is paragraph segmentation, not formatted text generation.
 
-Recommended conversion job config block:
+Recommended prep-subject job config block:
 
 ```json
 {
@@ -465,7 +465,7 @@ Carry forward the retry-command pattern, redesigned for segmentation.
 Recommended command:
 
 ```bash
-gurubodh retry-paragraph-segmentation --config jobs/001_aacharan_shaastra.r2.json
+gurubodh retry-paragraph-segmentation --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json
 ```
 
 The command should:
@@ -522,12 +522,12 @@ Add this approved task brief to `docs/tasks/` after the repository is prepared.
 
 ### Goal
 
-Add the optional `paragraph_segmentation` conversion job config block.
+Add the optional `paragraph_segmentation` prep-subject job config block.
 
 ### Scope
 
-- Bump conversion job schema version.
-- Add `paragraph_segmentation` to `conversion_job.schema.json`.
+- Bump prep-subject job schema version.
+- Add `paragraph_segmentation` to `config/jobs/prep_subject_job.schema.json`.
 - Add config constants and validation/defaulting.
 - Preserve disabled-by-default behavior when omitted.
 - Add migration support from the previous schema version.
@@ -808,8 +808,8 @@ git diff --check
 Manual verification, when credentials are available:
 
 ```bash
-gurubodh prep-subject --config jobs/001_aacharan_shaastra.r2.json --overwrite
-gurubodh retry-paragraph-segmentation --config jobs/001_aacharan_shaastra.r2.json --dry-run
+gurubodh prep-subject --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json --overwrite
+gurubodh retry-paragraph-segmentation --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json --dry-run
 ```
 
 Expected manual checks:
@@ -859,7 +859,7 @@ Expected manual checks:
 
 ## Definition Of Done
 
-- Paragraph segmentation can be enabled per conversion job.
+- Paragraph segmentation can be enabled per prep-subject job.
 - Sarvam returns only compact span data, not document text.
 - Validated spans are stored in chapter metadata.
 - Canonical raw text remains unchanged and authoritative.

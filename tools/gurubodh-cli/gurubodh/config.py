@@ -146,7 +146,7 @@ def validate_pipeline_matches_source(config, expected_pipeline=None):
         )
 
 
-def load_conversion_job(path):
+def load_prep_subject_job(path):
     config = read_json(path)
     if not isinstance(config, dict):
         raise SystemExit("Config error: root must be an object")
@@ -192,3 +192,7 @@ def load_conversion_job(path):
     optional_string_array(metadata_defaults, "summary_chapter_markers", "metadata_defaults")
     validate_pipeline_matches_source(config)
     return config
+
+
+def load_conversion_job(path):
+    return load_prep_subject_job(path)

@@ -17,7 +17,7 @@ PLANNED_COMMANDS = {
 
 
 def add_common_options(parser):
-    parser.add_argument("--config", required=True, help="Path to a Gurubodh CMS conversion job JSON file.")
+    parser.add_argument("--config", required=True, help="Path to a Gurubodh prep-subject job JSON file.")
     parser.add_argument(
         "--overwrite",
         action="store_true",
@@ -26,7 +26,7 @@ def add_common_options(parser):
     parser.add_argument(
         "--project-root",
         help=(
-            "Project root containing config/ and jobs/. If omitted, uses GURUBODH_CLI_ROOT "
+            "Project root containing config/jobs/ and jobs/subjects/. If omitted, uses GURUBODH_CLI_ROOT "
             "or walks upward from the current directory."
         ),
     )

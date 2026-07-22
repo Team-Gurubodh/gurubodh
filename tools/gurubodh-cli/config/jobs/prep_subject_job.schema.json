@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://gurubodh.local/schemas/conversion_job.schema.json",
-  "title": "Gurubodh DOCX Conversion Job",
+  "$id": "https://gurubodh.local/schemas/prep_subject_job.schema.json",
+  "title": "Gurubodh Prep Subject Job",
   "type": "object",
   "required": ["schema_version", "pipeline", "source", "destination", "naming", "chapter_split"],
   "properties": {

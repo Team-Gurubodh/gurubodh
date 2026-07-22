@@ -21,4 +21,4 @@ cli-help:
 	tools/gurubodh-cli/.venv/bin/gurubodh --help
 
 cli-run-sample:
-	tools/gurubodh-cli/.venv/bin/gurubodh prep-subject --project-root tools/gurubodh-cli --config jobs/002_spand_rahasya.local.json
+	tools/gurubodh-cli/.venv/bin/gurubodh prep-subject --project-root tools/gurubodh-cli --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json

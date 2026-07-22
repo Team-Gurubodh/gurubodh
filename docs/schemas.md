@@ -5,8 +5,8 @@
 
 ## Current Schema Locations
 
-- `tools/gurubodh-cli/config/chapter_metadata.schema.json`
-- `tools/gurubodh-cli/config/conversion_job.schema.json`
+- `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
+- `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
 - `tools/seed-data-cli/config/glossary_artifact.schema.json`
 - `tools/seed-data-cli/config/seed_data_sources.schema.json`
@@ -15,14 +15,19 @@
 
 ## Planned Schema Locations
 
-None currently recorded.
+- `tools/gurubodh-cli/config/artifacts/chunk_metadata.schema.json`
+- `tools/gurubodh-cli/config/artifacts/embedding_manifest.schema.json`
+- `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
+- `tools/gurubodh-cli/config/jobs/generate_embeddings_job.schema.json`
 
 ## Ownership Guidance
 
-- Content preparation JSON schemas belong under `tools/gurubodh-cli/config/`.
-- Conversion job configs support `local` and `r2` source/destination storage
+- Gurubodh CLI job schemas belong under `tools/gurubodh-cli/config/jobs/`.
+- Gurubodh CLI artifact schemas belong under
+  `tools/gurubodh-cli/config/artifacts/`.
+- Prep-subject job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
-- Conversion job `metadata_defaults.summary_chapter_markers` explicitly
+- Prep-subject job `metadata_defaults.summary_chapter_markers` explicitly
   configures Devanagari search terms that add `summary_chapter` and
   `उपसंहार` to chapter metadata `content.automated_tags` when found in
   generated chapter text. If omitted, summary chapter detection is disabled for

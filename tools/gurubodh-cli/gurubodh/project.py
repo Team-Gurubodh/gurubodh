@@ -11,8 +11,8 @@ class ProjectContext:
 
 def _looks_like_project_root(path):
     return (
-        (path / "config" / "conversion_job.schema.json").is_file()
-        and (path / "jobs").is_dir()
+        (path / "config" / "jobs" / "prep_subject_job.schema.json").is_file()
+        and (path / "jobs" / "subjects").is_dir()
     )
 
 
@@ -28,7 +28,7 @@ def resolve_project_context(project_root=None):
     if project_root:
         root = Path(project_root).expanduser().resolve()
         if not _looks_like_project_root(root):
-            raise SystemExit(f"Project root does not contain config/ and jobs/: {root}")
+            raise SystemExit(f"Project root does not contain config/jobs/ and jobs/subjects/: {root}")
     else:
         env_root = os.environ.get("GURUBODH_CLI_ROOT")
         if env_root:

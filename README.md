@@ -87,14 +87,15 @@ running `gurubodh` commands.
 
 For commands that read Gurubodh CLI project files, the CLI needs to locate
 `tools/gurubodh-cli`. It does this by walking upward from the current
-directory until it finds `config/conversion_job.schema.json` and `jobs/`.
+directory until it finds `config/jobs/prep_subject_job.schema.json` and
+`jobs/subjects/`.
 If you run it from the monorepo root instead of from `tools/gurubodh-cli`,
 pass the root explicitly:
 
 ```bash
 gurubodh prep-subject \
   --project-root tools/gurubodh-cli \
-  --config jobs/002_spand_rahasya.local.json
+  --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
 `make cli-help`
@@ -104,7 +105,7 @@ Shows the command-line help for `gurubodh`.
 `make cli-run-sample`
 
 Runs the sample Gurubodh CLI job using
-`tools/gurubodh-cli/jobs/002_spand_rahasya.local.json`.
+`tools/gurubodh-cli/jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`.
 
 Standalone semantic chunk generation requires a local model cache directory:
 
