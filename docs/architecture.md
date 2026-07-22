@@ -28,14 +28,15 @@ component, and should guide future decisions:
 2. **Preparation and ingestion are decoupled from each other and from the CMS.**
    Each stage hands off through a staging boundary so that a failure or slowdown
    in one stage does not corrupt or block another.
-3. **Consumption layers (web, mobile) are stateless clients of the CMS/RAG APIs.**
-   They never write to the CMS directly and never talk to preparation or
-   ingestion directly.
+3. **Consumption layers (web, chat, mobile) are stateless clients of the
+   CMS/RAG APIs.** They never write to the CMS directly and never talk to
+   preparation or ingestion directly.
 4. **The RAG layer is derived, not authoritative.** Embeddings and vector data are
    always rebuildable from CMS content; the vector store is never a system of
    record.
-5. **New consumption channels reuse existing APIs.** Mobile (Phase 4) is expected
-   to consume the same CMS/RAG APIs as web, not a channel-specific backend.
+5. **New consumption channels reuse existing APIs.** Chat and mobile are
+   expected to consume the same CMS/RAG APIs as web, not channel-specific
+   backends.
 
 ---
 
@@ -61,6 +62,7 @@ flowchart LR
 
     subgraph Consumption
         WEB[Web Consumption Layer]
+        CHAT[Chat Consumption Layer]
         MOBILE[Mobile Consumption Layer]
     end
 
@@ -75,11 +77,13 @@ flowchart LR
     PRE --> METAGEN --> METAING --> CMS
     CMS --> MEDIA
     CMS --> WEB
+    CMS --> CHAT
     CMS --> MOBILE
     MEDIA --> WEB
     MEDIA --> MOBILE
     CMS --> EMBED --> VDB --> RAGAPI
     RAGAPI --> WEB
+    RAGAPI --> CHAT
     RAGAPI --> MOBILE
 ```
 
@@ -164,7 +168,7 @@ flowchart LR
 - **Responsibility**: Store structured content and metadata, manage the
   publishing lifecycle (draft/published/archived), expose content via API, and
   reference media assets.
-- **Collaborates with**: receives writes from Content Ingestion, Metadata Ingestion; serves reads to Web and Mobile consumption layers; serves content to the Embedding Pipeline
+- **Collaborates with**: receives writes from Content Ingestion, Metadata Ingestion; serves reads to Web, Chat, and Mobile consumption layers; serves content to the Embedding Pipeline
   (RAG layer); fires webhooks on publish/update/delete that other components
   react to.
 - **Boundaries — does NOT**:
@@ -181,7 +185,7 @@ flowchart LR
 
 - **Responsibility**: Durable, Cloud-based storage for binary assets (documents,
   audio, etc.) referenced from CMS entries.
-- **Collaborates with**: Likely to be the CMS - the content management system as most such systems provide plugins to collaborate with cloud storages; may be read by Web/Mobile consumption layers, in the initial phases (often via a CDN in front of it).
+- **Collaborates with**: Likely to be the CMS - the content management system as most such systems provide plugins to collaborate with cloud storages; may be read by Web, Chat, or Mobile consumption layers, in the initial phases (often via a CDN in front of it).
 - **Boundaries — does NOT**:
   - Own asset metadata (alt text, captions, relations) — that belongs to the CMS.
 - **Current implementation**: None
@@ -198,11 +202,30 @@ flowchart LR
     layer may cache it.
   - Implement content validation/business logic that belongs in Content
     Preparation or Content Ingestion.
-- **Current implementation**: Next.js. See
+- **Current implementation**: planned Next.js placeholder root
+  `apps/gurubodh-web/`. The Next.js application has not been scaffolded yet. See
   [ADR-0002](./adr/0002-use-nextjs-for-web-frontend.md). Hosting model: see
   [ADR-0007](./adr/0007-nextjs-hosting-model-on-aws.md).
 
-### 4.8 Embedding Pipeline — *Phase 3*
+### 4.8 Chat Consumption Layer — *Phase 3*
+
+- **Responsibility**: Render the user-facing conversational interface for
+  asking questions about Gurubodh content and showing grounded answers with
+  source context.
+- **Collaborates with**: calls the RAG Query Service for answers; may read CMS
+  APIs for source display, citations, and content previews.
+- **Boundaries — does NOT**:
+  - Own content data — the CMS remains the source of truth.
+  - Generate embeddings, maintain vector indexes, or choose model providers
+    directly.
+  - Bypass the RAG Query Service for retrieval and answer-generation workflow
+    orchestration.
+- **Current implementation**: planned Next.js placeholder root
+  `apps/gurubodh-chat/`. The Next.js application has not been scaffolded yet.
+  The proposed chat/RAG workflow remains a task note, not accepted stable
+  architecture. See [Task-015](./tasks/015-chat-rag-workflow.md).
+
+### 4.9 Embedding Pipeline — *Phase 3*
 
 - **Responsibility**: React to CMS publish/update/unpublish events; generate
   embeddings for (chunked) content; keep the Vector Store in sync with the CMS.
@@ -215,7 +238,7 @@ flowchart LR
 - **Current implementation**: not yet decided; we need to work on how the generated embeddings work with "content descriptors metadata" prepared by future metadata generation commands to make search effective and efficient. See
   [ADR-0009](./adr/0009-embedding-model-and-llm-provider.md).
 
-### 4.9 Vector Store — *Phase 3*
+### 4.10 Vector Store — *Phase 3*
 
 - **Responsibility**: Store and serve embeddings for similarity search.
 - **Collaborates with**: written to by the Embedding Pipeline; read by the RAG
@@ -226,13 +249,13 @@ flowchart LR
 - **Current implementation**: likely to be pgvector extension for PostgreSQL See
   [ADR-0008](./adr/0008-vector-database-for-rag.md).
 
-### 4.10 RAG Query Service — *Phase 3*
+### 4.11 RAG Query Service — *Phase 3*
 
 - **Responsibility**: Accept a natural-language question, retrieve relevant
   chunks from the Vector Store, construct a grounded prompt, call an LLM, and
   return an answer that cites the source CMS entries.
-- **Collaborates with**: called by Web/Mobile consumption layers; reads from the
-  Vector Store; calls an external/managed LLM.
+- **Collaborates with**: called by Web, Chat, and Mobile consumption layers;
+  reads from the Vector Store; calls an external/managed LLM.
 - **Boundaries — does NOT**:
   - Generate answers without grounding them in retrieved CMS content and citing
     sources.
@@ -240,7 +263,7 @@ flowchart LR
 - **Current implementation**: not yet decided. See
   [ADR-0009](./adr/0009-embedding-model-and-llm-provider.md).
 
-### 4.11 Mobile Consumption Layer — *Phase 4*
+### 4.12 Mobile Consumption Layer — *Phase 4*
 
 - **Responsibility**: Render content and Q&A features for end users on mobile,
   using the same data as the web layer.
@@ -262,12 +285,13 @@ flowchart LR
 | Content Ingestion Layer | Prepared content artifacts | CMS | Convert DOCX; split chapters; bypass CMS API |
 | Metadata Generation Layer | Prepared chapter-level artifacts | Metadata Ingestion Layer, future search/RAG workflows | Generate metadata for unsplit single-file subjects; update CMS directly; convert DOCX |
 | Metadata Ingestion Layer | Generated metadata artifacts, existing CMS entries | CMS | Generate metadata; create new CMS content entries; bypass CMS API |
-| Headless CMS | Content Ingestion Layer and Metadata Ingestion Layer writes | Web, Mobile, Embedding Pipeline | Render UI; perform vector search |
-| Media Storage | CMS / storage-provider integration | Web, Mobile (via CDN) | Own asset metadata |
+| Headless CMS | Content Ingestion Layer and Metadata Ingestion Layer writes | Web, Chat, Mobile, Embedding Pipeline | Render UI; perform vector search |
+| Media Storage | CMS / storage-provider integration | Web, Chat, Mobile (via CDN) | Own asset metadata |
 | Web Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Own content data; implement content validation |
+| Chat Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Own content data; maintain vectors; orchestrate retrieval outside the RAG Query Service |
 | Embedding Pipeline | CMS (webhooks + reads) | Vector Store | Generate/own content; serve queries |
 | Vector Store | Embedding Pipeline (writes) | RAG Query Service | Act as a system of record |
-| RAG Query Service | Vector Store, LLM provider | Web, Mobile | Answer ungrounded/uncited questions |
+| RAG Query Service | Vector Store, LLM provider | Web, Chat, Mobile | Answer ungrounded/uncited questions |
 | Mobile Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Introduce a separate backend |
 
 ---
@@ -276,10 +300,10 @@ flowchart LR
 
 | Phase | Components Active |
 |---|---|
-| **Current implemented foundation** | Local Content Preparation utility, Headless CMS scaffold, local PostgreSQL scripts |
+| **Current implemented foundation** | Local Content Preparation utility, Headless CMS scaffold, local PostgreSQL scripts, planned web/chat app roots |
 | **Phase 1 target** | Content Ingestion, Content Preparation, Headless CMS, Media Storage |
 | **Phase 2** | + Web Consumption Layer (production-hardened) |
-| **Phase 3** | + Embedding Pipeline, Vector Store, RAG Query Service |
+| **Phase 3** | + Chat Consumption Layer, Embedding Pipeline, Vector Store, RAG Query Service |
 | **Phase 4** | + Mobile Consumption Layer |
 
 The component boundaries defined in Section 4 are designed to hold across all

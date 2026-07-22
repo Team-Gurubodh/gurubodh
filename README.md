@@ -1,12 +1,17 @@
 # Gurubodh
 
-Gurubodh is a monorepo for the CMS application, content preparation tools,
-future ingestion and metadata utilities, PostgreSQL infrastructure scripts, and
-ML/RAG preparation utilities housed in the Gurubodh CLI.
+Gurubodh is a monorepo for the CMS application, planned user-facing web and
+chat applications, content preparation tools, future ingestion and metadata
+utilities, PostgreSQL infrastructure scripts, and ML/RAG preparation utilities
+housed in the Gurubodh CLI.
 
 ## Structure
 
 - `apps/gurubodh-cms` - Strapi 5 CMS application.
+- `apps/gurubodh-web` - Planned Next.js application for reading Gurubodh
+  content online.
+- `apps/gurubodh-chat` - Planned Next.js chat application for interacting with
+  Gurubodh through a conversational interface.
 - `tools/gurubodh-cli` - Python utility for preprocessing and preparing
   MS Word 2007 content and metadata artifacts, including semantic chunking and
   ML/RAG preparation utilities. Future content ingestion and metadata workflow
