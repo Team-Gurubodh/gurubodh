@@ -11,9 +11,9 @@ class ProjectContextTests(unittest.TestCase):
     def make_project_root(self):
         temp_dir = tempfile.TemporaryDirectory()
         root = Path(temp_dir.name)
-        (root / "config").mkdir()
-        (root / "config" / "conversion_job.schema.json").write_text("{}", encoding="utf-8")
-        (root / "jobs").mkdir()
+        (root / "config" / "jobs").mkdir(parents=True)
+        (root / "config" / "jobs" / "prep_subject_job.schema.json").write_text("{}", encoding="utf-8")
+        (root / "jobs" / "subjects").mkdir(parents=True)
         self.addCleanup(temp_dir.cleanup)
         return root
 
