@@ -9,10 +9,10 @@ from gurubodh.project import resolve_project_context, resolve_project_path
 
 
 PLANNED_COMMANDS = {
-    "download-subject": "Download subject source files and existing artifacts from configured storage.",
-    "delete-subject": "Delete a subject and its generated artifacts from configured storage.",
     "generate-embeddings": "Generate vector embeddings for prepared semantic chunks.",
     "update-metadata": "Update subject and chapter metadata from the configured metadata source.",
+    "download-subject": "Download subject source files and existing artifacts from configured storage.",
+    "delete-subject": "Delete a subject and its generated artifacts from configured storage.",
 }
 
 
@@ -32,6 +32,15 @@ def add_common_options(parser):
     )
 
 
+def add_planned_command(subparsers, command):
+    help_text = PLANNED_COMMANDS[command]
+    subparsers.add_parser(
+        command,
+        help=f"[planned] {help_text}",
+        description=f"[planned] {help_text}",
+    )
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="gurubodh",
@@ -46,26 +55,14 @@ def build_parser():
     )
     add_common_options(prep_subject_parser)
 
-    unicode_parser = subparsers.add_parser(
-        "unicode-ingest",
-        help="[deprecated] Run only the Unicode DOCX ingest pipeline.",
-        description="[deprecated] Copy Unicode DOCX input, extract text, split chapters, and reject non-Unicode jobs.",
-    )
-    add_common_options(unicode_parser)
-
-    legacy_parser = subparsers.add_parser(
-        "legacy-convert",
-        help="[deprecated] Run only the legacy DOCX to Unicode pipeline.",
-        description="[deprecated] Convert supported legacy-font DOCX input to Unicode, then split chapters.",
-    )
-    add_common_options(legacy_parser)
-
     generate_chunks_parser = subparsers.add_parser(
         "generate-chunks",
         help="Generate semantic text chunks from prepared chapter text files.",
         description="Generate standalone semantic chunk JSON and Markdown outputs from prepared chapter .txt files.",
     )
     add_generate_chunks_options(generate_chunks_parser)
+
+    add_planned_command(subparsers, "generate-embeddings")
 
     compare_tokenizers_parser = subparsers.add_parser(
         "compare-tokenizers",
@@ -74,12 +71,23 @@ def build_parser():
     )
     add_compare_tokenizers_options(compare_tokenizers_parser)
 
-    for command, help_text in PLANNED_COMMANDS.items():
-        subparsers.add_parser(
-            command,
-            help=f"[planned] {help_text}",
-            description=f"[planned] {help_text}",
-        )
+    add_planned_command(subparsers, "update-metadata")
+    add_planned_command(subparsers, "download-subject")
+    add_planned_command(subparsers, "delete-subject")
+
+    legacy_parser = subparsers.add_parser(
+        "legacy-convert",
+        help="[deprecated] Run only the legacy DOCX to Unicode pipeline.",
+        description="[deprecated] Convert supported legacy-font DOCX input to Unicode, then split chapters.",
+    )
+    add_common_options(legacy_parser)
+
+    unicode_parser = subparsers.add_parser(
+        "unicode-ingest",
+        help="[deprecated] Run only the Unicode DOCX ingest pipeline.",
+        description="[deprecated] Copy Unicode DOCX input, extract text, split chapters, and reject non-Unicode jobs.",
+    )
+    add_common_options(unicode_parser)
 
     return parser
 
