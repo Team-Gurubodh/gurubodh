@@ -329,8 +329,8 @@ Restore only the files for issue `#22`:
 
 ```bash
 git restore --source strapi-mcp-setup-and-seed-data-scripts -- \
-  tools/seed-data/README.md \
-  tools/seed-data/scripts
+  tools/seed-data-cli/README.md \
+  tools/seed-data-cli/scripts
 ```
 
 Review, verify, commit, push, and open the pull request for issue `#22`.

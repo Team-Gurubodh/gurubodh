@@ -26,7 +26,7 @@
     "artifact_root": {
       "type": "string",
       "minLength": 1,
-      "description": "Path under tools/seed-data where generated JSON artifacts are written."
+      "description": "Path under tools/seed-data-cli where generated JSON artifacts are written."
     },
     "workflows": {
       "type": "array",

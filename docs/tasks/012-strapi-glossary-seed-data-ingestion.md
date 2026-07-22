@@ -21,8 +21,8 @@ observable, repeatable, and recoverable.
 Task 008 produced reviewed glossary JSON artifacts:
 
 ```text
-tools/seed-data/artifacts/glossary/sanatan-glossary.json
-tools/seed-data/artifacts/glossary/prabodhan-glossary.json
+tools/seed-data-cli/artifacts/glossary/sanatan-glossary.json
+tools/seed-data-cli/artifacts/glossary/prabodhan-glossary.json
 ```
 
 Those artifacts are staging contracts, not direct Strapi REST payloads. The
@@ -157,7 +157,7 @@ Scope:
 1. Load Sanatan Glossary and Prabodhan Glossary artifacts from their reviewed
    artifact locations.
 2. Validate loaded glossary artifacts against
-   `tools/seed-data/config/glossary_artifact.schema.json`.
+   `tools/seed-data-cli/config/glossary_artifact.schema.json`.
 3. Add read-only preflight checks for:
    - Strapi API reachability;
    - authenticated access to the Sanatan Glossary endpoint;
@@ -335,12 +335,12 @@ issue-67-glossary-preflight-artifact-loading
 ```
 
 Implemented read-only glossary ingestion preflight support in
-`tools/seed-data`:
+`tools/seed-data-cli`:
 
 - added reviewed Sanatan Glossary and Prabodhan Glossary artifact loading for
   ingestion preflight;
 - validates both artifacts against
-  `tools/seed-data/config/glossary_artifact.schema.json`;
+  `tools/seed-data-cli/config/glossary_artifact.schema.json`;
 - verifies artifact `strapi.collection_type` values against the approved
   glossary targets only;
 - checks authenticated read access and Draft & Publish status-query support for
@@ -369,7 +369,7 @@ Implementation branch:
 issue-69-glossary-dry-run-planning
 ```
 
-Implemented read-only glossary ingestion planning in `tools/seed-data`:
+Implemented read-only glossary ingestion planning in `tools/seed-data-cli`:
 
 - added a parameterized glossary ingestion planner for Sanatan Glossary and
   Prabodhan Glossary;
@@ -408,7 +408,7 @@ Implementation branch:
 issue-71-glossary-apply-publish-idempotency
 ```
 
-Implemented write-capable glossary ingestion in `tools/seed-data`:
+Implemented write-capable glossary ingestion in `tools/seed-data-cli`:
 
 - added explicit apply support to:
 
@@ -449,7 +449,7 @@ issue-73-task-12-stage-5-glossary-e2e
 ```
 
 Added maintainer-facing glossary ingestion operations documentation in
-`tools/seed-data/README.md`:
+`tools/seed-data-cli/README.md`:
 
 - documented required Strapi environment variables and API token permissions;
 - documented glossary preflight, dry-run, apply, and post-apply commands;

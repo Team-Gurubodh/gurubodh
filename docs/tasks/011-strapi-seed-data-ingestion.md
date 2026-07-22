@@ -21,8 +21,8 @@ observable, repeatable, and recoverable.
 Tasks 009 and 010 produce reviewed Category and Subject JSON artifacts:
 
 ```text
-tools/seed-data/artifacts/category/categories.json
-tools/seed-data/artifacts/subject/subjects.json
+tools/seed-data-cli/artifacts/category/categories.json
+tools/seed-data-cli/artifacts/subject/subjects.json
 ```
 
 Those artifacts are staging contracts, not direct Strapi REST payloads. The
@@ -158,7 +158,7 @@ default.
 
 Scope:
 
-1. Add a seed-data ingestion command group under `tools/seed-data`.
+1. Add a seed-data ingestion command group under `tools/seed-data-cli`.
 2. Read Category and Subject artifacts from their reviewed artifact locations.
 3. Load Strapi API configuration from environment variables or explicit CLI
    options without committing secrets.
@@ -428,7 +428,7 @@ Expected output:
 - 2026-07-11: Stage 5 implementation started under GitHub issue
   [#59](https://github.com/Team-Gurubodh/gurubodh/issues/59).
   - Added maintainer-facing Strapi ingestion operations guidance to
-    `tools/seed-data/README.md`.
+    `tools/seed-data-cli/README.md`.
   - Documented required environment variables, API token permissions, locale
     expectations, clean local database recommendation, preflight checks,
     dry-run/apply commands, report sections, end-to-end verification checklist,

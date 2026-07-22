@@ -57,7 +57,7 @@ relative to:
   compatibility checks out of this task.
 - Keep actual Strapi ingestion out of this task.
 - Define a formal subject artifact JSON Schema under:
-  - `tools/seed-data/config/subject_artifact.schema.json`
+  - `tools/seed-data-cli/config/subject_artifact.schema.json`
 - Record the durable subject artifact contract in:
   - `docs/interfaces/seed-data-artifacts.md`
 - Treat the generated subject artifact as reviewable project data, consistent
@@ -102,10 +102,10 @@ relative to:
    - `strapi`
    - `records`
 6. Add a formal subject artifact JSON Schema:
-   - `tools/seed-data/config/subject_artifact.schema.json`
+   - `tools/seed-data-cli/config/subject_artifact.schema.json`
 7. Validate generated subject artifacts against the subject artifact schema.
 8. Generate:
-   - `tools/seed-data/artifacts/subject/subjects.json`
+   - `tools/seed-data-cli/artifacts/subject/subjects.json`
 9. Ensure artifact generation runs CSV validation and category-reference
    validation first, and does not write an artifact when source validation,
    reference validation, or artifact validation fails.
@@ -113,7 +113,7 @@ relative to:
    reference validation, artifact generation, and artifact-schema validation.
 11. Update `docs/interfaces/seed-data-artifacts.md` with the finalized subject
    artifact contract.
-12. Update `tools/seed-data/README.md` with subject validation and generation
+12. Update `tools/seed-data-cli/README.md` with subject validation and generation
    commands.
 
 ## Out of Scope
@@ -143,12 +143,12 @@ relative to:
   category-reference validation, artifact generation, and artifact-schema
   validation.
 - Added a formal Subject artifact schema:
-  - `tools/seed-data/config/subject_artifact.schema.json`
+  - `tools/seed-data-cli/config/subject_artifact.schema.json`
 - Generated the reviewable Subject artifact:
-  - `tools/seed-data/artifacts/subject/subjects.json`
+  - `tools/seed-data-cli/artifacts/subject/subjects.json`
 - Updated `docs/interfaces/seed-data-artifacts.md` with the durable Subject
   artifact contract.
-- Updated `tools/seed-data/README.md` with Subject validation and generation
+- Updated `tools/seed-data-cli/README.md` with Subject validation and generation
   commands.
 
 #### What Works
@@ -166,11 +166,11 @@ relative to:
 
 #### Verification
 
-- `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data subject validate --source subjects`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data subject generate --source subjects`
-- `python3 -m json.tool tools/seed-data/config/subject_artifact.schema.json`
-- `python3 -m json.tool tools/seed-data/artifacts/subject/subjects.json`
+- `tools/seed-data-cli/.venv/bin/python -m unittest discover -s tools/seed-data-cli/tests`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data subject validate --source subjects`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data subject generate --source subjects`
+- `python3 -m json.tool tools/seed-data-cli/config/subject_artifact.schema.json`
+- `python3 -m json.tool tools/seed-data-cli/artifacts/subject/subjects.json`
 
 ## Follow-Up
 

@@ -8,7 +8,7 @@
 ## Purpose
 
 This document defines the lightweight interface between externally maintained
-seed-data CSV files, `tools/seed-data`, generated JSON artifacts, and future
+seed-data CSV files, `tools/seed-data-cli`, generated JSON artifacts, and future
 Strapi 5 ingestion.
 
 The contract exists so source data can evolve without losing the fields and
@@ -19,7 +19,7 @@ the implementation tasks may refine details as each seed-data type is built.
 
 ```text
 Google Sheets / exported CSV files
--> tools/seed-data source configuration
+-> tools/seed-data-cli source configuration
 -> validated JSON artifacts
 -> Strapi 5 content types and API ingestion
 ```
@@ -52,11 +52,11 @@ subject/subjects.csv
 ```
 
 The source root and source definitions are represented in
-`tools/seed-data/config/seed_data_sources.json`.
+`tools/seed-data-cli/config/seed_data_sources.json`.
 
 ## Artifact Locations
 
-Generated JSON artifacts should be written under `tools/seed-data/artifacts/`
+Generated JSON artifacts should be written under `tools/seed-data-cli/artifacts/`
 using stable workflow directories:
 
 ```text
@@ -298,15 +298,15 @@ fields.
 Formal JSON Schemas for seed-data artifacts belong under:
 
 ```text
-tools/seed-data/config/
+tools/seed-data-cli/config/
 ```
 
 The glossary artifact schema should be introduced as:
 
 ```text
-tools/seed-data/config/category_artifact.schema.json
-tools/seed-data/config/glossary_artifact.schema.json
-tools/seed-data/config/subject_artifact.schema.json
+tools/seed-data-cli/config/category_artifact.schema.json
+tools/seed-data-cli/config/glossary_artifact.schema.json
+tools/seed-data-cli/config/subject_artifact.schema.json
 ```
 
 That schema validates generated seed-data artifact files before ingestion. It is

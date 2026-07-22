@@ -337,7 +337,7 @@ Scope:
    - `plan --apply`;
    - `glossary-preflight`;
    - `glossary-plan`.
-2. Update `tools/seed-data/README.md` command examples.
+2. Update `tools/seed-data-cli/README.md` command examples.
 3. Update task history execution notes after implementation.
 4. Ensure help text describes only the final public command grammar.
 
@@ -386,7 +386,7 @@ Expected output:
 Required automated checks:
 
 ```bash
-cd tools/seed-data
+cd tools/seed-data-cli
 python3 -m unittest
 ```
 
@@ -448,7 +448,7 @@ issue-79-task-13-stage-2-target-preflight
 ```
 
 Implemented target-specific artifact loading and read-only preflight routing in
-`tools/seed-data`:
+`tools/seed-data-cli`:
 
 - added a target registry for:
   - `category`;
@@ -481,7 +481,7 @@ Verification ran the seed-data unit test suite and read-only preflight checks
 against the throwaway Strapi database:
 
 ```bash
-cd tools/seed-data
+cd tools/seed-data-cli
 python3 -m unittest discover -s tests
 python3 -m gurubodh_seed_data.cli ingest preflight category
 python3 -m gurubodh_seed_data.cli ingest preflight subject
@@ -502,7 +502,7 @@ Implementation branch:
 issue-81-task-13-stage-3-target-plan
 ```
 
-Implemented target-specific dry-run planning for `tools/seed-data`:
+Implemented target-specific dry-run planning for `tools/seed-data-cli`:
 
 - wired `gurubodh-seed-data ingest plan <target>` for:
   - `category`;
@@ -527,7 +527,7 @@ Verification ran the seed-data unit test suite and read-only target plan checks
 against the throwaway Strapi database:
 
 ```bash
-cd tools/seed-data
+cd tools/seed-data-cli
 python3 -m unittest discover -s tests
 python3 -m gurubodh_seed_data.cli ingest plan category
 python3 -m gurubodh_seed_data.cli ingest plan subject
@@ -550,7 +550,7 @@ Implementation branch:
 issue-83-task-13-stage-4-target-apply
 ```
 
-Implemented target-specific apply routing for `tools/seed-data`:
+Implemented target-specific apply routing for `tools/seed-data-cli`:
 
 - wired `gurubodh-seed-data ingest apply <target>` for:
   - `category`;
@@ -576,7 +576,7 @@ Verification ran the seed-data unit test suite, command-shape checks, and live
 target apply checks against the throwaway Strapi database:
 
 ```bash
-cd tools/seed-data
+cd tools/seed-data-cli
 python3 -m unittest discover -s tests
 python3 -m gurubodh_seed_data.cli ingest --help
 python3 -m gurubodh_seed_data.cli ingest preflight --help
@@ -606,7 +606,7 @@ Implementation branch:
 issue-85-task-13-stage-5-cli-cleanup
 ```
 
-Completed the public CLI simplification for `tools/seed-data`:
+Completed the public CLI simplification for `tools/seed-data-cli`:
 
 - removed the unreachable legacy CLI handlers for:
   - `ingest preflight` without a target;
@@ -629,7 +629,7 @@ legacy-form checks, and live target checks against the throwaway Strapi
 database:
 
 ```bash
-cd tools/seed-data
+cd tools/seed-data-cli
 python3 -m unittest discover -s tests
 python3 -m gurubodh_seed_data.cli ingest --help
 python3 -m gurubodh_seed_data.cli ingest preflight --help

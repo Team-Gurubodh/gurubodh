@@ -27,13 +27,13 @@ The CSV source files live outside the repository under:
 /Users/rajeev/Gurubodh_library/seed_data/csv_import
 ```
 
-`tools/seed-data` currently hardcodes some source and path details in Python.
+`tools/seed-data-cli` currently hardcodes some source and path details in Python.
 The next implementation should move those details into JSON configuration and
 use a lightweight interface document to define the CSV-to-artifact boundary.
 
 ## Decisions
 
-- Keep `tools/seed-data` as the canonical seed-data preparation and ingestion
+- Keep `tools/seed-data-cli` as the canonical seed-data preparation and ingestion
   tooling boundary.
 - Introduce `docs/interfaces/seed-data-artifacts.md` before implementing the
   next artifact-generation slices.
@@ -42,7 +42,7 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
   artifact generation.
 - Reserve Strapi schema/API comparison for the later ingestion or dry-run
   compatibility task.
-- Represent source definitions in JSON config under `tools/seed-data/config/`.
+- Represent source definitions in JSON config under `tools/seed-data-cli/config/`.
 
 ## Approved Plan
 
@@ -58,14 +58,14 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
      expectations.
 
 3. Add seed-data source configuration.
-   - Create `tools/seed-data/config/seed_data_sources.json`.
+   - Create `tools/seed-data-cli/config/seed_data_sources.json`.
    - Include source root, artifact root, supported workflows, and source
      records for category, subject, and glossary.
    - Keep paths relative to the configured external source root or artifact
      root.
 
 4. Add a seed-data source configuration schema.
-   - Create `tools/seed-data/config/seed_data_sources.schema.json`.
+   - Create `tools/seed-data-cli/config/seed_data_sources.schema.json`.
    - Require schema version, source root, artifact root, workflow definitions,
      source keys, labels, CSV paths, and artifact paths.
 
@@ -79,7 +79,7 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
    - Make `docs/interfaces/` discoverable from `docs/README.md`.
    - Register the planned seed-data schema location in `docs/schemas.md`, then
      move it to current schema locations when the schema file is implemented.
-   - Update `tools/seed-data/README.md` to describe the external CSV source
+   - Update `tools/seed-data-cli/README.md` to describe the external CSV source
      root and config-driven direction.
 
 ## Execution Results
@@ -90,8 +90,8 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
 
 - Created GitHub issue #38 for this implementation slice.
 - Created branch `issue-38-seed-data-config-foundation`.
-- Added `tools/seed-data/config/seed_data_sources.json`.
-- Added `tools/seed-data/config/seed_data_sources.schema.json`.
+- Added `tools/seed-data-cli/config/seed_data_sources.json`.
+- Added `tools/seed-data-cli/config/seed_data_sources.schema.json`.
 - Loaded seed-data workflows and source records from JSON config instead of
   hardcoded Python constants.
 - Preserved the existing glossary CLI commands:
@@ -102,7 +102,7 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
 - Updated glossary path resolution to read CSV files from the configured
   external source root:
   `/Users/rajeev/Gurubodh_library/seed_data/csv_import`.
-- Kept generated artifact paths under `tools/seed-data/artifacts/`.
+- Kept generated artifact paths under `tools/seed-data-cli/artifacts/`.
 - Added unit tests for seed-data config loading and updated glossary validation
   tests for config-driven source paths.
 - Updated schema and seed-data documentation now that the source config schema
@@ -122,14 +122,14 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
 
 #### Verification
 
-- `python3 -m compileall tools/seed-data/gurubodh_seed_data tools/seed-data/tests`
-- `tools/seed-data/.venv/bin/python -m unittest discover -s tools/seed-data/tests`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data workflows`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary sources`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary paths`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary paths --source sanatan-glossary`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary validate --source sanatan-glossary`
-- `tools/seed-data/.venv/bin/gurubodh-seed-data glossary validate --source prabodhan-glossary`
+- `python3 -m compileall tools/seed-data-cli/gurubodh_seed_data tools/seed-data-cli/tests`
+- `tools/seed-data-cli/.venv/bin/python -m unittest discover -s tools/seed-data-cli/tests`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data workflows`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary sources`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary paths`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary paths --source sanatan-glossary`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary validate --source sanatan-glossary`
+- `tools/seed-data-cli/.venv/bin/gurubodh-seed-data glossary validate --source prabodhan-glossary`
 
 ## Follow-Up
 
