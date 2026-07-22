@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Gurubodh is a monorepo for building and operating the Gurubodh CMS, content preparation workflows, future ingestion and metadata tooling, database infrastructure scripts, and ML research experiments.
+Gurubodh is a monorepo for building and operating the Gurubodh CMS, content preparation workflows, future ingestion and metadata tooling, database infrastructure scripts, and ML/RAG preparation utilities housed in the Gurubodh CLI.
 The project exists in order to bring over 7000 legacy audio files containing knowledge about "Sanatan Dharma", which is the central concept in the Indian Knowledge System. The project will progress in phases, with the initial phases displaying content that has already been converted from audio into Hindi-language transcripts. In the final phase, all knowledge lives within the Gurubodh CMS and is ready to be queried using AI prompts.
 
 ## Current Goals
