@@ -77,7 +77,7 @@ Run these commands from the monorepo root:
 
 ```bash
 cd tools/seed-data-cli
-python3 -m venv .venv
+python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install "setuptools>=68"
 python -m pip install -e .
@@ -95,7 +95,7 @@ From the monorepo root:
 ```bash
 rm -rf tools/seed-data-cli/.venv
 cd tools/seed-data-cli
-python3 -m venv .venv
+python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install "setuptools>=68"
 python -m pip install -e .

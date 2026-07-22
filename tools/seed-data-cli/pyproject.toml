@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gurubodh-seed-data"
 version = "0.1.0"
 description = "Gurubodh CMS seed-data preparation and ingestion tooling"
-requires-python = ">=3.9"
+requires-python = ">=3.12,<3.13"
 
 [project.scripts]
 gurubodh-seed-data = "gurubodh_seed_data.cli:main"
