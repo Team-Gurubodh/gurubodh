@@ -6,9 +6,10 @@ Follow it before planning, editing, generating code, refactoring, or updating do
 </agent_contract>
 
 <repository_summary>
-Gurubodh is a monorepo for a Strapi CMS application, content preparation tools,
-future ingestion and metadata utilities, PostgreSQL infrastructure scripts, and
-ML/RAG preparation utilities housed in the Gurubodh CLI.
+Gurubodh is a monorepo for a Strapi CMS application, planned user-facing web and
+chat applications, content preparation tools, future ingestion and metadata
+utilities, PostgreSQL infrastructure scripts, and ML/RAG preparation utilities
+housed in the Gurubodh CLI.
 </repository_summary>
 
 <routing>

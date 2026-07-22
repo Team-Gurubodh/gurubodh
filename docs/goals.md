@@ -5,12 +5,15 @@
 
 ## Purpose
 
-Gurubodh is a monorepo for building and operating the Gurubodh CMS, content preparation workflows, future ingestion and metadata tooling, database infrastructure scripts, and ML/RAG preparation utilities housed in the Gurubodh CLI.
+Gurubodh is a monorepo for building and operating the Gurubodh CMS, planned user-facing web and chat applications, content preparation workflows, future ingestion and metadata tooling, database infrastructure scripts, and ML/RAG preparation utilities housed in the Gurubodh CLI.
 The project exists in order to bring over 7000 legacy audio files containing knowledge about "Sanatan Dharma", which is the central concept in the Indian Knowledge System. The project will progress in phases, with the initial phases displaying content that has already been converted from audio into Hindi-language transcripts. In the final phase, all knowledge lives within the Gurubodh CMS and is ready to be queried using AI prompts.
 
 ## Current Goals
 
 - Create a Strapi 5 CMS application for Gurubodh content. The content is divided into about 75 subjects that have already been converted from audio to Hindi transcripts in MS Word 2007 format. The Strapi 5 headless CMS backend will work with a Next.js frontend application to bring content to knowledge-seekers worldwide.
+- Reserve clear application roots for the planned Next.js reading experience and
+  chat experience while keeping unimplemented app surfaces marked as
+  placeholders.
 - Maintain reliable content preparation tooling for DOCX and metadata workflows. 
   - Each subject is typically available as a single MS Word 2007 file. We need to divide that content into chapters, typically about 50 per subject. 
   - While splitting the original file into chapters, also capture relevant metadata that describes the content.
