@@ -30,7 +30,7 @@ class SemanticChunkConfig:
     provider: str = DEFAULT_PROVIDER
     model_name: str = DEFAULT_MODEL_NAME
     threshold_percentile: float = 80.0
-    min_chars: int = 650
+    min_chars: int = 600
     window_size: int = 3
     batch_size: int = 16
     normalize_embeddings: bool = True

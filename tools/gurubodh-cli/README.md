@@ -42,6 +42,36 @@ replace them:
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
 ```
 
+`gurubodh generate-chunks` reads prepared chapter text and metadata artifacts
+from a subject artifact tree and writes per-chapter semantic chunk JSON files
+with dense BGE-M3 embeddings:
+
+```bash
+export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
+gurubodh generate-chunks \
+  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+```
+
+When run from outside `tools/gurubodh-cli`, pass `--project-root` just like
+`prep-subject`:
+
+```bash
+gurubodh generate-chunks \
+  --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
+  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+```
+
+The output directory is scoped to:
+
+```text
+<subject>/chapters/semantic_chunks_and_embeddings/
+```
+
+It contains one `*.chunks.json` file per processed chapter and a `summary.json`.
+The command does not write chunk Markdown and does not update chapter metadata.
+For `--overwrite`, only the semantic chunk and embedding output directory, or
+the matching R2 prefix, is replaced.
+
 ## Audit Trail Reports
 
 Each successful `prep-subject` run writes machine-readable JSON and
@@ -68,6 +98,11 @@ cms_library/{subject_dir}/run_reports/
 
 Audit reports intentionally exclude secrets, environment variable values, API
 keys, request bodies, full source text, full chapter text, and DOCX contents.
+
+`generate-chunks` follows the same audit report convention and writes JSON and
+Markdown reports under `<subject>/run_reports/`. Reports include generated
+artifact references and aggregate counts, but exclude full source text and
+embedding vectors.
 
 Future Gurubodh CLI commands that create, transform, publish, ingest, delete, or
 materially modify content artifacts should use the same JSON/Markdown audit
@@ -114,8 +149,14 @@ Sample jobs are grouped by subject and split by backend:
 ```text
 jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
 jobs/subjects/sub039_aacharan_shastra/prep-subject.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/generate-chunks.local.json
+jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
 jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 jobs/subjects/sub123_spand_rahasya/prep-subject.r2-output.json
+jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+jobs/subjects/sub123_spand_rahasya/generate-chunks.r2-output.json
+jobs/subjects/sub123_spand_rahasya/generate-chunks.r2.json
 ```
 
 Use `.local.json` for local source and local output. Use `.r2-output.json` for
@@ -173,6 +214,14 @@ cms_library/{subject_dir}/chapters/text_and_metadata/
 R2 objects may remain private. Generated metadata stores bucket/key references
 as canonical storage references and leaves URL fields as `null` unless
 `url_base` is configured.
+
+`generate-chunks` R2 jobs read and write prepared subject artifact trees using
+the same `cms_library/{subject_dir}/` convention. Chunk artifacts are uploaded
+under:
+
+```text
+cms_library/{subject_dir}/chapters/semantic_chunks_and_embeddings/
+```
 
 ## Chapter Text Integrity
 

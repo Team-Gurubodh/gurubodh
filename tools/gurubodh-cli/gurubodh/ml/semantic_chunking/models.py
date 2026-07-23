@@ -24,6 +24,7 @@ class Chunk:
     start_char: int
     end_char: int
     chunk_text_sha256: str
+    dense_embedding: list[float] | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)

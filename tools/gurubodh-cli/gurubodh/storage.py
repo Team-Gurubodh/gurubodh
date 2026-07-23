@@ -92,8 +92,30 @@ class R2StorageClient:
         response = self.client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
         return response.get("KeyCount", 0) > 0
 
+    def list_keys(self, bucket, prefix):
+        keys = []
+        kwargs = {"Bucket": bucket, "Prefix": prefix}
+        while True:
+            response = self.client.list_objects_v2(**kwargs)
+            keys.extend(item["Key"] for item in response.get("Contents", []))
+            if not response.get("IsTruncated"):
+                return sorted(keys)
+            kwargs["ContinuationToken"] = response["NextContinuationToken"]
+
     def upload_file(self, path, bucket, key):
         self.client.upload_file(str(path), bucket, key)
+
+    def delete_prefix(self, bucket, prefix):
+        keys = self.list_keys(bucket, prefix)
+        for index in range(0, len(keys), 1000):
+            batch = keys[index : index + 1000]
+            if not batch:
+                continue
+            self.client.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": [{"Key": key} for key in batch]},
+            )
+        return keys
 
     def download_file(self, bucket, key, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -148,6 +170,14 @@ def destination_artifact_reference(config, relative_path):
 def destination_object_key(config, relative_path):
     destination = config["destination"]
     return join_key(destination["prefix"], destination["subject_dir"], relative_path.as_posix())
+
+
+def subject_artifact_prefix(section):
+    return join_key(section["prefix"], section["subject_dir"]) + "/"
+
+
+def subject_artifact_object_key(section, relative_path):
+    return join_key(section["prefix"], section["subject_dir"], relative_path.as_posix())
 
 
 def destination_subject_prefix(config):

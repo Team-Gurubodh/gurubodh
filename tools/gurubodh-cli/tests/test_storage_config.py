@@ -8,7 +8,7 @@ from pathlib import Path
 
 from botocore.exceptions import ClientError
 
-from gurubodh.config import load_prep_subject_job
+from gurubodh.config import load_generate_chunks_job, load_prep_subject_job
 from gurubodh.metadata import build_chapter_metadata, text_artifact_integrity
 from gurubodh.storage import (
     R2StorageClient,
@@ -397,11 +397,24 @@ class StorageConfigTests(unittest.TestCase):
     def test_sample_jobs_declare_summary_chapter_markers(self):
         jobs_dir = Path(__file__).parents[1] / "jobs" / "subjects"
 
-        for job_path in jobs_dir.glob("*/*.json"):
+        for job_path in jobs_dir.glob("*/prep-subject*.json"):
             with self.subTest(job=str(job_path.relative_to(jobs_dir))):
                 config = load_prep_subject_job(job_path)
 
                 self.assertIn("summary_chapter_markers", config["metadata_defaults"])
+
+    def test_sample_generate_chunks_jobs_load(self):
+        jobs_dir = Path(__file__).parents[1] / "jobs" / "subjects"
+
+        for job_path in jobs_dir.glob("*/generate-chunks*.json"):
+            with self.subTest(job=str(job_path.relative_to(jobs_dir))):
+                config = load_generate_chunks_job(job_path)
+
+                self.assertEqual(config["pipeline"], "generate-chunks")
+                self.assertEqual(config["_semantic_chunk_config"].model_name, "BAAI/bge-m3")
+                self.assertGreaterEqual(config["_semantic_chunk_config"].threshold_percentile, 0.0)
+                self.assertLessEqual(config["_semantic_chunk_config"].threshold_percentile, 100.0)
+                self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)
 
     def test_load_prep_subject_job_rejects_invalid_summary_chapter_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
