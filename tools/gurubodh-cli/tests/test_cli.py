@@ -12,7 +12,7 @@ class CliTests(unittest.TestCase):
         expected_order = [
             "prep-subject",
             "generate-chunks",
-            "generate-embeddings",
+            "regenerate-embeddings",
             "compare-tokenizers",
             "update-metadata",
             "download-subject",
