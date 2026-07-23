@@ -188,20 +188,39 @@ def materialize_source(config, r2_client=None):
 
 
 def ensure_local_destination(subject_dir, overwrite):
+    existed = subject_dir.exists()
+    removed_for_overwrite = False
     if subject_dir.exists():
         if not subject_dir.is_dir():
             raise SystemExit(f"Destination subject path exists but is not a directory: {subject_dir}")
         if not overwrite:
             raise SystemExit(f"Destination already exists. Re-run with --overwrite to replace: {subject_dir}")
         shutil.rmtree(subject_dir)
+        removed_for_overwrite = True
     subject_dir.mkdir(parents=True, exist_ok=True)
+    return {
+        "path": str(subject_dir),
+        "existed_before_run": existed,
+        "removed_for_overwrite": removed_for_overwrite,
+    }
 
 
 def ensure_r2_destination_available(config, overwrite, r2_client=None):
-    if overwrite or not is_r2(config["destination"]):
-        return
+    if not is_r2(config["destination"]):
+        return {
+            "status": "not_applicable",
+            "skipped": True,
+        }
     destination = config["destination"]
     prefix = destination_subject_prefix(config)
+    if overwrite:
+        return {
+            "status": "skipped",
+            "skipped": True,
+            "reason": "overwrite enabled",
+            "bucket": destination["bucket"],
+            "prefix": prefix,
+        }
     client = r2_client or R2StorageClient.from_env()
     print(f"checking R2 destination prefix r2://{destination['bucket']}/{prefix}")
     if client.prefix_has_objects(destination["bucket"], prefix):
@@ -209,13 +228,19 @@ def ensure_r2_destination_available(config, overwrite, r2_client=None):
             "R2 destination prefix already contains objects. Re-run with --overwrite to replace:\n"
             f"r2://{destination['bucket']}/{prefix}"
         )
+    return {
+        "status": "passed",
+        "skipped": False,
+        "bucket": destination["bucket"],
+        "prefix": prefix,
+    }
 
 
 def iter_subject_files(subject_dir):
     return sorted(path for path in subject_dir.rglob("*") if path.is_file())
 
 
-def publish_r2_destination(config, subject_dir, overwrite, r2_client=None):
+def publish_r2_destination(config, subject_dir, overwrite, r2_client=None, before_upload=None):
     destination = config["destination"]
     client = r2_client or R2StorageClient.from_env()
     uploads = []
@@ -240,6 +265,9 @@ def publish_r2_destination(config, subject_dir, overwrite, r2_client=None):
             "R2 destination object(s) already exist. Re-run with --overwrite to replace:\n"
             f"{sample}{extra}"
         )
+
+    if before_upload:
+        before_upload(uploads)
 
     print(f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}")
     for index, (path, key) in enumerate(uploads, start=1):

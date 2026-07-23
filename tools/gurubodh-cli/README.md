@@ -42,6 +42,44 @@ replace them:
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
 ```
 
+## Audit Trail Reports
+
+Each successful `prep-subject` run writes machine-readable JSON and
+operator-readable Markdown audit reports under the generated subject artifact
+tree:
+
+```text
+<subject>/run_reports/
+```
+
+The JSON report is the source of truth for tooling. The Markdown report is a
+human-readable summary for reviewing what happened during the run. Reports
+include run identity, the resolved job config path, pipeline, source and
+destination backends, overwrite mode, a safe configuration snapshot, chapter
+artifact summaries, text artifact SHA-256 values copied from chapter metadata,
+publish status, and final operator notes.
+
+For R2-backed destinations, audit reports are uploaded with the rest of the
+subject artifact tree:
+
+```text
+cms_library/{subject_dir}/run_reports/
+```
+
+Audit reports intentionally exclude secrets, environment variable values, API
+keys, request bodies, full source text, full chapter text, and DOCX contents.
+
+Future Gurubodh CLI commands that create, transform, publish, ingest, delete, or
+materially modify content artifacts should use the same JSON/Markdown audit
+report convention, or explicitly document why an audit trail is not required.
+Future command issues should include an audit-trail checklist:
+
+```markdown
+- [ ] Audit trail considered:
+  - [ ] command writes standard JSON/Markdown audit reports; or
+  - [ ] issue explains why no audit report is needed.
+```
+
 ## Project Root Detection
 
 The CLI detects this tool's root by finding both:

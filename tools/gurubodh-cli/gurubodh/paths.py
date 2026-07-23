@@ -25,8 +25,9 @@ def destination_paths_for_job(config, overwrite=False):
     else:
         subject_dir = output_root
 
+    destination_info = None
     if is_local(config["destination"]):
-        ensure_local_destination(subject_dir, overwrite)
+        destination_info = ensure_local_destination(subject_dir, overwrite)
 
     paths = destination_paths_for_subject(subject_dir)
-    return paths, temp_dir
+    return paths, temp_dir, destination_info
