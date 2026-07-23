@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/artifacts/semantic_chunks_and_embeddings.schema.json",
+  "title": "Gurubodh semantic chunks and dense embeddings artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "document",
+    "files",
+    "source_references",
+    "chunking",
+    "embedding",
+    "token_counting",
+    "chunks",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "document": {
+      "type": "object",
+      "required": ["category_code", "subject_code", "title_slug", "chapter_number", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "category_code": { "type": "string" },
+        "subject_code": { "type": "string" },
+        "title_slug": { "type": "string" },
+        "chapter_number": { "type": "string", "pattern": "^[0-9]{3}$" },
+        "version": { "type": "string" }
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chunk_filename", "source_text_filename", "source_metadata_filename"],
+      "properties": {
+        "chunk_filename": { "type": "string", "pattern": "\\.chunks\\.json$" },
+        "source_text_filename": { "type": "string", "pattern": "\\.txt$" },
+        "source_metadata_filename": { "type": "string", "pattern": "\\.json$" }
+      }
+    },
+    "source_references": {
+      "type": "object"
+    },
+    "chunking": {
+      "type": "object"
+    },
+    "embedding": {
+      "type": "object",
+      "required": ["provider", "model", "embedding_mode", "embedding_dimension", "normalize_embeddings"],
+      "properties": {
+        "provider": { "const": "semantic-chunking" },
+        "model": { "const": "BAAI/bge-m3" },
+        "embedding_mode": { "const": "dense" },
+        "embedding_dimension": { "const": 1024 },
+        "normalize_embeddings": { "type": "boolean" }
+      }
+    },
+    "token_counting": {
+      "type": "object"
+    },
+    "chunks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "chunk_index",
+          "text",
+          "sentence_count",
+          "character_count",
+          "estimated_embedding_token_count",
+          "sentence_range",
+          "character_span",
+          "chunk_text_sha256",
+          "dense_embedding"
+        ],
+        "properties": {
+          "chunk_index": { "type": "integer", "minimum": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "sentence_count": { "type": "integer", "minimum": 1 },
+          "character_count": { "type": "integer", "minimum": 1 },
+          "estimated_embedding_token_count": { "type": "integer", "minimum": 0 },
+          "sentence_range": { "type": "object" },
+          "character_span": { "type": "object" },
+          "chunk_text_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "dense_embedding": {
+            "type": "array",
+            "minItems": 1024,
+            "maxItems": 1024,
+            "items": { "type": "number" }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object"
+    }
+  }
+}

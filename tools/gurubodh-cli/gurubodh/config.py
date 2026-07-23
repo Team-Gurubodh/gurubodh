@@ -3,12 +3,15 @@ import re
 
 from gurubodh.constants import (
     CONVERSION_JOB_SCHEMA_VERSION,
+    GENERATE_CHUNKS_JOB_SCHEMA_VERSION,
+    PIPELINE_GENERATE_CHUNKS,
     PIPELINE_ENTRY_POINTS,
     PIPELINE_LEGACY_DOCX_TO_UNICODE,
     PIPELINE_UNICODE_DOCX_INGEST,
     SUPPORTED_LEGACY_ENCODINGS,
     SUPPORTED_FONT_ENCODINGS,
 )
+from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
 
 
 REGEX_FLAG_VALUES = {
@@ -58,6 +61,27 @@ def optional_string_array(data, key, context):
     for item in value:
         if not isinstance(item, str) or not item:
             raise SystemExit(f"Config error: {context}.{key} must contain only non-empty strings")
+    return value
+
+
+def require_number(data, key, context):
+    value = data.get(key)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise SystemExit(f"Config error: {context}.{key} must be a number")
+    return value
+
+
+def require_integer(data, key, context):
+    value = data.get(key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise SystemExit(f"Config error: {context}.{key} must be an integer")
+    return value
+
+
+def require_boolean(data, key, context):
+    value = data.get(key)
+    if not isinstance(value, bool):
+        raise SystemExit(f"Config error: {context}.{key} must be true or false")
     return value
 
 
@@ -132,6 +156,17 @@ def validate_destination_storage(destination):
     require_string(destination, "subject_dir", "destination")
 
 
+def validate_subject_artifact_storage(section, context):
+    backend = storage_backend(section, context)
+    if backend == "local":
+        require_string(section, "root_dir", context)
+    else:
+        require_string(section, "bucket", context)
+        require_string(section, "prefix", context)
+        optional_string_or_null(section, "url_base", context)
+    require_string(section, "subject_dir", context)
+
+
 def validate_pipeline_matches_source(config, expected_pipeline=None):
     pipeline = config["pipeline"]
     if expected_pipeline and pipeline != expected_pipeline:
@@ -196,3 +231,57 @@ def load_prep_subject_job(path):
 
 def load_conversion_job(path):
     return load_prep_subject_job(path)
+
+
+def load_generate_chunks_job(path):
+    config = read_json(path)
+    if not isinstance(config, dict):
+        raise SystemExit("Config error: root must be an object")
+    if config.get("schema_version") != GENERATE_CHUNKS_JOB_SCHEMA_VERSION:
+        raise SystemExit(
+            f"Config error: schema_version must be {GENERATE_CHUNKS_JOB_SCHEMA_VERSION}"
+        )
+    pipeline = require_string(config, "pipeline", "root")
+    if pipeline != PIPELINE_GENERATE_CHUNKS:
+        raise SystemExit("Config error: pipeline must be generate-chunks")
+
+    source = require_object(config, "source", "root")
+    destination = require_object(config, "destination", "root")
+    naming = require_object(config, "naming", "root")
+    chunking = require_object(config, "chunking", "root")
+
+    validate_subject_artifact_storage(source, "source")
+    validate_subject_artifact_storage(destination, "destination")
+
+    require_string(naming, "category_code", "naming", r"CAT[0-9]{3}")
+    require_string(naming, "subject_code", "naming", r"SUB[0-9]{3}")
+    require_string(naming, "title_slug", "naming", r"[A-Za-z0-9][A-Za-z0-9-]*")
+    require_string(naming, "version", "naming", r"[0-9]{2}")
+    require_string(naming, "subversion", "naming", r"[0-9]{2}")
+
+    chapters = config.get("chapters")
+    if chapters is not None:
+        if not isinstance(chapters, list) or not chapters:
+            raise SystemExit("Config error: chapters must be a non-empty array when present")
+        for chapter in chapters:
+            if not isinstance(chapter, str) or not re.fullmatch(r"[0-9]{3}", chapter):
+                raise SystemExit("Config error: chapters must contain zero-padded chapter numbers like 001")
+
+    try:
+        config["_semantic_chunk_config"] = SemanticChunkConfig.from_env(
+            provider=require_string(chunking, "provider", "chunking"),
+            model_name=require_string(chunking, "model", "chunking"),
+            model_revision=optional_string_or_null(chunking, "model_revision", "chunking"),
+            embedding_mode=require_string(chunking, "embedding_mode", "chunking"),
+            embedding_dimension=require_integer(chunking, "embedding_dimension", "chunking"),
+            threshold_percentile=require_number(chunking, "threshold_percentile", "chunking"),
+            min_chars=require_integer(chunking, "min_chars", "chunking"),
+            window_size=require_integer(chunking, "window_size", "chunking"),
+            batch_size=require_integer(chunking, "batch_size", "chunking"),
+            normalize_embeddings=require_boolean(chunking, "normalize_embeddings", "chunking"),
+            device=optional_string_or_null(chunking, "device", "chunking"),
+            local_files_only=require_boolean(chunking, "local_files_only", "chunking"),
+        )
+    except SemanticChunkConfigError as exc:
+        raise SystemExit(f"Config error: {exc}") from exc
+    return config

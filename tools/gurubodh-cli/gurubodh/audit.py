@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -46,6 +47,8 @@ def json_safe(data):
 
 
 def git_commit_sha(path):
+    previous_tokenizer_parallelism = os.environ.get("TOKENIZERS_PARALLELISM")
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     try:
         result = subprocess.run(
             ["git", "-C", str(path), "rev-parse", "HEAD"],
@@ -55,6 +58,11 @@ def git_commit_sha(path):
         )
     except (FileNotFoundError, subprocess.CalledProcessError):
         return None
+    finally:
+        if previous_tokenizer_parallelism is None:
+            os.environ.pop("TOKENIZERS_PARALLELISM", None)
+        else:
+            os.environ["TOKENIZERS_PARALLELISM"] = previous_tokenizer_parallelism
     return result.stdout.strip() or None
 
 
@@ -133,6 +141,9 @@ class AuditReportBuilder:
             "pipeline": self.config.get("pipeline"),
             "source": copy.deepcopy(self.config.get("source", {})),
             "destination": copy.deepcopy(self.config.get("destination", {})),
+            "naming": copy.deepcopy(self.config.get("naming", {})),
+            "chunking": copy.deepcopy(self.config.get("chunking", {})),
+            "chapters": copy.deepcopy(self.config.get("chapters")),
             "chapter_split": {
                 key: value
                 for key, value in self.config.get("chapter_split", {}).items()

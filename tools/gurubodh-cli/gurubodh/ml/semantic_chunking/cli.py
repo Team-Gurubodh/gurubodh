@@ -22,7 +22,7 @@ def add_generate_chunks_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--model-revision", default=None)
     parser.add_argument("--window-size", type=int, default=3)
     parser.add_argument("--threshold-percentile", type=float, default=80.0)
-    parser.add_argument("--min-chars", type=int, default=650)
+    parser.add_argument("--min-chars", type=int, default=600)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument(
         "--normalize-embeddings",

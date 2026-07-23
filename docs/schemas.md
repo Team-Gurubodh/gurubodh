@@ -6,6 +6,8 @@
 ## Current Schema Locations
 
 - `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
+- `tools/gurubodh-cli/config/artifacts/semantic_chunks_and_embeddings.schema.json`
+- `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
 - `tools/seed-data-cli/config/glossary_artifact.schema.json`
@@ -15,9 +17,7 @@
 
 ## Planned Schema Locations
 
-- `tools/gurubodh-cli/config/artifacts/chunk_metadata.schema.json`
 - `tools/gurubodh-cli/config/artifacts/embedding_manifest.schema.json`
-- `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_embeddings_job.schema.json`
 
 ## Ownership Guidance
@@ -36,10 +36,12 @@
   of the generated chapter `.txt` artifact bytes. It does not checksum the
   metadata JSON artifact.
 - Chapter metadata also reserves an optional `paragraph_segmentation` shape for
-  later semantic chunking integration. The standalone `generate-chunks` POC uses
-  separate JSON/Markdown outputs and does not write this field into generated
-  chapter metadata yet. The reserved chunk shape allows BGE-M3
-  `estimated_embedding_token_count` values and token-counting basis metadata.
+  later semantic chunking integration. The config-driven `generate-chunks`
+  command writes separate per-chapter semantic chunk and dense embedding JSON
+  artifacts under `chapters/semantic_chunks_and_embeddings/` and does not write
+  this field into generated chapter metadata. The reserved chunk shape allows
+  BGE-M3 `estimated_embedding_token_count` values and token-counting basis
+  metadata.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

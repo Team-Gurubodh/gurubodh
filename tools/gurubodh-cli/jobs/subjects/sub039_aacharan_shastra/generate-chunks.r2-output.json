@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0.0",
+  "pipeline": "generate-chunks",
+  "source": {
+    "backend": "local",
+    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
+    "subject_dir": "39_aacharan_shaastra"
+  },
+  "destination": {
+    "backend": "r2",
+    "bucket": "gurubodh-library-dev",
+    "prefix": "cms_library",
+    "subject_dir": "39_aacharan_shaastra",
+    "url_base": null
+  },
+  "naming": {
+    "category_code": "CAT004",
+    "subject_code": "SUB039",
+    "title_slug": "aacharan-shastra",
+    "version": "01",
+    "subversion": "01"
+  },
+  "chunking": {
+    "provider": "semantic-chunking",
+    "model": "BAAI/bge-m3",
+    "model_revision": null,
+    "embedding_mode": "dense",
+    "embedding_dimension": 1024,
+    "threshold_percentile": 78.0,
+    "min_chars": 550,
+    "window_size": 3,
+    "batch_size": 16,
+    "normalize_embeddings": true,
+    "device": null,
+    "local_files_only": false
+  }
+}

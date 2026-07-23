@@ -15,6 +15,10 @@ def chapter_output_filename(config, chapter_number, extension):
     return "_".join(parts) + extension
 
 
+def chapter_chunks_output_filename(config, chapter_number):
+    return chapter_output_filename(config, chapter_number, ".chunks.json")
+
+
 def full_subject_output_filename(config, extension):
     naming = config["naming"]
     parts = [
@@ -25,4 +29,3 @@ def full_subject_output_filename(config, extension):
         version_label(config),
     ]
     return "_".join(parts) + extension
-

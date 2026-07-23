@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
@@ -48,7 +49,7 @@ class SemanticChunker:
                 text=text,
                 source_name=source_name,
                 breakpoint_threshold=None,
-                chunks=[chunk],
+                chunks=self._with_dense_embeddings([chunk]),
             )
 
         sentences = [span.text for span in sentence_spans]
@@ -74,6 +75,7 @@ class SemanticChunker:
             )
             for index, chunk_sentence_spans in enumerate(raw_chunks, 1)
         ]
+        chunks = self._with_dense_embeddings(chunks)
 
         return self._build_document(
             text=text,
@@ -192,6 +194,28 @@ class SemanticChunker:
                 merged.append(pending_sentences)
 
         return merged
+
+    def _with_dense_embeddings(self, chunks: list[Chunk]) -> list[Chunk]:
+        if not chunks:
+            return chunks
+        embeddings = self.model.encode(
+            [chunk.text for chunk in chunks],
+            batch_size=self.config.batch_size,
+            normalize_embeddings=self.config.normalize_embeddings,
+            show_progress_bar=False,
+        )
+        if len(embeddings) != len(chunks):
+            raise RuntimeError("Embedding model returned a different number of vectors than requested chunks.")
+        return [
+            replace(chunk, dense_embedding=self._embedding_to_list(embedding))
+            for chunk, embedding in zip(chunks, embeddings)
+        ]
+
+    @staticmethod
+    def _embedding_to_list(embedding: Any) -> list[float]:
+        if hasattr(embedding, "tolist"):
+            embedding = embedding.tolist()
+        return [float(value) for value in embedding]
 
     def _build_chunk(self, index: int, sentence_spans: list[SentenceSpan], source_text: str) -> Chunk:
         start_char = sentence_spans[0].start_char

@@ -85,7 +85,7 @@ class SemanticChunkingTests(unittest.TestCase):
         self.assertEqual(config.provider, "semantic-chunking")
         self.assertEqual(config.model_name, "BAAI/bge-m3")
         self.assertEqual(config.threshold_percentile, 80.0)
-        self.assertEqual(config.min_chars, 650)
+        self.assertEqual(config.min_chars, 600)
         self.assertEqual(config.window_size, 3)
         self.assertEqual(config.batch_size, 16)
         self.assertTrue(config.normalize_embeddings)
