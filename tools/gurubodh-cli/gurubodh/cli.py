@@ -10,7 +10,7 @@ from gurubodh.project import resolve_project_context, resolve_project_path
 
 
 PLANNED_COMMANDS = {
-    "generate-embeddings": "Generate vector embeddings for prepared semantic chunks.",
+    "regenerate-embeddings": "Regenerate vector embeddings for prepared semantic chunks.",
     "update-metadata": "Update subject and chapter metadata from the configured metadata source.",
     "download-subject": "Download subject source files and existing artifacts from configured storage.",
     "delete-subject": "Delete a subject and its generated artifacts from configured storage.",
@@ -58,12 +58,12 @@ def build_parser():
 
     generate_chunks_parser = subparsers.add_parser(
         "generate-chunks",
-        help="Generate semantic text chunks from prepared chapter text files.",
+        help="Generate semantic text chunks and vector embeddings from prepared chapter text files.",
         description="Generate semantic chunk and dense embedding artifacts from a job config.",
     )
     add_common_options(generate_chunks_parser)
 
-    add_planned_command(subparsers, "generate-embeddings")
+    add_planned_command(subparsers, "regenerate-embeddings")
 
     compare_tokenizers_parser = subparsers.add_parser(
         "compare-tokenizers",
