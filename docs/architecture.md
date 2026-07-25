@@ -223,7 +223,7 @@ flowchart LR
 - **Current implementation**: planned Next.js placeholder root
   `apps/gurubodh-chat/`. The Next.js application has not been scaffolded yet.
   The proposed chat/RAG workflow remains a task note, not accepted stable
-  architecture. See [Task-015](./tasks/015-chat-rag-workflow.md).
+  architecture. See [Task-016](./tasks/016-chat-rag-workflow.md).
 
 ### 4.9 Embedding Pipeline — *Phase 3*
 
