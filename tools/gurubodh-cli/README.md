@@ -36,7 +36,10 @@ runs a sample local content job.
 
 Existing output is not archived. If the configured local output directory or R2
 objects already exist, re-run with `--overwrite` when you intentionally want to
-replace them:
+replace them. For both backends, `prep-subject --overwrite` destructively removes
+the complete destination subject output before publishing the current run's
+artifacts. An interrupted overwrite can therefore leave an incomplete output;
+staged/versioned publication and atomic promotion are not part of this command.
 
 ```bash
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
@@ -302,8 +305,10 @@ detection for that job.
 
 For R2 destinations, the tool checks the destination subject prefix before
 processing starts. If objects already exist and `--overwrite` is not supplied,
-the job fails before doing DOCX conversion or chapter splitting. During upload,
-the tool prints count-based progress for object checks and uploads.
+the job fails before doing DOCX conversion or chapter splitting. With
+`--overwrite`, it deletes every object only under that subject prefix immediately
+before upload, then publishes only the current run's artifacts. During publish,
+the tool prints count-based progress for deletion, object checks, and uploads.
 
 ## Cloudflare R2 Credentials
 

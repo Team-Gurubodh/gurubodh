@@ -159,7 +159,7 @@ def local_publish_audit(job):
     }
 
 
-def r2_publish_audit(config, job, status="pending", uploads=None):
+def r2_publish_audit(config, job, overwrite, status="pending", uploads=None, deleted_keys=None):
     destination = config["destination"]
     uploads = uploads or []
     preflight = job.get("r2_preflight") or {}
@@ -170,6 +170,8 @@ def r2_publish_audit(config, job, status="pending", uploads=None):
         "prefix": destination["prefix"],
         "destination_subject_prefix": destination_subject_prefix(config),
         "existing_prefix_check_status": preflight.get("status"),
+        "destructive_replacement": overwrite,
+        "deleted_object_count": len(deleted_keys) if deleted_keys is not None else None,
         "object_check_status": "passed" if status == "succeeded" else "pending",
         "artifact_files_prepared_for_upload": len(uploads) if uploads else None,
         "uploaded_artifact_count": len(uploads) if status == "succeeded" else None,
@@ -184,7 +186,10 @@ def operator_notes(report):
     if report["publish_audit"]["backend"] == "r2":
         notes.append("If R2 publishing fails, check Cloudflare R2 credentials, bucket, prefix, and object permissions.")
     if report["run_identity"]["overwrite"]:
-        notes.append("Overwrite was enabled; previous local destination contents or R2 objects may have been replaced.")
+        notes.append(
+            "Overwrite destructively replaces the complete destination subject output. "
+            "If it fails after deletion, the destination may be incomplete."
+        )
     else:
         notes.append("If the destination already exists, rerun with --overwrite only when replacing it is intentional.")
     return notes
@@ -327,7 +332,16 @@ class PrepSubjectAuditWriter:
         return self.write(local_publish_audit(self.job))
 
     def write_r2_pending(self):
-        return self.write(r2_publish_audit(self.config, self.job))
+        return self.write(r2_publish_audit(self.config, self.job, self.overwrite))
 
-    def before_r2_upload(self, uploads):
-        return self.write(r2_publish_audit(self.config, self.job, status="succeeded", uploads=uploads))
+    def before_r2_upload(self, uploads, deleted_keys):
+        return self.write(
+            r2_publish_audit(
+                self.config,
+                self.job,
+                self.overwrite,
+                status="succeeded",
+                uploads=uploads,
+                deleted_keys=deleted_keys,
+            )
+        )

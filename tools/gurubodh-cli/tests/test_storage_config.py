@@ -12,6 +12,7 @@ from gurubodh.config import load_generate_chunks_job, load_prep_subject_job
 from gurubodh.metadata import build_chapter_metadata, text_artifact_integrity
 from gurubodh.storage import (
     R2StorageClient,
+    ensure_local_destination,
     ensure_r2_destination_available,
     materialize_source,
     publish_r2_destination,
@@ -58,6 +59,14 @@ class FakeR2Client:
 
     def upload_file(self, path, bucket, key):
         self.uploads.append((Path(path).name, bucket, key))
+        self.existing_keys.add(key)
+
+    def delete_prefix(self, bucket, prefix):
+        deleted = sorted(key for key in self.existing_keys if key.startswith(prefix))
+        self.existing_keys.difference_update(deleted)
+        self.deleted_prefix = (bucket, prefix)
+        self.deleted_keys = deleted
+        return deleted
 
     def download_file(self, bucket, key, path):
         self.download = (bucket, key, Path(path).name)
@@ -85,6 +94,28 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
         self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya")
+
+    def test_local_destination_rejects_existing_output_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            subject_dir.mkdir()
+            (subject_dir / "stale.txt").write_text("stale", encoding="utf-8")
+
+            with self.assertRaises(SystemExit):
+                ensure_local_destination(subject_dir, overwrite=False)
+
+    def test_local_destination_overwrite_removes_complete_existing_output(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            stale_file = subject_dir / "chapters" / "stale.txt"
+            stale_file.parent.mkdir(parents=True)
+            stale_file.write_text("stale", encoding="utf-8")
+
+            audit = ensure_local_destination(subject_dir, overwrite=True)
+
+            self.assertTrue(audit["removed_for_overwrite"])
+            self.assertTrue(subject_dir.is_dir())
+            self.assertFalse(stale_file.exists())
 
     def test_r2_source_and_destination_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -583,7 +614,7 @@ class StorageConfigTests(unittest.TestCase):
             ("gurubodh-library-dev", "cms_library/129_spand_rahasya/"),
         )
 
-    def test_r2_preflight_skips_prefix_check_with_overwrite(self):
+    def test_r2_preflight_marks_destructive_replacement_pending_with_overwrite(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["destination"] = {
             "backend": "r2",
@@ -593,11 +624,12 @@ class StorageConfigTests(unittest.TestCase):
         }
         client = FakeR2Client({"cms_library/129_spand_rahasya/full_subject/full.txt"})
 
-        ensure_r2_destination_available(config, overwrite=True, r2_client=client)
+        preflight = ensure_r2_destination_available(config, overwrite=True, r2_client=client)
 
         self.assertFalse(hasattr(client, "prefix_check"))
+        self.assertEqual(preflight["status"], "destructive_replacement_pending")
 
-    def test_r2_publish_uploads_with_overwrite(self):
+    def test_r2_publish_overwrite_removes_stale_subject_objects_and_preserves_siblings(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["destination"] = {
             "backend": "r2",
@@ -610,7 +642,13 @@ class StorageConfigTests(unittest.TestCase):
             output_file = subject_dir / "full_subject" / "full.txt"
             output_file.parent.mkdir(parents=True)
             output_file.write_text("content", encoding="utf-8")
-            client = FakeR2Client({"cms_library/129_spand_rahasya/full_subject/full.txt"})
+            client = FakeR2Client(
+                {
+                    "cms_library/129_spand_rahasya/full_subject/full.txt",
+                    "cms_library/129_spand_rahasya/chapters/stale.txt",
+                    "cms_library/130_other_subject/full_subject/keep.txt",
+                }
+            )
 
             output = StringIO()
             with redirect_stdout(output):
@@ -618,8 +656,16 @@ class StorageConfigTests(unittest.TestCase):
 
             progress = output.getvalue()
             self.assertIn("prepared 1 artifact file(s) for R2 upload", progress)
-            self.assertIn("[1/1] checking cms_library/129_spand_rahasya/full_subject/full.txt", progress)
+            self.assertIn("deleted 2 object(s) from R2 destination subject prefix", progress)
             self.assertIn("[1/1] uploading cms_library/129_spand_rahasya/full_subject/full.txt", progress)
+            self.assertEqual(client.deleted_prefix, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/"))
+            self.assertEqual(
+                client.existing_keys,
+                {
+                    "cms_library/129_spand_rahasya/full_subject/full.txt",
+                    "cms_library/130_other_subject/full_subject/keep.txt",
+                },
+            )
             self.assertEqual(
                 client.uploads,
                 [
