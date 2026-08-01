@@ -3,9 +3,10 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from gurubodh.content_identity import validate_content_identity
 from gurubodh.constants import (
     ENTRY_POINT_GENERATE_CHUNKS,
-    GENERATE_CHUNKS_SUMMARY_SCHEMA_VERSION,
+    SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
     SEMANTIC_CHUNKS_ARTIFACT_SCHEMA_VERSION,
     SEMANTIC_CHUNKS_OUTPUT_DIR,
 )
@@ -46,12 +47,13 @@ def run_generate_chunks_job(
 
     job = prepare_generate_chunks_job(config, overwrite, r2_client=client, progress=progress)
     try:
+        validate_selected_content_identities(config, job["paths"]["source_text_and_metadata"])
         segmenter = segmenter or SemanticChunkingParagraphSegmenter(semantic_config, progress=progress)
         result = write_chunk_artifacts(config, job, semantic_config, segmenter, progress=progress)
 
         audit = GenerateChunksAuditWriter(context, config_path, config, entry_point, overwrite, job, result)
         result["audit_report_references"] = audit_report_references(config, audit.paths)
-        write_summary(job["paths"]["summary"], config, job, semantic_config, result)
+        write_chunk_manifest(job["paths"]["chunk_manifest"], config, job, semantic_config, result)
 
         if is_r2(config["destination"]):
             audit.write_r2_pending()
@@ -72,7 +74,7 @@ def prepare_generate_chunks_job(config, overwrite, r2_client=None, progress=prin
         "source_text_and_metadata": source_subject / TEXT_AND_METADATA_RELATIVE_DIR,
         "destination_subject": destination_subject,
         "semantic_chunks": destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR,
-        "summary": destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR / "summary.json",
+        "chunk_manifest": destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR / "semantic_chunks_manifest.json",
     }
     paths["semantic_chunks"].mkdir(parents=True, exist_ok=True)
     return {
@@ -206,6 +208,27 @@ def discover_chapter_sources(config, text_and_metadata_dir):
     return text_files, chapters
 
 
+def validate_selected_content_identities(config, text_and_metadata_dir):
+    """Fail before model initialization when prepared provenance is unavailable."""
+    _, chapters = discover_chapter_sources(config, text_and_metadata_dir)
+    for chapter in chapters:
+        metadata = chapter["metadata"]
+        try:
+            validate_content_identity(
+                metadata.get("content_identity"),
+                metadata["document"]["category_code"],
+                metadata["document"]["subject_code"],
+                metadata["document"]["language"],
+                chapter["text_path"].read_text(encoding="utf-8"),
+            )
+        except (KeyError, ValueError) as exc:
+            raise SystemExit(
+                f"Prepared chapter {chapter['metadata_path']} has missing or invalid content_identity. "
+                "Regenerate the prepared subject with `gurubodh prep-subject --overwrite` before running generate-chunks. "
+                f"Details: {exc}"
+            ) from exc
+
+
 def write_chunk_artifacts(config, job, semantic_config, segmenter, progress=print):
     all_text_files, chapters = discover_chapter_sources(config, job["paths"]["source_text_and_metadata"])
     result = {
@@ -214,7 +237,7 @@ def write_chunk_artifacts(config, job, semantic_config, segmenter, progress=prin
         "skipped_chapter_count": len(all_text_files) - len(chapters),
         "failed_chapter_count": 0,
         "chunk_artifacts_written": 0,
-        "summary_written": False,
+        "chunk_manifest_written": False,
         "total_chunk_count": 0,
         "total_estimated_embedding_token_count": 0,
         "chapters": [],
@@ -273,6 +296,11 @@ def chunk_artifact_payload(config, source, document, semantic_config, chunk_file
             "source_metadata_filename": source["metadata_path"].name,
         },
         "source_references": {
+            "content_identity": {
+                "content_key": metadata["content_identity"]["content_key"],
+                "normalized_content_sha256": metadata["content_identity"]["normalized_content_sha256"],
+                "identity_contract_version": metadata["content_identity"]["identity_contract_version"],
+            },
             "chapter_text_artifact": metadata["storage"]["artifacts"]["text"],
             "chapter_metadata_artifact": metadata["storage"]["artifacts"]["metadata"],
             "source_text_checksum": metadata["integrity"]["artifacts"]["text"],
@@ -349,6 +377,7 @@ def chapter_summary(config, source, document, chunk_filename):
         "source_metadata_artifact": metadata["storage"]["artifacts"]["metadata"],
         "chunk_artifact": destination_artifact_reference(config, relative_chunk_path),
         "source_text_checksum": metadata["integrity"]["artifacts"]["text"],
+        "content_key": metadata["content_identity"]["content_key"],
         "chunk_count": document.chunk_count,
         "estimated_embedding_token_count": document.estimated_embedding_token_count,
         "breakpoint_threshold": document.breakpoint_threshold,
@@ -356,9 +385,9 @@ def chapter_summary(config, source, document, chunk_filename):
     }
 
 
-def write_summary(path, config, job, semantic_config, result):
+def write_chunk_manifest(path, config, job, semantic_config, result):
     payload = {
-        "schema_version": GENERATE_CHUNKS_SUMMARY_SCHEMA_VERSION,
+        "schema_version": SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
         "run": {
             "pipeline": config["pipeline"],
             "source_backend": config["source"].get("backend", "local"),
@@ -385,7 +414,7 @@ def write_summary(path, config, job, semantic_config, result):
         "audit_reports": result["audit_report_references"],
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    result["summary_written"] = True
+    result["chunk_manifest_written"] = True
 
 
 def destination_output_location(config, job):

@@ -67,7 +67,10 @@ The output directory is scoped to:
 <subject>/chapters/semantic_chunks_and_embeddings/
 ```
 
-It contains one `*.chunks.json` file per processed chapter and a `summary.json`.
+It contains one `*.chunks.json` file per processed chapter and a
+`semantic_chunks_manifest.json`. The manifest describes the currently
+generated chunk-and-embedding set; the JSON/Markdown audit reports preserve
+the details of a particular run.
 The command does not write chunk Markdown and does not update chapter metadata.
 For `--overwrite`, only the semantic chunk and embedding output directory, or
 the matching R2 prefix, is replaced.
@@ -103,6 +106,22 @@ keys, request bodies, full source text, full chapter text, and DOCX contents.
 Markdown reports under `<subject>/run_reports/`. Reports include generated
 artifact references and aggregate counts, but exclude full source text and
 embedding vectors.
+
+## Chapter Content Identity
+
+Prepared chapter metadata contains a deterministic `content_identity` object.
+`content_key` is a UUID v5 provenance key for normalized chapter text within a
+category, subject, and language; it is not a stable editorial chapter ID. Text
+edits produce a new key, while reordering unchanged text does not. The
+normalization contract is NFC Unicode, LF line endings, no trailing spaces or
+tabs per line, and no outer Unicode whitespace; internal whitespace and
+punctuation remain unchanged. `chapters/chapter_content_manifest.json` records the current
+subject output set, and chunk artifacts copy their source identity.
+
+Artifacts created before this contract must be regenerated with
+`gurubodh prep-subject --overwrite` before `gurubodh generate-chunks` can use
+them. The existing exact artifact-byte checksum remains separate from the
+normalized content checksum.
 
 Future Gurubodh CLI commands that create, transform, publish, ingest, delete, or
 materially modify content artifacts should use the same JSON/Markdown audit

@@ -3,6 +3,7 @@ import re
 import unicodedata
 
 from gurubodh.constants import CHAPTER_METADATA_SCHEMA_VERSION
+from gurubodh.content_identity import build_content_identity
 from gurubodh.naming import version_label
 from gurubodh.storage import destination_artifact_reference, source_reference
 
@@ -86,6 +87,7 @@ def build_chapter_metadata(
     entry_point,
 ):
     defaults = config.get("metadata_defaults", {})
+    language = defaults.get("language", "hi-Deva")
     return {
         "schema_version": CHAPTER_METADATA_SCHEMA_VERSION,
         "document": {
@@ -94,7 +96,7 @@ def build_chapter_metadata(
             "title_slug": config["naming"]["title_slug"],
             "chapter_number": f"{chapter_number:03d}",
             "version": version_label(config),
-            "language": defaults.get("language", "hi-Deva"),
+            "language": language,
         },
         "files": {
             "metadata_filename": file_names["metadata"],
@@ -114,6 +116,12 @@ def build_chapter_metadata(
             "converter_counts": converter_counts,
         },
         "integrity": text_artifact_integrity(chapter_text_value),
+        "content_identity": build_content_identity(
+            config["naming"]["category_code"],
+            config["naming"]["subject_code"],
+            language,
+            chapter_text_value,
+        ),
         "content_stats": text_stats(chapter_text_value),
         "content": {
             "title": None,

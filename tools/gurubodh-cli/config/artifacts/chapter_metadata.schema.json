@@ -11,6 +11,7 @@
     "processing",
     "conversion",
     "integrity",
+    "content_identity",
     "content_stats",
     "content",
     "annotations"
@@ -18,7 +19,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.2.0"
+      "const": "1.3.0"
     },
     "document": {
       "type": "object",
@@ -213,6 +214,29 @@
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "content_identity": {
+      "type": "object",
+      "required": [
+        "algorithm",
+        "namespace",
+        "identity_contract_version",
+        "normalization",
+        "normalized_content_sha256",
+        "content_key"
+      ],
+      "properties": {
+        "algorithm": { "const": "uuid5" },
+        "namespace": { "const": "7ecde8b9-3560-426a-9fd5-52bff1b6c575" },
+        "identity_contract_version": { "const": 1 },
+        "normalization": { "const": "gurubodh-chapter-content-v1" },
+        "normalized_content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "content_key": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-5[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
         }
       },
       "additionalProperties": false

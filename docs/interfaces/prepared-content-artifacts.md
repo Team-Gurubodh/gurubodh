@@ -56,6 +56,7 @@ Prepared artifact grouping is preserved as object-key prefixes:
 cms_library/{subject_dir}/full_subject/
 cms_library/{subject_dir}/chapters/msword/
 cms_library/{subject_dir}/chapters/text_and_metadata/
+cms_library/{subject_dir}/chapters/chapter_content_manifest.json
 ```
 
 R2 prefixes are object-key strings, not real folders.
@@ -88,6 +89,29 @@ Local references use:
 
 URL values are optional in job configuration and nullable in generated metadata.
 Consumers must treat bucket/key or local path references as canonical.
+
+## Content Identity and Manifest
+
+Every newly prepared chapter metadata artifact carries `content_identity`. Its
+`content_key` is a deterministic UUID v5 for the normalized chapter text within
+the category, subject, and language. It is provenance for an exact content
+state, not a stable editorial chapter identity: a text edit changes it, while
+moving unchanged text to another generated chapter position does not.
+The immutable Gurubodh namespace for identity contract v1 is
+`7ecde8b9-3560-426a-9fd5-52bff1b6c575`.
+
+Normalization v1 applies NFC Unicode normalization, converts CRLF/lone CR to
+LF, removes trailing spaces/tabs from each line, and removes outer Unicode
+whitespace. It preserves internal whitespace, paragraph boundaries,
+punctuation, and other characters. The `normalized_content_sha256` is computed
+from the resulting UTF-8 text without an added final newline. This is distinct
+from `integrity.artifacts.text`, which checks the exact emitted `.txt` bytes.
+
+`chapters/chapter_content_manifest.json` is a deterministic list of the current generated
+chapter content keys and their metadata/text references. It does not retain
+history or create a chapter registry. Existing prepared trees must be fully
+regenerated with `gurubodh prep-subject --overwrite` before `generate-chunks`;
+the chunk command refuses metadata without valid content identity.
 
 ## Overwrite Behavior
 

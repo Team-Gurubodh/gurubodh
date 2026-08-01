@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.0.0"
+      "const": "1.1.0"
     },
     "document": {
       "type": "object",
@@ -42,7 +42,20 @@
       }
     },
     "source_references": {
-      "type": "object"
+      "type": "object",
+      "required": ["content_identity"],
+      "properties": {
+        "content_identity": {
+          "type": "object",
+          "required": ["content_key", "normalized_content_sha256", "identity_contract_version"],
+          "properties": {
+            "content_key": { "type": "string", "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-5[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$" },
+            "normalized_content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "identity_contract_version": { "const": 1 }
+          },
+          "additionalProperties": false
+        }
+      }
     },
     "chunking": {
       "type": "object"

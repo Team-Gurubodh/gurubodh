@@ -1,4 +1,5 @@
 from gurubodh.docx.chapter_split import split_docx_into_chapters
+from gurubodh.content_manifest import write_chapter_content_manifest
 from gurubodh.docx.validate import validate_docx
 from gurubodh.naming import full_subject_output_filename
 from gurubodh.paths import (
@@ -36,7 +37,7 @@ def validate_and_split(config, result, paths, entry_point):
 
     chapter_split = config["chapter_split"]
     if chapter_split.get("enabled"):
-        return split_docx_into_chapters(
+        outputs = split_docx_into_chapters(
             result["output_path"],
             chapter_split,
             paths["chapter_msword"],
@@ -45,6 +46,10 @@ def validate_and_split(config, result, paths, entry_point):
             result["converter_counts"],
             entry_point,
         )
+        if outputs:
+            manifest_path = write_chapter_content_manifest(config, paths)
+            print(f"wrote {manifest_path}")
+        return outputs
     return []
 
 

@@ -7,6 +7,7 @@ from io import StringIO
 from pathlib import Path
 
 from gurubodh.config import load_generate_chunks_job
+from gurubodh.content_identity import build_content_identity
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
@@ -65,6 +66,7 @@ def metadata_for(config, chapter_number, text):
             "title_slug": config["naming"]["title_slug"],
             "chapter_number": f"{chapter_number:03d}",
             "version": "v01.01",
+            "language": "hi-Deva",
         },
         "storage": {
             "artifacts": {
@@ -91,6 +93,12 @@ def metadata_for(config, chapter_number, text):
                 }
             }
         },
+        "content_identity": build_content_identity(
+            config["naming"]["category_code"],
+            config["naming"]["subject_code"],
+            "hi-Deva",
+            text,
+        ),
         "files": {
             "text_filename": text_name,
             "metadata_filename": metadata_name,
@@ -216,21 +224,46 @@ class GenerateChunksPipelineTests(unittest.TestCase):
 
         output_dir = Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "semantic_chunks_and_embeddings"
         chunk_path = output_dir / "CAT001_SUB123_spand-rahasya_001_v01.01.chunks.json"
-        summary_path = output_dir / "summary.json"
+        manifest_path = output_dir / "semantic_chunks_manifest.json"
         payload = json.loads(chunk_path.read_text(encoding="utf-8"))
-        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         reports = list((Path(self.temp_dir.name) / "123_spand_rahasya" / "run_reports").glob("*generate-chunks*.json"))
 
         self.assertEqual(result["processed_chapter_count"], 1)
         self.assertTrue(chunk_path.exists())
-        self.assertTrue(summary_path.exists())
+        self.assertTrue(manifest_path.exists())
         self.assertEqual(payload["chunks"][0]["dense_embedding"], [0.25] * 1024)
         self.assertEqual(payload["embedding"]["embedding_dimension"], 1024)
-        self.assertEqual(summary["counts"]["total_chunk_count"], 1)
-        self.assertEqual(summary["chapters"][0]["chunk_filename"], chunk_path.name)
+        self.assertEqual(
+            payload["source_references"]["content_identity"]["content_key"],
+            manifest["chapters"][0]["content_key"],
+        )
+        self.assertEqual(manifest["counts"]["total_chunk_count"], 1)
+        self.assertEqual(manifest["chapters"][0]["chunk_filename"], chunk_path.name)
         self.assertEqual(len(reports), 1)
         self.assertEqual(metadata_path.read_text(encoding="utf-8"), before_metadata)
         self.assertFalse(list(output_dir.glob("*.md")))
+
+    def test_missing_content_identity_fails_before_segmenting(self):
+        config = base_config(Path(self.temp_dir.name))
+        write_prepared_chapter(self.temp_dir.name, config)
+        metadata_path = (
+            Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "text_and_metadata"
+            / chapter_output_filename(config, 1, ".json")
+        )
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        del metadata["content_identity"]
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+        loaded, config_path = self.write_config(config)
+
+        with self.assertRaisesRegex(SystemExit, "prep-subject --overwrite"):
+            run_generate_chunks_job(
+                self.context,
+                loaded,
+                config_path=config_path,
+                segmenter=FakeSegmenter(),
+                progress=lambda message: None,
+            )
 
     def test_local_overwrite_is_scoped_to_semantic_output_dir(self):
         config = base_config(Path(self.temp_dir.name))
