@@ -245,9 +245,9 @@ def ensure_r2_destination_available(config, overwrite, r2_client=None):
     prefix = destination_subject_prefix(config)
     if overwrite:
         return {
-            "status": "skipped",
+            "status": "destructive_replacement_pending",
             "skipped": True,
-            "reason": "overwrite enabled",
+            "reason": "overwrite enabled; destination subject prefix will be deleted before upload",
             "bucket": destination["bucket"],
             "prefix": prefix,
         }
@@ -281,23 +281,29 @@ def publish_r2_destination(config, subject_dir, overwrite, r2_client=None, befor
 
     total = len(uploads)
     print(f"prepared {total} artifact file(s) for R2 upload")
-    print(f"checking target object keys in r2://{destination['bucket']}/{destination['prefix']}")
-
-    existing = []
-    for index, (_, key) in enumerate(uploads, start=1):
-        print(f"[{index}/{total}] checking {key}")
-        if client.exists(destination["bucket"], key):
-            existing.append(key)
-    if existing and not overwrite:
-        sample = "\n".join(f"- {key}" for key in existing[:10])
-        extra = "" if len(existing) <= 10 else f"\n... and {len(existing) - 10} more"
-        raise SystemExit(
-            "R2 destination object(s) already exist. Re-run with --overwrite to replace:\n"
-            f"{sample}{extra}"
-        )
+    deleted_keys = []
+    subject_prefix = destination_subject_prefix(config)
+    if overwrite:
+        print(f"deleting R2 destination subject prefix r2://{destination['bucket']}/{subject_prefix}")
+        deleted_keys = client.delete_prefix(destination["bucket"], subject_prefix)
+        print(f"deleted {len(deleted_keys)} object(s) from R2 destination subject prefix")
+    else:
+        print(f"checking target object keys in r2://{destination['bucket']}/{destination['prefix']}")
+        existing = []
+        for index, (_, key) in enumerate(uploads, start=1):
+            print(f"[{index}/{total}] checking {key}")
+            if client.exists(destination["bucket"], key):
+                existing.append(key)
+        if existing:
+            sample = "\n".join(f"- {key}" for key in existing[:10])
+            extra = "" if len(existing) <= 10 else f"\n... and {len(existing) - 10} more"
+            raise SystemExit(
+                "R2 destination object(s) already exist. Re-run with --overwrite to replace:\n"
+                f"{sample}{extra}"
+            )
 
     if before_upload:
-        before_upload(uploads)
+        before_upload(uploads, deleted_keys)
 
     print(f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}")
     for index, (path, key) in enumerate(uploads, start=1):

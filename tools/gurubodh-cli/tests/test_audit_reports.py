@@ -187,11 +187,13 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
                 if path.is_file()
             ]
             with redirect_stdout(StringIO()):
-                report = writer.before_r2_upload(uploads)
+                report = writer.before_r2_upload(uploads, ["cms_library/129_spand_rahasya/chapters/stale.txt"])
 
             payload = json.loads(writer.paths["json"].read_text(encoding="utf-8"))
             self.assertEqual(report["publish_audit"]["backend"], "r2")
             self.assertEqual(report["publish_audit"]["status"], "succeeded")
+            self.assertTrue(report["publish_audit"]["destructive_replacement"])
+            self.assertEqual(report["publish_audit"]["deleted_object_count"], 1)
             self.assertEqual(report["publish_audit"]["artifact_files_prepared_for_upload"], len(uploads))
             self.assertEqual(payload["publish_audit"]["uploaded_artifact_count"], len(uploads))
             self.assertEqual(
