@@ -139,7 +139,7 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             self.assertEqual(payload["final_outcome"]["generated_artifact_counts"]["run_report_json"], 1)
             self.assertEqual(payload["final_outcome"]["generated_artifact_counts"]["run_report_markdown"], 1)
             self.assertIn("# Gurubodh prep-subject Audit Report", markdown)
-            self.assertIn("| Chapter | Text artifact | SHA-256 |", markdown)
+            self.assertIn("| Chapter | Content key | Text artifact | SHA-256 |", markdown)
             self.assertNotIn("do-not-write", payload_text)
             self.assertIn("[redacted]", payload_text)
 

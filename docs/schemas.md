@@ -6,6 +6,7 @@
 ## Current Schema Locations
 
 - `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
+- `tools/gurubodh-cli/config/artifacts/chapter_content_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks_and_embeddings.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
@@ -35,6 +36,11 @@
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
   of the generated chapter `.txt` artifact bytes. It does not checksum the
   metadata JSON artifact.
+- Chapter metadata also includes `content_identity`: a UUID v5 provenance key
+  and normalized-content SHA-256 for the exact normalized chapter text within
+  its category, subject, and language. This does not identify an editorial
+  chapter across text changes. `chapters/chapter_content_manifest.json` lists the current
+  generated subject chapter set and uses the content-manifest artifact schema.
 - Chapter metadata also reserves an optional `paragraph_segmentation` shape for
   later semantic chunking integration. The config-driven `generate-chunks`
   command writes separate per-chapter semantic chunk and dense embedding JSON

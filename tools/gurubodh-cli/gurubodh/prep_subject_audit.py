@@ -49,6 +49,7 @@ def artifact_counts(subject_dir):
         "chapter_docx": 0,
         "chapter_text": 0,
         "chapter_metadata": 0,
+        "chapter_content_manifest": 0,
         "run_report_json": 0,
         "run_report_markdown": 0,
         "total_files": 0,
@@ -70,6 +71,8 @@ def artifact_counts(subject_dir):
             counts["chapter_text"] += 1
         elif parts[:2] == ("chapters", "text_and_metadata") and suffix == ".json":
             counts["chapter_metadata"] += 1
+        elif relative.parts == ("chapters", "chapter_content_manifest.json"):
+            counts["chapter_content_manifest"] += 1
         elif parts[:1] == ("run_reports",) and suffix == ".json":
             counts["run_report_json"] += 1
         elif parts[:1] == ("run_reports",) and suffix == ".md":
@@ -92,6 +95,7 @@ def chapter_audit_from_metadata(path):
         "text_filename": text_filename,
         "msword_filename": files["msword_filename"],
         "text_artifact_sha256": metadata["integrity"]["artifacts"]["text"]["value"],
+        "content_key": metadata["content_identity"]["content_key"],
         "content_stats": metadata["content_stats"],
         "automated_tags": metadata["content"]["automated_tags"],
         "storage": metadata["storage"],
@@ -132,6 +136,7 @@ def processing_summary(config, result, split_outputs, chapters, publish_audit, s
         "chapter_docx_artifacts_written": counts["chapter_docx"],
         "chapter_text_artifacts_written": counts["chapter_text"],
         "chapter_metadata_artifacts_written": counts["chapter_metadata"],
+        "chapter_content_manifest_artifacts_written": counts["chapter_content_manifest"],
         "split_output_count": len(split_outputs or []),
         "legacy_converter_counts": result.get("converter_counts", {}),
         "converted_text_nodes": result.get("total_nodes", 0),
@@ -225,6 +230,7 @@ def render_markdown(report):
         f"- Chapter DOCX artifacts: {report['processing_summary']['chapter_docx_artifacts_written']}",
         f"- Chapter text artifacts: {report['processing_summary']['chapter_text_artifacts_written']}",
         f"- Chapter metadata artifacts: {report['processing_summary']['chapter_metadata_artifacts_written']}",
+        f"- Chapter content manifests: {report['processing_summary']['chapter_content_manifest_artifacts_written']}",
         f"- Summary chapters detected: {report['processing_summary']['summary_chapter_count']}",
         f"- Publish status: {report['processing_summary']['publish_status']}",
         "",
@@ -235,14 +241,15 @@ def render_markdown(report):
         lines.append(f"- {key}: `{value}`")
     lines.extend(["", "## Per-Chapter Audit", ""])
     if report["chapters"]:
-        lines.append("| Chapter | Text artifact | SHA-256 | Words | Characters | Tags |")
-        lines.append("| --- | --- | --- | ---: | ---: | --- |")
+        lines.append("| Chapter | Content key | Text artifact | SHA-256 | Words | Characters | Tags |")
+        lines.append("| --- | --- | --- | --- | ---: | ---: | --- |")
         for chapter in report["chapters"]:
             stats = chapter["content_stats"]
             tags = ", ".join(chapter["automated_tags"]) or "-"
             lines.append(
                 "| "
                 f"{chapter['chapter_number']} | "
+                f"`{chapter['content_key']}` | "
                 f"{chapter['text_filename']} | "
                 f"`{chapter['text_artifact_sha256']}` | "
                 f"{stats['word_count']} | "

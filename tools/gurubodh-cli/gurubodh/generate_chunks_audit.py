@@ -92,7 +92,7 @@ def processing_summary(result, publish_audit):
         "skipped_chapter_count": result["skipped_chapter_count"],
         "failed_chapter_count": result["failed_chapter_count"],
         "chunk_artifacts_written": result["chunk_artifacts_written"],
-        "summary_written": result["summary_written"],
+        "semantic_chunks_manifest_written": result["chunk_manifest_written"],
         "total_chunk_count": result["total_chunk_count"],
         "total_estimated_embedding_token_count": result["total_estimated_embedding_token_count"],
         "output_directory_name": SEMANTIC_CHUNKS_OUTPUT_DIR,
@@ -143,12 +143,13 @@ def render_markdown(report):
         "",
     ]
     if report["chapters"]:
-        lines.append("| Chapter | Source text | Chunk artifact | Chunks | Tokens | Status |")
-        lines.append("| --- | --- | --- | ---: | ---: | --- |")
+        lines.append("| Chapter | Content key | Source text | Chunk artifact | Chunks | Tokens | Status |")
+        lines.append("| --- | --- | --- | --- | ---: | ---: | --- |")
         for chapter in report["chapters"]:
             lines.append(
                 "| "
                 f"{chapter['chapter_number']} | "
+                f"`{chapter['content_key']}` | "
                 f"{chapter['source_text_filename']} | "
                 f"{chapter.get('chunk_filename') or '-'} | "
                 f"{chapter['chunk_count']} | "
