@@ -24,5 +24,5 @@ This directory is a placeholder root only. The Next.js application has not been
 scaffolded yet.
 
 The proposed chat/RAG workflow is tracked separately in
-[`docs/tasks/015-chat-rag-workflow.md`](../../docs/tasks/015-chat-rag-workflow.md)
+[`docs/tasks/016-chat-rag-workflow.md`](../../docs/tasks/016-chat-rag-workflow.md)
 and has not been promoted to accepted stable architecture.
