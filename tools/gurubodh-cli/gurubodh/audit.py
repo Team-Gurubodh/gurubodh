@@ -80,8 +80,8 @@ def report_basename(config, command_name, timestamp=None):
     )
 
 
-def report_paths(subject_dir, basename):
-    report_dir = Path(subject_dir) / "run_reports"
+def report_paths(subject_dir, basename, command_name=None):
+    report_dir = Path(subject_dir) / "run_reports" / command_name if command_name else Path(subject_dir) / "run_reports"
     return {
         "directory": report_dir,
         "json": report_dir / f"{basename}.json",
@@ -106,6 +106,13 @@ def write_report(paths, report, markdown_text):
         "json": str(paths["json"]),
         "markdown": str(paths["markdown"]),
     }
+
+
+def print_report_locations(command_name, paths):
+    print(f"{command_name} audit reports:")
+    print(f"  directory: {paths['directory']}")
+    print(f"  {paths['json'].name}")
+    print(f"  {paths['markdown'].name}")
 
 
 class AuditReportBuilder:

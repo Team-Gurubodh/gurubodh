@@ -213,13 +213,14 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         before_metadata = metadata_path.read_text(encoding="utf-8")
         loaded, config_path = self.write_config(config)
 
+        progress_messages = []
         with redirect_stdout(StringIO()):
             result = run_generate_chunks_job(
                 self.context,
                 loaded,
                 config_path=config_path,
                 segmenter=FakeSegmenter(),
-                progress=lambda message: None,
+                progress=progress_messages.append,
             )
 
         output_dir = Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "semantic_chunks_and_embeddings"
@@ -227,7 +228,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         manifest_path = output_dir / "semantic_chunks_manifest.json"
         payload = json.loads(chunk_path.read_text(encoding="utf-8"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        reports = list((Path(self.temp_dir.name) / "123_spand_rahasya" / "run_reports").glob("*generate-chunks*.json"))
+        reports = list((Path(self.temp_dir.name) / "123_spand_rahasya" / "run_reports" / "generate-chunks").glob("*generate-chunks*.json"))
 
         self.assertEqual(result["processed_chapter_count"], 1)
         self.assertTrue(chunk_path.exists())
@@ -241,6 +242,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertEqual(manifest["counts"]["total_chunk_count"], 1)
         self.assertEqual(manifest["chapters"][0]["chunk_filename"], chunk_path.name)
         self.assertEqual(len(reports), 1)
+        self.assertIn("[manifest] wrote semantic_chunks_manifest.json", progress_messages)
         self.assertEqual(metadata_path.read_text(encoding="utf-8"), before_metadata)
         self.assertFalse(list(output_dir.glob("*.md")))
 
@@ -277,7 +279,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         keep_path.write_text("keep", encoding="utf-8")
         loaded, config_path = self.write_config(config)
 
-        with redirect_stdout(StringIO()):
+        output = StringIO()
+        with redirect_stdout(output):
             run_generate_chunks_job(
                 self.context,
                 loaded,
@@ -349,7 +352,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         )
         loaded, config_path = self.write_config(r2_config)
 
-        with redirect_stdout(StringIO()):
+        output = StringIO()
+        with redirect_stdout(output):
             run_generate_chunks_job(
                 self.context,
                 loaded,
@@ -360,6 +364,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
                 progress=lambda message: None,
             )
 
+        progress = output.getvalue()
         uploaded_keys = [key for _, _, key in client.uploads]
         self.assertIn(
             (
@@ -370,8 +375,13 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         )
         self.assertIn("cms_library/123_spand_rahasya/full_subject/keep.txt", client.objects)
         self.assertTrue(any(key.endswith(".chunks.json") for key in uploaded_keys))
-        self.assertTrue(any("/run_reports/" in key and key.endswith(".json") for key in uploaded_keys))
-        self.assertTrue(any("/run_reports/" in key and key.endswith(".md") for key in uploaded_keys))
+        self.assertTrue(any("/run_reports/generate-chunks/" in key and key.endswith(".json") for key in uploaded_keys))
+        self.assertTrue(any("/run_reports/generate-chunks/" in key and key.endswith(".md") for key in uploaded_keys))
+        self.assertIn("Publishing 4 chunk artifact(s) to:", progress)
+        self.assertIn("[1/3] semantic chunk artifacts: 1 chapters", progress)
+        self.assertIn("[2/3] semantic chunk manifest: semantic_chunks_manifest.json", progress)
+        self.assertIn("[3/3] generate-chunks audit:", progress)
+        self.assertEqual(progress.count("generate-chunks audit reports:"), 1)
 
 
 if __name__ == "__main__":

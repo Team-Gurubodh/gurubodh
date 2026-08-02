@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 
 from gurubodh.storage import ensure_local_destination, is_local, subject_output_root
@@ -27,7 +28,11 @@ def destination_paths_for_job(config, overwrite=False):
 
     destination_info = None
     if is_local(config["destination"]):
-        destination_info = ensure_local_destination(subject_dir, overwrite)
+        destination_info = ensure_local_destination(subject_dir, overwrite, command="prep-subject")
+        # Build canonical artifacts outside the published tree. Promotion happens
+        # only after DOCX validation and chapter splitting have succeeded.
+        temp_dir = tempfile.TemporaryDirectory(prefix="gurubodh-prep-subject-output-")
+        subject_dir = Path(temp_dir.name) / config["destination"]["subject_dir"]
 
     paths = destination_paths_for_subject(subject_dir)
     return paths, temp_dir, destination_info

@@ -8,7 +8,7 @@ from gurubodh.prep_subject_audit import PrepSubjectAuditWriter
 from gurubodh.storage import is_r2
 
 
-def copy_unicode_docx(path, output_path, text_path):
+def copy_unicode_docx(path, output_path, text_path, progress=None):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     text_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -16,8 +16,11 @@ def copy_unicode_docx(path, output_path, text_path):
     text = extract_docx_text(output_path)
     text_path.write_text((text + "\n") if text else "", encoding="utf-8")
 
-    print(f"copied Unicode DOCX to {output_path}")
-    print(f"wrote {text_path}")
+    if progress:
+        progress("prepare", output_path, text_path)
+    else:
+        print(f"copied Unicode DOCX to {output_path}")
+        print(f"wrote {text_path}")
     print(f"extracted {len(text)} Unicode text characters")
     return {
         "output_path": output_path,
@@ -31,16 +34,17 @@ def copy_unicode_docx(path, output_path, text_path):
 def run_unicode_docx_ingest(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True):
     validate_pipeline_matches_source(config, PIPELINE_UNICODE_DOCX_INGEST)
     job = prepare_job_output(config, overwrite)
-    result = copy_unicode_docx(job["source_path"], job["full_docx"], job["full_text"])
-    split_outputs = validate_and_split(config, result, job["paths"], entry_point)
+    result = copy_unicode_docx(job["source_path"], job["full_docx"], job["full_text"], progress=job["progress"])
+    split_outputs = validate_and_split(config, result, job["paths"], entry_point, progress=job["progress"])
     if audit_enabled:
         audit = PrepSubjectAuditWriter(context, config_path, config, entry_point, overwrite, job, result, split_outputs)
         if is_r2(config["destination"]):
             audit.write_r2_pending()
             publish_job_output(config, job, overwrite, before_upload=audit.before_r2_upload)
+            audit.announce_locations()
         else:
-            audit.write_local_success()
             publish_job_output(config, job, overwrite)
+            audit.write_local_success()
     else:
         publish_job_output(config, job, overwrite)
     return result
