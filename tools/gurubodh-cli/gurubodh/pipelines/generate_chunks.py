@@ -25,6 +25,7 @@ from gurubodh.storage import (
     subject_artifact_object_key,
     subject_artifact_prefix,
     upload_r2_file,
+    r2_existing_artifacts_error,
 )
 
 
@@ -105,16 +106,34 @@ def materialize_source_subject(config, r2_client=None, progress=print):
     subject_dir = Path(temp_dir.name) / source["subject_dir"]
     prefix = subject_artifact_object_key(source, TEXT_AND_METADATA_RELATIVE_DIR) + "/"
     client = r2_client or R2StorageClient.from_env()
-    progress(f"listing R2 prepared chapter artifacts r2://{source['bucket']}/{prefix}")
+    progress("Reading prepared chapter artifacts from:")
+    progress(f"  r2://{source['bucket']}/{prefix}")
     keys = [key for key in client.list_keys(source["bucket"], prefix) if key.endswith((".txt", ".json"))]
     if not keys:
         raise SystemExit(f"No prepared chapter text artifacts found at r2://{source['bucket']}/{prefix}")
     subject_prefix = subject_artifact_prefix(source)
+    chapter_files = {}
     for key in keys:
         relative_path = Path(key.removeprefix(subject_prefix))
-        target = subject_dir / relative_path
-        progress(f"downloading r2://{source['bucket']}/{key}")
-        client.download_file(source["bucket"], key, target)
+        chapter_files.setdefault(relative_path.stem, []).append((relative_path, key))
+    suffix_order = {".json": 0, ".txt": 1}
+    chapters = [
+        (stem, sorted(files, key=lambda item: suffix_order.get(item[0].suffix, 99)))
+        for stem, files in sorted(chapter_files.items())
+    ]
+    width = max(2, len(str(len(chapters))))
+    type_names = {".json": "metadata", ".txt": "text"}
+    for index, (stem, files) in enumerate(chapters, start=1):
+        for relative_path, key in files:
+            target = subject_dir / relative_path
+            try:
+                client.download_file(source["bucket"], key, target)
+            except Exception as exc:
+                raise SystemExit(
+                    f"R2 download failed for {relative_path.name} from r2://{source['bucket']}/{key}: {exc}"
+                ) from exc
+        types = ", ".join(type_names.get(relative_path.suffix, relative_path.suffix.lstrip(".")) for relative_path, _ in files)
+        progress(f"[{index:0{width}d}/{len(chapters):0{width}d}] {stem} ({types})")
     return subject_dir, temp_dir
 
 
@@ -168,8 +187,9 @@ def ensure_destination_available(config, destination_subject, overwrite, r2_clie
         }
     if client.prefix_has_objects(destination["bucket"], prefix):
         raise SystemExit(
-            "R2 semantic chunk output prefix already contains objects. Re-run with --overwrite to replace:\n"
-            f"r2://{destination['bucket']}/{prefix}"
+            r2_existing_artifacts_error(
+                "generate-chunks", destination["bucket"], [prefix], "semantic chunk output"
+            )
         )
     return {
         "backend": "r2",
@@ -479,8 +499,11 @@ def publish_generate_chunks_r2(config, job, overwrite, r2_client=None, before_up
         if client.exists(destination["bucket"], key):
             existing.append(key)
     if existing and not overwrite:
-        sample = "\n".join(f"- {key}" for key in existing[:10])
-        raise SystemExit(f"R2 destination object(s) already exist:\n{sample}")
+        raise SystemExit(
+            r2_existing_artifacts_error(
+                "generate-chunks", destination["bucket"], existing[:10], "generate-chunks target objects"
+            )
+        )
     if before_upload:
         before_upload(uploads)
     print(f"Publishing {len(uploads)} chunk artifact(s) to:")

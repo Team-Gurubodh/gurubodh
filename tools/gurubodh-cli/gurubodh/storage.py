@@ -47,6 +47,28 @@ def owned_prefixes(config, command):
     return [destination_object_key(config, path) + ("/" if path.suffix == "" else "") for path in replaceable_relative_paths(command)]
 
 
+def r2_existing_artifacts_error(command, bucket, keys, artifact_label):
+    locations = "\n".join(f"- r2://{bucket}/{key}" for key in keys)
+    if command == "prep-subject":
+        overwrite_effect = (
+            "With --overwrite, contents of these locations will be replaced and existing semantic chunk artifacts "
+            "will be invalidated. Audit history will be preserved. Unrelated subject files will be preserved.\n\n"
+            "Run gurubodh generate-chunks --config <generate-chunks-job> before relying on RAG/chunk outputs."
+        )
+    elif command == "generate-chunks":
+        overwrite_effect = (
+            "With --overwrite, only semantic chunk artifacts will be replaced.\n"
+            "Canonical prepared content, prep audit history, and unrelated subject files will be preserved."
+        )
+    else:
+        raise ValueError(f"Unknown artifact owner: {command}")
+    return (
+        f"R2 destination already contains {artifact_label}.\n\n"
+        "Re-run with --overwrite to continue:\n"
+        f"{locations}\n\n{overwrite_effect}"
+    )
+
+
 def remove_local_owned_paths(subject_dir, command):
     removed = []
     for relative_path in replaceable_relative_paths(command):
@@ -326,8 +348,9 @@ def ensure_r2_destination_available(config, overwrite, r2_client=None, command="
     existing = [prefix for prefix in prefixes if client.prefix_has_objects(destination["bucket"], prefix)]
     if existing:
         raise SystemExit(
-            "R2 destination prefix already contains objects. Re-run with --overwrite to replace:\n"
-            "\n".join(f"r2://{destination['bucket']}/{prefix}" for prefix in existing)
+            r2_existing_artifacts_error(
+                command, destination["bucket"], existing, f"{command} artifact locations"
+            )
         )
     return {
         "status": "passed",
@@ -430,11 +453,10 @@ def publish_r2_destination(config, subject_dir, overwrite, r2_client=None, befor
             if client.exists(destination["bucket"], key):
                 existing.append(key)
         if existing:
-            sample = "\n".join(f"- {key}" for key in existing[:10])
-            extra = "" if len(existing) <= 10 else f"\n... and {len(existing) - 10} more"
             raise SystemExit(
-                "R2 destination object(s) already exist. Re-run with --overwrite to replace:\n"
-                f"{sample}{extra}"
+                r2_existing_artifacts_error(
+                    command, destination["bucket"], existing[:10], f"{command} target objects"
+                )
             )
 
     if before_upload:

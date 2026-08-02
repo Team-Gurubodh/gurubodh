@@ -11,7 +11,7 @@ from gurubodh.content_identity import build_content_identity
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
-from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
+from gurubodh.pipelines.generate_chunks import materialize_source_subject, run_generate_chunks_job
 from gurubodh.project import ProjectContext
 
 
@@ -190,6 +190,33 @@ class FakeR2Client:
 
 
 class GenerateChunksPipelineTests(unittest.TestCase):
+    def test_r2_source_download_progress_is_compact_and_chapter_oriented(self):
+        config = base_config(Path(self.temp_dir.name))
+        config["source"] = {
+            "backend": "r2",
+            "bucket": "gurubodh-library-dev",
+            "prefix": "cms_library",
+            "subject_dir": "123_spand_rahasya",
+        }
+        base_key = "cms_library/123_spand_rahasya/chapters/text_and_metadata"
+        client = FakeR2Client(
+            {
+                f"{base_key}/chapter-001.json": "{}",
+                f"{base_key}/chapter-001.txt": "one",
+                f"{base_key}/chapter-002.json": "{}",
+                f"{base_key}/chapter-002.txt": "two",
+            }
+        )
+        progress = []
+        subject_dir, temp_dir = materialize_source_subject(config, r2_client=client, progress=progress.append)
+        self.addCleanup(temp_dir.cleanup)
+
+        self.assertTrue((subject_dir / "chapters/text_and_metadata/chapter-001.txt").is_file())
+        self.assertEqual(progress[0], "Reading prepared chapter artifacts from:")
+        self.assertIn("r2://gurubodh-library-dev/cms_library/123_spand_rahasya/chapters/text_and_metadata/", progress[1])
+        self.assertEqual(progress[2], "[01/02] chapter-001 (metadata, text)")
+        self.assertEqual(progress[3], "[02/02] chapter-002 (metadata, text)")
+
     def write_config(self, config):
         path = Path(self.temp_dir.name) / "generate-chunks.json"
         path.write_text(json.dumps(config), encoding="utf-8")

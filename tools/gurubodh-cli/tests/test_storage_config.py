@@ -610,9 +610,16 @@ class StorageConfigTests(unittest.TestCase):
         client = FakeR2Client({"cms_library/129_spand_rahasya/full_subject/full.txt"})
 
         with redirect_stdout(StringIO()):
-            with self.assertRaises(SystemExit):
+            with self.assertRaises(SystemExit) as error:
                 ensure_r2_destination_available(config, overwrite=False, r2_client=client)
 
+        message = str(error.exception)
+        self.assertIn("R2 destination already contains prep-subject artifact locations.", message)
+        self.assertIn("- r2://gurubodh-library-dev/cms_library/129_spand_rahasya/full_subject/", message)
+        self.assertIn("contents of these locations will be replaced and existing semantic chunk artifacts will be invalidated.", message)
+        self.assertIn("Audit history will be preserved. Unrelated subject files will be preserved.", message)
+        self.assertIn("Run gurubodh generate-chunks --config <generate-chunks-job> before relying on RAG/chunk outputs.", message)
+        self.assertEqual(message.count("R2 destination already contains"), 1)
         self.assertEqual(client.prefix_check, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/chapters/chapter_content_manifest.json"))
 
     def test_r2_preflight_marks_destructive_replacement_pending_with_overwrite(self):
