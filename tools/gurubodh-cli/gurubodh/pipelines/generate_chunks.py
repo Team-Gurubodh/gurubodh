@@ -16,6 +16,7 @@ from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
 from gurubodh.ml.semantic_chunking.segmenter import ParagraphSegmenter, SemanticChunkingParagraphSegmenter
 from gurubodh.naming import chapter_chunks_output_filename
 from gurubodh.storage import (
+    CHUNKS_REPORT_DIR,
     R2StorageClient,
     destination_artifact_reference,
     is_local,
@@ -23,6 +24,8 @@ from gurubodh.storage import (
     optional_url,
     subject_artifact_object_key,
     subject_artifact_prefix,
+    upload_r2_file,
+    r2_existing_artifacts_error,
 )
 
 
@@ -54,10 +57,12 @@ def run_generate_chunks_job(
         audit = GenerateChunksAuditWriter(context, config_path, config, entry_point, overwrite, job, result)
         result["audit_report_references"] = audit_report_references(config, audit.paths)
         write_chunk_manifest(job["paths"]["chunk_manifest"], config, job, semantic_config, result)
+        progress("[manifest] wrote semantic_chunks_manifest.json")
 
         if is_r2(config["destination"]):
             audit.write_r2_pending()
             publish_generate_chunks_r2(config, job, overwrite, r2_client=client, before_upload=audit.before_r2_upload)
+            audit.announce_locations()
         else:
             audit.write_local_success()
         return result
@@ -101,16 +106,34 @@ def materialize_source_subject(config, r2_client=None, progress=print):
     subject_dir = Path(temp_dir.name) / source["subject_dir"]
     prefix = subject_artifact_object_key(source, TEXT_AND_METADATA_RELATIVE_DIR) + "/"
     client = r2_client or R2StorageClient.from_env()
-    progress(f"listing R2 prepared chapter artifacts r2://{source['bucket']}/{prefix}")
+    progress("Reading prepared chapter artifacts from:")
+    progress(f"  r2://{source['bucket']}/{prefix}")
     keys = [key for key in client.list_keys(source["bucket"], prefix) if key.endswith((".txt", ".json"))]
     if not keys:
         raise SystemExit(f"No prepared chapter text artifacts found at r2://{source['bucket']}/{prefix}")
     subject_prefix = subject_artifact_prefix(source)
+    chapter_files = {}
     for key in keys:
         relative_path = Path(key.removeprefix(subject_prefix))
-        target = subject_dir / relative_path
-        progress(f"downloading r2://{source['bucket']}/{key}")
-        client.download_file(source["bucket"], key, target)
+        chapter_files.setdefault(relative_path.stem, []).append((relative_path, key))
+    suffix_order = {".json": 0, ".txt": 1}
+    chapters = [
+        (stem, sorted(files, key=lambda item: suffix_order.get(item[0].suffix, 99)))
+        for stem, files in sorted(chapter_files.items())
+    ]
+    width = max(2, len(str(len(chapters))))
+    type_names = {".json": "metadata", ".txt": "text"}
+    for index, (stem, files) in enumerate(chapters, start=1):
+        for relative_path, key in files:
+            target = subject_dir / relative_path
+            try:
+                client.download_file(source["bucket"], key, target)
+            except Exception as exc:
+                raise SystemExit(
+                    f"R2 download failed for {relative_path.name} from r2://{source['bucket']}/{key}: {exc}"
+                ) from exc
+        types = ", ".join(type_names.get(relative_path.suffix, relative_path.suffix.lstrip(".")) for relative_path, _ in files)
+        progress(f"[{index:0{width}d}/{len(chapters):0{width}d}] {stem} ({types})")
     return subject_dir, temp_dir
 
 
@@ -164,8 +187,9 @@ def ensure_destination_available(config, destination_subject, overwrite, r2_clie
         }
     if client.prefix_has_objects(destination["bucket"], prefix):
         raise SystemExit(
-            "R2 semantic chunk output prefix already contains objects. Re-run with --overwrite to replace:\n"
-            f"r2://{destination['bucket']}/{prefix}"
+            r2_existing_artifacts_error(
+                "generate-chunks", destination["bucket"], [prefix], "semantic chunk output"
+            )
         )
     return {
         "backend": "r2",
@@ -436,8 +460,8 @@ def destination_output_location(config, job):
 
 def audit_report_references(config, paths):
     return {
-        "json": destination_artifact_reference(config, Path("run_reports") / paths["json"].name),
-        "markdown": destination_artifact_reference(config, Path("run_reports") / paths["markdown"].name),
+        "json": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["json"].name),
+        "markdown": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["markdown"].name),
     }
 
 
@@ -447,7 +471,7 @@ def publish_generate_chunks_r2(config, job, overwrite, r2_client=None, before_up
     subject_dir = job["paths"]["destination_subject"]
     upload_roots = [
         subject_dir / SEMANTIC_CHUNKS_RELATIVE_DIR,
-        subject_dir / "run_reports",
+        subject_dir / "run_reports" / "generate-chunks",
     ]
     uploads = []
     for root in upload_roots:
@@ -458,17 +482,47 @@ def publish_generate_chunks_r2(config, job, overwrite, r2_client=None, before_up
             key = subject_artifact_object_key(destination, relative_path)
             uploads.append((path, key))
 
+    chunk_uploads = sorted(
+        [item for item in uploads if item[0].name.endswith(".chunks.json")], key=lambda item: item[0].name
+    )
+    manifest_uploads = [item for item in uploads if item[0].name == "semantic_chunks_manifest.json"]
+    report_uploads = [item for item in uploads if item[0].parent.name == "generate-chunks"]
+    grouped_uploads = [
+        ("chunks", chunk_uploads),
+        ("manifest", manifest_uploads),
+        ("reports", report_uploads),
+    ]
+    uploads = [item for _, items in grouped_uploads for item in items]
+
     existing = []
     for _, key in uploads:
         if client.exists(destination["bucket"], key):
             existing.append(key)
     if existing and not overwrite:
-        sample = "\n".join(f"- {key}" for key in existing[:10])
-        raise SystemExit(f"R2 destination object(s) already exist:\n{sample}")
+        raise SystemExit(
+            r2_existing_artifacts_error(
+                "generate-chunks", destination["bucket"], existing[:10], "generate-chunks target objects"
+            )
+        )
     if before_upload:
         before_upload(uploads)
-    for path, key in uploads:
-        client.upload_file(path, destination["bucket"], key)
+    print(f"Publishing {len(uploads)} chunk artifact(s) to:")
+    print(f"  r2://{destination['bucket']}/{destination['prefix']}/{destination['subject_dir']}/")
+    nonempty_groups = [(kind, items) for kind, items in grouped_uploads if items]
+    for group_index, (kind, items) in enumerate(nonempty_groups, start=1):
+        if kind == "chunks":
+            print(f"[{group_index}/{len(nonempty_groups)}] semantic chunk artifacts: {len(items)} chapters")
+            for chapter_index, (path, key) in enumerate(items, start=1):
+                upload_r2_file(client, destination, path, key)
+                print(f"  [{chapter_index:02d}/{len(items):02d}] {path.stem.removesuffix('.chunks')}")
+        else:
+            for path, key in items:
+                upload_r2_file(client, destination, path, key)
+            if kind == "manifest":
+                print(f"[{group_index}/{len(nonempty_groups)}] semantic chunk manifest: semantic_chunks_manifest.json")
+            else:
+                print(f"[{group_index}/{len(nonempty_groups)}] generate-chunks audit: {', '.join(path.name for path, _ in items)}")
+    print(f"Published {len(uploads)} chunk artifact(s) successfully.")
     return uploads
 
 

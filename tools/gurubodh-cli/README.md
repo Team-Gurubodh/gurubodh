@@ -34,12 +34,21 @@ editable install.
 `gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`
 runs a sample local content job.
 
-Existing output is not archived. If the configured local output directory or R2
-objects already exist, re-run with `--overwrite` when you intentionally want to
-replace them. For both backends, `prep-subject --overwrite` destructively removes
-the complete destination subject output before publishing the current run's
-artifacts. An interrupted overwrite can therefore leave an incomplete output;
-staged/versioned publication and atomic promotion are not part of this command.
+Existing output is not archived. Artifact ownership is command-scoped: `prep-subject`
+owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`, and
+`chapters/chapter_content_manifest.json`; `generate-chunks` owns only
+`chapters/semantic_chunks_and_embeddings/`. Each command owns its own audit
+history. `--overwrite` replaces only the invoking command's owned paths, never
+the complete subject root. A successful `prep-subject --overwrite` invalidates
+semantic chunks because they may no longer match the prepared content; rerun
+`gurubodh generate-chunks --config <generate-chunks-job>` before using RAG output.
+Cross-prefix local/R2 replacement is not a fully atomic release protocol.
+
+During preparation, the CLI prints the local staging subject directory and the
+canonical output-directory mapping once. It then reports each artifact set by
+its shared filename stem and types (for example, `DOCX, text, metadata`) rather
+than repeating full paths. This applies to both local and R2 destinations; R2
+runs then print their destination object-key publication progress separately.
 
 ```bash
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
@@ -85,7 +94,7 @@ operator-readable Markdown audit reports under the generated subject artifact
 tree:
 
 ```text
-<subject>/run_reports/
+<subject>/run_reports/prep-subject/
 ```
 
 The JSON report is the source of truth for tooling. The Markdown report is a
@@ -99,14 +108,14 @@ For R2-backed destinations, audit reports are uploaded with the rest of the
 subject artifact tree:
 
 ```text
-cms_library/{subject_dir}/run_reports/
+cms_library/{subject_dir}/run_reports/prep-subject/
 ```
 
 Audit reports intentionally exclude secrets, environment variable values, API
 keys, request bodies, full source text, full chapter text, and DOCX contents.
 
 `generate-chunks` follows the same audit report convention and writes JSON and
-Markdown reports under `<subject>/run_reports/`. Reports include generated
+Markdown reports under `<subject>/run_reports/generate-chunks/`. Reports include generated
 artifact references and aggregate counts, but exclude full source text and
 embedding vectors.
 
@@ -303,12 +312,11 @@ Jobs configure the marker terms under `metadata_defaults`:
 If `summary_chapter_markers` is omitted, the CLI does not run summary chapter
 detection for that job.
 
-For R2 destinations, the tool checks the destination subject prefix before
-processing starts. If objects already exist and `--overwrite` is not supplied,
-the job fails before doing DOCX conversion or chapter splitting. With
-`--overwrite`, it deletes every object only under that subject prefix immediately
-before upload, then publishes only the current run's artifacts. During publish,
-the tool prints count-based progress for deletion, object checks, and uploads.
+For R2 destinations, the tool checks only command-owned prefixes before
+processing starts. If an owned location already exists and `--overwrite` is not
+supplied, the job fails before doing DOCX conversion or chapter splitting. With
+`--overwrite`, it deletes and uploads only the command-owned locations; audit
+history from the other command and unrelated subject files are preserved.
 
 ## Cloudflare R2 Credentials
 

@@ -11,7 +11,7 @@ from gurubodh.content_identity import build_content_identity
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
-from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
+from gurubodh.pipelines.generate_chunks import materialize_source_subject, run_generate_chunks_job
 from gurubodh.project import ProjectContext
 
 
@@ -190,6 +190,33 @@ class FakeR2Client:
 
 
 class GenerateChunksPipelineTests(unittest.TestCase):
+    def test_r2_source_download_progress_is_compact_and_chapter_oriented(self):
+        config = base_config(Path(self.temp_dir.name))
+        config["source"] = {
+            "backend": "r2",
+            "bucket": "gurubodh-library-dev",
+            "prefix": "cms_library",
+            "subject_dir": "123_spand_rahasya",
+        }
+        base_key = "cms_library/123_spand_rahasya/chapters/text_and_metadata"
+        client = FakeR2Client(
+            {
+                f"{base_key}/chapter-001.json": "{}",
+                f"{base_key}/chapter-001.txt": "one",
+                f"{base_key}/chapter-002.json": "{}",
+                f"{base_key}/chapter-002.txt": "two",
+            }
+        )
+        progress = []
+        subject_dir, temp_dir = materialize_source_subject(config, r2_client=client, progress=progress.append)
+        self.addCleanup(temp_dir.cleanup)
+
+        self.assertTrue((subject_dir / "chapters/text_and_metadata/chapter-001.txt").is_file())
+        self.assertEqual(progress[0], "Reading prepared chapter artifacts from:")
+        self.assertIn("r2://gurubodh-library-dev/cms_library/123_spand_rahasya/chapters/text_and_metadata/", progress[1])
+        self.assertEqual(progress[2], "[01/02] chapter-001 (metadata, text)")
+        self.assertEqual(progress[3], "[02/02] chapter-002 (metadata, text)")
+
     def write_config(self, config):
         path = Path(self.temp_dir.name) / "generate-chunks.json"
         path.write_text(json.dumps(config), encoding="utf-8")
@@ -213,13 +240,14 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         before_metadata = metadata_path.read_text(encoding="utf-8")
         loaded, config_path = self.write_config(config)
 
+        progress_messages = []
         with redirect_stdout(StringIO()):
             result = run_generate_chunks_job(
                 self.context,
                 loaded,
                 config_path=config_path,
                 segmenter=FakeSegmenter(),
-                progress=lambda message: None,
+                progress=progress_messages.append,
             )
 
         output_dir = Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "semantic_chunks_and_embeddings"
@@ -227,7 +255,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         manifest_path = output_dir / "semantic_chunks_manifest.json"
         payload = json.loads(chunk_path.read_text(encoding="utf-8"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        reports = list((Path(self.temp_dir.name) / "123_spand_rahasya" / "run_reports").glob("*generate-chunks*.json"))
+        reports = list((Path(self.temp_dir.name) / "123_spand_rahasya" / "run_reports" / "generate-chunks").glob("*generate-chunks*.json"))
 
         self.assertEqual(result["processed_chapter_count"], 1)
         self.assertTrue(chunk_path.exists())
@@ -241,6 +269,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertEqual(manifest["counts"]["total_chunk_count"], 1)
         self.assertEqual(manifest["chapters"][0]["chunk_filename"], chunk_path.name)
         self.assertEqual(len(reports), 1)
+        self.assertIn("[manifest] wrote semantic_chunks_manifest.json", progress_messages)
         self.assertEqual(metadata_path.read_text(encoding="utf-8"), before_metadata)
         self.assertFalse(list(output_dir.glob("*.md")))
 
@@ -277,7 +306,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         keep_path.write_text("keep", encoding="utf-8")
         loaded, config_path = self.write_config(config)
 
-        with redirect_stdout(StringIO()):
+        output = StringIO()
+        with redirect_stdout(output):
             run_generate_chunks_job(
                 self.context,
                 loaded,
@@ -349,7 +379,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         )
         loaded, config_path = self.write_config(r2_config)
 
-        with redirect_stdout(StringIO()):
+        output = StringIO()
+        with redirect_stdout(output):
             run_generate_chunks_job(
                 self.context,
                 loaded,
@@ -360,6 +391,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
                 progress=lambda message: None,
             )
 
+        progress = output.getvalue()
         uploaded_keys = [key for _, _, key in client.uploads]
         self.assertIn(
             (
@@ -370,8 +402,13 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         )
         self.assertIn("cms_library/123_spand_rahasya/full_subject/keep.txt", client.objects)
         self.assertTrue(any(key.endswith(".chunks.json") for key in uploaded_keys))
-        self.assertTrue(any("/run_reports/" in key and key.endswith(".json") for key in uploaded_keys))
-        self.assertTrue(any("/run_reports/" in key and key.endswith(".md") for key in uploaded_keys))
+        self.assertTrue(any("/run_reports/generate-chunks/" in key and key.endswith(".json") for key in uploaded_keys))
+        self.assertTrue(any("/run_reports/generate-chunks/" in key and key.endswith(".md") for key in uploaded_keys))
+        self.assertIn("Publishing 4 chunk artifact(s) to:", progress)
+        self.assertIn("[1/3] semantic chunk artifacts: 1 chapters", progress)
+        self.assertIn("[2/3] semantic chunk manifest: semantic_chunks_manifest.json", progress)
+        self.assertIn("[3/3] generate-chunks audit:", progress)
+        self.assertEqual(progress.count("generate-chunks audit reports:"), 1)
 
 
 if __name__ == "__main__":

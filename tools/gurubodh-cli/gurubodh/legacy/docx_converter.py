@@ -142,7 +142,7 @@ def ensure_font_table(xml_bytes, font_name):
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def convert_docx(path, font_name, legacy_converter, output_path, text_path):
+def convert_docx(path, font_name, legacy_converter, output_path, text_path, progress=None):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     text_path.parent.mkdir(parents=True, exist_ok=True)
     extracted = []
@@ -168,8 +168,11 @@ def convert_docx(path, font_name, legacy_converter, output_path, text_path):
 
     text_path.write_text("\n\n".join(text for text in extracted if text.strip()) + "\n", encoding="utf-8")
 
-    print(f"wrote {output_path}")
-    print(f"wrote {text_path}")
+    if progress:
+        progress("prepare", output_path, text_path)
+    else:
+        print(f"wrote {output_path}")
+        print(f"wrote {text_path}")
     if converter_counts:
         summary = ", ".join(f"{name}: {count}" for name, count in sorted(converter_counts.items()))
         print(f"converter groups: {summary}")
@@ -181,4 +184,3 @@ def convert_docx(path, font_name, legacy_converter, output_path, text_path):
         "total_nodes": total_nodes,
         "total_chars": total_chars,
     }
-

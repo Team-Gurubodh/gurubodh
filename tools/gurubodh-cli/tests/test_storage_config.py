@@ -95,27 +95,31 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
         self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya")
 
-    def test_local_destination_rejects_existing_output_without_overwrite(self):
+    def test_local_destination_ignores_unowned_files_without_overwrite(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             subject_dir = Path(temp_dir) / "129_spand_rahasya"
             subject_dir.mkdir()
             (subject_dir / "stale.txt").write_text("stale", encoding="utf-8")
 
-            with self.assertRaises(SystemExit):
-                ensure_local_destination(subject_dir, overwrite=False)
+            ensure_local_destination(subject_dir, overwrite=False)
+            self.assertTrue((subject_dir / "stale.txt").exists())
 
-    def test_local_destination_overwrite_removes_complete_existing_output(self):
+    def test_local_destination_overwrite_removes_only_canonical_output(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             subject_dir = Path(temp_dir) / "129_spand_rahasya"
-            stale_file = subject_dir / "chapters" / "stale.txt"
-            stale_file.parent.mkdir(parents=True)
-            stale_file.write_text("stale", encoding="utf-8")
+            canonical_file = subject_dir / "chapters" / "text_and_metadata" / "stale.txt"
+            semantic_file = subject_dir / "chapters" / "semantic_chunks_and_embeddings" / "keep.json"
+            canonical_file.parent.mkdir(parents=True)
+            semantic_file.parent.mkdir(parents=True)
+            canonical_file.write_text("stale", encoding="utf-8")
+            semantic_file.write_text("keep", encoding="utf-8")
 
             audit = ensure_local_destination(subject_dir, overwrite=True)
 
-            self.assertTrue(audit["removed_for_overwrite"])
+            self.assertFalse(audit["removed_for_overwrite"])
             self.assertTrue(subject_dir.is_dir())
-            self.assertFalse(stale_file.exists())
+            self.assertTrue(canonical_file.exists())
+            self.assertTrue(semantic_file.exists())
 
     def test_r2_source_and_destination_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -606,13 +610,17 @@ class StorageConfigTests(unittest.TestCase):
         client = FakeR2Client({"cms_library/129_spand_rahasya/full_subject/full.txt"})
 
         with redirect_stdout(StringIO()):
-            with self.assertRaises(SystemExit):
+            with self.assertRaises(SystemExit) as error:
                 ensure_r2_destination_available(config, overwrite=False, r2_client=client)
 
-        self.assertEqual(
-            client.prefix_check,
-            ("gurubodh-library-dev", "cms_library/129_spand_rahasya/"),
-        )
+        message = str(error.exception)
+        self.assertIn("R2 destination already contains prep-subject artifact locations.", message)
+        self.assertIn("- r2://gurubodh-library-dev/cms_library/129_spand_rahasya/full_subject/", message)
+        self.assertIn("contents of these locations will be replaced and existing semantic chunk artifacts will be invalidated.", message)
+        self.assertIn("Audit history will be preserved. Unrelated subject files will be preserved.", message)
+        self.assertIn("Run gurubodh generate-chunks --config <generate-chunks-job> before relying on RAG/chunk outputs.", message)
+        self.assertEqual(message.count("R2 destination already contains"), 1)
+        self.assertEqual(client.prefix_check, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/chapters/chapter_content_manifest.json"))
 
     def test_r2_preflight_marks_destructive_replacement_pending_with_overwrite(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -656,13 +664,14 @@ class StorageConfigTests(unittest.TestCase):
 
             progress = output.getvalue()
             self.assertIn("prepared 1 artifact file(s) for R2 upload", progress)
-            self.assertIn("deleted 2 object(s) from R2 destination subject prefix", progress)
-            self.assertIn("[1/1] uploading cms_library/129_spand_rahasya/full_subject/full.txt", progress)
-            self.assertEqual(client.deleted_prefix, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/"))
+            self.assertIn("deleted 1 object(s) from prep-subject-owned R2 paths", progress)
+            self.assertIn("[1/1] full subject: full (text)", progress)
+            self.assertEqual(client.deleted_prefix, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/chapters/chapter_content_manifest.json"))
             self.assertEqual(
                 client.existing_keys,
                 {
                     "cms_library/129_spand_rahasya/full_subject/full.txt",
+                    "cms_library/129_spand_rahasya/chapters/stale.txt",
                     "cms_library/130_other_subject/full_subject/keep.txt",
                 },
             )
@@ -676,6 +685,42 @@ class StorageConfigTests(unittest.TestCase):
                     )
                 ],
             )
+
+    def test_r2_prep_upload_reports_chapter_progress_and_keeps_chapter_files_together(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["destination"] = {
+            "backend": "r2",
+            "bucket": "gurubodh-library-dev",
+            "prefix": "cms_library",
+            "subject_dir": "129_spand_rahasya",
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            for chapter in ("001", "002"):
+                stem = f"CAT020_SUB129_spand-rahasya_{chapter}_v01.01"
+                for directory, suffix in (("chapters/msword", ".docx"), ("chapters/text_and_metadata", ".txt"), ("chapters/text_and_metadata", ".json")):
+                    path = subject_dir / directory / f"{stem}{suffix}"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("artifact", encoding="utf-8")
+            manifest = subject_dir / "chapters" / "chapter_content_manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            client = FakeR2Client()
+
+            output = StringIO()
+            with redirect_stdout(output):
+                publish_r2_destination(config, subject_dir, overwrite=False, r2_client=client)
+
+            progress = output.getvalue()
+            self.assertIn("[1/2] chapter artifacts: 2 chapters / 6 files", progress)
+            self.assertIn("[01/02] CAT020_SUB129_spand-rahasya_001_v01.01 (DOCX, text, metadata)", progress)
+            self.assertIn("[02/02] CAT020_SUB129_spand-rahasya_002_v01.01 (DOCX, text, metadata)", progress)
+            self.assertIn("[2/2] content manifest: chapters/chapter_content_manifest.json", progress)
+            uploaded_names = [name for name, _, _ in client.uploads]
+            self.assertEqual(uploaded_names[:3], [
+                "CAT020_SUB129_spand-rahasya_001_v01.01.docx",
+                "CAT020_SUB129_spand-rahasya_001_v01.01.txt",
+                "CAT020_SUB129_spand-rahasya_001_v01.01.json",
+            ])
 
 
 if __name__ == "__main__":

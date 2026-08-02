@@ -16,16 +16,18 @@ def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, co
         context.legacy_converter,
         job["full_docx"],
         job["full_text"],
+        progress=job["progress"],
     )
-    split_outputs = validate_and_split(config, result, job["paths"], entry_point)
+    split_outputs = validate_and_split(config, result, job["paths"], entry_point, progress=job["progress"])
     if audit_enabled:
         audit = PrepSubjectAuditWriter(context, config_path, config, entry_point, overwrite, job, result, split_outputs)
         if is_r2(config["destination"]):
             audit.write_r2_pending()
             publish_job_output(config, job, overwrite, before_upload=audit.before_r2_upload)
+            audit.announce_locations()
         else:
-            audit.write_local_success()
             publish_job_output(config, job, overwrite)
+            audit.write_local_success()
     else:
         publish_job_output(config, job, overwrite)
     return result

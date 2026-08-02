@@ -1,10 +1,11 @@
 import json
 from pathlib import Path
 
-from gurubodh.audit import AuditReportBuilder, report_basename, report_paths, write_report
+from gurubodh.audit import AuditReportBuilder, print_report_locations, report_basename, report_paths, write_report
 from gurubodh.metadata import SUMMARY_CHAPTER_TAGS
 from gurubodh.naming import version_label
 from gurubodh.storage import (
+    PREP_REPORT_DIR,
     destination_artifact_reference,
     destination_subject_prefix,
     is_r2,
@@ -149,7 +150,7 @@ def processing_summary(config, result, split_outputs, chapters, publish_audit, s
 
 def local_publish_audit(job):
     destination = job.get("local_destination") or {}
-    return {
+    audit = {
         "backend": "local",
         "status": "succeeded",
         "destination_subject_path": str(job["paths"]["subject"]),
@@ -157,6 +158,8 @@ def local_publish_audit(job):
         "removed_for_overwrite": destination.get("removed_for_overwrite", False),
         "final_artifact_root": str(job["paths"]["subject"]),
     }
+    audit["semantic_invalidation"] = job.get("semantic_invalidation", {"invalidated": False, "reason": "overwrite not requested"})
+    return audit
 
 
 def r2_publish_audit(config, job, overwrite, status="pending", uploads=None, deleted_keys=None):
@@ -185,11 +188,14 @@ def operator_notes(report):
         notes.append("No chapters were detected; review the chapter split configuration.")
     if report["publish_audit"]["backend"] == "r2":
         notes.append("If R2 publishing fails, check Cloudflare R2 credentials, bucket, prefix, and object permissions.")
-    if report["run_identity"]["overwrite"]:
+    invalidation = report["publish_audit"].get("semantic_invalidation", {})
+    if invalidation.get("invalidated"):
         notes.append(
-            "Overwrite destructively replaces the complete destination subject output. "
-            "If it fails after deletion, the destination may be incomplete."
+            "Derived chunks were invalidated because canonical content was overwritten. "
+            "Run gurubodh generate-chunks --config <generate-chunks-job> before relying on RAG/chunk outputs."
         )
+    elif report["run_identity"]["overwrite"]:
+        notes.append("No derived semantic artifacts existed; no invalidation was necessary.")
     else:
         notes.append("If the destination already exists, rerun with --overwrite only when replacing it is intentional.")
     return notes
@@ -197,8 +203,8 @@ def operator_notes(report):
 
 def relative_report_references(config, paths):
     return {
-        "json": destination_artifact_reference(config, Path("run_reports") / paths["json"].name),
-        "markdown": destination_artifact_reference(config, Path("run_reports") / paths["markdown"].name),
+        "json": destination_artifact_reference(config, PREP_REPORT_DIR / paths["json"].name),
+        "markdown": destination_artifact_reference(config, PREP_REPORT_DIR / paths["markdown"].name),
     }
 
 
@@ -286,8 +292,13 @@ class PrepSubjectAuditWriter:
         self.split_outputs = split_outputs
         self.builder = AuditReportBuilder(COMMAND_NAME, entry_point, context, config_path, config, overwrite)
         basename = report_basename(config, COMMAND_NAME, self.builder.filename_timestamp)
-        self.paths = report_paths(job["paths"]["subject"], basename)
+        self.paths = report_paths(job["paths"]["subject"], basename, COMMAND_NAME)
         self.report = None
+
+    def relocate_to_published_subject(self):
+        """Point local reports at the subject tree after staging promotion."""
+        basename = self.paths["json"].stem
+        self.paths = report_paths(self.job["paths"]["subject"], basename, COMMAND_NAME)
 
     def build(self, publish_audit):
         chapters = collect_chapter_audits(self.job["paths"]["text_and_metadata"])
@@ -319,20 +330,24 @@ class PrepSubjectAuditWriter:
         report["final_outcome"]["operator_notes"] = operator_notes(report)
         return report
 
-    def write(self, publish_audit):
+    def write(self, publish_audit, announce=True):
         self.report = self.build(publish_audit)
         write_report(self.paths, self.report, render_markdown(self.report))
         self.report = self.build(publish_audit)
         write_report(self.paths, self.report, render_markdown(self.report))
-        print(f"wrote prep-subject audit report {self.paths['json']}")
-        print(f"wrote prep-subject audit report {self.paths['markdown']}")
+        if announce:
+            print_report_locations(COMMAND_NAME, self.paths)
         return self.report
 
+    def announce_locations(self):
+        print_report_locations(COMMAND_NAME, self.paths)
+
     def write_local_success(self):
+        self.relocate_to_published_subject()
         return self.write(local_publish_audit(self.job))
 
     def write_r2_pending(self):
-        return self.write(r2_publish_audit(self.config, self.job, self.overwrite))
+        return self.write(r2_publish_audit(self.config, self.job, self.overwrite), announce=False)
 
     def before_r2_upload(self, uploads, deleted_keys):
         return self.write(
@@ -343,5 +358,6 @@ class PrepSubjectAuditWriter:
                 status="succeeded",
                 uploads=uploads,
                 deleted_keys=deleted_keys,
-            )
+            ),
+            announce=False,
         )

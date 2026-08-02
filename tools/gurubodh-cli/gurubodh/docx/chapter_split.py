@@ -124,6 +124,7 @@ def split_docx_into_chapters(
     config=None,
     converter_counts=None,
     entry_point=None,
+    progress=None,
 ):
     with zipfile.ZipFile(docx_path) as docx:
         document_xml = docx.read("word/document.xml")
@@ -199,8 +200,14 @@ def split_docx_into_chapters(
                 encoding="utf-8",
             )
         validate_docx(output_path)
+        if progress:
+            generated_paths = [output_path, text_path]
+            if metadata_name:
+                generated_paths.append(chapter_text_dir / metadata_name)
+            progress(f"split {index:02d}/{len(chapters):02d}", *generated_paths)
         outputs.append(output_path)
 
-    print(f"wrote {len(outputs)} chapter files under {chapter_docx_dir}")
-    print(f"wrote {len(outputs)} chapter text files under {chapter_text_dir}")
+    if not progress:
+        print(f"wrote {len(outputs)} chapter files under {chapter_docx_dir}")
+        print(f"wrote {len(outputs)} chapter text files under {chapter_text_dir}")
     return outputs

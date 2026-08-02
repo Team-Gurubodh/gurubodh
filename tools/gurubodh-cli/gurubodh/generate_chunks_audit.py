@@ -1,9 +1,10 @@
 from pathlib import Path
 
-from gurubodh.audit import AuditReportBuilder, report_basename, report_paths, write_report
+from gurubodh.audit import AuditReportBuilder, print_report_locations, report_basename, report_paths, write_report
 from gurubodh.constants import SEMANTIC_CHUNKS_OUTPUT_DIR
 from gurubodh.naming import version_label
 from gurubodh.storage import (
+    CHUNKS_REPORT_DIR,
     destination_artifact_reference,
     is_r2,
     subject_artifact_prefix,
@@ -80,8 +81,8 @@ def r2_publish_audit(config, job, status="pending", uploads=None):
 
 def report_references(config, paths):
     return {
-        "json": destination_artifact_reference(config, Path("run_reports") / paths["json"].name),
-        "markdown": destination_artifact_reference(config, Path("run_reports") / paths["markdown"].name),
+        "json": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["json"].name),
+        "markdown": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["markdown"].name),
     }
 
 
@@ -178,7 +179,7 @@ class GenerateChunksAuditWriter:
         self.result = result
         self.builder = AuditReportBuilder(COMMAND_NAME, entry_point, context, config_path, config, overwrite)
         basename = report_basename(config, COMMAND_NAME, self.builder.filename_timestamp)
-        self.paths = report_paths(job["paths"]["destination_subject"], basename)
+        self.paths = report_paths(job["paths"]["destination_subject"], basename, COMMAND_NAME)
         self.report = None
 
     def build(self, publish_audit):
@@ -201,18 +202,21 @@ class GenerateChunksAuditWriter:
         report["final_outcome"]["operator_notes"] = operator_notes(report)
         return report
 
-    def write(self, publish_audit):
+    def write(self, publish_audit, announce=True):
         self.report = self.build(publish_audit)
         write_report(self.paths, self.report, render_markdown(self.report))
-        print(f"wrote generate-chunks audit report {self.paths['json']}")
-        print(f"wrote generate-chunks audit report {self.paths['markdown']}")
+        if announce:
+            print_report_locations(COMMAND_NAME, self.paths)
         return self.report
+
+    def announce_locations(self):
+        print_report_locations(COMMAND_NAME, self.paths)
 
     def write_local_success(self):
         return self.write(local_publish_audit(self.job))
 
     def write_r2_pending(self):
-        return self.write(r2_publish_audit(self.config, self.job))
+        return self.write(r2_publish_audit(self.config, self.job), announce=False)
 
     def before_r2_upload(self, uploads):
-        return self.write(r2_publish_audit(self.config, self.job, status="succeeded", uploads=uploads))
+        return self.write(r2_publish_audit(self.config, self.job, status="succeeded", uploads=uploads), announce=False)

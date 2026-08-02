@@ -7,6 +7,7 @@ from pathlib import Path
 
 from gurubodh.metadata import build_chapter_metadata
 from gurubodh.prep_subject_audit import PrepSubjectAuditWriter
+from gurubodh.pipelines.common import staging_progress
 from gurubodh.project import ProjectContext
 
 
@@ -45,6 +46,23 @@ BASE_CONFIG = {
 
 
 class PrepSubjectAuditReportTests(unittest.TestCase):
+    def test_staging_progress_announces_root_once_and_uses_relative_artifact_paths(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "123_spand_rahasya"
+            output = StringIO()
+            with redirect_stdout(output):
+                progress = staging_progress(subject_dir)
+                progress(
+                    "split 01/02",
+                    subject_dir / "chapters" / "msword" / "chapter-001.docx",
+                    subject_dir / "chapters" / "text_and_metadata" / "chapter-001.txt",
+                )
+
+            report = output.getvalue()
+            self.assertEqual(report.count(str(subject_dir)), 1)
+            self.assertIn("Outputs: full_subject/, chapters/msword/, and chapters/text_and_metadata/", report)
+            self.assertIn("[split 01/02] chapter-001 (DOCX, text)", report)
+
     def make_job(self, temp_dir, config):
         subject_dir = Path(temp_dir) / config["destination"]["subject_dir"]
         paths = {
@@ -122,7 +140,8 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             self.write_chapter_metadata(config, job)
             writer = self.make_writer(temp_dir, config, job)
 
-            with redirect_stdout(StringIO()):
+            output = StringIO()
+            with redirect_stdout(output):
                 report = writer.write_local_success()
 
             json_path = writer.paths["json"]
@@ -140,6 +159,10 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             self.assertEqual(payload["final_outcome"]["generated_artifact_counts"]["run_report_markdown"], 1)
             self.assertIn("# Gurubodh prep-subject Audit Report", markdown)
             self.assertIn("| Chapter | Content key | Text artifact | SHA-256 |", markdown)
+            self.assertIn("prep-subject audit reports:", output.getvalue())
+            self.assertIn(f"directory: {writer.paths['directory']}", output.getvalue())
+            self.assertIn(f"  {writer.paths['json'].name}", output.getvalue())
+            self.assertIn(f"  {writer.paths['markdown'].name}", output.getvalue())
             self.assertNotIn("do-not-write", payload_text)
             self.assertIn("[redacted]", payload_text)
 
@@ -163,6 +186,30 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
 
             self.assertEqual(report["processing_summary"]["legacy_converter_counts"], {"aps": 3})
             self.assertEqual(report["processing_summary"]["converted_text_nodes"], 7)
+
+    def test_local_audit_relocates_from_staging_to_published_subject(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            job = self.make_job(temp_dir, json.loads(json.dumps(BASE_CONFIG)))
+            self.write_chapter_metadata(BASE_CONFIG, job)
+            staging_subject = job["paths"]["subject"]
+            published_subject = Path(temp_dir) / "published" / BASE_CONFIG["destination"]["subject_dir"]
+            published_subject.parent.mkdir(parents=True)
+            staging_subject.rename(published_subject)
+            job["paths"] = {
+                key: published_subject / value.relative_to(staging_subject)
+                for key, value in job["paths"].items()
+            }
+            writer = self.make_writer(temp_dir, BASE_CONFIG, job)
+            # Simulate construction before the local staging tree was promoted.
+            writer.paths = writer.paths | {
+                "directory": staging_subject / "run_reports" / "prep-subject",
+                "json": staging_subject / "run_reports" / "prep-subject" / writer.paths["json"].name,
+                "markdown": staging_subject / "run_reports" / "prep-subject" / writer.paths["markdown"].name,
+            }
+            with redirect_stdout(StringIO()):
+                writer.write_local_success()
+            self.assertTrue(writer.paths["json"].is_file())
+            self.assertTrue(str(writer.paths["json"]).startswith(str(published_subject)))
 
     def test_r2_audit_report_updates_publish_counts_before_upload(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -198,7 +245,7 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             self.assertEqual(payload["publish_audit"]["uploaded_artifact_count"], len(uploads))
             self.assertEqual(
                 payload["final_outcome"]["report_files"]["json"]["key"],
-                "cms_library/129_spand_rahasya/run_reports/" + writer.paths["json"].name,
+                "cms_library/129_spand_rahasya/run_reports/prep-subject/" + writer.paths["json"].name,
             )
 
 
