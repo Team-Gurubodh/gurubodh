@@ -447,9 +447,23 @@ class StorageConfigTests(unittest.TestCase):
 
                 self.assertEqual(config["pipeline"], "generate-chunks")
                 self.assertEqual(config["_semantic_chunk_config"].model_name, "BAAI/bge-m3")
+                self.assertRegex(config["_semantic_chunk_config"].model_revision, r"^[0-9a-f]{40}$")
                 self.assertGreaterEqual(config["_semantic_chunk_config"].threshold_percentile, 0.0)
                 self.assertLessEqual(config["_semantic_chunk_config"].threshold_percentile, 100.0)
                 self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)
+
+    def test_generate_chunks_job_rejects_unpinned_model_revision(self):
+        config = {
+            "schema_version": "1.0.0",
+            "pipeline": "generate-chunks",
+            "source": {"backend": "r2", "bucket": "source", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None},
+            "destination": {"backend": "r2", "bucket": "destination", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None},
+            "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
+            "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "embedding_mode": "dense", "embedding_dimension": 1024, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_embeddings": True, "device": None, "local_files_only": False},
+        }
+
+        with self.assertRaisesRegex(SystemExit, "chunking.model_revision must be a non-empty string"):
+            load_generate_chunks_job(self.write_config(config))
 
     def test_load_prep_subject_job_rejects_invalid_summary_chapter_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))

@@ -39,7 +39,7 @@ def base_config(root_dir):
         "chunking": {
             "provider": "semantic-chunking",
             "model": "BAAI/bge-m3",
-            "model_revision": None,
+            "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
             "embedding_mode": "dense",
             "embedding_dimension": 1024,
             "threshold_percentile": 80.0,
@@ -267,8 +267,13 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             manifest["chapters"][0]["content_key"],
         )
         self.assertEqual(manifest["counts"]["total_chunk_count"], 1)
+        self.assertEqual(payload["chunking"]["model_revision"], config["chunking"]["model_revision"])
+        self.assertEqual(manifest["provider"]["model_revision"], config["chunking"]["model_revision"])
+        self.assertEqual(manifest["embedding"]["model_revision"], config["chunking"]["model_revision"])
         self.assertEqual(manifest["chapters"][0]["chunk_filename"], chunk_path.name)
         self.assertEqual(len(reports), 1)
+        audit = json.loads(reports[0].read_text(encoding="utf-8"))
+        self.assertEqual(audit["job_identity"]["chunking_model"]["model_revision"], config["chunking"]["model_revision"])
         self.assertIn("[manifest] wrote semantic_chunks_manifest.json", progress_messages)
         self.assertEqual(metadata_path.read_text(encoding="utf-8"), before_metadata)
         self.assertFalse(list(output_dir.glob("*.md")))

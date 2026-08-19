@@ -25,6 +25,11 @@ def job_identity(config, job):
         "subversion": config["naming"]["subversion"],
         "version_label": version_label(config),
         "source_subject": source_subject_reference(source, job),
+        "chunking_model": {
+            "provider": config["chunking"]["provider"],
+            "model": config["chunking"]["model"],
+            "model_revision": config["chunking"]["model_revision"],
+        },
     }
     if is_r2(destination):
         identity["destination_output"] = {
@@ -128,6 +133,7 @@ def render_markdown(report):
         f"- Destination backend: `{report['run_identity']['destination_backend']}`",
         f"- Overwrite: `{report['run_identity']['overwrite']}`",
         f"- Git commit SHA: `{report['run_identity']['git_commit_sha'] or 'unavailable'}`",
+        f"- Model revision: `{report['job_identity']['chunking_model']['model_revision']}`",
         "",
         "## Processing Summary",
         "",

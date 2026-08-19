@@ -58,14 +58,21 @@
       }
     },
     "chunking": {
-      "type": "object"
-    },
-    "embedding": {
       "type": "object",
-      "required": ["provider", "model", "embedding_mode", "embedding_dimension", "normalize_embeddings"],
+      "required": ["provider", "model", "model_revision"],
       "properties": {
         "provider": { "const": "semantic-chunking" },
         "model": { "const": "BAAI/bge-m3" },
+        "model_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "embedding": {
+      "type": "object",
+      "required": ["provider", "model", "model_revision", "embedding_mode", "embedding_dimension", "normalize_embeddings"],
+      "properties": {
+        "provider": { "const": "semantic-chunking" },
+        "model": { "const": "BAAI/bge-m3" },
+        "model_revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
         "embedding_mode": { "const": "dense" },
         "embedding_dimension": { "const": 1024 },
         "normalize_embeddings": { "type": "boolean" }

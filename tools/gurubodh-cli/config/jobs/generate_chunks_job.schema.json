@@ -46,8 +46,8 @@
           "const": "BAAI/bge-m3"
         },
         "model_revision": {
-          "type": ["string", "null"],
-          "minLength": 1
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
         },
         "embedding_mode": {
           "const": "dense"

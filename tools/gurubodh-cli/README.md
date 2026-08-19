@@ -64,6 +64,33 @@ gurubodh generate-chunks \
   --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
 ```
 
+### Pinned BGE-M3 model workflow
+
+Every maintained `generate-chunks` job, whether local or R2-backed, must set
+`chunking.model_revision` to a full immutable Hugging Face commit SHA. The
+selected BGE-M3 revision is
+`5617a9f61b028005a4858fdac845db406aefb181`. Job validation rejects `null`,
+branch names, tags, and abbreviated SHAs. This revision is recorded in each
+chunk artifact, the semantic-chunks manifest, and the JSON/Markdown audit
+reports.
+
+Populate the cache before an online run, using the same cache directory the
+job will use:
+
+```bash
+export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
+hf download BAAI/bge-m3 \
+  --revision 5617a9f61b028005a4858fdac845db406aefb181 \
+  --cache-dir "$GURUBODH_MODEL_CACHE_DIR"
+```
+
+After that command completes, set `chunking.local_files_only` to `true` to
+require the already-populated pinned snapshot and prevent an unexpected network
+lookup. Keep it `false` only while intentionally populating or repairing the
+cache. The standalone experimental command accepts an optional
+`--model-revision`, but its outputs are not maintained production artifacts;
+pass the same SHA whenever those results need to be reproducible.
+
 When run from outside `tools/gurubodh-cli`, pass `--project-root` just like
 `prep-subject`:
 
