@@ -1,8 +1,10 @@
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from gurubodh.ml.semantic_chunking.chunker import SemanticChunker
@@ -117,6 +119,26 @@ class SemanticChunkingTests(unittest.TestCase):
 
         load_model.assert_not_called()
         self.assertIsNone(chunker._model)
+
+    def test_model_loader_passes_pinned_revision_to_sentence_transformer(self):
+        calls = []
+
+        class CapturingSentenceTransformer:
+            def __init__(self, model_name, **kwargs):
+                calls.append((model_name, kwargs))
+
+        with tempfile.TemporaryDirectory() as cache_dir:
+            config = SemanticChunkConfig(
+                model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+                cache_dir=cache_dir,
+                local_files_only=True,
+            )
+            with patch.dict(sys.modules, {"sentence_transformers": SimpleNamespace(SentenceTransformer=CapturingSentenceTransformer)}):
+                SemanticChunker(config)._load_model()
+
+        self.assertEqual(calls[0][0], "BAAI/bge-m3")
+        self.assertEqual(calls[0][1]["revision"], "5617a9f61b028005a4858fdac845db406aefb181")
+        self.assertTrue(calls[0][1]["local_files_only"])
 
     def test_semantic_chunker_uses_injected_model_and_emits_spans_and_checksums(self):
         model = FakeEmbeddingModel()

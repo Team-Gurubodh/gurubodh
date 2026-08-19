@@ -66,6 +66,7 @@ class SemanticChunkConfig:
         return {
             "provider": self.provider,
             "model": self.model_name,
+            "model_revision": self.model_revision,
             "embedding_mode": self.embedding_mode,
             "embedding_dimension": self.embedding_dimension,
             "strategy_version": self.strategy_version,

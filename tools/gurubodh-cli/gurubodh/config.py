@@ -271,7 +271,12 @@ def load_generate_chunks_job(path):
         config["_semantic_chunk_config"] = SemanticChunkConfig.from_env(
             provider=require_string(chunking, "provider", "chunking"),
             model_name=require_string(chunking, "model", "chunking"),
-            model_revision=optional_string_or_null(chunking, "model_revision", "chunking"),
+            model_revision=require_string(
+                chunking,
+                "model_revision",
+                "chunking",
+                r"[0-9a-f]{40}",
+            ),
             embedding_mode=require_string(chunking, "embedding_mode", "chunking"),
             embedding_dimension=require_integer(chunking, "embedding_dimension", "chunking"),
             threshold_percentile=require_number(chunking, "threshold_percentile", "chunking"),

@@ -23,7 +23,7 @@
   "chunking": {
     "provider": "semantic-chunking",
     "model": "BAAI/bge-m3",
-    "model_revision": null,
+    "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
     "embedding_mode": "dense",
     "embedding_dimension": 1024,
     "threshold_percentile": 78.0,
