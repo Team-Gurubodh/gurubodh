@@ -14,6 +14,84 @@ python -m pip install -e .
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
+## Container Batch Runner
+
+Docker is the supported runner for production R2-to-R2 batch jobs. Native Python
+execution remains supported for development and debugging. The published CPU-only
+image is `ghcr.io/team-gurubodh/gurubodh-cli`; use an immutable digest or a
+`sha-<full-git-sha>` tag, never an unpinned mutable reference.
+
+Build and perform local smoke checks from the monorepo root:
+
+```bash
+docker build --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
+  --build-arg IMAGE_VERSION=local \
+  --build-arg IMAGE_CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -t gurubodh-cli:local tools/gurubodh-cli
+docker run --rm gurubodh-cli:local --help
+docker run --rm --entrypoint node gurubodh-cli:local --version
+```
+
+The image supplies Python 3.12 and Node for the bundled APS converter, runs as
+a non-root user, and contains no credentials, content artifacts, or BGE-M3
+weights. Its entrypoint is `gurubodh`; `/work` is a temporary workspace and
+`/var/cache/gurubodh/models` is the model-cache path.
+
+### R2-to-R2 production runs
+
+Export credentials in the calling shell or put them in a local, untracked
+environment file. Never add them to a job JSON file, image, command history, or
+repository configuration.
+
+```bash
+export CLOUDFLARE_R2_ACCOUNT_ID=...
+export CLOUDFLARE_R2_ACCESS_KEY_ID=...
+export CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+docker volume create gurubodh-bge-m3-cache
+```
+
+Run a prep job whose source DOCX and artifact destination are both R2:
+
+```bash
+docker run --rm \
+  --env CLOUDFLARE_R2_ACCOUNT_ID \
+  --env CLOUDFLARE_R2_ACCESS_KEY_ID \
+  --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
+  --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
+  ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
+  prep-subject --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json
+```
+
+Then run its R2-backed chunk-generation job with the same named volume. The
+first online run populates the pinned BGE-M3 cache; later runs reuse it across
+stopped and recreated containers. Set `local_files_only: true` in a committed
+job only after that exact pinned snapshot is present in the volume.
+
+```bash
+docker run --rm \
+  --env CLOUDFLARE_R2_ACCOUNT_ID \
+  --env CLOUDFLARE_R2_ACCESS_KEY_ID \
+  --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
+  --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
+  ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
+  generate-chunks --config jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
+```
+
+The CLI downloads R2 inputs to temporary container storage and uploads outputs
+back to R2. Audit reports are published under the subject's
+`run_reports/prep-subject/` or `run_reports/generate-chunks/` prefix and identify
+the baked image source revision and provenance source. Do not bind-mount a
+working checkout over `/opt/gurubodh-cli` in production, as that defeats this
+audit identity.
+
+`--overwrite` replaces only the command-owned output paths described below; it
+does not create an atomic or versioned R2 publication. Retry failed jobs after
+checking the reported R2 state, and never run concurrent jobs that write to the
+same subject. The named cache volume is reusable but may be removed with
+`docker volume rm gurubodh-bge-m3-cache` when its downloaded model snapshots are
+no longer needed; the next chunk job will download them again if network access
+is allowed.
+
 ## What These Commands Do
 
 `cd tools/gurubodh-cli` moves into this Python tool project.

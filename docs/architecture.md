@@ -103,7 +103,9 @@ flowchart LR
 - **Current implementation**: Python utility under
   `tools/gurubodh-cli/`, currently used for legacy DOCX Unicode
   conversion, Unicode DOCX ingest, chapter splitting, and preparation artifact
-  publication to local storage or Cloudflare R2. See
+  publication to local storage or Cloudflare R2. Production R2 batch jobs run
+  in the CPU-only `gurubodh-cli` container; native Python remains the
+  development and debugging path. See
   [ADR-0013](./adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md).
 - **Planned/recommended direction**: Shri-Lipi font conversion was unsuccessful. As such newly created documents cannot be used by our system. We need to find a solution to this problem.
 

@@ -1,0 +1,83 @@
+name: gurubodh-cli container
+
+on:
+  pull_request:
+    paths:
+      - "tools/gurubodh-cli/**"
+      - ".github/workflows/gurubodh-cli-container.yml"
+  push:
+    branches: [main]
+    tags: ["cli-v*"]
+    paths:
+      - "tools/gurubodh-cli/**"
+      - ".github/workflows/gurubodh-cli-container.yml"
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/team-gurubodh/gurubodh-cli
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build smoke-test image
+        uses: docker/build-push-action@v6
+        with:
+          context: tools/gurubodh-cli
+          load: true
+          tags: gurubodh-cli:smoke
+          build-args: |
+            SOURCE_REVISION=${{ github.sha }}
+            IMAGE_VERSION=smoke-${{ github.sha }}
+            IMAGE_CREATED=${{ github.event.repository.updated_at }}
+      - name: Verify CLI and bundled Node converter runtime
+        run: |
+          docker run --rm gurubodh-cli:smoke --help
+          docker run --rm --entrypoint node gurubodh-cli:smoke --version
+          docker run -i --rm --entrypoint node gurubodh-cli:smoke /opt/gurubodh-cli/scripts/legacy_font_convert.js <<<'{"converter":"aps","texts":[""]}'
+          docker run --rm --entrypoint python gurubodh-cli:smoke -c "from gurubodh.audit import resolved_build_provenance; from pathlib import Path; assert resolved_build_provenance(Path('/opt/gurubodh-cli'))['source_revision'] == '${{ github.sha }}'"
+
+  publish:
+    needs: smoke-test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Derive image tags
+        id: tags
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          tags="${IMAGE_NAME}:sha-${SHA}"
+          if [ "$REF_TYPE" = "tag" ]; then tags="${tags},${IMAGE_NAME}:${REF_NAME}"; fi
+          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+      - name: Build and publish multi-platform image
+        uses: docker/build-push-action@v6
+        with:
+          context: tools/gurubodh-cli
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            SOURCE_REVISION=${{ github.sha }}
+            IMAGE_VERSION=sha-${{ github.sha }}
+            IMAGE_CREATED=${{ github.event.repository.updated_at }}

@@ -46,6 +46,28 @@ def json_safe(data):
     return data
 
 
+def embedded_build_provenance():
+    """Return non-secret provenance embedded when a container image is built."""
+    manifest_path = os.environ.get(
+        "GURUBODH_BUILD_PROVENANCE_FILE",
+        str(Path(__file__).with_name("build_provenance.json")),
+    )
+    try:
+        payload = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    source_revision = payload.get("source_revision")
+    if not isinstance(source_revision, str) or not source_revision:
+        return None
+    return {
+        "source_revision": source_revision,
+        "image_revision": payload.get("image_revision") or source_revision,
+        "image_version": payload.get("image_version"),
+        "image_created": payload.get("image_created"),
+    }
+
+
 def git_commit_sha(path):
     previous_tokenizer_parallelism = os.environ.get("TOKENIZERS_PARALLELISM")
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -64,6 +86,21 @@ def git_commit_sha(path):
         else:
             os.environ["TOKENIZERS_PARALLELISM"] = previous_tokenizer_parallelism
     return result.stdout.strip() or None
+
+
+def resolved_build_provenance(path):
+    """Resolve provenance from an image manifest before consulting a checkout."""
+    embedded = embedded_build_provenance()
+    if embedded:
+        return {"source": "embedded-container-manifest", **embedded}
+    commit_sha = git_commit_sha(path)
+    return {
+        "source": "native-git-checkout" if commit_sha else "unavailable",
+        "source_revision": commit_sha,
+        "image_revision": None,
+        "image_version": None,
+        "image_created": None,
+    }
 
 
 def report_basename(config, command_name, timestamp=None):
@@ -127,6 +164,7 @@ class AuditReportBuilder:
         self.filename_timestamp = timestamp_for_filename()
 
     def run_identity(self, status, error=None):
+        provenance = resolved_build_provenance(self.context.root)
         return {
             "run_timestamp": self.timestamp,
             "command": self.command_name,
@@ -137,7 +175,8 @@ class AuditReportBuilder:
             "source_backend": self.config["source"].get("backend", "local"),
             "destination_backend": self.config["destination"].get("backend", "local"),
             "overwrite": self.overwrite,
-            "git_commit_sha": git_commit_sha(self.context.root),
+            "git_commit_sha": provenance["source_revision"],
+            "build_provenance": provenance,
             "status": status,
             "error": error,
         }

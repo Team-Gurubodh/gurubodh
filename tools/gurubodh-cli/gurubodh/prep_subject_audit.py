@@ -223,6 +223,8 @@ def render_markdown(report):
         f"- Destination backend: `{report['run_identity']['destination_backend']}`",
         f"- Overwrite: `{report['run_identity']['overwrite']}`",
         f"- Git commit SHA: `{report['run_identity']['git_commit_sha'] or 'unavailable'}`",
+        f"- Provenance source: `{report['run_identity']['build_provenance']['source']}`",
+        f"- Image revision: `{report['run_identity']['build_provenance']['image_revision'] or 'not an image run'}`",
         "",
         "## Job Identity",
         "",
