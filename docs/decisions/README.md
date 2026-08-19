@@ -16,6 +16,7 @@ Use numbered filenames:
 | # | Title | Status |
 | --- | --- | --- |
 | [0003](./0003-prepared-artifact-ownership-and-lifecycle.md) | Prepared Artifact Ownership and Lifecycle | Accepted |
+| [0004](./0004-gurubodh-cli-container-publication-and-runtime.md) | Gurubodh CLI Container Publication and Runtime | Accepted |
 
 Keep `0000-template.md` as the local starter template.
 

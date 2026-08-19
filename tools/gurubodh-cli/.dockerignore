@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.egg-info
+tests
+input_word
+converted_word
+.env
+.env.*
+jobs/**/*.local.json
