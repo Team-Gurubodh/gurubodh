@@ -77,6 +77,32 @@ docker run --rm \
   generate-chunks --config jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
 ```
 
+If you already have the `bge-m3` cache and wish to use the same with the docker container, then use the following commands, replacing `--mount type=volume` by  `--mount type=bind`, as shown in the examples below:
+
+```bash
+
+docker run --rm -it \
+  --env PYTHONUNBUFFERED=1 \
+  --env CLOUDFLARE_R2_ACCOUNT_ID \
+  --env CLOUDFLARE_R2_ACCESS_KEY_ID \
+  --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
+  --mount type=bind,src="$HOME/.cache/huggingface/hub",dst=/var/cache/gurubodh/models \
+  ghcr.io/team-gurubodh/gurubodh-cli:sha-2bc31051711eaa8e39f314bf8752f0871eee6d57 \
+  prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.r2.json --overwrite
+
+docker run --rm -it \
+  --env PYTHONUNBUFFERED=1 \
+  --env CLOUDFLARE_R2_ACCOUNT_ID \
+  --env CLOUDFLARE_R2_ACCESS_KEY_ID \
+  --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
+  --mount type=bind,src="$HOME/.cache/huggingface/hub",dst=/var/cache/gurubodh/models \
+  ghcr.io/team-gurubodh/gurubodh-cli:sha-2bc31051711eaa8e39f314bf8752f0871eee6d57 \
+  generate-chunks --config jobs/subjects/sub123_spand_rahasya/generate-chunks.r2.json
+```
+
+The `--env PYTHONUNBUFFERED=1` flag disables buffered `stdout` and `stderr`, so logs appear immediately in docker logs or your terminal instead of being delayed until a buffer fills or the process exits. It’s useful for long-running CLI jobs and debugging.
+
+
 The CLI downloads R2 inputs to temporary container storage and uploads outputs
 back to R2. Audit reports are published under the subject's
 `run_reports/prep-subject/` or `run_reports/generate-chunks/` prefix and identify
