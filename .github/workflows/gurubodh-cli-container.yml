@@ -40,7 +40,7 @@ jobs:
         run: |
           docker run --rm gurubodh-cli:smoke --help
           docker run --rm --entrypoint node gurubodh-cli:smoke --version
-          docker run --rm --entrypoint node gurubodh-cli:smoke /opt/gurubodh-cli/scripts/legacy_font_convert.js <<<'{"converter":"aps","texts":[""]}'
+          docker run -i --rm --entrypoint node gurubodh-cli:smoke /opt/gurubodh-cli/scripts/legacy_font_convert.js <<<'{"converter":"aps","texts":[""]}'
           docker run --rm --entrypoint python gurubodh-cli:smoke -c "from gurubodh.audit import resolved_build_provenance; from pathlib import Path; assert resolved_build_provenance(Path('/opt/gurubodh-cli'))['source_revision'] == '${{ github.sha }}'"
 
   publish:
