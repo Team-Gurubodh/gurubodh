@@ -140,6 +140,23 @@ class SemanticChunkingTests(unittest.TestCase):
         self.assertEqual(calls[0][1]["revision"], "5617a9f61b028005a4858fdac845db406aefb181")
         self.assertTrue(calls[0][1]["local_files_only"])
 
+    def test_cached_only_model_loader_reports_missing_or_incomplete_snapshot(self):
+        class MissingCachedModel:
+            def __init__(self, *_args, **_kwargs):
+                raise OSError("Cached file not found")
+
+        with tempfile.TemporaryDirectory() as cache_dir:
+            config = SemanticChunkConfig(
+                model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+                cache_dir=cache_dir,
+                local_files_only=True,
+            )
+            with patch.dict(sys.modules, {"sentence_transformers": SimpleNamespace(SentenceTransformer=MissingCachedModel)}):
+                with self.assertRaisesRegex(ModelCacheConfigError, "unavailable or incomplete") as exc:
+                    SemanticChunker(config)._load_model()
+
+        self.assertIn("5617a9f61b028005a4858fdac845db406aefb181", str(exc.exception))
+
     def test_semantic_chunker_uses_injected_model_and_emits_spans_and_checksums(self):
         model = FakeEmbeddingModel()
         config = SemanticChunkConfig(min_chars=0, threshold_percentile=50.0)

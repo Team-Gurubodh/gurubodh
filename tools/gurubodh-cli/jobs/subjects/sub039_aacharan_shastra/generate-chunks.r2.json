@@ -34,6 +34,6 @@
     "batch_size": 16,
     "normalize_embeddings": true,
     "device": null,
-    "local_files_only": false
+    "local_files_only": true
   }
 }
