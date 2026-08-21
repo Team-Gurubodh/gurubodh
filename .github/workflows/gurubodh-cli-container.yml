@@ -24,10 +24,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
       - name: Build smoke-test image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: tools/gurubodh-cli
           load: true
@@ -52,11 +52,11 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v6
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -72,7 +72,7 @@ jobs:
           if [ "$REF_TYPE" = "tag" ]; then tags="${tags},${IMAGE_NAME}:${REF_NAME}"; fi
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"
       - name: Build and publish multi-platform image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: tools/gurubodh-cli
           push: true
