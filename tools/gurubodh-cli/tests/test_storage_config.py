@@ -438,7 +438,7 @@ class StorageConfigTests(unittest.TestCase):
 
                 self.assertIn("summary_chapter_markers", config["metadata_defaults"])
 
-    def test_sample_generate_chunks_jobs_load(self):
+    def test_maintained_generate_chunks_jobs_use_pinned_cached_model_loading(self):
         jobs_dir = Path(__file__).parents[1] / "jobs" / "subjects"
 
         for job_path in jobs_dir.glob("*/generate-chunks*.json"):
@@ -447,7 +447,11 @@ class StorageConfigTests(unittest.TestCase):
 
                 self.assertEqual(config["pipeline"], "generate-chunks")
                 self.assertEqual(config["_semantic_chunk_config"].model_name, "BAAI/bge-m3")
-                self.assertRegex(config["_semantic_chunk_config"].model_revision, r"^[0-9a-f]{40}$")
+                self.assertEqual(
+                    config["_semantic_chunk_config"].model_revision,
+                    "5617a9f61b028005a4858fdac845db406aefb181",
+                )
+                self.assertTrue(config["_semantic_chunk_config"].local_files_only)
                 self.assertGreaterEqual(config["_semantic_chunk_config"].threshold_percentile, 0.0)
                 self.assertLessEqual(config["_semantic_chunk_config"].threshold_percentile, 100.0)
                 self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)

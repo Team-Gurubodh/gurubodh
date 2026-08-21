@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
-from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
+from gurubodh.ml.semantic_chunking.config import ModelCacheConfigError, SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.models import (
     Chunk,
     ChunkedDocument,
@@ -113,7 +113,17 @@ class SemanticChunker:
             kwargs["device"] = self.config.device
         if self.config.model_revision:
             kwargs["revision"] = self.config.model_revision
-        return SentenceTransformer(self.config.model_name, **kwargs)
+        try:
+            return SentenceTransformer(self.config.model_name, **kwargs)
+        except OSError as exc:
+            if not self.config.local_files_only:
+                raise
+            revision = self.config.model_revision or "the requested revision"
+            raise ModelCacheConfigError(
+                f"Cached model {self.config.model_name} at revision {revision} is unavailable or incomplete in "
+                f"{self.config.resolved_cache_dir()}. Populate that exact pinned snapshot before running a "
+                "cached-only job."
+            ) from exc
 
     def _contextual_windows(self, sentences: list[str]) -> list[str]:
         radius = max(0, self.config.window_size // 2)

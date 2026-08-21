@@ -50,6 +50,30 @@ export CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
 docker volume create gurubodh-bge-m3-cache
 ```
 
+Provision the pinned model snapshot once for each new or repaired cache volume.
+This is a deliberate online bootstrap step; maintained chunk-generation jobs do
+not populate or repair their model caches.
+
+```bash
+docker run --rm \
+  --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
+  --entrypoint hf \
+  ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
+  download BAAI/bge-m3 \
+  1_Pooling/config.json \
+  config.json \
+  config_sentence_transformers.json \
+  modules.json \
+  pytorch_model.bin \
+  sentence_bert_config.json \
+  sentencepiece.bpe.model \
+  special_tokens_map.json \
+  tokenizer.json \
+  tokenizer_config.json \
+  --revision 5617a9f61b028005a4858fdac845db406aefb181 \
+  --cache-dir /var/cache/gurubodh/models
+```
+
 Run a prep job whose source DOCX and artifact destination are both R2:
 
 ```bash
@@ -63,14 +87,15 @@ docker run --rm \
   prep-subject --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json
 ```
 
-Then run its R2-backed chunk-generation job with the same named volume. The
-first online run populates the pinned BGE-M3 cache; later runs reuse it across
-stopped and recreated containers. Set `local_files_only: true` in a committed
-job only after that exact pinned snapshot is present in the volume.
+Then run its R2-backed chunk-generation job with the same named volume.
+Maintained `generate-chunks` jobs use `local_files_only: true`, so they require
+the exact pinned BGE-M3 snapshot to be present and never perform a Hugging Face
+lookup. The volume remains reusable across stopped and recreated containers.
 
 ```bash
 docker run --rm \
   --env PYTHONUNBUFFERED=1 \
+  --env HF_HUB_OFFLINE=1 \
   --env CLOUDFLARE_R2_ACCOUNT_ID \
   --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
@@ -95,6 +120,7 @@ docker run --rm \
 # Run the `generate-chunks` command
 docker run --rm \
   --env PYTHONUNBUFFERED=1 \
+  --env HF_HUB_OFFLINE=1 \
   --env CLOUDFLARE_R2_ACCOUNT_ID \
   --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
@@ -114,6 +140,11 @@ back to R2. Audit reports are published under the subject's
 the baked image source revision and provenance source. Do not bind-mount a
 working checkout over `/opt/gurubodh-cli` in production, as that defeats this
 audit identity.
+
+Job configurations are baked into the immutable image. After changing a
+maintained `generate-chunks` configuration, build and publish a new image and
+use its new immutable tag or digest; an existing image retains its previous
+configuration.
 
 `--overwrite` replaces only the command-owned output paths described below; it
 does not create an atomic or versioned R2 publication. Retry failed jobs after
@@ -173,7 +204,7 @@ gurubodh generate-chunks \
   --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
 ```
 
-### Pinned BGE-M3 model workflow
+### Pinned BGE-M3 model and cache workflow
 
 Every maintained `generate-chunks` job, whether local or R2-backed, must set
 `chunking.model_revision` to a full immutable Hugging Face commit SHA. The
@@ -183,22 +214,37 @@ branch names, tags, and abbreviated SHAs. This revision is recorded in each
 chunk artifact, the semantic-chunks manifest, and the JSON/Markdown audit
 reports.
 
-Populate the cache before an online run, using the same cache directory the
-job will use:
+Bootstrap or repair the cache explicitly, using the same cache directory the
+job will use. Download only the files required by the SentenceTransformers
+PyTorch loader; the repository also includes optional ONNX, ColBERT, sparse,
+and image artifacts that normal chunk generation does not need. This is the
+only step that should be online:
 
 ```bash
 export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
 hf download BAAI/bge-m3 \
+  1_Pooling/config.json \
+  config.json \
+  config_sentence_transformers.json \
+  modules.json \
+  pytorch_model.bin \
+  sentence_bert_config.json \
+  sentencepiece.bpe.model \
+  special_tokens_map.json \
+  tokenizer.json \
+  tokenizer_config.json \
   --revision 5617a9f61b028005a4858fdac845db406aefb181 \
   --cache-dir "$GURUBODH_MODEL_CACHE_DIR"
 ```
 
-After that command completes, set `chunking.local_files_only` to `true` to
-require the already-populated pinned snapshot and prevent an unexpected network
-lookup. Keep it `false` only while intentionally populating or repairing the
-cache. The standalone experimental command accepts an optional
-`--model-revision`, but its outputs are not maintained production artifacts;
-pass the same SHA whenever those results need to be reproducible.
+Every maintained job already sets `chunking.local_files_only` to `true`. It
+therefore requires the already-populated pinned snapshot, prevents an
+unexpected network lookup, and fails clearly when the cache is empty or
+incomplete. `HF_HUB_OFFLINE=1` is an additional Docker runtime safeguard after
+bootstrap. Keep `local_files_only` false only for deliberate cache bootstrap or
+repair tools, or for standalone experimental commands. The standalone
+experimental command accepts an optional `--model-revision`; pass the same SHA
+whenever those results need to be reproducible.
 
 When run from outside `tools/gurubodh-cli`, pass `--project-root` just like
 `prep-subject`:
