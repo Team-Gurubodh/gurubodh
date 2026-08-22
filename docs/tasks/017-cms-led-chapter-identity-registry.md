@@ -58,6 +58,11 @@ established by [Task-015](015-chapter-versioning-and-RAG-vrchitecture.md):
 - `generate-chunks` propagates source `content_key` but does not know a stable
   logical `chapter_key` or a preparation snapshot. It currently discovers
   prepared chapter files from the text-and-metadata directory.
+- [GitHub Issue #210](https://github.com/Team-Gurubodh/gurubodh/issues/210)
+  scopes a planned, breaking semantic-chunk artifact v2: it will make the
+  candidate chapter manifest authoritative for `generate-chunks`, and make
+  that command emit candidate chunks only. It does not yet change the current
+  implementation.
 - The Strapi application has no Chapter, chapter-revision, content-snapshot,
   retirement, or ingestion-job content type. Content ingestion remains future
   work ([architecture](../architecture.md)).
@@ -76,11 +81,15 @@ Use a CMS-led identity registry with a candidate-to-finalized boundary:
 prep-subject
     -> candidate chapter manifest and prepared artifacts
 generate-chunks
-    -> candidate chunks and embeddings
+    -> candidate semantic chunks bound to the candidate manifest
 ingestion reconciliation
     -> resolve or allocate chapter_key values
 Strapi/PostgreSQL
     -> finalized snapshot, lineage, current pointer, and retirements
+Embedding Pipeline
+    -> vectors derived only from an immutable CMS-managed snapshot
+Derived vector store
+    -> per-embedding-configuration RAG-ready snapshot pointer
 ```
 
 The candidate manifest remains a portable handoff from preparation. It is not a
@@ -93,13 +102,37 @@ optional and must not become a second authority.
 | Responsibility | Proposed owner |
 | --- | --- |
 | DOCX conversion, splitting, normalized checksums, and candidate `content_key` | `prep-subject` |
-| Candidate chunk and embedding production | `generate-chunks` |
+| Candidate semantic chunk production | `generate-chunks` |
 | Candidate validation and reconciliation planning | Content ingestion workflow |
 | UUID v4 `chapter_key` allocation and preservation | Strapi ingestion service / PostgreSQL registry |
 | Operator decisions for ambiguity and retirement | Controlled ingestion workflow |
 | Finalized snapshot lineage and current-snapshot pointer | PostgreSQL registry |
 | Prepared text, DOCX, metadata, and audit artifacts | R2 or local development storage |
-| Vector retrieval data | Derived vector store |
+| Embedding generation from immutable CMS snapshots | Future Embedding Pipeline |
+| Vector retrieval data and RAG-ready pointer | Derived vector store |
+
+### 2026-08-22 Design Update: Candidate Chunks, CMS-Snapshot Embeddings
+
+The recommendation now separates candidate chunk production from retrieval
+embedding production. `generate-chunks` may use a model internally to find
+semantic boundaries, but it must not persist final chunk vectors. Its candidate
+chunk artifacts must instead preserve text, spans, checksums, chunking-model
+provenance, and an exact checksum binding to the source candidate manifest.
+
+Retrieval embeddings must be generated only after ingestion has established an
+immutable CMS-managed snapshot. The future Embedding Pipeline reads that
+snapshot through the CMS/service boundary and writes derived vectors through
+the vector-store boundary; an external CLI must not read or write Strapi
+PostgreSQL tables directly. R2 remains prepared-artifact staging and must not
+become an embedding-vector store or embedding-manifest authority.
+
+CMS content finalization and RAG readiness are separate states. The current
+recommendation is that a failed or delayed embedding job must not change the
+authoritative CMS snapshot. Instead, the vector layer records pending, ready,
+or failed work for each snapshot and embedding configuration, and retrieval
+uses the latest fully ready snapshot for that configuration. This is a design
+conclusion for later implementation, not approval of an Embedding Pipeline,
+CMS schema, or vector-store implementation.
 
 ## Proposed Registry Invariants
 
@@ -137,15 +170,21 @@ optional and must not become a second authority.
    proposals, missing-chapter reports, and conflict detection.
 4. The workflow persists operator approval for every ambiguous mapping and
    retirement. No unresolved plan may be finalized.
-5. Required chapter content, chunks, and embeddings are staged under the
-   candidate import or snapshot identifier. No long-running file transfer or
-   model work belongs inside the final database transaction.
+5. Required chapter content and accepted candidate chunks are staged under the
+   candidate import identifier. No long-running file transfer or model work
+   belongs inside the final database transaction.
 6. A short finalization transaction verifies that the registry still points to
    `base_snapshot_id`, inserts any new identities, writes immutable snapshot
    membership and retirement events, updates the current pointer, and marks the
    job finalized. A concurrent change requires replanning.
-7. Downstream readers use the current finalized snapshot. A retry using the same
-   idempotency key returns its existing outcome rather than allocating new keys.
+7. A post-finalization Embedding Pipeline may derive vectors from that immutable
+   CMS snapshot. It records a separate pending, ready, or failed result for an
+   embedding configuration; no vector run belongs in the finalization
+   transaction.
+8. CMS readers use the current finalized snapshot. RAG readers use the latest
+   fully ready snapshot for their selected embedding configuration. A retry
+   using the same ingestion idempotency key returns its existing outcome rather
+   than allocating new keys.
 
 ## Design Constraints and Safeguards
 
@@ -161,16 +200,20 @@ optional and must not become a second authority.
   workflows use the separate `chapter_key`.
 - If chunks are generated before reconciliation, ingestion must bind every
   accepted chunk artifact to the exact candidate chapter entry, then attach the
-  resolved `chapter_key`, content state, snapshot ID, and embedding
-  configuration in durable derived records.
-- The current generator should eventually bind the semantic manifest to a
-  source candidate-manifest checksum or preparation-run identifier. Until then,
-  ingestion must compare every chapter number, `content_key`, source checksum,
-  and artifact reference before it treats the two manifests as one candidate
-  release.
-- If vectors reside outside the CMS database, use pending/ready/finalized
-  states instead of assuming a distributed database transaction. The current
-  CMS snapshot advances only after required derived data is ready.
+  resolved `chapter_key`, content state, and snapshot ID. Embedding
+  configuration and vectors are added only by the later CMS-snapshot Embedding
+  Pipeline.
+- Candidate chunk artifacts and their semantic manifest must bind to the exact
+  source candidate-manifest checksum or preparation-run identifier. Until
+  Issue #210 is implemented, ingestion must compare every chapter number,
+  `content_key`, source checksum, and artifact reference before it treats the
+  two manifests as one candidate release.
+- The future Embedding Pipeline must use the CMS/service boundary rather than
+  direct external writes to PostgreSQL. Its vector-store records must be
+  derived, rebuildable, and separately owned from Strapi content tables.
+- Per-snapshot/per-embedding-configuration pending, ready, and failed states
+  must be recorded. RAG readiness must not be inferred from the CMS current
+  pointer alone.
 
 ## Questions Still Open
 
@@ -190,8 +233,10 @@ optional and must not become a second authority.
    rows sufficient?
 5. Should an identical rerun record a no-op ingestion job only, or create a new
    finalized snapshot with identical membership?
-6. Which required chunks and embedding configurations must be ready before a
-   snapshot can become current, particularly before production RAG exists?
+6. The current recommendation is that no embedding configuration gates the CMS
+   current-snapshot pointer. What RAG-ready pointer, lag reporting, and
+   deployment policy should govern retrieval while a newer CMS snapshot is
+   pending or failed for a selected embedding configuration?
 7. Will registry constraints and the finalization endpoint be implemented as
    protected Strapi content types, a Strapi plugin/service with internal tables,
    or another Strapi-supported persistence boundary?
