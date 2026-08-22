@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/artifacts/semantic_chunks_manifest.schema.json",
+  "title": "Gurubodh candidate semantic chunks manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run", "document", "source_candidate_manifest", "chunking", "counts", "chapters", "audit_reports"],
+  "properties": {
+    "schema_version": { "const": "2.0.0" },
+    "run": { "type": "object" },
+    "document": { "type": "object" },
+    "source_candidate_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "sha256"],
+      "properties": {
+        "reference": { "type": "object" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "chunking": {
+      "type": "object",
+      "required": ["provider", "model", "model_revision", "strategy_version", "chunking_config_key"]
+    },
+    "counts": {
+      "type": "object",
+      "required": ["total_chapter_count", "processed_chapter_count", "skipped_chapter_count", "failed_chapter_count", "total_chunk_count", "total_estimated_token_count"]
+    },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chapter_number", "chunk_artifact", "chunk_artifact_sha256", "content_key", "normalized_content_sha256", "estimated_token_count"]
+      }
+    },
+    "audit_reports": { "type": "object" }
+  }
+}

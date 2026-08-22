@@ -342,14 +342,6 @@
           "type": "string",
           "const": "BAAI/bge-m3"
         },
-        "embedding_mode": {
-          "type": "string",
-          "const": "dense"
-        },
-        "embedding_dimension": {
-          "type": "integer",
-          "const": 1024
-        },
         "strategy_version": {
           "type": "string",
           "const": "semantic-window-v1"
@@ -370,7 +362,7 @@
           "type": "string",
           "const": "zero-based-end-exclusive"
         },
-        "estimated_embedding_token_count": {
+        "estimated_token_count": {
           "type": "integer",
           "minimum": 0
         },
@@ -400,7 +392,7 @@
             "min_chars",
             "window_size",
             "batch_size",
-            "normalize_embeddings",
+            "normalize_contextual_vectors",
             "device"
           ],
           "properties": {
@@ -421,7 +413,7 @@
               "type": "integer",
               "minimum": 1
             },
-            "normalize_embeddings": {
+            "normalize_contextual_vectors": {
               "type": "boolean"
             },
             "device": {
@@ -449,7 +441,7 @@
                 "type": "integer",
                 "minimum": 0
               },
-              "estimated_embedding_token_count": {
+              "estimated_token_count": {
                 "type": "integer",
                 "minimum": 0
               },
@@ -511,8 +503,6 @@
             "required": [
               "provider",
               "model",
-              "embedding_mode",
-              "embedding_dimension",
               "strategy_version",
               "source_text_sha256",
               "index_unit",

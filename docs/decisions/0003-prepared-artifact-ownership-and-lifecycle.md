@@ -14,13 +14,17 @@ outputs and audit evidence owned by other commands.
 ## Decision
 
 `prep-subject` owns canonical artifacts (`full_subject/`, chapter DOCX,
-chapter text/metadata, and the content manifest). `generate-chunks` owns
-semantic artifacts. Their audit reports are retained independently under
+chapter text/metadata, and the candidate content manifest). `generate-chunks`
+owns v2 candidate semantic artifacts under `chapters/semantic_chunks/`. Their
+audit reports are retained independently under
 `run_reports/prep-subject/` and `run_reports/generate-chunks/`.
 
 An overwrite is scoped to the command's paths. After successful canonical
-replacement, semantic artifacts are invalidated, with an operator notice to
-regenerate them. Local and R2 replacement are not a fully atomic multi-prefix
+replacement, both v2 semantic artifacts and the legacy
+`chapters/semantic_chunks_and_embeddings/` path are invalidated, with an
+operator notice to regenerate candidate chunks. The legacy path is unsupported
+for new ingestion; `generate-chunks --overwrite` removes it before creating
+v2 output. Local and R2 replacement are not a fully atomic multi-prefix
 release; versioned releases and a current pointer are deferred.
 
 ## Rationale

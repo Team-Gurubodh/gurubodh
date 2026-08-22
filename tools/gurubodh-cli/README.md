@@ -177,7 +177,9 @@ runs a sample local content job.
 Existing output is not archived. Artifact ownership is command-scoped: `prep-subject`
 owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`, and
 `chapters/chapter_content_manifest.json`; `generate-chunks` owns only
-`chapters/semantic_chunks_and_embeddings/`. Each command owns its own audit
+`chapters/semantic_chunks/`. The legacy
+`chapters/semantic_chunks_and_embeddings/` location is removed only by an
+explicit `generate-chunks --overwrite` migration run. Each command owns its own audit
 history. `--overwrite` replaces only the invoking command's owned paths, never
 the complete subject root. A successful `prep-subject --overwrite` invalidates
 semantic chunks because they may no longer match the prepared content; rerun
@@ -194,9 +196,11 @@ runs then print their destination object-key publication progress separately.
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
 ```
 
-`gurubodh generate-chunks` reads prepared chapter text and metadata artifacts
-from a subject artifact tree and writes per-chapter semantic chunk JSON files
-with dense BGE-M3 embeddings:
+`gurubodh generate-chunks` reads `chapters/chapter_content_manifest.json`
+as the authoritative candidate set, validates its selected metadata/text
+references before model initialization, and writes per-chapter semantic chunk
+JSON files. It may use BGE-M3 contextual vectors to find boundaries but never
+persists finalized chunk vectors:
 
 ```bash
 export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
@@ -258,16 +262,18 @@ gurubodh generate-chunks \
 The output directory is scoped to:
 
 ```text
-<subject>/chapters/semantic_chunks_and_embeddings/
+<subject>/chapters/semantic_chunks/
 ```
 
 It contains one `*.chunks.json` file per processed chapter and a
-`semantic_chunks_manifest.json`. The manifest describes the currently
-generated chunk-and-embedding set; the JSON/Markdown audit reports preserve
-the details of a particular run.
+`semantic_chunks_manifest.json`. Every artifact records the exact SHA-256
+binding to its candidate manifest; the semantic manifest also records each
+chunk artifact SHA-256 and a deterministic chunking configuration fingerprint.
+The JSON/Markdown audit reports preserve the details of a particular run.
 The command does not write chunk Markdown and does not update chapter metadata.
-For `--overwrite`, only the semantic chunk and embedding output directory, or
-the matching R2 prefix, is replaced.
+For `--overwrite`, only the semantic chunk output directory (and, if present,
+the legacy combined-output directory), or the matching R2 prefixes, are
+replaced.
 
 ## Audit Trail Reports
 
@@ -433,7 +439,7 @@ the same `cms_library/{subject_dir}/` convention. Chunk artifacts are uploaded
 under:
 
 ```text
-cms_library/{subject_dir}/chapters/semantic_chunks_and_embeddings/
+cms_library/{subject_dir}/chapters/semantic_chunks/
 ```
 
 ## Chapter Text Integrity
@@ -529,10 +535,10 @@ chunker = SemanticChunker(config)
 document = chunker.chunk_text(raw_text, source_name="chapter.txt")
 ```
 
-The module is intentionally not called by the existing DOCX preparation
-pipelines yet. Issue #130 integrates the package structure so modified Task 014
-work can evaluate semantic chunking for paragraph display and later RAG chunk
-generation.
+The config-driven `generate-chunks` pipeline uses this module after it has
+validated the prepared candidate manifest. The standalone interface remains
+useful for local paragraphing experiments; it does not publish preparation
+artifacts.
 
 Before running standalone semantic chunking, set the Gurubodh model cache
 environment variable. The command fails clearly if this variable is omitted:
@@ -564,7 +570,7 @@ segmentation, validation, write steps, and final file/chunk totals.
 
 The standalone output includes provider/model metadata, explicit chunking
 parameters, zero-based end-exclusive Python character spans, per-chunk SHA-256
-checksums, per-chunk `estimated_embedding_token_count`, and a source/chunks
+checksums, per-chunk `estimated_token_count`, and a source/chunks
 checksum round trip. The token estimate is counted with the BGE-M3 tokenizer
 without special tokens and represents the BGE-M3 input token size if the chunk
 were embedded as one standalone input; it is not an API billing metric for the

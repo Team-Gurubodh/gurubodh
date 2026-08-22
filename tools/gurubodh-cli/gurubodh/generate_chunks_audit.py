@@ -30,6 +30,10 @@ def job_identity(config, job):
             "model": config["chunking"]["model"],
             "model_revision": config["chunking"]["model_revision"],
         },
+        "source_candidate_manifest": {
+            "reference": job["candidate_manifest"]["reference"],
+            "sha256": job["candidate_manifest"]["sha256"],
+        },
     }
     if is_r2(destination):
         identity["destination_output"] = {
@@ -100,7 +104,7 @@ def processing_summary(result, publish_audit):
         "chunk_artifacts_written": result["chunk_artifacts_written"],
         "semantic_chunks_manifest_written": result["chunk_manifest_written"],
         "total_chunk_count": result["total_chunk_count"],
-        "total_estimated_embedding_token_count": result["total_estimated_embedding_token_count"],
+        "total_estimated_token_count": result["total_estimated_token_count"],
         "output_directory_name": SEMANTIC_CHUNKS_OUTPUT_DIR,
         "publish_status": publish_audit["status"],
     }
@@ -113,7 +117,7 @@ def operator_notes(report):
     if report["publish_audit"]["backend"] == "r2":
         notes.append("If R2 publishing fails, check Cloudflare R2 credentials, bucket, prefix, and object permissions.")
     if report["run_identity"]["overwrite"]:
-        notes.append("Overwrite was enabled only for semantic chunk and embedding outputs.")
+        notes.append("Overwrite was enabled only for semantic chunk outputs.")
     else:
         notes.append("If semantic chunk outputs already exist, rerun with --overwrite only when replacing them is intentional.")
     return notes
@@ -136,6 +140,7 @@ def render_markdown(report):
         f"- Provenance source: `{report['run_identity']['build_provenance']['source']}`",
         f"- Image revision: `{report['run_identity']['build_provenance']['image_revision'] or 'not an image run'}`",
         f"- Model revision: `{report['job_identity']['chunking_model']['model_revision']}`",
+        f"- Candidate manifest SHA-256: `{report['job_identity']['source_candidate_manifest']['sha256']}`",
         "",
         "## Processing Summary",
         "",
@@ -145,7 +150,7 @@ def render_markdown(report):
         f"- Failed chapters: {report['processing_summary']['failed_chapter_count']}",
         f"- Chunk artifacts: {report['processing_summary']['chunk_artifacts_written']}",
         f"- Total chunks: {report['processing_summary']['total_chunk_count']}",
-        f"- Estimated embedding tokens: {report['processing_summary']['total_estimated_embedding_token_count']}",
+        f"- Estimated tokens: {report['processing_summary']['total_estimated_token_count']}",
         f"- Publish status: {report['processing_summary']['publish_status']}",
         "",
         "## Per-Chapter Audit",
@@ -162,7 +167,7 @@ def render_markdown(report):
                 f"{chapter['source_text_filename']} | "
                 f"{chapter.get('chunk_filename') or '-'} | "
                 f"{chapter['chunk_count']} | "
-                f"{chapter['estimated_embedding_token_count']} | "
+                f"{chapter['estimated_token_count']} | "
                 f"{chapter['status']} |"
             )
     else:

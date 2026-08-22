@@ -7,7 +7,8 @@
 
 - `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_content_manifest.schema.json`
-- `tools/gurubodh-cli/config/artifacts/semantic_chunks_and_embeddings.schema.json`
+- `tools/gurubodh-cli/config/artifacts/semantic_chunks.schema.json`
+- `tools/gurubodh-cli/config/artifacts/semantic_chunks_manifest.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
@@ -41,13 +42,13 @@
   its category, subject, and language. This does not identify an editorial
   chapter across text changes. `chapters/chapter_content_manifest.json` lists the current
   generated subject chapter set and uses the content-manifest artifact schema.
-- Chapter metadata also reserves an optional `paragraph_segmentation` shape for
-  later semantic chunking integration. The config-driven `generate-chunks`
-  command writes separate per-chapter semantic chunk and dense embedding JSON
-  artifacts under `chapters/semantic_chunks_and_embeddings/` and does not write
-  this field into generated chapter metadata. The reserved chunk shape allows
-  BGE-M3 `estimated_embedding_token_count` values and token-counting basis
-  metadata.
+- The config-driven `generate-chunks` command consumes
+  `chapters/chapter_content_manifest.json` as its authoritative candidate set
+  and writes v2 per-chapter semantic chunk JSON artifacts under
+  `chapters/semantic_chunks/`. They bind to the exact source candidate manifest,
+  retain chunking and token-counting provenance, and contain no retrieval
+  vectors. The legacy `semantic_chunks_and_embeddings` path is unsupported for
+  new output and is removed only with explicit overwrite.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

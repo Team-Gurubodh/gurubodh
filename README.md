@@ -107,13 +107,13 @@ Shows the command-line help for `gurubodh`.
 Runs the sample Gurubodh CLI job using
 `tools/gurubodh-cli/jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`.
 
-Standalone semantic chunk generation requires a local model cache directory:
+Manifest-bound semantic chunk generation requires a local model cache directory:
 
 ```bash
 export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
 gurubodh generate-chunks \
-  --source-dir /path/to/chapters/text_and_metadata \
-  --output-dir /path/to/chapters
+  --project-root tools/gurubodh-cli \
+  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
 ```
 
 ### Repository Tooling

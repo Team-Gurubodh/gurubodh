@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from gurubodh.ml.semantic_chunking.config import ModelCacheConfigError, SemanticChunkConfig
+from gurubodh.ml.embeddings import SentenceTransformerEmbeddingHelper, TextEmbeddingHelper
+from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.models import (
     Chunk,
     ChunkedDocument,
@@ -16,22 +16,28 @@ from gurubodh.ml.semantic_chunking.models import (
 )
 from gurubodh.ml.semantic_chunking.sentence_splitter import SentenceSpan, split_sentence_spans
 
-if TYPE_CHECKING:
-    from sentence_transformers import SentenceTransformer
-
-
 class SemanticChunker:
     """Chunk text by detecting large semantic shifts between neighboring sentences."""
 
     def __init__(
         self,
         config: SemanticChunkConfig | None = None,
-        model: "SentenceTransformer | None" = None,
+        model: Any | None = None,
+        embedding_helper: TextEmbeddingHelper | None = None,
         progress: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config or SemanticChunkConfig()
-        self._model = model
         self._progress = progress
+        self.embedding_helper = embedding_helper or SentenceTransformerEmbeddingHelper(
+            provider=self.config.provider,
+            model_name=self.config.model_name,
+            model_revision=self.config.model_revision,
+            cache_dir_resolver=self.config.resolved_cache_dir,
+            local_files_only=self.config.local_files_only,
+            device=self.config.device,
+            model=model,
+            progress=progress,
+        )
 
     def chunk_text(self, text: str, source_name: str | None = None) -> ChunkedDocument:
         sentence_spans = split_sentence_spans(text)
@@ -49,16 +55,15 @@ class SemanticChunker:
                 text=text,
                 source_name=source_name,
                 breakpoint_threshold=None,
-                chunks=self._with_dense_embeddings([chunk]),
+                chunks=[chunk],
             )
 
         sentences = [span.text for span in sentence_spans]
         windows = self._contextual_windows(sentences)
-        embeddings = self.model.encode(
+        embeddings = self.embedding_helper.encode_texts(
             windows,
             batch_size=self.config.batch_size,
-            normalize_embeddings=self.config.normalize_embeddings,
-            show_progress_bar=False,
+            normalize=self.config.normalize_contextual_vectors,
         )
         distances = self._cosine_distances(embeddings)
         threshold = self._percentile(distances, self.config.threshold_percentile)
@@ -75,55 +80,12 @@ class SemanticChunker:
             )
             for index, chunk_sentence_spans in enumerate(raw_chunks, 1)
         ]
-        chunks = self._with_dense_embeddings(chunks)
-
         return self._build_document(
             text=text,
             source_name=source_name,
             breakpoint_threshold=None if math.isinf(threshold) else threshold,
             chunks=chunks,
         )
-
-    @property
-    def model(self) -> "SentenceTransformer":
-        if self._model is None:
-            self._emit_progress(f"Loading embedding model {self.config.model_name}...")
-            self._model = self._load_model()
-            self._emit_progress("Embedding model ready.")
-        return self._model
-
-    def _emit_progress(self, message: str) -> None:
-        if self._progress:
-            self._progress(message)
-
-    def _load_model(self) -> "SentenceTransformer":
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as exc:
-            raise RuntimeError(
-                "Semantic chunking requires sentence-transformers. "
-                "Install the Gurubodh CLI package dependencies before running semantic chunking."
-            ) from exc
-
-        kwargs: dict[str, Any] = {
-            "cache_folder": str(self.config.resolved_cache_dir()),
-            "local_files_only": self.config.local_files_only,
-        }
-        if self.config.device:
-            kwargs["device"] = self.config.device
-        if self.config.model_revision:
-            kwargs["revision"] = self.config.model_revision
-        try:
-            return SentenceTransformer(self.config.model_name, **kwargs)
-        except OSError as exc:
-            if not self.config.local_files_only:
-                raise
-            revision = self.config.model_revision or "the requested revision"
-            raise ModelCacheConfigError(
-                f"Cached model {self.config.model_name} at revision {revision} is unavailable or incomplete in "
-                f"{self.config.resolved_cache_dir()}. Populate that exact pinned snapshot before running a "
-                "cached-only job."
-            ) from exc
 
     def _contextual_windows(self, sentences: list[str]) -> list[str]:
         radius = max(0, self.config.window_size // 2)
@@ -205,28 +167,6 @@ class SemanticChunker:
 
         return merged
 
-    def _with_dense_embeddings(self, chunks: list[Chunk]) -> list[Chunk]:
-        if not chunks:
-            return chunks
-        embeddings = self.model.encode(
-            [chunk.text for chunk in chunks],
-            batch_size=self.config.batch_size,
-            normalize_embeddings=self.config.normalize_embeddings,
-            show_progress_bar=False,
-        )
-        if len(embeddings) != len(chunks):
-            raise RuntimeError("Embedding model returned a different number of vectors than requested chunks.")
-        return [
-            replace(chunk, dense_embedding=self._embedding_to_list(embedding))
-            for chunk, embedding in zip(chunks, embeddings)
-        ]
-
-    @staticmethod
-    def _embedding_to_list(embedding: Any) -> list[float]:
-        if hasattr(embedding, "tolist"):
-            embedding = embedding.tolist()
-        return [float(value) for value in embedding]
-
     def _build_chunk(self, index: int, sentence_spans: list[SentenceSpan], source_text: str) -> Chunk:
         start_char = sentence_spans[0].start_char
         end_char = sentence_spans[-1].end_char
@@ -236,7 +176,7 @@ class SemanticChunker:
             text=text,
             sentence_count=len(sentence_spans),
             char_count=len(text),
-            estimated_embedding_token_count=self._count_embedding_tokens(text),
+            estimated_token_count=self._count_tokens(text),
             start_sentence=sentence_spans[0].source_index,
             end_sentence=sentence_spans[-1].source_index,
             start_char=start_char,
@@ -244,22 +184,13 @@ class SemanticChunker:
             chunk_text_sha256=text_sha256(text),
         )
 
-    def _count_embedding_tokens(self, text: str) -> int:
-        tokenizer = self._embedding_tokenizer()
+    def _count_tokens(self, text: str) -> int:
+        tokenizer = self.embedding_helper.tokenizer
         try:
             token_ids = tokenizer.encode(text, add_special_tokens=False)
         except TypeError:
             token_ids = tokenizer.encode(text)
         return len(token_ids)
-
-    def _embedding_tokenizer(self) -> Any:
-        tokenizer = getattr(self.model, "tokenizer", None)
-        if tokenizer is None:
-            raise RuntimeError(
-                "Semantic chunking requires the embedding model to expose a tokenizer "
-                "for estimated_embedding_token_count."
-            )
-        return tokenizer
 
     def _build_document(
         self,
@@ -273,14 +204,12 @@ class SemanticChunker:
             source_name=source_name,
             provider=self.config.provider,
             model_name=self.config.model_name,
-            embedding_mode=self.config.embedding_mode,
-            embedding_dimension=self.config.embedding_dimension,
             strategy_version=self.config.strategy_version,
             threshold_percentile=self.config.threshold_percentile,
             min_chars=self.config.min_chars,
             window_size=self.config.window_size,
             batch_size=self.config.batch_size,
-            normalize_embeddings=self.config.normalize_embeddings,
+            normalize_contextual_vectors=self.config.normalize_contextual_vectors,
             device=self.config.device,
             breakpoint_threshold=breakpoint_threshold,
             chunks=chunks,

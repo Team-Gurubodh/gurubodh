@@ -8,10 +8,9 @@ from pathlib import Path
 
 from gurubodh.config import load_generate_chunks_job
 from gurubodh.content_identity import build_content_identity
-from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
-from gurubodh.pipelines.generate_chunks import materialize_source_subject, run_generate_chunks_job
+from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
 from gurubodh.project import ProjectContext
 
 
@@ -19,150 +18,114 @@ def base_config(root_dir):
     return {
         "schema_version": "1.0.0",
         "pipeline": "generate-chunks",
-        "source": {
-            "backend": "local",
-            "root_dir": str(root_dir),
-            "subject_dir": "123_spand_rahasya",
-        },
-        "destination": {
-            "backend": "local",
-            "root_dir": str(root_dir),
-            "subject_dir": "123_spand_rahasya",
-        },
+        "source": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya"},
+        "destination": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya"},
         "naming": {
-            "category_code": "CAT001",
-            "subject_code": "SUB123",
-            "title_slug": "spand-rahasya",
-            "version": "01",
-            "subversion": "01",
+            "category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya",
+            "version": "01", "subversion": "01", "language": "hi-Deva",
         },
         "chunking": {
-            "provider": "semantic-chunking",
-            "model": "BAAI/bge-m3",
+            "provider": "semantic-chunking", "model": "BAAI/bge-m3",
             "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
-            "embedding_mode": "dense",
-            "embedding_dimension": 1024,
-            "threshold_percentile": 80.0,
-            "min_chars": 600,
-            "window_size": 3,
-            "batch_size": 16,
-            "normalize_embeddings": True,
-            "device": None,
-            "local_files_only": False,
+            "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16,
+            "normalize_contextual_vectors": True, "device": None, "local_files_only": False,
         },
     }
 
 
-def metadata_for(config, chapter_number, text):
+def artifact_reference(backend, root, config, filename):
+    relative = f"chapters/text_and_metadata/{filename}"
+    if backend == "local":
+        return {"backend": "local", "path": relative, "url": None}
+    return {"backend": "r2", "bucket": "gurubodh-library-dev", "key": f"cms_library/{config['source']['subject_dir']}/{relative}", "url": None}
+
+
+def metadata_for(config, chapter_number, text, backend="local"):
     text_name = chapter_output_filename(config, chapter_number, ".txt")
     metadata_name = chapter_output_filename(config, chapter_number, ".json")
-    subject_dir = config["source"]["subject_dir"]
-    relative_text = f"chapters/text_and_metadata/{text_name}"
-    relative_metadata = f"chapters/text_and_metadata/{metadata_name}"
     return {
         "document": {
-            "category_code": config["naming"]["category_code"],
-            "subject_code": config["naming"]["subject_code"],
-            "title_slug": config["naming"]["title_slug"],
-            "chapter_number": f"{chapter_number:03d}",
-            "version": "v01.01",
-            "language": "hi-Deva",
+            "category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"],
+            "title_slug": config["naming"]["title_slug"], "chapter_number": f"{chapter_number:03d}",
+            "version": "v01.01", "language": config["naming"]["language"],
         },
-        "storage": {
-            "artifacts": {
-                "text": {
-                    "backend": "local",
-                    "path": relative_text,
-                    "url": None,
-                },
-                "metadata": {
-                    "backend": "local",
-                    "path": relative_metadata,
-                    "url": None,
-                },
-            }
-        },
-        "integrity": {
-            "artifacts": {
-                "text": {
-                    "algorithm": "sha256",
-                    "encoding": "UTF-8",
-                    "line_endings": "LF",
-                    "scope": "artifact-bytes",
-                    "value": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                }
-            }
-        },
+        "storage": {"artifacts": {
+            "text": artifact_reference(backend, None, config, text_name),
+            "metadata": artifact_reference(backend, None, config, metadata_name),
+        }},
+        "integrity": {"artifacts": {"text": {
+            "algorithm": "sha256", "encoding": "UTF-8", "line_endings": "LF",
+            "scope": "artifact-bytes", "value": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        }}},
         "content_identity": build_content_identity(
-            config["naming"]["category_code"],
-            config["naming"]["subject_code"],
-            "hi-Deva",
-            text,
+            config["naming"]["category_code"], config["naming"]["subject_code"], config["naming"]["language"], text
         ),
-        "files": {
-            "text_filename": text_name,
-            "metadata_filename": metadata_name,
-        },
-        "subject_dir": subject_dir,
+        "files": {"text_filename": text_name, "metadata_filename": metadata_name},
     }
 
 
 def write_prepared_chapter(root_dir, config, chapter_number=1, text="पहला वाक्य।\n"):
-    subject_dir = Path(root_dir) / config["source"]["subject_dir"]
-    text_dir = subject_dir / "chapters" / "text_and_metadata"
-    text_dir.mkdir(parents=True, exist_ok=True)
-    text_name = chapter_output_filename(config, chapter_number, ".txt")
-    metadata_name = chapter_output_filename(config, chapter_number, ".json")
-    (text_dir / text_name).write_text(text, encoding="utf-8")
-    (text_dir / metadata_name).write_text(
-        json.dumps(metadata_for(config, chapter_number, text), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    subject = Path(root_dir) / config["source"]["subject_dir"]
+    directory = subject / "chapters" / "text_and_metadata"
+    directory.mkdir(parents=True, exist_ok=True)
+    metadata = metadata_for(config, chapter_number, text)
+    (directory / metadata["files"]["text_filename"]).write_text(text, encoding="utf-8")
+    (directory / metadata["files"]["metadata_filename"]).write_text(json.dumps(metadata, ensure_ascii=False) + "\n", encoding="utf-8")
+    return metadata
+
+
+def write_candidate_manifest(root_dir, config, chapters):
+    subject = Path(root_dir) / config["source"]["subject_dir"]
+    payload = {
+        "schema_version": 1,
+        "identity_contract_version": 1,
+        "subject": {
+            "category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"],
+            "language": config["naming"]["language"],
+        },
+        "chapters": [
+            {
+                "generated_chapter_number": metadata["document"]["chapter_number"],
+                "content_key": metadata["content_identity"]["content_key"],
+                "normalized_content_sha256": metadata["content_identity"]["normalized_content_sha256"],
+                "metadata_artifact": metadata["storage"]["artifacts"]["metadata"],
+                "text_artifact": metadata["storage"]["artifacts"]["text"],
+            }
+            for metadata in chapters
+        ],
+    }
+    path = subject / "chapters" / "chapter_content_manifest.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path, payload
 
 
 class FakeSegmenter:
     provider_metadata = {}
 
+    def __init__(self):
+        self.calls = 0
+
     def segment(self, text, source_name=None):
+        self.calls += 1
         chunk_text = text.strip()
         chunk = Chunk(
-            index=1,
-            text=chunk_text,
-            sentence_count=1,
-            char_count=len(chunk_text),
-            estimated_embedding_token_count=2,
-            start_sentence=0,
-            end_sentence=0,
-            start_char=0,
-            end_char=len(chunk_text),
-            chunk_text_sha256=text_sha256(chunk_text),
-            dense_embedding=[0.25] * 1024,
+            index=1, text=chunk_text, sentence_count=1, char_count=len(chunk_text),
+            estimated_token_count=2, start_sentence=0, end_sentence=0, start_char=0,
+            end_char=len(chunk_text), chunk_text_sha256=text_sha256(chunk_text),
         )
         return ChunkedDocument(
-            source_name=source_name,
-            provider="semantic-chunking",
-            model_name="BAAI/bge-m3",
-            embedding_mode="dense",
-            embedding_dimension=1024,
-            strategy_version="semantic-window-v1",
-            threshold_percentile=80.0,
-            min_chars=650,
-            window_size=3,
-            batch_size=16,
-            normalize_embeddings=True,
-            device=None,
-            breakpoint_threshold=None,
-            chunks=[chunk],
-            source_text_sha256=whitespace_insensitive_sha256(text),
+            source_name=source_name, provider="semantic-chunking", model_name="BAAI/bge-m3",
+            strategy_version="semantic-window-v1", threshold_percentile=80.0, min_chars=600,
+            window_size=3, batch_size=16, normalize_contextual_vectors=True, device=None,
+            breakpoint_threshold=None, chunks=[chunk], source_text_sha256=whitespace_insensitive_sha256(text),
             concatenated_chunks_sha256=whitespace_insensitive_sha256(chunk_text),
         )
 
 
 class FakeR2Client:
-    def __init__(self, objects=None):
-        self.objects = dict(objects or {})
-        self.uploads = []
-        self.deleted_prefixes = []
+    def __init__(self, objects):
+        self.objects = dict(objects)
+        self.downloads, self.uploads, self.deleted_prefixes = [], [], []
 
     def list_keys(self, bucket, prefix):
         return sorted(key for key in self.objects if key.startswith(prefix))
@@ -174,15 +137,16 @@ class FakeR2Client:
         return key in self.objects
 
     def download_file(self, bucket, key, path):
+        self.downloads.append(key)
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         Path(path).write_text(self.objects[key], encoding="utf-8")
 
     def upload_file(self, path, bucket, key):
-        self.uploads.append((Path(path).name, bucket, key))
+        self.uploads.append(key)
         self.objects[key] = Path(path).read_text(encoding="utf-8")
 
     def delete_prefix(self, bucket, prefix):
-        self.deleted_prefixes.append((bucket, prefix))
+        self.deleted_prefixes.append(prefix)
         deleted = [key for key in self.objects if key.startswith(prefix)]
         for key in deleted:
             del self.objects[key]
@@ -190,230 +154,144 @@ class FakeR2Client:
 
 
 class GenerateChunksPipelineTests(unittest.TestCase):
-    def test_r2_source_download_progress_is_compact_and_chapter_oriented(self):
-        config = base_config(Path(self.temp_dir.name))
-        config["source"] = {
-            "backend": "r2",
-            "bucket": "gurubodh-library-dev",
-            "prefix": "cms_library",
-            "subject_dir": "123_spand_rahasya",
-        }
-        base_key = "cms_library/123_spand_rahasya/chapters/text_and_metadata"
-        client = FakeR2Client(
-            {
-                f"{base_key}/chapter-001.json": "{}",
-                f"{base_key}/chapter-001.txt": "one",
-                f"{base_key}/chapter-002.json": "{}",
-                f"{base_key}/chapter-002.txt": "two",
-            }
-        )
-        progress = []
-        subject_dir, temp_dir = materialize_source_subject(config, r2_client=client, progress=progress.append)
-        self.addCleanup(temp_dir.cleanup)
-
-        self.assertTrue((subject_dir / "chapters/text_and_metadata/chapter-001.txt").is_file())
-        self.assertEqual(progress[0], "Reading prepared chapter artifacts from:")
-        self.assertIn("r2://gurubodh-library-dev/cms_library/123_spand_rahasya/chapters/text_and_metadata/", progress[1])
-        self.assertEqual(progress[2], "[01/02] chapter-001 (metadata, text)")
-        self.assertEqual(progress[3], "[02/02] chapter-002 (metadata, text)")
-
-    def write_config(self, config):
-        path = Path(self.temp_dir.name) / "generate-chunks.json"
-        path.write_text(json.dumps(config), encoding="utf-8")
-        return load_generate_chunks_job(path), path
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.context = ProjectContext(root=Path(self.temp_dir.name), legacy_converter=Path(self.temp_dir.name) / "converter.js")
 
-    def test_local_job_writes_chunk_json_summary_and_audit_without_metadata_mutation(self):
-        config = base_config(Path(self.temp_dir.name))
-        write_prepared_chapter(self.temp_dir.name, config)
-        metadata_path = (
-            Path(self.temp_dir.name)
-            / "123_spand_rahasya"
-            / "chapters"
-            / "text_and_metadata"
-            / chapter_output_filename(config, 1, ".json")
-        )
-        before_metadata = metadata_path.read_text(encoding="utf-8")
-        loaded, config_path = self.write_config(config)
+    def load(self, config):
+        path = Path(self.temp_dir.name) / "generate-chunks.json"
+        path.write_text(json.dumps(config), encoding="utf-8")
+        return load_generate_chunks_job(path), path
 
-        progress_messages = []
+    def test_manifest_is_authoritative_and_v2_artifacts_have_no_vectors(self):
+        config = base_config(self.temp_dir.name)
+        listed = write_prepared_chapter(self.temp_dir.name, config, 1)
+        write_candidate_manifest(self.temp_dir.name, config, [listed])
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        extra = subject / "chapters" / "text_and_metadata" / "unlisted.txt"
+        extra.write_text("ignored", encoding="utf-8")
+        (extra.with_suffix(".json")).write_text("{}", encoding="utf-8")
+        loaded, config_path = self.load(config)
+        segmenter = FakeSegmenter()
+
         with redirect_stdout(StringIO()):
-            result = run_generate_chunks_job(
-                self.context,
-                loaded,
-                config_path=config_path,
-                segmenter=FakeSegmenter(),
-                progress=progress_messages.append,
-            )
+            result = run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
 
-        output_dir = Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "semantic_chunks_and_embeddings"
-        chunk_path = output_dir / "CAT001_SUB123_spand-rahasya_001_v01.01.chunks.json"
-        manifest_path = output_dir / "semantic_chunks_manifest.json"
+        output_dir = subject / "chapters" / "semantic_chunks"
+        chunk_path = next(output_dir.glob("*.chunks.json"))
         payload = json.loads(chunk_path.read_text(encoding="utf-8"))
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        reports = list((Path(self.temp_dir.name) / "123_spand_rahasya" / "run_reports" / "generate-chunks").glob("*generate-chunks*.json"))
+        semantic_manifest = json.loads((output_dir / "semantic_chunks_manifest.json").read_text(encoding="utf-8"))
+        audit_path = next((subject / "run_reports" / "generate-chunks").glob("*.json"))
+        audit = json.loads(audit_path.read_text(encoding="utf-8"))
+        source_manifest_bytes = (subject / "chapters" / "chapter_content_manifest.json").read_bytes()
+        rendered = json.dumps(payload, ensure_ascii=False)
 
-        self.assertEqual(result["processed_chapter_count"], 1)
-        self.assertTrue(chunk_path.exists())
-        self.assertTrue(manifest_path.exists())
-        self.assertEqual(payload["chunks"][0]["dense_embedding"], [0.25] * 1024)
-        self.assertEqual(payload["embedding"]["embedding_dimension"], 1024)
-        self.assertEqual(
-            payload["source_references"]["content_identity"]["content_key"],
-            manifest["chapters"][0]["content_key"],
-        )
-        self.assertEqual(manifest["counts"]["total_chunk_count"], 1)
-        self.assertEqual(payload["chunking"]["model_revision"], config["chunking"]["model_revision"])
-        self.assertEqual(manifest["provider"]["model_revision"], config["chunking"]["model_revision"])
-        self.assertEqual(manifest["embedding"]["model_revision"], config["chunking"]["model_revision"])
-        self.assertEqual(manifest["chapters"][0]["chunk_filename"], chunk_path.name)
-        self.assertEqual(len(reports), 1)
-        audit = json.loads(reports[0].read_text(encoding="utf-8"))
-        self.assertEqual(audit["job_identity"]["chunking_model"]["model_revision"], config["chunking"]["model_revision"])
-        self.assertIn("[manifest] wrote semantic_chunks_manifest.json", progress_messages)
-        self.assertEqual(metadata_path.read_text(encoding="utf-8"), before_metadata)
-        self.assertFalse(list(output_dir.glob("*.md")))
+        self.assertEqual(segmenter.calls, 1)
+        self.assertEqual(result["source_chapter_count"], 1)
+        self.assertNotIn("dense_embedding", rendered)
+        self.assertNotIn('"embedding"', rendered)
+        self.assertNotIn("embedding", json.dumps(semantic_manifest, ensure_ascii=False))
+        self.assertNotIn("embedding", json.dumps(audit, ensure_ascii=False))
+        self.assertEqual(payload["source_references"]["candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
+        self.assertEqual(semantic_manifest["source_candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
+        self.assertEqual(semantic_manifest["chapters"][0]["chunk_artifact_sha256"], hashlib.sha256(chunk_path.read_bytes()).hexdigest())
+        self.assertIn("chunking_config_key", semantic_manifest["chunking"])
+        self.assertEqual(payload["chunks"][0]["estimated_token_count"], 2)
 
-    def test_missing_content_identity_fails_before_segmenting(self):
-        config = base_config(Path(self.temp_dir.name))
-        write_prepared_chapter(self.temp_dir.name, config)
-        metadata_path = (
-            Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "text_and_metadata"
-            / chapter_output_filename(config, 1, ".json")
-        )
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        del metadata["content_identity"]
-        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
-        loaded, config_path = self.write_config(config)
+    def test_invalid_manifest_references_fail_before_segmenting(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        manifest_path, manifest = write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        manifest["chapters"][0]["text_artifact"]["path"] = "../escaped.txt"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        loaded, config_path = self.load(config)
+        segmenter = FakeSegmenter()
 
-        with self.assertRaisesRegex(SystemExit, "prep-subject --overwrite"):
-            run_generate_chunks_job(
-                self.context,
-                loaded,
-                config_path=config_path,
-                segmenter=FakeSegmenter(),
-                progress=lambda message: None,
-            )
+        with self.assertRaisesRegex(SystemExit, "must not escape"):
+            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
+        self.assertEqual(segmenter.calls, 0)
 
-    def test_local_overwrite_is_scoped_to_semantic_output_dir(self):
-        config = base_config(Path(self.temp_dir.name))
-        write_prepared_chapter(self.temp_dir.name, config)
-        subject_dir = Path(self.temp_dir.name) / "123_spand_rahasya"
-        output_dir = subject_dir / "chapters" / "semantic_chunks_and_embeddings"
-        output_dir.mkdir(parents=True)
-        (output_dir / "stale.chunks.json").write_text("{}", encoding="utf-8")
-        keep_path = subject_dir / "full_subject" / "keep.txt"
-        keep_path.parent.mkdir(parents=True, exist_ok=True)
-        keep_path.write_text("keep", encoding="utf-8")
-        loaded, config_path = self.write_config(config)
+    def test_manifest_identity_mismatch_fails_before_segmenting(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        manifest_path, manifest = write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        manifest["chapters"][0]["content_key"] = "00000000-0000-5000-8000-000000000000"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        loaded, config_path = self.load(config)
+        segmenter = FakeSegmenter()
 
-        output = StringIO()
-        with redirect_stdout(output):
-            run_generate_chunks_job(
-                self.context,
-                loaded,
-                overwrite=True,
-                config_path=config_path,
-                segmenter=FakeSegmenter(),
-                progress=lambda message: None,
-            )
+        with self.assertRaisesRegex(SystemExit, "content identity disagree"):
+            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
+        self.assertEqual(segmenter.calls, 0)
 
-        self.assertFalse((output_dir / "stale.chunks.json").exists())
-        self.assertTrue(keep_path.exists())
-
-    def test_chapter_filter_skips_unlisted_chapters(self):
-        config = base_config(Path(self.temp_dir.name))
+    def test_chapter_filter_uses_manifest_and_reports_absent_number(self):
+        config = base_config(self.temp_dir.name)
+        first = write_prepared_chapter(self.temp_dir.name, config, 1)
+        second = write_prepared_chapter(self.temp_dir.name, config, 2, "दूसरा वाक्य।\n")
+        write_candidate_manifest(self.temp_dir.name, config, [first, second])
         config["chapters"] = ["002"]
-        write_prepared_chapter(self.temp_dir.name, config, chapter_number=1, text="पहला।\n")
-        write_prepared_chapter(self.temp_dir.name, config, chapter_number=2, text="दूसरा।\n")
-        loaded, config_path = self.write_config(config)
-
+        loaded, config_path = self.load(config)
         with redirect_stdout(StringIO()):
-            result = run_generate_chunks_job(
-                self.context,
-                loaded,
-                config_path=config_path,
-                segmenter=FakeSegmenter(),
-                progress=lambda message: None,
-            )
-
-        output_dir = Path(self.temp_dir.name) / "123_spand_rahasya" / "chapters" / "semantic_chunks_and_embeddings"
+            result = run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
         self.assertEqual(result["processed_chapter_count"], 1)
         self.assertEqual(result["skipped_chapter_count"], 1)
-        self.assertFalse((output_dir / "CAT001_SUB123_spand-rahasya_001_v01.01.chunks.json").exists())
-        self.assertTrue((output_dir / "CAT001_SUB123_spand-rahasya_002_v01.01.chunks.json").exists())
+        self.assertEqual(len(list((Path(self.temp_dir.name) / config["source"]["subject_dir"] / "chapters" / "semantic_chunks").glob("*.chunks.json"))), 1)
 
-    def test_r2_job_reads_source_deletes_only_output_prefix_and_uploads_reports(self):
-        config = base_config(Path(self.temp_dir.name))
-        text = "पहला वाक्य।\n"
-        text_name = chapter_output_filename(config, 1, ".txt")
-        metadata_name = chapter_output_filename(config, 1, ".json")
-        r2_config = json.loads(json.dumps(config))
-        r2_config["source"] = {
-            "backend": "r2",
-            "bucket": "gurubodh-library-dev",
-            "prefix": "cms_library",
-            "subject_dir": "123_spand_rahasya",
-            "url_base": None,
-        }
-        r2_config["destination"] = json.loads(json.dumps(r2_config["source"]))
-        metadata = metadata_for(config, 1, text)
-        metadata["storage"]["artifacts"]["text"] = {
-            "backend": "r2",
-            "bucket": "gurubodh-library-dev",
-            "key": f"cms_library/123_spand_rahasya/chapters/text_and_metadata/{text_name}",
-            "url": None,
-        }
-        metadata["storage"]["artifacts"]["metadata"] = {
-            "backend": "r2",
-            "bucket": "gurubodh-library-dev",
-            "key": f"cms_library/123_spand_rahasya/chapters/text_and_metadata/{metadata_name}",
-            "url": None,
-        }
-        client = FakeR2Client(
-            {
-                f"cms_library/123_spand_rahasya/chapters/text_and_metadata/{text_name}": text,
-                f"cms_library/123_spand_rahasya/chapters/text_and_metadata/{metadata_name}": json.dumps(metadata, ensure_ascii=False),
-                "cms_library/123_spand_rahasya/chapters/semantic_chunks_and_embeddings/stale.chunks.json": "{}",
-                "cms_library/123_spand_rahasya/full_subject/keep.txt": "keep",
-            }
-        )
-        loaded, config_path = self.write_config(r2_config)
+        config["chapters"] = ["003"]
+        loaded, config_path = self.load(config)
+        with self.assertRaisesRegex(SystemExit, "absent from the candidate manifest"):
+            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
 
-        output = StringIO()
-        with redirect_stdout(output):
-            run_generate_chunks_job(
-                self.context,
-                loaded,
-                overwrite=True,
-                config_path=config_path,
-                segmenter=FakeSegmenter(),
-                r2_client=client,
-                progress=lambda message: None,
-            )
+    def test_legacy_output_requires_overwrite_and_is_removed(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        legacy = subject / "chapters" / "semantic_chunks_and_embeddings"
+        legacy.mkdir()
+        (legacy / "old.chunks.json").write_text("{}", encoding="utf-8")
+        loaded, config_path = self.load(config)
+        with self.assertRaisesRegex(SystemExit, "Legacy combined"):
+            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
+        with redirect_stdout(StringIO()):
+            run_generate_chunks_job(self.context, loaded, overwrite=True, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
+        self.assertFalse(legacy.exists())
 
-        progress = output.getvalue()
-        uploaded_keys = [key for _, _, key in client.uploads]
-        self.assertIn(
-            (
-                "gurubodh-library-dev",
-                "cms_library/123_spand_rahasya/chapters/semantic_chunks_and_embeddings/",
-            ),
-            client.deleted_prefixes,
-        )
-        self.assertIn("cms_library/123_spand_rahasya/full_subject/keep.txt", client.objects)
-        self.assertTrue(any(key.endswith(".chunks.json") for key in uploaded_keys))
-        self.assertTrue(any("/run_reports/generate-chunks/" in key and key.endswith(".json") for key in uploaded_keys))
-        self.assertTrue(any("/run_reports/generate-chunks/" in key and key.endswith(".md") for key in uploaded_keys))
-        self.assertIn("Publishing 4 chunk artifact(s) to:", progress)
-        self.assertIn("[1/3] semantic chunk artifacts: 1 chapters", progress)
-        self.assertIn("[2/3] semantic chunk manifest: semantic_chunks_manifest.json", progress)
-        self.assertIn("[3/3] generate-chunks audit:", progress)
-        self.assertEqual(progress.count("generate-chunks audit reports:"), 1)
+    def test_r2_materializes_only_selected_manifest_artifacts(self):
+        config = base_config(self.temp_dir.name)
+        config["source"] = {"backend": "r2", "bucket": "gurubodh-library-dev", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None}
+        config["destination"] = dict(config["source"])
+        text_one, text_two = "पहला।\n", "दूसरा।\n"
+        metadata_one = metadata_for(config, 1, text_one, "r2")
+        metadata_two = metadata_for(config, 2, text_two, "r2")
+        manifest = {
+            "schema_version": 1, "identity_contract_version": 1,
+            "subject": {"category_code": "CAT001", "subject_code": "SUB123", "language": "hi-Deva"},
+            "chapters": [
+                {"generated_chapter_number": metadata_one["document"]["chapter_number"], "content_key": metadata_one["content_identity"]["content_key"], "normalized_content_sha256": metadata_one["content_identity"]["normalized_content_sha256"], "metadata_artifact": metadata_one["storage"]["artifacts"]["metadata"], "text_artifact": metadata_one["storage"]["artifacts"]["text"]},
+                {"generated_chapter_number": metadata_two["document"]["chapter_number"], "content_key": metadata_two["content_identity"]["content_key"], "normalized_content_sha256": metadata_two["content_identity"]["normalized_content_sha256"], "metadata_artifact": metadata_two["storage"]["artifacts"]["metadata"], "text_artifact": metadata_two["storage"]["artifacts"]["text"]},
+            ],
+        }
+        prefix = "cms_library/123_spand_rahasya/chapters"
+        client = FakeR2Client({
+            f"{prefix}/chapter_content_manifest.json": json.dumps(manifest, ensure_ascii=False),
+            metadata_one["storage"]["artifacts"]["metadata"]["key"]: json.dumps(metadata_one, ensure_ascii=False),
+            metadata_one["storage"]["artifacts"]["text"]["key"]: text_one,
+            metadata_two["storage"]["artifacts"]["metadata"]["key"]: json.dumps(metadata_two, ensure_ascii=False),
+            metadata_two["storage"]["artifacts"]["text"]["key"]: text_two,
+            "cms_library/123_spand_rahasya/chapters/text_and_metadata/unlisted.txt": "ignored",
+        })
+        config["chapters"] = ["002"]
+        loaded, config_path = self.load(config)
+        with redirect_stdout(StringIO()):
+            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=FakeSegmenter(), r2_client=client, progress=lambda _: None)
+        self.assertEqual(client.downloads, [
+            f"{prefix}/chapter_content_manifest.json",
+            metadata_two["storage"]["artifacts"]["metadata"]["key"],
+            metadata_two["storage"]["artifacts"]["text"]["key"],
+        ])
+        self.assertTrue(any("/chapters/semantic_chunks/" in key for key in client.uploads))
 
 
 if __name__ == "__main__":

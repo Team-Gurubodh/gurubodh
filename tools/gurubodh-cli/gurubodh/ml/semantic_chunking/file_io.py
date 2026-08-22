@@ -106,7 +106,7 @@ def write_markdown(path: Path, document: ChunkedDocument) -> None:
         f"# Semantic chunks: {document.source_name or 'document'}",
         "",
         f"Total chunks: {document.chunk_count}",
-        f"Estimated embedding tokens: {document.estimated_embedding_token_count}",
+        f"Estimated tokens: {document.estimated_token_count}",
         "",
     ]
     for chunk in document.chunks:
@@ -116,7 +116,7 @@ def write_markdown(path: Path, document: ChunkedDocument) -> None:
                 "",
                 f"- Characters: {chunk.char_count}",
                 f"- Sentences: {chunk.sentence_count}",
-                f"- Estimated embedding tokens: {chunk.estimated_embedding_token_count}",
+                f"- Estimated tokens: {chunk.estimated_token_count}",
                 f"- Sentence range: {chunk.start_sentence}-{chunk.end_sentence}",
                 f"- Character span: {chunk.start_char}-{chunk.end_char}",
                 f"- Text checksum: {chunk.chunk_text_sha256}",
@@ -138,8 +138,6 @@ def write_summary(
     payload = {
         "provider": config.provider,
         "model": config.model_name,
-        "embedding_mode": config.embedding_mode,
-        "embedding_dimension": config.embedding_dimension,
         "strategy_version": config.strategy_version,
         "source_dir": str(source_dir),
         "output_dir": str(output_dir),
@@ -147,13 +145,13 @@ def write_summary(
         "threshold_percentile": config.threshold_percentile,
         "min_chars": config.min_chars,
         "batch_size": config.batch_size,
-        "normalize_embeddings": config.normalize_embeddings,
+        "normalize_contextual_vectors": config.normalize_contextual_vectors,
         "device": config.device,
         "files": [
             {
                 "source_file": document.source_name,
                 "chunk_count": document.chunk_count,
-                "estimated_embedding_token_count": document.estimated_embedding_token_count,
+                "estimated_token_count": document.estimated_token_count,
                 "breakpoint_threshold": document.breakpoint_threshold,
                 "source_text_sha256": document.source_text_sha256,
                 "concatenated_chunks_sha256": document.concatenated_chunks_sha256,
