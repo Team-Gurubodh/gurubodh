@@ -21,7 +21,8 @@ CANONICAL_ARTIFACT_DIRS = (
     Path("chapters") / "text_and_metadata",
 )
 CANONICAL_ARTIFACT_FILES = (Path("chapters") / "chapter_content_manifest.json",)
-SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
+SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks"
+LEGACY_SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
 PREP_REPORT_DIR = Path("run_reports") / "prep-subject"
 CHUNKS_REPORT_DIR = Path("run_reports") / "generate-chunks"
 
@@ -87,24 +88,29 @@ def local_owned_paths_exist(subject_dir, command):
 
 
 def invalidate_local_semantic_artifacts(subject_dir):
-    target = Path(subject_dir) / SEMANTIC_ARTIFACT_DIR
-    if not target.exists():
+    targets = [Path(subject_dir) / path for path in (SEMANTIC_ARTIFACT_DIR, LEGACY_SEMANTIC_ARTIFACT_DIR)]
+    if not any(target.exists() for target in targets):
         return {"invalidated": False, "deleted_paths": [], "reason": "no semantic artifacts existed"}
-    if target.is_dir():
-        deleted = [str(path.relative_to(subject_dir)) for path in target.rglob("*") if path.is_file()]
-        shutil.rmtree(target)
-    else:
-        deleted = [str(target.relative_to(subject_dir))]
-        target.unlink()
+    deleted = []
+    for target in targets:
+        if target.is_dir():
+            deleted.extend(str(path.relative_to(subject_dir)) for path in target.rglob("*") if path.is_file())
+            shutil.rmtree(target)
+        elif target.exists():
+            deleted.append(str(target.relative_to(subject_dir)))
+            target.unlink()
     return {"invalidated": True, "deleted_paths": deleted, "reason": "canonical content was overwritten"}
 
 
 def invalidate_r2_semantic_artifacts(config, r2_client=None):
     destination = config["destination"]
-    prefix = destination_object_key(config, SEMANTIC_ARTIFACT_DIR) + "/"
+    prefixes = [
+        destination_object_key(config, SEMANTIC_ARTIFACT_DIR) + "/",
+        destination_object_key(config, LEGACY_SEMANTIC_ARTIFACT_DIR) + "/",
+    ]
     client = r2_client or R2StorageClient.from_env()
-    deleted = client.delete_prefix(destination["bucket"], prefix)
-    return {"invalidated": bool(deleted), "deleted_keys": deleted, "prefix": prefix,
+    deleted = [key for prefix in prefixes for key in client.delete_prefix(destination["bucket"], prefix)]
+    return {"invalidated": bool(deleted), "deleted_keys": deleted, "prefixes": prefixes,
             "reason": "canonical content was overwritten" if deleted else "no semantic artifacts existed"}
 
 

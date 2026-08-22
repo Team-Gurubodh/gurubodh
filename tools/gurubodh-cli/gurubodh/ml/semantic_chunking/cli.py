@@ -25,8 +25,8 @@ def add_generate_chunks_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--min-chars", type=int, default=600)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument(
-        "--normalize-embeddings",
-        dest="normalize_embeddings",
+        "--normalize-contextual-vectors",
+        dest="normalize_contextual_vectors",
         action=argparse.BooleanOptionalAction,
         default=True,
     )
@@ -51,7 +51,7 @@ def build_config_from_args(args: argparse.Namespace) -> SemanticChunkConfig:
         min_chars=args.min_chars,
         window_size=args.window_size,
         batch_size=args.batch_size,
-        normalize_embeddings=args.normalize_embeddings,
+        normalize_contextual_vectors=args.normalize_contextual_vectors,
         device=args.device,
         local_files_only=args.local_files_only,
     )

@@ -1,8 +1,8 @@
 # Semantic Chunking
 
-Semantic chunking is an internal content capability for grouping
-Hindi/Indic chapter text into semantically coherent chunks with local embedding
-models.
+Semantic chunking is an internal content capability for grouping Hindi/Indic
+chapter text into semantically coherent chunks. It may use a local model only
+for temporary contextual similarity while finding boundaries.
 
 The module lives under:
 
@@ -20,7 +20,7 @@ alternative to API-backed paragraph segmentation. It may support two related
 future needs:
 
 - display paragraphing for long chapter text that currently has no paragraphs;
-- semantic chunks for later CMS ingestion, embeddings, and RAG workflows.
+- candidate semantic chunks for later CMS ingestion and RAG workflows.
 
 ## Runtime
 
@@ -45,13 +45,13 @@ export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
 
 The BGE-M3 model is not loaded at import time or when lightweight config/parser
 objects are constructed. It is loaded lazily only when semantic chunking needs
-embeddings, and one `SemanticChunker` instance reuses the loaded model across
-files in a run.
+contextual similarity or tokenizer access, and one `SemanticChunker` instance
+reuses the loaded model across files in a run.
 
 ## Python API
 
-Use one `SemanticChunker` instance across many documents so the embedding model
-is loaded only once:
+Use one `SemanticChunker` instance across many documents so the contextual
+similarity model is loaded only once:
 
 ```python
 from gurubodh.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
@@ -66,7 +66,7 @@ chunker = SemanticChunker(config)
 document = chunker.chunk_text(raw_text, source_name="chapter.txt")
 
 for chunk in document.chunks:
-    print(chunk.index, chunk.char_count, chunk.estimated_embedding_token_count, chunk.text)
+    print(chunk.index, chunk.char_count, chunk.estimated_token_count, chunk.text)
 ```
 
 ## Standalone Evaluation
@@ -97,16 +97,17 @@ final file/chunk totals.
 
 Current behavior returns chunk text, sentence ranges, exact zero-based
 end-exclusive character spans into the source text, provider/model metadata,
-per-chunk checksums, and `estimated_embedding_token_count` for each chunk. The
-token estimate is counted with the BGE-M3 tokenizer, without special tokens, and
-means roughly "how many BGE-M3 input tokens this chunk would use if embedded as
-one standalone input." It is not an API billing metric, and it is not exactly the
-token count used by the chunking algorithm, because breakpoint detection embeds
-overlapping contextual sentence windows. Before writing a chapter's outputs, the
-command removes Python-recognized Unicode whitespace with `str.isspace()`, hashes
+per-chunk checksums, and `estimated_token_count` for each chunk. The token
+estimate is counted with the BGE-M3 tokenizer, without special tokens. It is
+not an API billing metric, and it is not exactly the token count used by the
+chunking algorithm, because breakpoint detection encodes overlapping contextual
+sentence windows. No finalized chunk vector is retained. Before writing a
+chapter's outputs, the command removes Python-recognized Unicode whitespace
+with `str.isspace()`, hashes
 the source text, hashes the ordered chunks, and requires those checksums to
 match.
 
-The existing DOCX preparation pipelines do not call semantic chunking yet.
-Future Task 014 integration should use the `ParagraphSegmenter` boundary rather
-than directly constructing a model-specific `SentenceTransformer`.
+The config-driven `generate-chunks` command uses the `ParagraphSegmenter`
+boundary after validating its candidate manifest. Future embedding work should
+reuse the internal text-encoding helper rather than make generated candidate
+chunks own vectors.

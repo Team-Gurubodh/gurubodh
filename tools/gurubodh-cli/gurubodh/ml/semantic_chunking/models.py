@@ -18,13 +18,12 @@ class Chunk:
     text: str
     sentence_count: int
     char_count: int
-    estimated_embedding_token_count: int
+    estimated_token_count: int
     start_sentence: int
     end_sentence: int
     start_char: int
     end_char: int
     chunk_text_sha256: str
-    dense_embedding: list[float] | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -37,14 +36,12 @@ class ChunkedDocument:
     source_name: str | None
     provider: str
     model_name: str
-    embedding_mode: str
-    embedding_dimension: int
     strategy_version: str
     threshold_percentile: float
     min_chars: int
     window_size: int
     batch_size: int
-    normalize_embeddings: bool
+    normalize_contextual_vectors: bool
     device: str | None
     breakpoint_threshold: float | None
     chunks: list[Chunk]
@@ -59,16 +56,14 @@ class ChunkedDocument:
         return len(self.chunks)
 
     @property
-    def estimated_embedding_token_count(self) -> int:
-        return sum(chunk.estimated_embedding_token_count for chunk in self.chunks)
+    def estimated_token_count(self) -> int:
+        return sum(chunk.estimated_token_count for chunk in self.chunks)
 
     def to_dict(self) -> dict:
         return {
             "source_name": self.source_name,
             "provider": self.provider,
             "model": self.model_name,
-            "embedding_mode": self.embedding_mode,
-            "embedding_dimension": self.embedding_dimension,
             "strategy_version": self.strategy_version,
             "index_unit": self.index_unit,
             "span_semantics": self.span_semantics,
@@ -78,13 +73,13 @@ class ChunkedDocument:
                 "min_chars": self.min_chars,
                 "window_size": self.window_size,
                 "batch_size": self.batch_size,
-                "normalize_embeddings": self.normalize_embeddings,
+                "normalize_contextual_vectors": self.normalize_contextual_vectors,
                 "device": self.device,
             },
             "source_text_sha256": self.source_text_sha256,
             "concatenated_chunks_sha256": self.concatenated_chunks_sha256,
             "chunk_count": self.chunk_count,
-            "estimated_embedding_token_count": self.estimated_embedding_token_count,
+            "estimated_token_count": self.estimated_token_count,
             "token_counting": {
                 "tokenizer": self.model_name,
                 "unit": TOKEN_COUNT_UNIT,

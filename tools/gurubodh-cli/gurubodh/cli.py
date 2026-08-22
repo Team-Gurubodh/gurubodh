@@ -18,7 +18,7 @@ PLANNED_COMMANDS = {
 
 
 def add_common_options(parser):
-    parser.add_argument("--config", required=True, help="Path to a Gurubodh prep-subject job JSON file.")
+    parser.add_argument("--config", required=True, help="Path to a Gurubodh job JSON file.")
     parser.add_argument(
         "--overwrite",
         action="store_true",
@@ -58,8 +58,8 @@ def build_parser():
 
     generate_chunks_parser = subparsers.add_parser(
         "generate-chunks",
-        help="Generate semantic text chunks and vector embeddings from prepared chapter text files.",
-        description="Generate semantic chunk and dense embedding artifacts from a job config.",
+        help="Generate candidate-manifest-bound semantic chunks from prepared chapter text.",
+        description="Generate semantic chunk artifacts from an authoritative candidate manifest.",
     )
     add_common_options(generate_chunks_parser)
 

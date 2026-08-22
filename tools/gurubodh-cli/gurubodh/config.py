@@ -258,6 +258,7 @@ def load_generate_chunks_job(path):
     require_string(naming, "title_slug", "naming", r"[A-Za-z0-9][A-Za-z0-9-]*")
     require_string(naming, "version", "naming", r"[0-9]{2}")
     require_string(naming, "subversion", "naming", r"[0-9]{2}")
+    require_string(naming, "language", "naming")
 
     chapters = config.get("chapters")
     if chapters is not None:
@@ -277,13 +278,11 @@ def load_generate_chunks_job(path):
                 "chunking",
                 r"[0-9a-f]{40}",
             ),
-            embedding_mode=require_string(chunking, "embedding_mode", "chunking"),
-            embedding_dimension=require_integer(chunking, "embedding_dimension", "chunking"),
             threshold_percentile=require_number(chunking, "threshold_percentile", "chunking"),
             min_chars=require_integer(chunking, "min_chars", "chunking"),
             window_size=require_integer(chunking, "window_size", "chunking"),
             batch_size=require_integer(chunking, "batch_size", "chunking"),
-            normalize_embeddings=require_boolean(chunking, "normalize_embeddings", "chunking"),
+            normalize_contextual_vectors=require_boolean(chunking, "normalize_contextual_vectors", "chunking"),
             device=optional_string_or_null(chunking, "device", "chunking"),
             local_files_only=require_boolean(chunking, "local_files_only", "chunking"),
         )

@@ -11,8 +11,6 @@ MODEL_CACHE_ENV_VAR = "GURUBODH_MODEL_CACHE_DIR"
 DEFAULT_PROVIDER = "semantic-chunking"
 DEFAULT_MODEL_NAME = "BAAI/bge-m3"
 DEFAULT_STRATEGY_VERSION = "semantic-window-v1"
-DEFAULT_EMBEDDING_MODE = "dense"
-DEFAULT_EMBEDDING_DIMENSION = 1024
 
 
 class SemanticChunkConfigError(ValueError):
@@ -33,10 +31,8 @@ class SemanticChunkConfig:
     min_chars: int = 600
     window_size: int = 3
     batch_size: int = 16
-    normalize_embeddings: bool = True
+    normalize_contextual_vectors: bool = True
     device: str | None = None
-    embedding_mode: str = DEFAULT_EMBEDDING_MODE
-    embedding_dimension: int = DEFAULT_EMBEDDING_DIMENSION
     strategy_version: str = DEFAULT_STRATEGY_VERSION
     model_revision: str | None = None
     cache_dir: Path | str | None = None
@@ -67,10 +63,8 @@ class SemanticChunkConfig:
             "provider": self.provider,
             "model": self.model_name,
             "model_revision": self.model_revision,
-            "embedding_mode": self.embedding_mode,
-            "embedding_dimension": self.embedding_dimension,
             "strategy_version": self.strategy_version,
-            "normalize_embeddings": self.normalize_embeddings,
+            "normalize_contextual_vectors": self.normalize_contextual_vectors,
             "batch_size": self.batch_size,
             "device": self.device,
         }
@@ -82,7 +76,7 @@ class SemanticChunkConfig:
             "min_chars": self.min_chars,
             "window_size": self.window_size,
             "batch_size": self.batch_size,
-            "normalize_embeddings": self.normalize_embeddings,
+            "normalize_contextual_vectors": self.normalize_contextual_vectors,
             "device": self.device,
         }
 
@@ -99,14 +93,10 @@ class SemanticChunkConfig:
             raise SemanticChunkConfigError("window_size must be one or greater.")
         if self.batch_size < 1:
             raise SemanticChunkConfigError("batch_size must be one or greater.")
-        if not isinstance(self.normalize_embeddings, bool):
-            raise SemanticChunkConfigError("normalize_embeddings must be true or false.")
+        if not isinstance(self.normalize_contextual_vectors, bool):
+            raise SemanticChunkConfigError("normalize_contextual_vectors must be true or false.")
         if self.device not in {None, "cpu", "mps", "cuda"}:
             raise SemanticChunkConfigError("device must be one of: cpu, mps, cuda.")
-        if self.embedding_mode != DEFAULT_EMBEDDING_MODE:
-            raise SemanticChunkConfigError("Only dense embedding mode is supported.")
-        if self.embedding_dimension != DEFAULT_EMBEDDING_DIMENSION:
-            raise SemanticChunkConfigError("BGE-M3 dense embedding_dimension must be 1024.")
         if self.strategy_version != DEFAULT_STRATEGY_VERSION:
             raise SemanticChunkConfigError(
                 f"Unsupported semantic chunking strategy_version: {self.strategy_version}"

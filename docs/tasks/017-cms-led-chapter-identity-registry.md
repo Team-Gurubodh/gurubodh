@@ -56,13 +56,13 @@ established by [Task-015](015-chapter-versioning-and-RAG-vrchitecture.md):
   but it has no `chapter_key`, snapshot ID, lineage, retirement record, or
   history ([prepared-content interface](../interfaces/prepared-content-artifacts.md)).
 - `generate-chunks` propagates source `content_key` but does not know a stable
-  logical `chapter_key` or a preparation snapshot. It currently discovers
-  prepared chapter files from the text-and-metadata directory.
+  logical `chapter_key` or a preparation snapshot. It consumes the candidate
+  manifest as its authoritative selected set and emits candidate chunks bound
+  to that exact manifest.
 - [GitHub Issue #210](https://github.com/Team-Gurubodh/gurubodh/issues/210)
-  scopes a planned, breaking semantic-chunk artifact v2: it will make the
-  candidate chapter manifest authoritative for `generate-chunks`, and make
-  that command emit candidate chunks only. It does not yet change the current
-  implementation.
+  implements the breaking semantic-chunk artifact v2: the candidate chapter
+  manifest is authoritative for `generate-chunks`, and the command emits
+  candidate chunks only.
 - The Strapi application has no Chapter, chapter-revision, content-snapshot,
   retirement, or ingestion-job content type. Content ingestion remains future
   work ([architecture](../architecture.md)).

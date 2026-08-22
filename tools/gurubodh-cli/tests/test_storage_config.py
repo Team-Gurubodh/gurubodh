@@ -14,6 +14,7 @@ from gurubodh.storage import (
     R2StorageClient,
     ensure_local_destination,
     ensure_r2_destination_available,
+    invalidate_local_semantic_artifacts,
     materialize_source,
     publish_r2_destination,
 )
@@ -120,6 +121,23 @@ class StorageConfigTests(unittest.TestCase):
             self.assertTrue(subject_dir.is_dir())
             self.assertTrue(canonical_file.exists())
             self.assertTrue(semantic_file.exists())
+
+    def test_prep_overwrite_invalidation_removes_v2_and_legacy_semantic_outputs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "129_spand_rahasya"
+            v2_file = subject_dir / "chapters" / "semantic_chunks" / "current.chunks.json"
+            legacy_file = subject_dir / "chapters" / "semantic_chunks_and_embeddings" / "legacy.chunks.json"
+            v2_file.parent.mkdir(parents=True)
+            legacy_file.parent.mkdir(parents=True)
+            v2_file.write_text("{}", encoding="utf-8")
+            legacy_file.write_text("{}", encoding="utf-8")
+
+            result = invalidate_local_semantic_artifacts(subject_dir)
+
+            self.assertTrue(result["invalidated"])
+            self.assertFalse(v2_file.parent.exists())
+            self.assertFalse(legacy_file.parent.exists())
+            self.assertEqual(len(result["deleted_paths"]), 2)
 
     def test_r2_source_and_destination_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -452,6 +470,7 @@ class StorageConfigTests(unittest.TestCase):
                     "5617a9f61b028005a4858fdac845db406aefb181",
                 )
                 self.assertTrue(config["_semantic_chunk_config"].local_files_only)
+                self.assertEqual(config["naming"]["language"], "hi-IN")
                 self.assertGreaterEqual(config["_semantic_chunk_config"].threshold_percentile, 0.0)
                 self.assertLessEqual(config["_semantic_chunk_config"].threshold_percentile, 100.0)
                 self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)
@@ -462,8 +481,8 @@ class StorageConfigTests(unittest.TestCase):
             "pipeline": "generate-chunks",
             "source": {"backend": "r2", "bucket": "source", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None},
             "destination": {"backend": "r2", "bucket": "destination", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None},
-            "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
-            "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "embedding_mode": "dense", "embedding_dimension": 1024, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_embeddings": True, "device": None, "local_files_only": False},
+            "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01", "language": "hi-Deva"},
+            "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_contextual_vectors": True, "device": None, "local_files_only": False},
         }
 
         with self.assertRaisesRegex(SystemExit, "chunking.model_revision must be a non-empty string"):

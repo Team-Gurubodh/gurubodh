@@ -113,6 +113,25 @@ history or create a chapter registry. Existing prepared trees must be fully
 regenerated with `gurubodh prep-subject --overwrite` before `generate-chunks`;
 the chunk command refuses metadata without valid content identity.
 
+## Candidate Semantic Chunks
+
+`generate-chunks` consumes the candidate manifest as its only
+chapter-selection authority. It validates selected manifest references against
+chapter metadata and text before model initialization, then writes schema-v2
+artifacts under `chapters/semantic_chunks/`.
+
+Every chunk artifact and `semantic_chunks_manifest.json` records the SHA-256
+of the exact UTF-8 candidate manifest bytes used for the run. Chunk artifacts
+contain ordered text, spans, checksums, token estimates, and chunking
+provenance only. Temporary contextual vectors may be used to determine
+boundaries, but retrieval vectors are not preparation artifacts and are not
+stored in local artifact trees or R2.
+
+`chapters/semantic_chunks_and_embeddings/` is a legacy combined-output path.
+It is unsupported for new ingestion. `generate-chunks` fails when it exists
+unless `--overwrite` is supplied, which removes that legacy command-owned
+output before producing v2 chunks.
+
 ## Overwrite Behavior
 
 The preparation tool does not archive existing output. If output already exists,
