@@ -20,8 +20,13 @@ CANONICAL_ARTIFACT_DIRS = (
     Path("chapters") / "msword",
     Path("chapters") / "text_and_metadata",
 )
+UNMODIFIED_SOURCE_TEXT_ARTIFACT_DIR = Path("chapters") / "unmodified_source_text"
 PROOFREADING_ARTIFACT_DIR = Path("chapters") / "proofreading"
-PREP_ARTIFACT_DIRS = (*CANONICAL_ARTIFACT_DIRS, PROOFREADING_ARTIFACT_DIR)
+PREP_ARTIFACT_DIRS = (
+    *CANONICAL_ARTIFACT_DIRS,
+    UNMODIFIED_SOURCE_TEXT_ARTIFACT_DIR,
+    PROOFREADING_ARTIFACT_DIR,
+)
 CANONICAL_ARTIFACT_FILES = (Path("chapters") / "chapter_content_manifest.json",)
 SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks"
 LEGACY_SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
@@ -374,15 +379,37 @@ def iter_subject_files(subject_dir):
 
 def prep_upload_groups(uploads, subject_dir):
     """Return prep artifacts in operator-facing publication order."""
-    groups = {"full_subject": [], "chapters": {}, "manifest": [], "reports": [], "other": []}
+    groups = {
+        "full_subject": [],
+        "chapters": {},
+        "manifest": [],
+        "proofreading_manifest": [],
+        "reports": [],
+        "other": [],
+    }
+
+    def chapter_stem(relative_path):
+        filename = relative_path.name
+        if relative_path.parts[:2] in {("chapters", "msword"), ("chapters", "text_and_metadata")}:
+            return Path(filename).stem
+        if relative_path.parts[:2] == ("chapters", "unmodified_source_text") and filename.endswith("_unmodified_source.txt"):
+            return filename.removesuffix("_unmodified_source.txt")
+        if relative_path.parts[:2] == ("chapters", "proofreading") and filename.endswith(".proofread.diff.txt"):
+            return filename.removesuffix(".proofread.diff.txt")
+        if relative_path.parts[:2] == ("chapters", "proofreading") and filename.endswith(".proofread.json"):
+            return filename.removesuffix(".proofread.json")
+        return None
+
     for upload in uploads:
         relative_path = upload[0].relative_to(subject_dir)
         if relative_path.parts[:1] == ("full_subject",):
             groups["full_subject"].append(upload)
-        elif relative_path.parts[:2] in {("chapters", "msword"), ("chapters", "text_and_metadata")}:
-            groups["chapters"].setdefault(upload[0].stem, []).append(upload)
+        elif stem := chapter_stem(relative_path):
+            groups["chapters"].setdefault(stem, []).append(upload)
         elif relative_path == Path("chapters") / "chapter_content_manifest.json":
             groups["manifest"].append(upload)
+        elif relative_path == PROOFREADING_ARTIFACT_DIR / "proofreading_manifest.json":
+            groups["proofreading_manifest"].append(upload)
         elif relative_path.parts[:2] == ("run_reports", "prep-subject"):
             groups["reports"].append(upload)
         else:
@@ -392,14 +419,29 @@ def prep_upload_groups(uploads, subject_dir):
     if groups["full_subject"]:
         ordered.append(("full_subject", sorted(groups["full_subject"])))
     if groups["chapters"]:
-        suffix_order = {".docx": 0, ".txt": 1, ".json": 2}
+        def chapter_file_order(upload):
+            path, _ = upload
+            if "msword" in path.parts:
+                return 0
+            if "text_and_metadata" in path.parts:
+                return 1 if path.suffix == ".txt" else 2
+            if "unmodified_source_text" in path.parts:
+                return 3
+            if path.name.endswith(".proofread.diff.txt"):
+                return 4
+            if path.name.endswith(".proofread.json"):
+                return 5
+            return 99
+
         chapters = [
-            (stem, sorted(files, key=lambda item: suffix_order.get(item[0].suffix, 99)))
+            (stem, sorted(files, key=chapter_file_order))
             for stem, files in sorted(groups["chapters"].items())
         ]
         ordered.append(("chapters", chapters))
     if groups["manifest"]:
         ordered.append(("manifest", sorted(groups["manifest"])))
+    if groups["proofreading_manifest"]:
+        ordered.append(("proofreading_manifest", sorted(groups["proofreading_manifest"])))
     if groups["reports"]:
         ordered.append(("reports", sorted(groups["reports"])))
     if groups["other"]:
@@ -408,11 +450,26 @@ def prep_upload_groups(uploads, subject_dir):
 
 
 def artifact_types(files):
-    names = {".docx": "DOCX", ".txt": "text", ".json": "metadata"}
-    suffixes = {path.suffix for path, _ in files}
-    ordered = [suffix for suffix in (".docx", ".txt", ".json") if suffix in suffixes]
-    ordered.extend(sorted(suffixes - set(ordered)))
-    return ", ".join(names.get(suffix, suffix.lstrip(".")) for suffix in ordered)
+    labels = []
+    for path, _ in files:
+        if "unmodified_source_text" in path.parts:
+            label = "unmodified source"
+        elif "proofreading" in path.parts and path.name.endswith(".proofread.diff.txt"):
+            label = "diff"
+        elif "proofreading" in path.parts and path.name.endswith(".proofread.json"):
+            label = "proofreading details"
+        elif "full_subject" in path.parts:
+            label = {".docx": "DOCX", ".txt": "text", ".json": "metadata"}.get(
+                path.suffix,
+                path.suffix.lstrip("."),
+            )
+        else:
+            label = {".docx": "DOCX", ".txt": "canonical text", ".json": "canonical metadata"}.get(
+                path.suffix,
+                path.suffix.lstrip("."),
+            )
+        labels.append(label)
+    return ", ".join(labels)
 
 
 def upload_r2_file(client, destination, path, key):
@@ -488,6 +545,8 @@ def publish_r2_destination(config, subject_dir, overwrite, r2_client=None, befor
                     print(f"[{index}/{len(groups)}] full subject: {items[0][0].stem} ({artifact_types(items)})")
                 elif kind == "manifest":
                     print(f"[{index}/{len(groups)}] content manifest: chapters/chapter_content_manifest.json")
+                elif kind == "proofreading_manifest":
+                    print(f"[{index}/{len(groups)}] proofreading manifest: chapters/proofreading/proofreading_manifest.json")
                 elif kind == "reports":
                     print(f"[{index}/{len(groups)}] prep-subject audit: {', '.join(path.name for path, _ in items)}")
                 else:

@@ -21,7 +21,7 @@ from gurubodh.storage import (
 
 
 BASE_CONFIG = {
-    "schema_version": "1.2.0",
+    "schema_version": "1.3.0",
     "pipeline": "unicode-docx-ingest",
     "source": {
         "root_dir": "/tmp/source",
@@ -43,6 +43,7 @@ BASE_CONFIG = {
     "chapter_split": {
         "enabled": False,
     },
+    "proofreading": {},
 }
 
 
@@ -95,6 +96,22 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
         self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya")
+
+    def test_prep_subject_requires_strict_proofreading_configuration(self):
+        missing = json.loads(json.dumps(BASE_CONFIG))
+        missing.pop("proofreading")
+        with self.assertRaisesRegex(SystemExit, "proofreading is required"):
+            load_prep_subject_job(self.write_config(missing))
+
+        disabled = json.loads(json.dumps(BASE_CONFIG))
+        disabled["proofreading"] = {"enabled": False}
+        with self.assertRaisesRegex(SystemExit, "proofreading.enabled must be true"):
+            load_prep_subject_job(self.write_config(disabled))
+
+        permissive = json.loads(json.dumps(BASE_CONFIG))
+        permissive["proofreading"] = {"continue_on_error": True}
+        with self.assertRaisesRegex(SystemExit, "continue_on_error must be false"):
+            load_prep_subject_job(self.write_config(permissive))
 
     def test_local_destination_ignores_unowned_files_without_overwrite(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -450,7 +467,11 @@ class StorageConfigTests(unittest.TestCase):
     def test_sample_jobs_declare_summary_chapter_markers(self):
         jobs_dir = Path(__file__).parents[1] / "jobs" / "subjects"
 
-        for job_path in jobs_dir.glob("*/prep-subject*.json"):
+        for job_path in sorted(
+            path
+            for pattern in ("prep-subject.local.json", "prep-subject.r2-output.json", "prep-subject.r2.json")
+            for path in jobs_dir.glob(f"*/{pattern}")
+        ):
             with self.subTest(job=str(job_path.relative_to(jobs_dir))):
                 config = load_prep_subject_job(job_path)
 
@@ -735,12 +756,21 @@ class StorageConfigTests(unittest.TestCase):
             subject_dir = Path(temp_dir) / "129_spand_rahasya"
             for chapter in ("001", "002"):
                 stem = f"CAT020_SUB129_spand-rahasya_{chapter}_v01.01"
-                for directory, suffix in (("chapters/msword", ".docx"), ("chapters/text_and_metadata", ".txt"), ("chapters/text_and_metadata", ".json")):
+                for directory, suffix in (
+                    ("chapters/msword", ".docx"),
+                    ("chapters/text_and_metadata", ".txt"),
+                    ("chapters/text_and_metadata", ".json"),
+                    ("chapters/unmodified_source_text", "_unmodified_source.txt"),
+                    ("chapters/proofreading", ".proofread.diff.txt"),
+                    ("chapters/proofreading", ".proofread.json"),
+                ):
                     path = subject_dir / directory / f"{stem}{suffix}"
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text("artifact", encoding="utf-8")
             manifest = subject_dir / "chapters" / "chapter_content_manifest.json"
             manifest.write_text("{}", encoding="utf-8")
+            proofreading_manifest = subject_dir / "chapters" / "proofreading" / "proofreading_manifest.json"
+            proofreading_manifest.write_text("{}", encoding="utf-8")
             client = FakeR2Client()
 
             output = StringIO()
@@ -748,15 +778,19 @@ class StorageConfigTests(unittest.TestCase):
                 publish_r2_destination(config, subject_dir, overwrite=False, r2_client=client)
 
             progress = output.getvalue()
-            self.assertIn("[1/2] chapter artifacts: 2 chapters / 6 files", progress)
-            self.assertIn("[01/02] CAT020_SUB129_spand-rahasya_001_v01.01 (DOCX, text, metadata)", progress)
-            self.assertIn("[02/02] CAT020_SUB129_spand-rahasya_002_v01.01 (DOCX, text, metadata)", progress)
-            self.assertIn("[2/2] content manifest: chapters/chapter_content_manifest.json", progress)
+            self.assertIn("[1/3] chapter artifacts: 2 chapters / 12 files", progress)
+            self.assertIn("[01/02] CAT020_SUB129_spand-rahasya_001_v01.01 (DOCX, canonical text, canonical metadata, unmodified source, diff, proofreading details)", progress)
+            self.assertIn("[02/02] CAT020_SUB129_spand-rahasya_002_v01.01 (DOCX, canonical text, canonical metadata, unmodified source, diff, proofreading details)", progress)
+            self.assertIn("[2/3] content manifest: chapters/chapter_content_manifest.json", progress)
+            self.assertIn("[3/3] proofreading manifest: chapters/proofreading/proofreading_manifest.json", progress)
             uploaded_names = [name for name, _, _ in client.uploads]
-            self.assertEqual(uploaded_names[:3], [
+            self.assertEqual(uploaded_names[:6], [
                 "CAT020_SUB129_spand-rahasya_001_v01.01.docx",
                 "CAT020_SUB129_spand-rahasya_001_v01.01.txt",
                 "CAT020_SUB129_spand-rahasya_001_v01.01.json",
+                "CAT020_SUB129_spand-rahasya_001_v01.01_unmodified_source.txt",
+                "CAT020_SUB129_spand-rahasya_001_v01.01.proofread.diff.txt",
+                "CAT020_SUB129_spand-rahasya_001_v01.01.proofread.json",
             ])
 
 

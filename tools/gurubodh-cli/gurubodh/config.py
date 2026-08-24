@@ -183,18 +183,18 @@ def validate_pipeline_matches_source(config, expected_pipeline=None):
 
 
 def proofreading_config(config):
-    value = config.get("proofreading", {})
-    if value is None:
-        value = {}
+    value = config.get("proofreading")
     if not isinstance(value, dict):
-        raise SystemExit("Config error: proofreading must be an object")
-    allowed = set(ProofreadingSettings.__dataclass_fields__)
+        raise SystemExit("Config error: proofreading is required and must be an object")
+    allowed = set(ProofreadingSettings.__dataclass_fields__) | {"enabled", "continue_on_error"}
     unknown = sorted(set(value) - allowed)
     if unknown:
         raise SystemExit(f"Config error: unsupported proofreading option(s): {', '.join(unknown)}")
+    if "enabled" in value and value["enabled"] is not True:
+        raise SystemExit("Config error: proofreading.enabled must be true; proofreading is mandatory")
+    if "continue_on_error" in value and value["continue_on_error"] is not False:
+        raise SystemExit("Config error: proofreading.continue_on_error must be false; proofread failures are strict")
     settings = ProofreadingSettings.from_config(value)
-    if not isinstance(settings.enabled, bool):
-        raise SystemExit("Config error: proofreading.enabled must be true or false")
     if settings.provider != "google-ai-studio":
         raise SystemExit("Config error: proofreading.provider must be google-ai-studio")
     if not isinstance(settings.model, str) or not settings.model:
@@ -208,8 +208,6 @@ def proofreading_config(config):
             raise SystemExit(f"Config error: proofreading.{field} must be a non-negative number")
     if settings.max_retry_delay_seconds < settings.initial_retry_delay_seconds:
         raise SystemExit("Config error: proofreading.max_retry_delay_seconds must be at least initial_retry_delay_seconds")
-    if not isinstance(settings.continue_on_error, bool):
-        raise SystemExit("Config error: proofreading.continue_on_error must be true or false")
     return settings
 
 

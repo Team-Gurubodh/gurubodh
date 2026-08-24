@@ -11,6 +11,7 @@ cd tools/gurubodh-cli
 python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
+export GEMINI_API_KEY=...
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
 ```
 
@@ -79,6 +80,7 @@ Run a prep job whose source DOCX and artifact destination are both R2:
 ```bash
 docker run --rm \
   --env PYTHONUNBUFFERED=1 \
+  --env GEMINI_API_KEY \
   --env CLOUDFLARE_R2_ACCOUNT_ID \
   --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
@@ -110,6 +112,7 @@ If you already have the `bge-m3` cache and wish to reuse the same with the docke
 # Run the `prep-subject` command
 docker run --rm \
   --env PYTHONUNBUFFERED=1 \
+  --env GEMINI_API_KEY \
   --env CLOUDFLARE_R2_ACCOUNT_ID \
   --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
@@ -176,7 +179,7 @@ runs a sample local content job.
 
 Existing output is not archived. Artifact ownership is command-scoped: `prep-subject`
 owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`,
-optional `chapters/proofreading/` review sidecars, and
+`chapters/unmodified_source_text/`, `chapters/proofreading/`, and
 `chapters/chapter_content_manifest.json`; `generate-chunks` owns only
 `chapters/semantic_chunks/`. The legacy
 `chapters/semantic_chunks_and_embeddings/` location is removed only by an
@@ -187,49 +190,58 @@ semantic chunks because they may no longer match the prepared content; rerun
 `gurubodh generate-chunks --config <generate-chunks-job>` before using RAG output.
 Cross-prefix local/R2 replacement is not a fully atomic release protocol.
 
-### Optional Gemini proof-reading review artifacts
+### Mandatory Gemini proofreading and canonical chapter artifacts
 
-`prep-subject` can optionally submit canonical chapter text to Gemini for a
-limited review trial. It uses `gemini-3.7-flash` by default and writes only
-review sidecars; it never alters the canonical chapter text, chapter metadata,
-or `chapter_content_manifest.json`. Consequently, `generate-chunks` continues
-to read precisely the same canonical source artifacts.
-
-Enable it in a local job configuration only after setting `GEMINI_API_KEY` in
-the calling environment. Do not put the key in a job JSON file or audit report.
+`prep-subject` requires a `proofreading` object in every job and always reads
+the Gemini credential from `GEMINI_API_KEY`. Do not put the key in a job JSON
+file or audit report. Proofreading is strict: missing credentials, oversized
+input, malformed/safety-blocked responses, invalid configuration, or exhausted
+transient retries fail the run before any local promotion or R2 publication.
 
 ```json
 "proofreading": {
-  "enabled": true,
   "provider": "google-ai-studio",
   "model": "gemini-3.7-flash",
-  "continue_on_error": true,
+  "max_output_tokens": 8192,
+  "max_input_characters": 30000,
+  "max_retries": 3,
+  "initial_retry_delay_seconds": 2,
+  "max_retry_delay_seconds": 30,
   "min_request_interval_seconds": 6,
   "max_requests_per_minute": 8,
   "max_estimated_input_tokens_per_minute": 20000
 }
 ```
 
-Each successfully reviewed chapter receives three artifacts under
-`chapters/proofreading/`: `*.proofread.txt` (corrected review text),
-`*.proofread.diff.txt` (a local word-level diff using `[-removed-]` and
-`{+added+}` markers), and `*.proofread.json` (Gemini change-list, reasons,
-checksums, and request provenance). `proofreading_manifest.json` records every
-chapter result. The local diff has no additional API call and is the source of
-truth for what changed; the Gemini list explains why it made each correction.
+For each successful chapter, the versioned `.txt` under
+`chapters/text_and_metadata/` is the canonical proofread text and its matching
+metadata JSON is computed entirely from that text. The exact extracted input
+submitted to Gemini is retained only as
+`chapters/unmodified_source_text/*_unmodified_source.txt`. The chapter also has
+`*.proofread.diff.txt` and `*.proofread.json` under `chapters/proofreading/`.
+The details JSON binds the unmodified and corrected artifacts with checksums,
+content identities, request provenance, local diff summary, and Gemini edit
+explanations without storing full text, prompts, keys, or raw responses.
+`proofreading_manifest.json` remains aggregate operational provenance.
 
 Proof-reading is deliberately sequential and applies a local request/token
 budget. It retries transient rate-limit, timeout, network, and server failures
 with capped exponential backoff and jitter. It does not retry invalid
 credentials, malformed structured output, safety blocks, or oversized chapters.
-With the default `continue_on_error: true`, any such failure is recorded as a
-review failure or skip while canonical preparation completes.
+The content manifest is written only after every chapter succeeds and lists
+only proofread canonical text/metadata. Therefore `generate-chunks` consumes
+proofread text automatically and ignores the unmodified/proofreading paths.
 
 During preparation, the CLI prints the local staging subject directory and the
 canonical output-directory mapping once. It then reports each artifact set by
-its shared filename stem and types (for example, `DOCX, text, metadata`) rather
+its shared filename stem and types (for example, `DOCX, canonical text,
+canonical metadata, unmodified source, diff, proofreading details`) rather
 than repeating full paths. This applies to both local and R2 destinations; R2
 runs then print their destination object-key publication progress separately.
+It also announces chapter splitting, every sequential Gemini request, local
+pacing waits, provider-requested retry waits, and structured-response handling.
+These progress messages contain counts and timing only; they never print chapter
+text or credentials.
 
 ```bash
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite

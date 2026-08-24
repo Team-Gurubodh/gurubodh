@@ -1,5 +1,4 @@
 import copy
-import json
 import re
 import zipfile
 from xml.etree import ElementTree as ET
@@ -7,10 +6,8 @@ from xml.etree import ElementTree as ET
 from gurubodh.docx.namespaces import NS, W
 from gurubodh.docx.text import block_text
 from gurubodh.docx.validate import validate_docx
-from gurubodh.metadata import build_chapter_metadata
-from gurubodh.naming import chapter_output_filename, full_subject_output_filename
+from gurubodh.naming import chapter_output_filename, chapter_unmodified_source_filename
 from gurubodh.text_utils import normalize_spaces, safe_filename
-from gurubodh.time_utils import utc_now
 
 
 def chapter_starts(text, chapter_split):
@@ -120,10 +117,8 @@ def split_docx_into_chapters(
     docx_path,
     chapter_split,
     chapter_docx_dir,
-    chapter_text_dir,
+    unmodified_source_text_dir,
     config=None,
-    converter_counts=None,
-    entry_point=None,
     progress=None,
 ):
     with zipfile.ZipFile(docx_path) as docx:
@@ -141,73 +136,38 @@ def split_docx_into_chapters(
 
     subject_blocks = detect_subject_blocks(preface)
     chapter_docx_dir.mkdir(parents=True, exist_ok=True)
-    chapter_text_dir.mkdir(parents=True, exist_ok=True)
+    unmodified_source_text_dir.mkdir(parents=True, exist_ok=True)
 
+    print(
+        f"[split] Detected {len(chapters)} chapter(s); creating chapter DOCX files "
+        "and unmodified-source snapshots sequentially."
+    )
     outputs = []
-    created_at = utc_now()
     for index, blocks in enumerate(chapters, start=1):
+        print(f"[split {index:02d}/{len(chapters):02d}] Starting chapter DOCX split and source-text extraction.")
         if config:
             docx_name = chapter_output_filename(config, index, ".docx")
-            text_name = chapter_output_filename(config, index, ".txt")
-            metadata_name = chapter_output_filename(config, index, ".json")
+            unmodified_source_name = chapter_unmodified_source_filename(config, index)
         else:
             title = chapter_title(block_text(blocks[0]), index)
             docx_name = f"{title}.docx"
-            text_name = f"{title}.txt"
-            metadata_name = None
+            unmodified_source_name = f"{title}_unmodified_source.txt"
 
         output_path = chapter_docx_dir / docx_name
-        text_path = chapter_text_dir / text_name
+        unmodified_source_path = unmodified_source_text_dir / unmodified_source_name
         xml = chapter_document_xml(document_xml, blocks, subject_blocks, sect_pr)
         write_chapter_docx(docx_path, output_path, xml)
         text_value = chapter_text(subject_blocks + blocks)
-        text_path.write_text(text_value + "\n", encoding="utf-8")
-        if config:
-            metadata = build_chapter_metadata(
-                config,
-                index,
-                {
-                    "metadata": metadata_name,
-                    "text": text_name,
-                    "msword": docx_name,
-                    "metadata_relative_path": (chapter_text_dir / metadata_name).relative_to(
-                        chapter_text_dir.parents[1]
-                    ),
-                    "text_relative_path": (chapter_text_dir / text_name).relative_to(
-                        chapter_text_dir.parents[1]
-                    ),
-                    "msword_relative_path": (chapter_docx_dir / docx_name).relative_to(
-                        chapter_docx_dir.parents[1]
-                    ),
-                    "full_msword_relative_path": (
-                        chapter_docx_dir.parents[1]
-                        / "full_subject"
-                        / full_subject_output_filename(config, ".docx")
-                    ).relative_to(chapter_docx_dir.parents[1]),
-                    "full_text_relative_path": (
-                        chapter_docx_dir.parents[1]
-                        / "full_subject"
-                        / full_subject_output_filename(config, ".txt")
-                    ).relative_to(chapter_docx_dir.parents[1]),
-                },
-                text_value,
-                converter_counts or {},
-                created_at,
-                entry_point or "",
-            )
-            (chapter_text_dir / metadata_name).write_text(
-                json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+        # This is the exact extracted text submitted to Gemini.  Canonical
+        # chapter text and text-derived metadata are intentionally written only
+        # after the strict proofreading response has been validated.
+        unmodified_source_path.write_text(text_value + "\n", encoding="utf-8")
         validate_docx(output_path)
         if progress:
-            generated_paths = [output_path, text_path]
-            if metadata_name:
-                generated_paths.append(chapter_text_dir / metadata_name)
-            progress(f"split {index:02d}/{len(chapters):02d}", *generated_paths)
+            progress(f"split {index:02d}/{len(chapters):02d}", output_path, unmodified_source_path)
         outputs.append(output_path)
 
     if not progress:
         print(f"wrote {len(outputs)} chapter files under {chapter_docx_dir}")
-        print(f"wrote {len(outputs)} chapter text files under {chapter_text_dir}")
+        print(f"wrote {len(outputs)} unmodified chapter text files under {unmodified_source_text_dir}")
     return outputs

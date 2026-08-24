@@ -1,6 +1,7 @@
 import shutil
 
 from gurubodh.config import validate_pipeline_matches_source
+from gurubodh.content_manifest import write_chapter_content_manifest
 from gurubodh.constants import PIPELINE_UNICODE_DOCX_INGEST
 from gurubodh.docx.text import extract_docx_text
 from gurubodh.pipelines.common import prepare_job_output, publish_job_output, validate_and_split
@@ -35,9 +36,19 @@ def copy_unicode_docx(path, output_path, text_path, progress=None):
 def run_unicode_docx_ingest(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True):
     validate_pipeline_matches_source(config, PIPELINE_UNICODE_DOCX_INGEST)
     job = prepare_job_output(config, overwrite)
+    print("[prepare] Copying the Unicode source DOCX and extracting full-subject text.")
     result = copy_unicode_docx(job["source_path"], job["full_docx"], job["full_text"], progress=job["progress"])
     split_outputs = validate_and_split(config, result, job["paths"], entry_point, progress=job["progress"])
-    result["proofreading"] = proofread_chapter_artifacts(config, job["paths"], progress=job["progress"])
+    result["proofreading"] = proofread_chapter_artifacts(
+        config,
+        job["paths"],
+        converter_counts=result["converter_counts"],
+        entry_point=entry_point,
+        progress=job["progress"],
+    )
+    if split_outputs:
+        manifest_path = write_chapter_content_manifest(config, job["paths"])
+        job["progress"]("validate", manifest_path)
     if audit_enabled:
         audit = PrepSubjectAuditWriter(context, config_path, config, entry_point, overwrite, job, result, split_outputs)
         if is_r2(config["destination"]):

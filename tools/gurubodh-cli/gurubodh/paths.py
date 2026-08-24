@@ -10,6 +10,7 @@ def destination_paths_for_subject(subject_dir):
         "full_subject": subject_dir / "full_subject",
         "chapter_msword": subject_dir / "chapters" / "msword",
         "text_and_metadata": subject_dir / "chapters" / "text_and_metadata",
+        "unmodified_source_text": subject_dir / "chapters" / "unmodified_source_text",
         "proofreading": subject_dir / "chapters" / "proofreading",
     }
 

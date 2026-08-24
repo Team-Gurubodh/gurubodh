@@ -175,6 +175,9 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         review = subject / "chapters" / "proofreading" / "unlisted.proofread.json"
         review.parent.mkdir(parents=True)
         review.write_text("{}", encoding="utf-8")
+        unmodified = subject / "chapters" / "unmodified_source_text" / "unlisted_unmodified_source.txt"
+        unmodified.parent.mkdir(parents=True)
+        unmodified.write_text("ignored", encoding="utf-8")
         loaded, config_path = self.load(config)
         segmenter = FakeSegmenter()
 
@@ -284,6 +287,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             metadata_two["storage"]["artifacts"]["metadata"]["key"]: json.dumps(metadata_two, ensure_ascii=False),
             metadata_two["storage"]["artifacts"]["text"]["key"]: text_two,
             "cms_library/123_spand_rahasya/chapters/text_and_metadata/unlisted.txt": "ignored",
+            "cms_library/123_spand_rahasya/chapters/unmodified_source_text/unlisted_unmodified_source.txt": "ignored",
+            "cms_library/123_spand_rahasya/chapters/proofreading/unlisted.proofread.json": "{}",
         })
         config["chapters"] = ["002"]
         loaded, config_path = self.load(config)

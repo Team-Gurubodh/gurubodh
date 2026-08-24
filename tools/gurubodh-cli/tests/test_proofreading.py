@@ -1,11 +1,17 @@
 import hashlib
 import json
+import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from gurubodh.config import proofreading_config, validate_pipeline_matches_source
 from gurubodh.content_identity import build_content_identity
+from gurubodh.content_manifest import write_chapter_content_manifest
+from gurubodh.naming import chapter_output_filename, chapter_unmodified_source_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
 from gurubodh.proofreading import (
     EDIT_LIST_SCHEMA,
@@ -56,7 +62,11 @@ class HttpError(Exception):
 
 
 class FakeChapterProofreader:
-    def proofread(self, text):
+    def __init__(self):
+        self.inputs = []
+
+    def proofread(self, text, progress=None):
+        self.inputs.append(text)
         return {
             "corrected_text": "यह सही वाक्य है।\n",
             "edits": [{"original": "गलत", "corrected": "सही", "category": "spelling", "reason": "वर्तनी"}],
@@ -69,7 +79,7 @@ class FakeChapterProofreader:
 
 class ProofreadingTests(unittest.TestCase):
     def settings(self, **overrides):
-        values = {"enabled": True, "min_request_interval_seconds": 0, "max_requests_per_minute": 10}
+        values = {"min_request_interval_seconds": 0, "max_requests_per_minute": 10}
         values.update(overrides)
         return ProofreadingSettings(**values)
 
@@ -81,7 +91,13 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(summary["changed_segments"], 1)
 
     def test_proofreading_configuration_defaults_and_rejects_unknown_options(self):
-        self.assertEqual(proofreading_config({}).model, "gemini-3.7-flash")
+        self.assertEqual(proofreading_config({"proofreading": {}}).model, "gemini-3.7-flash")
+        with self.assertRaisesRegex(SystemExit, "proofreading is required"):
+            proofreading_config({})
+        with self.assertRaisesRegex(SystemExit, "proofreading.enabled must be true"):
+            proofreading_config({"proofreading": {"enabled": False}})
+        with self.assertRaisesRegex(SystemExit, "continue_on_error must be false"):
+            proofreading_config({"proofreading": {"continue_on_error": True}})
         with self.assertRaisesRegex(SystemExit, "unsupported proofreading option"):
             proofreading_config({"proofreading": {"api_key": "not-allowed"}})
         with self.assertRaisesRegex(SystemExit, "unsupported proofreading option"):
@@ -106,9 +122,24 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(client.models.calls[0]["model"], "gemini-3.7-flash")
         self.assertNotIn("temperature", client.models.calls[0]["config"].kwargs)
 
+    def test_missing_gemini_credential_fails_before_a_request(self):
+        with patch.dict(os.environ, {"GEMINI_API_KEY": ""}, clear=False):
+            with self.assertRaisesRegex(ProofreadingError, "Set GEMINI_API_KEY"):
+                GeminiProofreader(self.settings()).proofread("यह गलत वाक्य है।")
+
     def test_gemini_schema_omits_unsupported_additional_properties(self):
         self.assertNotIn("additionalProperties", EDIT_LIST_SCHEMA)
         self.assertNotIn("additionalProperties", EDIT_LIST_SCHEMA["properties"]["edits"]["items"])
+
+    def test_full_chapter_edit_is_rejected_to_keep_provenance_text_free(self):
+        client = FakeClient([{
+            "corrected_text": "यह सही वाक्य है।",
+            "edits": [{"original": "यह गलत वाक्य है।", "corrected": "यह सही वाक्य है।", "category": "spelling", "reason": "वर्तनी"}],
+        }])
+        proofreader = GeminiProofreader(self.settings(), client=client, types_module=FakeTypes)
+
+        with self.assertRaisesRegex(ProofreadingError, "full chapter text"):
+            proofreader.proofread("यह गलत वाक्य है।")
 
     def test_api_error_includes_safe_gemini_status(self):
         client = FakeClient([HttpError(400, "INVALID_ARGUMENT", "Unsupported request setting")])
@@ -136,44 +167,121 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(result["attempts"], 2)
         self.assertEqual(delays, [1.0])
 
-    def test_sidecars_do_not_change_canonical_artifacts(self):
+    def test_proofreader_reports_provider_retry_delay_to_operator(self):
+        client = FakeClient([
+            HttpError(429, "RESOURCE_EXHAUSTED", "Quota exceeded. Please retry in 35.089783349s."),
+            {"corrected_text": "यह सही है।", "edits": [{"original": "गलत", "corrected": "सही", "category": "spelling", "reason": "वर्तनी"}]},
+        ])
+        delays, messages = [], []
+        proofreader = GeminiProofreader(
+            self.settings(),
+            client=client,
+            types_module=FakeTypes,
+            sleep=delays.append,
+            random_value=lambda: 0,
+        )
+
+        proofreader.proofread("यह गलत है।", progress=messages.append)
+
+        self.assertEqual(delays, [35.089783349])
+        self.assertEqual(messages[0], "Checking local Gemini request pacing before sending.")
+        self.assertIn("Sending Gemini request (attempt 1; estimated input", messages[1])
+        self.assertIn("retrying in 35.1 seconds (Gemini's requested retry delay)", messages[2])
+        self.assertIn("Gemini response received; validating", messages[-1])
+
+    def test_proofreading_writes_exact_canonical_five_artifacts_without_full_text_in_details(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             config = {
+                "pipeline": "unicode-docx-ingest",
+                "source": {"backend": "local", "root_dir": temp_dir, "relative_path": "source.docx", "font_encoding": "unicode", "file_format": "docx"},
                 "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject"},
+                "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
+                "metadata_defaults": {"language": "hi-Deva", "summary_chapter_markers": ["सही"]},
                 "_proofreading_config": self.settings(),
             }
             paths = destination_paths_for_subject(root / "subject")
             ensure_job_dirs(paths)
             source_text = "यह गलत वाक्य है।\n"
-            text_path = paths["text_and_metadata"] / "chapter.txt"
-            text_path.write_text(source_text, encoding="utf-8")
-            identity = build_content_identity("CAT001", "SUB123", "hi-Deva", source_text)
-            metadata = {
-                "document": {"chapter_number": "001"},
-                "files": {"text_filename": "chapter.txt"},
-                "content_identity": identity,
-                "storage": {"artifacts": {"text": {"backend": "local", "path": "chapters/text_and_metadata/chapter.txt", "url": None}}},
-            }
-            metadata_path = paths["text_and_metadata"] / "chapter.json"
-            metadata_path.write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
-            canonical_before = {path: path.read_bytes() for path in (text_path, metadata_path)}
-            manifest_path = paths["subject"] / "chapters" / "chapter_content_manifest.json"
-            manifest_path.write_text("{\"canonical\": true}\n", encoding="utf-8")
-            manifest_before = manifest_path.read_bytes()
+            source_name = chapter_unmodified_source_filename(config, 1)
+            source_path = paths["unmodified_source_text"] / source_name
+            source_path.write_text(source_text, encoding="utf-8")
+            fake = FakeChapterProofreader()
 
-            result = proofread_chapter_artifacts(config, paths, proofreader=FakeChapterProofreader())
+            output = StringIO()
+            with redirect_stdout(output):
+                result = proofread_chapter_artifacts(
+                    config,
+                    paths,
+                    entry_point="python3 -m gurubodh prep-subject",
+                    proofreader=fake,
+                    progress=lambda *_: None,
+                )
 
             self.assertEqual(result["counts"], {"succeeded": 1, "failed": 0, "skipped": 0})
-            self.assertEqual(text_path.read_bytes(), canonical_before[text_path])
-            self.assertEqual(metadata_path.read_bytes(), canonical_before[metadata_path])
-            self.assertEqual(manifest_path.read_bytes(), manifest_before)
-            sidecar = paths["proofreading"] / "chapter.proofread.json"
-            self.assertTrue(sidecar.is_file())
-            self.assertEqual(json.loads(sidecar.read_text(encoding="utf-8"))["source"]["text_sha256"], hashlib.sha256(source_text.encode("utf-8")).hexdigest())
+            self.assertIn("Preparing 1 chapter(s) for sequential Gemini proofreading", output.getvalue())
+            self.assertIn("Unmodified source is ready", output.getvalue())
+            self.assertEqual(fake.inputs, [source_text])
+            text_name = chapter_output_filename(config, 1, ".txt")
+            metadata_name = chapter_output_filename(config, 1, ".json")
+            text_path = paths["text_and_metadata"] / text_name
+            metadata_path = paths["text_and_metadata"] / metadata_name
+            details_path = paths["proofreading"] / f"{Path(text_name).stem}.proofread.json"
+            diff_path = paths["proofreading"] / f"{Path(text_name).stem}.proofread.diff.txt"
+            self.assertEqual(
+                {path.name for path in paths["text_and_metadata"].iterdir()},
+                {text_name, metadata_name},
+            )
+            self.assertEqual({path.name for path in paths["unmodified_source_text"].iterdir()}, {source_name})
+            self.assertTrue(diff_path.is_file())
+            self.assertTrue(details_path.is_file())
+            self.assertFalse((paths["proofreading"] / f"{Path(text_name).stem}.proofread.txt").exists())
+            self.assertEqual(text_path.read_text(encoding="utf-8"), "यह सही वाक्य है।\n")
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["content_identity"], build_content_identity("CAT001", "SUB123", "hi-Deva", "यह सही वाक्य है।"))
+            self.assertEqual(metadata["content_stats"]["character_count"], len("यह सही वाक्य है।"))
+            self.assertEqual(metadata["content"]["automated_tags"], ["summary_chapter", "उपसंहार"])
+            self.assertEqual(metadata["integrity"]["artifacts"]["text"]["value"], hashlib.sha256(text_path.read_bytes()).hexdigest())
+            details = json.loads(details_path.read_text(encoding="utf-8"))
+            details_text = details_path.read_text(encoding="utf-8")
+            self.assertEqual(details["unmodified_source"]["text_sha256"], hashlib.sha256(source_text.encode("utf-8")).hexdigest())
+            self.assertEqual(details["canonical_corrected"]["text_sha256"], hashlib.sha256(text_path.read_bytes()).hexdigest())
+            self.assertEqual(details["unmodified_source"]["text_artifact"]["path"], f"chapters/unmodified_source_text/{source_name}")
+            self.assertEqual(details["canonical_corrected"]["text_artifact"], metadata["storage"]["artifacts"]["text"])
+            self.assertNotIn(source_text, details_text)
+            self.assertNotIn("यह सही वाक्य है।", details_text)
+            content_manifest_path = write_chapter_content_manifest(config, paths)
+            content_manifest = json.loads(content_manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(content_manifest["chapters"][0]["text_artifact"], metadata["storage"]["artifacts"]["text"])
+            self.assertNotIn("unmodified_source_text", json.dumps(content_manifest))
+
+    def test_proofreading_failure_does_not_write_canonical_artifacts_or_a_manifest(self):
+        class FailingProofreader:
+            def proofread(self, text, progress=None):
+                raise ProofreadingError("missing_credentials", "Set GEMINI_API_KEY before enabling proofreading.")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = {
+                "pipeline": "unicode-docx-ingest",
+                "source": {"backend": "local", "root_dir": temp_dir, "relative_path": "source.docx", "font_encoding": "unicode", "file_format": "docx"},
+                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject"},
+                "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
+                "_proofreading_config": self.settings(),
+            }
+            paths = destination_paths_for_subject(root / "subject")
+            ensure_job_dirs(paths)
+            (paths["unmodified_source_text"] / chapter_unmodified_source_filename(config, 1)).write_text("यह गलत है।\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ProofreadingError, "GEMINI_API_KEY"):
+                proofread_chapter_artifacts(config, paths, proofreader=FailingProofreader())
+
+            self.assertEqual(list(paths["text_and_metadata"].iterdir()), [])
+            self.assertFalse((paths["proofreading"] / "proofreading_manifest.json").exists())
 
     def test_proofreading_directory_is_prep_owned_not_chunk_owned(self):
         self.assertIn(Path("chapters") / "proofreading", owned_relative_paths("prep-subject"))
+        self.assertIn(Path("chapters") / "unmodified_source_text", owned_relative_paths("prep-subject"))
         self.assertNotIn(Path("chapters") / "proofreading", owned_relative_paths("generate-chunks"))
 
 

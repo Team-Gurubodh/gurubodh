@@ -15,6 +15,12 @@ def chapter_output_filename(config, chapter_number, extension):
     return "_".join(parts) + extension
 
 
+def chapter_unmodified_source_filename(config, chapter_number):
+    """Return the provenance filename for one versioned chapter input."""
+    text_name = chapter_output_filename(config, chapter_number, ".txt")
+    return f"{text_name.removesuffix('.txt')}_unmodified_source.txt"
+
+
 def chapter_chunks_output_filename(config, chapter_number):
     return chapter_output_filename(config, chapter_number, ".chunks.json")
 

@@ -51,10 +51,13 @@
   retain chunking and token-counting provenance, and contain no retrieval
   vectors. The legacy `semantic_chunks_and_embeddings` path is unsupported for
   new output and is removed only with explicit overwrite.
-- When enabled, `prep-subject` writes Gemini proof-reading review sidecars under
-  `chapters/proofreading/`. These are deliberately outside
-  `chapters/text_and_metadata/`, are not referenced by the chapter content
-  manifest, and do not change canonical chapter text, metadata, or chunk input.
+- Every prep-subject job requires strict Gemini proofreading. The canonical
+  versioned chapter text and matching metadata under
+  `chapters/text_and_metadata/` are derived from Gemini's corrected text.
+  `chapters/unmodified_source_text/` retains the exact submitted source text
+  without a metadata JSON; `chapters/proofreading/` holds its local diff and
+  provenance details. Only the proofread canonical pair is referenced by the
+  chapter content manifest or eligible for `generate-chunks`.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

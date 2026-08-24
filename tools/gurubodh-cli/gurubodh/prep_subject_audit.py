@@ -50,8 +50,8 @@ def artifact_counts(subject_dir):
         "chapter_docx": 0,
         "chapter_text": 0,
         "chapter_metadata": 0,
+        "unmodified_source_text": 0,
         "chapter_content_manifest": 0,
-        "proofreading_text": 0,
         "proofreading_diff": 0,
         "proofreading_json": 0,
         "proofreading_manifest": 0,
@@ -76,14 +76,14 @@ def artifact_counts(subject_dir):
             counts["chapter_text"] += 1
         elif parts[:2] == ("chapters", "text_and_metadata") and suffix == ".json":
             counts["chapter_metadata"] += 1
+        elif parts[:2] == ("chapters", "unmodified_source_text") and relative.name.endswith("_unmodified_source.txt"):
+            counts["unmodified_source_text"] += 1
         elif relative.parts == ("chapters", "chapter_content_manifest.json"):
             counts["chapter_content_manifest"] += 1
         elif parts[:2] == ("chapters", "proofreading") and relative.name == "proofreading_manifest.json":
             counts["proofreading_manifest"] += 1
         elif parts[:2] == ("chapters", "proofreading") and relative.name.endswith(".proofread.diff.txt"):
             counts["proofreading_diff"] += 1
-        elif parts[:2] == ("chapters", "proofreading") and relative.name.endswith(".proofread.txt"):
-            counts["proofreading_text"] += 1
         elif parts[:2] == ("chapters", "proofreading") and suffix == ".json":
             counts["proofreading_json"] += 1
         elif parts[:1] == ("run_reports",) and suffix == ".json":
@@ -149,6 +149,7 @@ def processing_summary(config, result, split_outputs, chapters, publish_audit, s
         "chapter_docx_artifacts_written": counts["chapter_docx"],
         "chapter_text_artifacts_written": counts["chapter_text"],
         "chapter_metadata_artifacts_written": counts["chapter_metadata"],
+        "unmodified_source_text_artifacts_written": counts["unmodified_source_text"],
         "chapter_content_manifest_artifacts_written": counts["chapter_content_manifest"],
         "split_output_count": len(split_outputs or []),
         "legacy_converter_counts": result.get("converter_counts", {}),
@@ -174,7 +175,15 @@ def proofreading_summary(result):
 def proofreading_audit(result):
     if not result:
         return {"enabled": False, "chapters": []}
-    allowed_keys = ("chapter_number", "status", "warning", "error_code", "correction_count", "local_diff_summary", "artifacts")
+    allowed_keys = (
+        "chapter_number",
+        "status",
+        "correction_count",
+        "local_diff_summary",
+        "unmodified_source_content_key",
+        "canonical_content_key",
+        "artifacts",
+    )
     return {
         "enabled": result["enabled"],
         "chapters": [{key: chapter[key] for key in allowed_keys if key in chapter} for chapter in result["chapters"]],
@@ -276,6 +285,7 @@ def render_markdown(report):
         f"- Chapter DOCX artifacts: {report['processing_summary']['chapter_docx_artifacts_written']}",
         f"- Chapter text artifacts: {report['processing_summary']['chapter_text_artifacts_written']}",
         f"- Chapter metadata artifacts: {report['processing_summary']['chapter_metadata_artifacts_written']}",
+        f"- Unmodified-source text artifacts: {report['processing_summary']['unmodified_source_text_artifacts_written']}",
         f"- Chapter content manifests: {report['processing_summary']['chapter_content_manifest_artifacts_written']}",
         f"- Summary chapters detected: {report['processing_summary']['summary_chapter_count']}",
         f"- Proof-reading enabled: {report['processing_summary']['proofreading']['enabled']}",
