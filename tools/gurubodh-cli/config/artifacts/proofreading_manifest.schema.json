@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/proofreading_manifest.schema.json",
+  "title": "Gurubodh proof-reading review manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "provider", "counts", "chapters"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "provider": {"type": "object"},
+    "counts": {
+      "type": "object",
+      "required": ["succeeded", "failed", "skipped"],
+      "properties": {
+        "succeeded": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "skipped": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "chapters": {"type": "array"}
+  }
+}

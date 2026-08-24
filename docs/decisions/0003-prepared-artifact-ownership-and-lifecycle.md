@@ -14,10 +14,20 @@ outputs and audit evidence owned by other commands.
 ## Decision
 
 `prep-subject` owns canonical artifacts (`full_subject/`, chapter DOCX,
-chapter text/metadata, and the candidate content manifest). `generate-chunks`
+proofread chapter text/metadata, and the candidate content manifest),
+unmodified chapter input snapshots under `chapters/unmodified_source_text/`,
+and mandatory proof-reading provenance under `chapters/proofreading/`.
+`generate-chunks`
 owns v2 candidate semantic artifacts under `chapters/semantic_chunks/`. Their
 audit reports are retained independently under
 `run_reports/prep-subject/` and `run_reports/generate-chunks/`.
+
+The versioned text and metadata files in `chapters/text_and_metadata/` are the
+proofread source of truth. The corresponding unmodified-source file is
+provenance only; it never has metadata, is not manifest-listed, and cannot be a
+chunking candidate. Each proof-reading details artifact binds those two text
+artifacts and the locally generated whitespace-preserving diff without
+embedding source/corrected text, prompts, credentials, or raw responses.
 
 An overwrite is scoped to the command's paths. After successful canonical
 replacement, both v2 semantic artifacts and the legacy
@@ -29,8 +39,10 @@ release; versioned releases and a current pointer are deferred.
 
 ## Rationale
 
-This preserves the canonical/derived boundary and audit history without
-introducing premature revision or release infrastructure.
+Proofreading is a required staging step. All chapter responses must validate
+before the proofread canonical tree and its manifest are promoted locally or
+published to R2. This preserves the canonical/derived boundary and audit
+history without introducing premature revision or release infrastructure.
 
 ## Impact
 

@@ -127,8 +127,10 @@ Each job config declares:
 - naming fields for category, subject, title slug, version, and subversion
 - chapter split behavior
 - metadata defaults
+- mandatory strict Gemini proofreading settings
 
 Configured source files must be `.docx`.
+Set `GEMINI_API_KEY` in the calling environment before running `prep-subject`.
 
 Supported `source.font_encoding` values are:
 
@@ -149,7 +151,7 @@ Unicode source:
 
 ```json
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "pipeline": "unicode-docx-ingest",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
@@ -165,7 +167,8 @@ Unicode source:
     "enabled": true,
     "pattern_type": "regex",
     "pattern": "प्रबोधन.*?जनवरी.*?२०२६"
-  }
+  },
+  "proofreading": {}
 }
 ```
 
@@ -173,19 +176,21 @@ Legacy APS source:
 
 ```json
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "pipeline": "legacy-docx-to-unicode",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
     "relative_path": "39_aacharan_shaastra/aps_fonts/ms_word/aacharanshstra.docx",
     "font_encoding": "aps",
     "file_format": "docx"
-  }
+  },
+  "proofreading": {}
 }
 ```
 
 The examples above are shortened. Real job files also include `destination`,
-`naming`, `chapter_split`, and `metadata_defaults`.
+`naming`, `chapter_split`, `metadata_defaults`, and a strict `proofreading`
+object. Proofreading cannot be disabled or configured to continue on errors.
 
 ## Output Layout
 
@@ -240,11 +245,16 @@ chapters/
   text_and_metadata/
     CAT020_SUB129_spand-rahasya_001_v01.01.txt
     CAT020_SUB129_spand-rahasya_001_v01.01.json
+  unmodified_source_text/
+    CAT020_SUB129_spand-rahasya_001_v01.01_unmodified_source.txt
+  proofreading/
+    CAT020_SUB129_spand-rahasya_001_v01.01.proofread.diff.txt
+    CAT020_SUB129_spand-rahasya_001_v01.01.proofread.json
 ```
 
 ## Metadata
 
-Chapter metadata uses schema `1.2.0` and records processing details separately
+Chapter metadata uses schema `1.3.0` and records processing details separately
 from conversion facts.
 
 When a job is run through the dispatcher:

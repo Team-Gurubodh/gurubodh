@@ -1,5 +1,4 @@
 from gurubodh.docx.chapter_split import split_docx_into_chapters
-from gurubodh.content_manifest import write_chapter_content_manifest
 from gurubodh.docx.validate import validate_docx
 from gurubodh.naming import full_subject_output_filename
 from gurubodh.paths import (
@@ -10,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from gurubodh.storage import (
-    CANONICAL_ARTIFACT_DIRS,
+    PREP_ARTIFACT_DIRS,
     CANONICAL_ARTIFACT_FILES,
     ensure_r2_destination_available,
     invalidate_local_semantic_artifacts,
@@ -25,7 +24,8 @@ from gurubodh.storage import (
 def staging_progress(subject_dir):
     print("Preparing canonical artifacts in staging directory:")
     print(f"  {subject_dir}")
-    print("Outputs: full_subject/, chapters/msword/, and chapters/text_and_metadata/")
+    print("Outputs: full_subject/, chapters/msword/, chapters/unmodified_source_text/, and chapters/text_and_metadata/")
+    print("Proof-reading outputs: chapters/proofreading/")
 
     def report(stage, *paths):
         relative_paths = [Path(path).relative_to(subject_dir) for path in paths]
@@ -33,18 +33,28 @@ def staging_progress(subject_dir):
             print(f"[{stage}] wrote {relative_paths[0]}")
             return
 
-        artifact_types = {
-            ".docx": "DOCX",
-            ".txt": "text",
-            ".json": "metadata",
-        }
-        types = [artifact_types.get(path.suffix, path.suffix.lstrip(".")) for path in relative_paths]
+        def artifact_type(path):
+            if path.parts[:2] == ("chapters", "unmodified_source_text"):
+                return "unmodified source"
+            if path.parts[:2] == ("chapters", "proofreading") and path.name.endswith(".proofread.diff.txt"):
+                return "diff"
+            if path.parts[:2] == ("chapters", "proofreading") and path.name.endswith(".proofread.json"):
+                return "proofreading details"
+            if path.parts[:2] == ("chapters", "text_and_metadata"):
+                return "canonical text" if path.suffix == ".txt" else "canonical metadata"
+            return {".docx": "DOCX", ".txt": "text", ".json": "metadata"}.get(
+                path.suffix,
+                path.suffix.lstrip("."),
+            )
+
+        types = [artifact_type(path) for path in relative_paths]
         stem = relative_paths[0].stem
         if stage == "prepare":
             location = relative_paths[0].parent / stem
         else:
             location = Path(stem)
-        print(f"[{stage}] {location} ({', '.join(types)})")
+        label = "chapter artifacts" if stage == "proofread" else stage
+        print(f"[{label}] {location} ({', '.join(types)})")
 
     return report
 
@@ -76,6 +86,7 @@ def prepare_job_output(config, overwrite=False):
 
 
 def validate_and_split(config, result, paths, entry_point, progress=None):
+    print("[validate] Validating full-subject DOCX before chapter splitting.")
     validate_docx(result["output_path"])
 
     chapter_split = config["chapter_split"]
@@ -84,18 +95,10 @@ def validate_and_split(config, result, paths, entry_point, progress=None):
             result["output_path"],
             chapter_split,
             paths["chapter_msword"],
-            paths["text_and_metadata"],
+            paths["unmodified_source_text"],
             config,
-            result["converter_counts"],
-            entry_point,
             progress=progress,
         )
-        if outputs:
-            manifest_path = write_chapter_content_manifest(config, paths)
-            if progress:
-                progress("validate", manifest_path)
-            else:
-                print(f"wrote {manifest_path}")
         return outputs
     return []
 
@@ -131,7 +134,7 @@ def _promote_local_canonical_artifacts(job):
     if staging_subject == published_subject:
         return
     print(f"Promoting canonical artifacts to: {published_subject}")
-    for relative_path in (*CANONICAL_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES):
+    for relative_path in (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES):
         source = staging_subject / relative_path
         target = published_subject / relative_path
         if not source.exists():

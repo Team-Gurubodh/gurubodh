@@ -12,7 +12,7 @@ from gurubodh.project import ProjectContext
 
 
 BASE_CONFIG = {
-    "schema_version": "1.2.0",
+    "schema_version": "1.3.0",
     "pipeline": "unicode-docx-ingest",
     "source": {
         "root_dir": "/tmp/source",
@@ -42,6 +42,7 @@ BASE_CONFIG = {
         "output_text_encoding": "UTF-8",
         "summary_chapter_markers": ["उपसंहार"],
     },
+    "proofreading": {},
 }
 
 
@@ -55,13 +56,35 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
                 progress(
                     "split 01/02",
                     subject_dir / "chapters" / "msword" / "chapter-001.docx",
-                    subject_dir / "chapters" / "text_and_metadata" / "chapter-001.txt",
+                    subject_dir / "chapters" / "unmodified_source_text" / "chapter-001_unmodified_source.txt",
                 )
 
             report = output.getvalue()
             self.assertEqual(report.count(str(subject_dir)), 1)
-            self.assertIn("Outputs: full_subject/, chapters/msword/, and chapters/text_and_metadata/", report)
-            self.assertIn("[split 01/02] chapter-001 (DOCX, text)", report)
+            self.assertIn("Outputs: full_subject/, chapters/msword/, chapters/unmodified_source_text/, and chapters/text_and_metadata/", report)
+            self.assertIn("[split 01/02] chapter-001 (DOCX, unmodified source)", report)
+
+    def test_staging_progress_labels_completed_proofread_artifacts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subject_dir = Path(temp_dir) / "123_spand_rahasya"
+            output = StringIO()
+            with redirect_stdout(output):
+                progress = staging_progress(subject_dir)
+                progress(
+                    "proofread",
+                    subject_dir / "chapters" / "msword" / "chapter-001.docx",
+                    subject_dir / "chapters" / "text_and_metadata" / "chapter-001.txt",
+                    subject_dir / "chapters" / "text_and_metadata" / "chapter-001.json",
+                    subject_dir / "chapters" / "unmodified_source_text" / "chapter-001_unmodified_source.txt",
+                    subject_dir / "chapters" / "proofreading" / "chapter-001.proofread.diff.txt",
+                    subject_dir / "chapters" / "proofreading" / "chapter-001.proofread.json",
+                )
+
+            self.assertIn(
+                "[chapter artifacts] chapter-001 (DOCX, canonical text, canonical metadata, "
+                "unmodified source, diff, proofreading details)",
+                output.getvalue(),
+            )
 
     def make_job(self, temp_dir, config):
         subject_dir = Path(temp_dir) / config["destination"]["subject_dir"]
@@ -70,6 +93,8 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             "full_subject": subject_dir / "full_subject",
             "chapter_msword": subject_dir / "chapters" / "msword",
             "text_and_metadata": subject_dir / "chapters" / "text_and_metadata",
+            "unmodified_source_text": subject_dir / "chapters" / "unmodified_source_text",
+            "proofreading": subject_dir / "chapters" / "proofreading",
         }
         for path in paths.values():
             path.mkdir(parents=True, exist_ok=True)
@@ -113,6 +138,13 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
         )
         (job["paths"]["chapter_msword"] / docx_name).write_bytes(b"chapter docx")
         (job["paths"]["text_and_metadata"] / text_name).write_text(text + "\n", encoding="utf-8")
+        (job["paths"]["unmodified_source_text"] / f"{Path(text_name).stem}_unmodified_source.txt").write_text(
+            "unmodified source\n",
+            encoding="utf-8",
+        )
+        (job["paths"]["proofreading"] / f"{Path(text_name).stem}.proofread.diff.txt").write_text("diff\n", encoding="utf-8")
+        (job["paths"]["proofreading"] / f"{Path(text_name).stem}.proofread.json").write_text("{}\n", encoding="utf-8")
+        (job["paths"]["proofreading"] / "proofreading_manifest.json").write_text("{}\n", encoding="utf-8")
         metadata_path = job["paths"]["text_and_metadata"] / metadata_name
         metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return metadata_path
@@ -155,6 +187,9 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             self.assertEqual(report["publish_audit"]["backend"], "local")
             self.assertEqual(payload["processing_summary"]["chapters_detected"], 1)
             self.assertEqual(payload["processing_summary"]["summary_chapter_count"], 1)
+            self.assertEqual(payload["processing_summary"]["unmodified_source_text_artifacts_written"], 1)
+            self.assertEqual(payload["processing_summary"]["artifact_counts"]["proofreading_diff"], 1)
+            self.assertEqual(payload["processing_summary"]["artifact_counts"]["proofreading_json"], 1)
             self.assertEqual(payload["final_outcome"]["generated_artifact_counts"]["run_report_json"], 1)
             self.assertEqual(payload["final_outcome"]["generated_artifact_counts"]["run_report_markdown"], 1)
             self.assertIn("# Gurubodh prep-subject Audit Report", markdown)
@@ -164,6 +199,7 @@ class PrepSubjectAuditReportTests(unittest.TestCase):
             self.assertIn(f"  {writer.paths['json'].name}", output.getvalue())
             self.assertIn(f"  {writer.paths['markdown'].name}", output.getvalue())
             self.assertNotIn("do-not-write", payload_text)
+            self.assertNotIn("प्रबोधन\n\nउपसंहार", payload_text)
             self.assertIn("[redacted]", payload_text)
 
     def test_legacy_audit_report_includes_converter_counts(self):

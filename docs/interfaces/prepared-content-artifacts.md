@@ -56,10 +56,42 @@ Prepared artifact grouping is preserved as object-key prefixes:
 cms_library/{subject_dir}/full_subject/
 cms_library/{subject_dir}/chapters/msword/
 cms_library/{subject_dir}/chapters/text_and_metadata/
+cms_library/{subject_dir}/chapters/unmodified_source_text/
 cms_library/{subject_dir}/chapters/chapter_content_manifest.json
+cms_library/{subject_dir}/chapters/proofreading/
 ```
 
 R2 prefixes are object-key strings, not real folders.
+
+## Mandatory Canonical Gemini Proofreading
+
+Every `prep-subject` job must provide a strict `proofreading` object and read
+its credential only from `GEMINI_API_KEY`. For every successfully prepared
+chapter, preparation writes these five files across three directories:
+
+```text
+chapters/text_and_metadata/<chapter>.txt
+chapters/text_and_metadata/<chapter>.json
+chapters/unmodified_source_text/<chapter>_unmodified_source.txt
+chapters/proofreading/<chapter>.proofread.diff.txt
+chapters/proofreading/<chapter>.proofread.json
+```
+
+The versioned `.txt` and `.json` under `text_and_metadata/` are the canonical
+proofread text and proofread-derived metadata. The unmodified source text is
+the exact converted/extracted input submitted to Gemini; it is provenance only
+and has no metadata JSON. The proof-reading details JSON binds the unmodified
+and canonical text artifacts with storage references, checksums, content
+identities, provider/model provenance, request pacing/usage, local diff summary,
+and Gemini edit explanations. It contains no full source/corrected text,
+prompts, API keys, or raw responses.
+
+`chapters/proofreading/proofreading_manifest.json` remains an aggregate
+operational provenance artifact. It is not part of the five per-chapter files.
+
+`chapter_content_manifest.json` lists only the proofread versioned text and
+matching metadata. `generate-chunks` consumes those manifest-listed artifacts
+only, so it ignores both `unmodified_source_text/` and `proofreading/`.
 
 ## Metadata References
 
@@ -92,7 +124,7 @@ Consumers must treat bucket/key or local path references as canonical.
 
 ## Content Identity and Manifest
 
-Every newly prepared chapter metadata artifact carries `content_identity`. Its
+Every newly prepared canonical chapter metadata artifact carries `content_identity`. Its
 `content_key` is a deterministic UUID v5 for the normalized chapter text within
 the category, subject, and language. It is provenance for an exact content
 state, not a stable editorial chapter identity: a text edit changes it, while
@@ -135,7 +167,9 @@ output before producing v2 chunks.
 ## Overwrite Behavior
 
 The preparation tool does not archive existing output. If output already exists,
-jobs fail unless `--overwrite` is supplied. For R2 destinations, existing object
+jobs fail unless `--overwrite` is supplied. All required proofreading must
+succeed in staging before local promotion or any R2 overwrite/publication step.
+For R2 destinations, existing object
 keys are checked before upload and object replacement requires `--overwrite`.
 R2 jobs also check the destination subject prefix before local processing starts
 so a missing overwrite flag fails early instead of after artifact generation.

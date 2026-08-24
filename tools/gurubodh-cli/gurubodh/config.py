@@ -12,6 +12,7 @@ from gurubodh.constants import (
     SUPPORTED_FONT_ENCODINGS,
 )
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
+from gurubodh.proofreading import ProofreadingSettings
 
 
 REGEX_FLAG_VALUES = {
@@ -181,6 +182,35 @@ def validate_pipeline_matches_source(config, expected_pipeline=None):
         )
 
 
+def proofreading_config(config):
+    value = config.get("proofreading")
+    if not isinstance(value, dict):
+        raise SystemExit("Config error: proofreading is required and must be an object")
+    allowed = set(ProofreadingSettings.__dataclass_fields__) | {"enabled", "continue_on_error"}
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise SystemExit(f"Config error: unsupported proofreading option(s): {', '.join(unknown)}")
+    if "enabled" in value and value["enabled"] is not True:
+        raise SystemExit("Config error: proofreading.enabled must be true; proofreading is mandatory")
+    if "continue_on_error" in value and value["continue_on_error"] is not False:
+        raise SystemExit("Config error: proofreading.continue_on_error must be false; proofread failures are strict")
+    settings = ProofreadingSettings.from_config(value)
+    if settings.provider != "google-ai-studio":
+        raise SystemExit("Config error: proofreading.provider must be google-ai-studio")
+    if not isinstance(settings.model, str) or not settings.model:
+        raise SystemExit("Config error: proofreading.model must be a non-empty string")
+    integer_fields = ("max_output_tokens", "max_input_characters", "max_retries", "max_requests_per_minute", "max_estimated_input_tokens_per_minute")
+    for field in integer_fields:
+        if not isinstance(getattr(settings, field), int) or isinstance(getattr(settings, field), bool) or getattr(settings, field) < 1:
+            raise SystemExit(f"Config error: proofreading.{field} must be a positive integer")
+    for field in ("initial_retry_delay_seconds", "max_retry_delay_seconds", "min_request_interval_seconds"):
+        if not isinstance(getattr(settings, field), (int, float)) or isinstance(getattr(settings, field), bool) or getattr(settings, field) < 0:
+            raise SystemExit(f"Config error: proofreading.{field} must be a non-negative number")
+    if settings.max_retry_delay_seconds < settings.initial_retry_delay_seconds:
+        raise SystemExit("Config error: proofreading.max_retry_delay_seconds must be at least initial_retry_delay_seconds")
+    return settings
+
+
 def load_prep_subject_job(path):
     config = read_json(path)
     if not isinstance(config, dict):
@@ -225,6 +255,7 @@ def load_prep_subject_job(path):
     if metadata_defaults and not isinstance(metadata_defaults, dict):
         raise SystemExit("Config error: metadata_defaults must be an object")
     optional_string_array(metadata_defaults, "summary_chapter_markers", "metadata_defaults")
+    config["_proofreading_config"] = proofreading_config(config)
     validate_pipeline_matches_source(config)
     return config
 

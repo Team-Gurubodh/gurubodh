@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/chapter_proofreading.schema.json",
+  "title": "Gurubodh canonical chapter proof-reading artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "created_at", "provider", "unmodified_source", "canonical_corrected", "diff_artifact", "integrity", "local_diff_summary", "gemini_edits", "request"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "status": {"const": "succeeded"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "provider": {"type": "object"},
+    "unmodified_source": {"type": "object"},
+    "canonical_corrected": {"type": "object"},
+    "diff_artifact": {"type": "object"},
+    "integrity": {"type": "object"},
+    "local_diff_summary": {"type": "object"},
+    "gemini_edits": {"type": "array"},
+    "request": {"type": "object"}
+  }
+}
