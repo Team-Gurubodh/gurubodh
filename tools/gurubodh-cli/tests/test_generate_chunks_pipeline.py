@@ -172,6 +172,9 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         extra = subject / "chapters" / "text_and_metadata" / "unlisted.txt"
         extra.write_text("ignored", encoding="utf-8")
         (extra.with_suffix(".json")).write_text("{}", encoding="utf-8")
+        review = subject / "chapters" / "proofreading" / "unlisted.proofread.json"
+        review.parent.mkdir(parents=True)
+        review.write_text("{}", encoding="utf-8")
         loaded, config_path = self.load(config)
         segmenter = FakeSegmenter()
 

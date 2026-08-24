@@ -7,6 +7,8 @@
 
 - `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_content_manifest.schema.json`
+- `tools/gurubodh-cli/config/artifacts/chapter_proofreading.schema.json`
+- `tools/gurubodh-cli/config/artifacts/proofreading_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks_manifest.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
@@ -49,6 +51,10 @@
   retain chunking and token-counting provenance, and contain no retrieval
   vectors. The legacy `semantic_chunks_and_embeddings` path is unsupported for
   new output and is removed only with explicit overwrite.
+- When enabled, `prep-subject` writes Gemini proof-reading review sidecars under
+  `chapters/proofreading/`. These are deliberately outside
+  `chapters/text_and_metadata/`, are not referenced by the chapter content
+  manifest, and do not change canonical chapter text, metadata, or chunk input.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

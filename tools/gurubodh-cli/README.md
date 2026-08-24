@@ -175,7 +175,8 @@ editable install.
 runs a sample local content job.
 
 Existing output is not archived. Artifact ownership is command-scoped: `prep-subject`
-owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`, and
+owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`,
+optional `chapters/proofreading/` review sidecars, and
 `chapters/chapter_content_manifest.json`; `generate-chunks` owns only
 `chapters/semantic_chunks/`. The legacy
 `chapters/semantic_chunks_and_embeddings/` location is removed only by an
@@ -185,6 +186,44 @@ the complete subject root. A successful `prep-subject --overwrite` invalidates
 semantic chunks because they may no longer match the prepared content; rerun
 `gurubodh generate-chunks --config <generate-chunks-job>` before using RAG output.
 Cross-prefix local/R2 replacement is not a fully atomic release protocol.
+
+### Optional Gemini proof-reading review artifacts
+
+`prep-subject` can optionally submit canonical chapter text to Gemini for a
+limited review trial. It uses `gemini-3.7-flash` by default and writes only
+review sidecars; it never alters the canonical chapter text, chapter metadata,
+or `chapter_content_manifest.json`. Consequently, `generate-chunks` continues
+to read precisely the same canonical source artifacts.
+
+Enable it in a local job configuration only after setting `GEMINI_API_KEY` in
+the calling environment. Do not put the key in a job JSON file or audit report.
+
+```json
+"proofreading": {
+  "enabled": true,
+  "provider": "google-ai-studio",
+  "model": "gemini-3.7-flash",
+  "continue_on_error": true,
+  "min_request_interval_seconds": 6,
+  "max_requests_per_minute": 8,
+  "max_estimated_input_tokens_per_minute": 20000
+}
+```
+
+Each successfully reviewed chapter receives three artifacts under
+`chapters/proofreading/`: `*.proofread.txt` (corrected review text),
+`*.proofread.diff.txt` (a local word-level diff using `[-removed-]` and
+`{+added+}` markers), and `*.proofread.json` (Gemini change-list, reasons,
+checksums, and request provenance). `proofreading_manifest.json` records every
+chapter result. The local diff has no additional API call and is the source of
+truth for what changed; the Gemini list explains why it made each correction.
+
+Proof-reading is deliberately sequential and applies a local request/token
+budget. It retries transient rate-limit, timeout, network, and server failures
+with capped exponential backoff and jitter. It does not retry invalid
+credentials, malformed structured output, safety blocks, or oversized chapters.
+With the default `continue_on_error: true`, any such failure is recorded as a
+review failure or skip while canonical preparation completes.
 
 During preparation, the CLI prints the local staging subject directory and the
 canonical output-directory mapping once. It then reports each artifact set by

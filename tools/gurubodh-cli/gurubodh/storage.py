@@ -20,6 +20,8 @@ CANONICAL_ARTIFACT_DIRS = (
     Path("chapters") / "msword",
     Path("chapters") / "text_and_metadata",
 )
+PROOFREADING_ARTIFACT_DIR = Path("chapters") / "proofreading"
+PREP_ARTIFACT_DIRS = (*CANONICAL_ARTIFACT_DIRS, PROOFREADING_ARTIFACT_DIR)
 CANONICAL_ARTIFACT_FILES = (Path("chapters") / "chapter_content_manifest.json",)
 SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks"
 LEGACY_SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
@@ -29,7 +31,7 @@ CHUNKS_REPORT_DIR = Path("run_reports") / "generate-chunks"
 
 def owned_relative_paths(command):
     if command == "prep-subject":
-        return (*CANONICAL_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES, PREP_REPORT_DIR)
+        return (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES, PREP_REPORT_DIR)
     if command == "generate-chunks":
         return (SEMANTIC_ARTIFACT_DIR, CHUNKS_REPORT_DIR)
     raise ValueError(f"Unknown artifact owner: {command}")
@@ -38,7 +40,7 @@ def owned_relative_paths(command):
 def replaceable_relative_paths(command):
     """Paths that participate in preflight and overwrite; reports are append-only history."""
     if command == "prep-subject":
-        return (*CANONICAL_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES)
+        return (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES)
     if command == "generate-chunks":
         return (SEMANTIC_ARTIFACT_DIR,)
     raise ValueError(f"Unknown artifact owner: {command}")

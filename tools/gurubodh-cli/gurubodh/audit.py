@@ -196,5 +196,6 @@ class AuditReportBuilder:
                 if not key.startswith("_")
             },
             "metadata_defaults": copy.deepcopy(self.config.get("metadata_defaults", {})),
+            "proofreading": copy.deepcopy(self.config.get("_proofreading_config").public_dict()) if self.config.get("_proofreading_config") else {},
         }
         return redact_mapping(snapshot)

@@ -14,7 +14,9 @@ outputs and audit evidence owned by other commands.
 ## Decision
 
 `prep-subject` owns canonical artifacts (`full_subject/`, chapter DOCX,
-chapter text/metadata, and the candidate content manifest). `generate-chunks`
+chapter text/metadata, and the candidate content manifest), plus optional
+review-only proof-reading sidecars under `chapters/proofreading/`.
+`generate-chunks`
 owns v2 candidate semantic artifacts under `chapters/semantic_chunks/`. Their
 audit reports are retained independently under
 `run_reports/prep-subject/` and `run_reports/generate-chunks/`.
@@ -29,7 +31,8 @@ release; versioned releases and a current pointer are deferred.
 
 ## Rationale
 
-This preserves the canonical/derived boundary and audit history without
+Proof-reading sidecars are not canonical content and are not candidate inputs;
+they bind to, but never replace, the canonical chapter text. This preserves the canonical/derived boundary and audit history without
 introducing premature revision or release infrastructure.
 
 ## Impact

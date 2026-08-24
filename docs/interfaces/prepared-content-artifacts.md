@@ -57,9 +57,21 @@ cms_library/{subject_dir}/full_subject/
 cms_library/{subject_dir}/chapters/msword/
 cms_library/{subject_dir}/chapters/text_and_metadata/
 cms_library/{subject_dir}/chapters/chapter_content_manifest.json
+cms_library/{subject_dir}/chapters/proofreading/
 ```
 
 R2 prefixes are object-key strings, not real folders.
+
+## Optional Proof-reading Review Artifacts
+
+When a prep-subject job enables Gemini proof-reading, it writes review-only
+sidecars under `chapters/proofreading/`: a corrected text copy, local
+word-level diff, structured Gemini change list, and a proof-reading manifest.
+Each sidecar binds to the canonical source text checksum and content identity.
+
+These artifacts are not canonical prepared text. They are never included in
+`chapter_content_manifest.json`, and `generate-chunks` must ignore them. The
+canonical chapter text, chapter metadata, and content manifest remain unchanged.
 
 ## Metadata References
 

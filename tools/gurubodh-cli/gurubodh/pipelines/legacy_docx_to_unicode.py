@@ -2,6 +2,7 @@ from gurubodh.config import validate_pipeline_matches_source
 from gurubodh.constants import PIPELINE_LEGACY_DOCX_TO_UNICODE
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
 from gurubodh.pipelines.common import prepare_job_output, publish_job_output, validate_and_split
+from gurubodh.proofreading import proofread_chapter_artifacts
 from gurubodh.prep_subject_audit import PrepSubjectAuditWriter
 from gurubodh.storage import is_r2
 
@@ -19,6 +20,7 @@ def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, co
         progress=job["progress"],
     )
     split_outputs = validate_and_split(config, result, job["paths"], entry_point, progress=job["progress"])
+    result["proofreading"] = proofread_chapter_artifacts(config, job["paths"], progress=job["progress"])
     if audit_enabled:
         audit = PrepSubjectAuditWriter(context, config_path, config, entry_point, overwrite, job, result, split_outputs)
         if is_r2(config["destination"]):

@@ -10,11 +10,14 @@ def destination_paths_for_subject(subject_dir):
         "full_subject": subject_dir / "full_subject",
         "chapter_msword": subject_dir / "chapters" / "msword",
         "text_and_metadata": subject_dir / "chapters" / "text_and_metadata",
+        "proofreading": subject_dir / "chapters" / "proofreading",
     }
 
 
 def ensure_job_dirs(paths):
-    for path in paths.values():
+    for key, path in paths.items():
+        if key == "proofreading":
+            continue
         path.mkdir(parents=True, exist_ok=True)
 
 

@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 
 from gurubodh.storage import (
-    CANONICAL_ARTIFACT_DIRS,
+    PREP_ARTIFACT_DIRS,
     CANONICAL_ARTIFACT_FILES,
     ensure_r2_destination_available,
     invalidate_local_semantic_artifacts,
@@ -26,6 +26,7 @@ def staging_progress(subject_dir):
     print("Preparing canonical artifacts in staging directory:")
     print(f"  {subject_dir}")
     print("Outputs: full_subject/, chapters/msword/, and chapters/text_and_metadata/")
+    print("Optional proof-reading outputs: chapters/proofreading/")
 
     def report(stage, *paths):
         relative_paths = [Path(path).relative_to(subject_dir) for path in paths]
@@ -131,7 +132,7 @@ def _promote_local_canonical_artifacts(job):
     if staging_subject == published_subject:
         return
     print(f"Promoting canonical artifacts to: {published_subject}")
-    for relative_path in (*CANONICAL_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES):
+    for relative_path in (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES):
         source = staging_subject / relative_path
         target = published_subject / relative_path
         if not source.exists():
