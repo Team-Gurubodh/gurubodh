@@ -177,7 +177,7 @@ editable install.
 `gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`
 runs a sample local content job.
 
-Existing output is not archived. Artifact ownership is command-scoped: `prep-subject`
+Artifact ownership is command-scoped: `prep-subject`
 owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`,
 `chapters/unmodified_source_text/`, `chapters/proofreading/`, and
 `chapters/chapter_content_manifest.json`; `generate-chunks` owns only
@@ -188,7 +188,10 @@ history. `--overwrite` replaces only the invoking command's owned paths, never
 the complete subject root. A successful `prep-subject --overwrite` invalidates
 semantic chunks because they may no longer match the prepared content; rerun
 `gurubodh generate-chunks --config <generate-chunks-job>` before using RAG output.
-Cross-prefix local/R2 replacement is not a fully atomic release protocol.
+`prep-subject` also owns operational state at
+`run_state/prep-subject/job-state.json` and staged checkpoints at
+`.work/prep-subject/{job-id}/`. Cross-prefix local/R2 replacement is not a
+fully atomic release protocol.
 
 ### Mandatory Gemini proofreading and canonical chapter artifacts
 
@@ -246,6 +249,30 @@ text or credentials.
 ```bash
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
 ```
+
+### Resuming an interrupted prep job
+
+Each successful chapter is written and checksum-validated in the staged
+workspace before `job-state.json` is updated. When an individual chapter fails,
+the command finishes the remaining independently processable chapters, writes
+an immutable JSON/Markdown run report, and exits non-zero with state
+`incomplete`. Resume it without paying for already checkpointed chapters:
+
+```bash
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --resume
+```
+
+`--resume` and `--overwrite` are mutually exclusive. Resume requires the same
+source DOCX and output-affecting pipeline, naming, metadata, and proofreading
+contract; use `--overwrite` for a changed input. An overwrite archives the old
+state and discards its workspace, but preserves existing canonical artifacts
+and semantic chunks until the replacement is successfully published. Do not
+run concurrent writers for a subject; a stale local lock or R2 lease can be
+recovered safely with `--resume`.
+
+`generate-chunks` now checks `job-state.json` and the canonical manifest before
+it creates or deletes any chunk output. It refuses incomplete, publishing, or
+legacy prepared trees until `prep-subject --resume` reaches `succeeded`.
 
 `gurubodh generate-chunks` reads `chapters/chapter_content_manifest.json`
 as the authoritative candidate set, validates its selected metadata/text

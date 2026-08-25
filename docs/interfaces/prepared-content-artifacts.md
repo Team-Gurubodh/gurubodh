@@ -59,9 +59,33 @@ cms_library/{subject_dir}/chapters/text_and_metadata/
 cms_library/{subject_dir}/chapters/unmodified_source_text/
 cms_library/{subject_dir}/chapters/chapter_content_manifest.json
 cms_library/{subject_dir}/chapters/proofreading/
+cms_library/{subject_dir}/run_state/prep-subject/job-state.json
+cms_library/{subject_dir}/.work/prep-subject/{job-id}/
 ```
 
 R2 prefixes are object-key strings, not real folders.
+
+## Prep-subject operational checkpoint
+
+`run_state/prep-subject/job-state.json` is the durable operational record for a
+preparation job, not a canonical content artifact. Its schema is
+`prep_subject_job_state.schema.json`. It records a unique job ID, lifecycle
+state, lease heartbeat, compatibility fingerprint, source checksum, bounded
+per-chapter outcomes, checksum-validated staged artifact references, canonical
+manifest binding, and immutable run-report references. It never contains API
+keys, request/response bodies, full chapter text, or unbounded provider errors.
+
+The job workspace is under `.work/prep-subject/{job-id}/`. It contains staged
+artifacts only and is never a source for ingestion or chunk generation. Local
+workspaces are retained for incomplete or publishing recovery and removed after
+successful canonical promotion. R2 stores the equivalent workspace object
+prefix; its multi-object publication remains recoverable but non-atomic.
+
+The lifecycle is `running`, `incomplete`, `ready_to_publish`, `publishing`,
+`succeeded`, or `failed`. Chapters are only `pending`, `failed`, or
+`succeeded`. A successful chapter is reusable only after its complete staged
+artifact set passes checksum validation. `generate-chunks` refuses any state
+other than `succeeded`, including before an overwrite can delete chunk output.
 
 ## Mandatory Canonical Gemini Proofreading
 
@@ -166,10 +190,16 @@ output before producing v2 chunks.
 
 ## Overwrite Behavior
 
-The preparation tool does not archive existing output. If output already exists,
-jobs fail unless `--overwrite` is supplied. All required proofreading must
-succeed in staging before local promotion or any R2 overwrite/publication step.
-For R2 destinations, existing object
-keys are checked before upload and object replacement requires `--overwrite`.
-R2 jobs also check the destination subject prefix before local processing starts
-so a missing overwrite flag fails early instead of after artifact generation.
+Without a flag, an incomplete checkpoint causes `prep-subject` to stop with
+instructions to use `--resume` or `--overwrite`. `--resume` requires the same
+source/configuration fingerprint and retries only pending or failed chapters;
+on a succeeded job it exits without Gemini calls. `--resume` and `--overwrite`
+are mutually exclusive. `--overwrite` archives the old state record, discards
+its staged workspace, and starts a fresh job; it does not resume.
+
+All required proofreading must succeed in staging before canonical promotion.
+An unfinished overwrite leaves the previous canonical tree and its semantic
+chunks intact. Only a successful replacement invalidates semantic output.
+There must be no concurrent writer for a subject: local jobs take an exclusive
+lock and R2 jobs use the active lease/heartbeat in job state. A stale lease is
+recoverable with `--resume`.

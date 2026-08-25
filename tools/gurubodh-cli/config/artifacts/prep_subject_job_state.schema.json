@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/prep_subject_job_state.schema.json",
+  "title": "Gurubodh resumable prep-subject job state",
+  "type": "object",
+  "required": ["schema_version", "job_id", "state", "created_at", "updated_at", "compatibility", "chapters", "counts", "publication", "run_reports"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "job_id": {"type": "string", "format": "uuid"},
+    "state": {"enum": ["running", "incomplete", "ready_to_publish", "publishing", "succeeded", "failed"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "run": {"type": "object"},
+    "lease": {"type": "object"},
+    "compatibility": {
+      "type": "object",
+      "required": ["fingerprint", "source_docx_sha256", "output_affecting_inputs"],
+      "properties": {
+        "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "source_docx_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "output_affecting_inputs": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chapter_number", "source_filename", "source_sha256", "state", "attempt_count"],
+        "properties": {
+          "chapter_number": {"type": "string", "pattern": "^[0-9]{3}$"},
+          "source_filename": {"type": "string", "minLength": 1},
+          "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "state": {"enum": ["pending", "failed", "succeeded"]},
+          "attempt_count": {"type": "integer", "minimum": 0},
+          "latest_error": {"type": ["object", "null"]},
+          "successful_artifacts": {"type": "array"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["succeeded", "failed", "pending"],
+      "properties": {
+        "succeeded": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "pending": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "publication": {"type": "object"},
+    "run_reports": {"type": "array"},
+    "failure": {"type": ["object", "null"]}
+  },
+  "additionalProperties": true
+}
