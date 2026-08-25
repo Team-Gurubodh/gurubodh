@@ -14,6 +14,7 @@ from gurubodh.constants import (
     SEMANTIC_CHUNKS_OUTPUT_DIR,
 )
 from gurubodh.generate_chunks_audit import GenerateChunksAuditWriter
+from gurubodh.prep_subject_checkpoints import validate_generate_chunks_gate
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
 from gurubodh.ml.semantic_chunking.segmenter import ParagraphSegmenter, SemanticChunkingParagraphSegmenter
@@ -69,6 +70,7 @@ def run_generate_chunks_job(
 def prepare_generate_chunks_job(config, overwrite, r2_client=None, progress=print):
     source_subject, source_temp_dir, candidate_manifest = materialize_source_subject(config, r2_client, progress)
     candidate_sources = validate_materialized_candidates(config, source_subject, candidate_manifest)
+    validate_generate_chunks_gate(config, source_subject, candidate_manifest, r2_client=r2_client)
     destination_subject, destination_temp_dir = destination_subject_dir(config)
     preflight = ensure_destination_available(config, destination_subject, overwrite, r2_client)
     paths = {

@@ -9,6 +9,7 @@
 - `tools/gurubodh-cli/config/artifacts/chapter_content_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_proofreading.schema.json`
 - `tools/gurubodh-cli/config/artifacts/proofreading_manifest.schema.json`
+- `tools/gurubodh-cli/config/artifacts/prep_subject_job_state.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks_manifest.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
@@ -58,6 +59,13 @@
   without a metadata JSON; `chapters/proofreading/` holds its local diff and
   provenance details. Only the proofread canonical pair is referenced by the
   chapter content manifest or eligible for `generate-chunks`.
+- `prep_subject_job_state.schema.json` defines the durable operational
+  checkpoint at `run_state/prep-subject/job-state.json`. It records safe
+  compatibility, lease, per-chapter state, artifact checksums, publication, and
+  report references; it must never contain credentials, raw requests/responses,
+  or full chapter text. `generate-chunks` requires this state to be `succeeded`
+  and to bind the published chapter content manifest before it can mutate chunk
+  output.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

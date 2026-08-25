@@ -96,6 +96,28 @@ def write_candidate_manifest(root_dir, config, chapters):
     }
     path = subject / "chapters" / "chapter_content_manifest.json"
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    state_path = subject / "run_state" / "prep-subject" / "job-state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps({
+        "schema_version": 1,
+        "job_id": "test-job",
+        "state": "succeeded",
+        "publication": {
+            "state": "succeeded",
+            "canonical_manifest": {
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "chapter_numbers": [entry["generated_chapter_number"] for entry in payload["chapters"]],
+            },
+        },
+        "chapters": [
+            {
+                "chapter_number": entry["generated_chapter_number"],
+                "state": "succeeded",
+                "proofreading": {"canonical_content_key": entry["content_key"]},
+            }
+            for entry in payload["chapters"]
+        ],
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path, payload
 
 
@@ -264,6 +286,24 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             run_generate_chunks_job(self.context, loaded, overwrite=True, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
         self.assertFalse(legacy.exists())
 
+    def test_incomplete_prep_state_refuses_before_overwrite_can_delete_existing_chunks(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        state_path = subject / "run_state" / "prep-subject" / "job-state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["state"] = "publishing"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        previous = subject / "chapters" / "semantic_chunks" / "previous.chunks.json"
+        previous.parent.mkdir(parents=True)
+        previous.write_text("previous", encoding="utf-8")
+        loaded, config_path = self.load(config)
+
+        with self.assertRaisesRegex(SystemExit, "latest prep-subject job is not succeeded"):
+            run_generate_chunks_job(self.context, loaded, overwrite=True, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
+        self.assertTrue(previous.is_file())
+
     def test_r2_materializes_only_selected_manifest_artifacts(self):
         config = base_config(self.temp_dir.name)
         config["source"] = {"backend": "r2", "bucket": "gurubodh-library-dev", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None}
@@ -289,6 +329,22 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             "cms_library/123_spand_rahasya/chapters/text_and_metadata/unlisted.txt": "ignored",
             "cms_library/123_spand_rahasya/chapters/unmodified_source_text/unlisted_unmodified_source.txt": "ignored",
             "cms_library/123_spand_rahasya/chapters/proofreading/unlisted.proofread.json": "{}",
+            "cms_library/123_spand_rahasya/run_state/prep-subject/job-state.json": json.dumps({
+                "schema_version": 1,
+                "job_id": "test-job",
+                "state": "succeeded",
+                "publication": {
+                    "state": "succeeded",
+                    "canonical_manifest": {
+                        "sha256": hashlib.sha256(json.dumps(manifest, ensure_ascii=False).encode("utf-8")).hexdigest(),
+                        "chapter_numbers": ["001", "002"],
+                    },
+                },
+                "chapters": [
+                    {"chapter_number": "001", "state": "succeeded", "proofreading": {"canonical_content_key": metadata_one["content_identity"]["content_key"]}},
+                    {"chapter_number": "002", "state": "succeeded", "proofreading": {"canonical_content_key": metadata_two["content_identity"]["content_key"]}},
+                ],
+            }, ensure_ascii=False),
         })
         config["chapters"] = ["002"]
         loaded, config_path = self.load(config)
@@ -298,6 +354,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             f"{prefix}/chapter_content_manifest.json",
             metadata_two["storage"]["artifacts"]["metadata"]["key"],
             metadata_two["storage"]["artifacts"]["text"]["key"],
+            "cms_library/123_spand_rahasya/run_state/prep-subject/job-state.json",
         ])
         self.assertTrue(any("/chapters/semantic_chunks/" in key for key in client.uploads))
 

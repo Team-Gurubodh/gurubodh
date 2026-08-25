@@ -1,46 +1,31 @@
 from gurubodh.config import validate_pipeline_matches_source
-from gurubodh.content_manifest import write_chapter_content_manifest
 from gurubodh.constants import PIPELINE_LEGACY_DOCX_TO_UNICODE
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
-from gurubodh.pipelines.common import prepare_job_output, publish_job_output, validate_and_split
-from gurubodh.proofreading import proofread_chapter_artifacts
-from gurubodh.prep_subject_audit import PrepSubjectAuditWriter
-from gurubodh.storage import is_r2
+from gurubodh.prep_subject_checkpoints import run_resumable_prep_job
 
 
-def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True):
+def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True, resume=False, r2_client=None):
     validate_pipeline_matches_source(config, PIPELINE_LEGACY_DOCX_TO_UNICODE)
-    job = prepare_job_output(config, overwrite)
     print("[prepare] Converting the legacy source DOCX to Unicode and extracting full-subject text.")
     font_name = target_devanagari_font()
-    result = convert_docx(
-        job["source_path"],
-        font_name,
-        context.legacy_converter,
-        job["full_docx"],
-        job["full_text"],
-        progress=job["progress"],
-    )
-    split_outputs = validate_and_split(config, result, job["paths"], entry_point, progress=job["progress"])
-    result["proofreading"] = proofread_chapter_artifacts(
+
+    def prepare(source_path, output_path, text_path, progress):
+        return convert_docx(
+            source_path,
+            font_name,
+            context.legacy_converter,
+            output_path,
+            text_path,
+            progress=progress,
+        )
+
+    return run_resumable_prep_job(
+        context,
         config,
-        job["paths"],
-        converter_counts=result["converter_counts"],
-        entry_point=entry_point,
-        progress=job["progress"],
+        entry_point,
+        overwrite,
+        resume,
+        config_path,
+        prepare,
+        r2_client=r2_client,
     )
-    if split_outputs:
-        manifest_path = write_chapter_content_manifest(config, job["paths"])
-        job["progress"]("validate", manifest_path)
-    if audit_enabled:
-        audit = PrepSubjectAuditWriter(context, config_path, config, entry_point, overwrite, job, result, split_outputs)
-        if is_r2(config["destination"]):
-            audit.write_r2_pending()
-            publish_job_output(config, job, overwrite, before_upload=audit.before_r2_upload)
-            audit.announce_locations()
-        else:
-            publish_job_output(config, job, overwrite)
-            audit.write_local_success()
-    else:
-        publish_job_output(config, job, overwrite)
-    return result

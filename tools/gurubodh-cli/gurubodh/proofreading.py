@@ -423,6 +423,142 @@ def _canonical_text_value(corrected_text: str) -> str:
     return corrected_text.rstrip("\n")
 
 
+def proofread_single_chapter_artifacts(
+    config: dict[str, Any],
+    paths: dict[str, Path],
+    chapter_number: int,
+    unmodified_source_path: Path,
+    converter_counts: dict[str, int] | None = None,
+    entry_point: str = "",
+    proofreader: GeminiProofreader | None = None,
+    progress: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    """Proofread one staged chapter and write its complete artifact set.
+
+    The caller owns checkpointing.  This deliberately returns only bounded
+    provenance and artifact checksums; neither the source nor corrected text is
+    returned for inclusion in a job checkpoint or audit record.
+    """
+    settings = config["_proofreading_config"]
+    source_bytes = unmodified_source_path.read_bytes()
+    source_text = source_bytes.decode("utf-8")
+    source_identity = build_content_identity(
+        config["naming"]["category_code"],
+        config["naming"]["subject_code"],
+        config.get("metadata_defaults", {}).get("language", "hi-Deva"),
+        source_text,
+    )
+    text_filename = _canonical_text_filename(unmodified_source_path.name)
+    file_names = _chapter_file_names(config, chapter_number)
+    if text_filename != file_names["text"]:
+        raise ProofreadingError(
+            "invalid_unmodified_source_artifact",
+            f"Unmodified source filename does not match chapter {chapter_number:03d}: {unmodified_source_path.name}",
+        )
+
+    proofreader = proofreader or GeminiProofreader(settings)
+    response = proofreader.proofread(source_text, progress=progress)
+    canonical_text = _canonical_text_value(response["corrected_text"])
+    canonical_text_path = paths["text_and_metadata"] / text_filename
+    metadata_path = paths["text_and_metadata"] / file_names["metadata"]
+    _write_text(canonical_text_path, canonical_text)
+    metadata = build_chapter_metadata(
+        config,
+        chapter_number,
+        file_names,
+        canonical_text,
+        converter_counts or {},
+        utc_now(),
+        entry_point,
+    )
+    _write_text(metadata_path, json.dumps(metadata, ensure_ascii=False, indent=2))
+
+    canonical_artifact_text = canonical_text_path.read_text(encoding="utf-8")
+    rendered_diff, diff_summary = word_level_diff(source_text, canonical_artifact_text)
+    proof_dir = paths["proofreading"]
+    proof_dir.mkdir(parents=True, exist_ok=True)
+    artifact_paths = _proofread_artifact_paths(proof_dir, text_filename)
+    _write_text(artifact_paths["diff"], "Word-level proof-reading diff. [-removed-] {+added+}\n\n" + rendered_diff)
+    relative_dir = Path("chapters") / PROOFREADING_OUTPUT_DIR
+    canonical_integrity = _artifact_integrity(canonical_text_path)
+    payload = {
+        "schema_version": PROOFREADING_SCHEMA_VERSION,
+        "status": "succeeded",
+        "created_at": utc_now(),
+        "provider": {"name": settings.provider, "model": settings.model},
+        "unmodified_source": {
+            "text_artifact": destination_artifact_reference(
+                config,
+                Path("chapters") / "unmodified_source_text" / unmodified_source_path.name,
+            ),
+            "text_sha256": hashlib.sha256(source_bytes).hexdigest(),
+            "content_identity": source_identity,
+        },
+        "canonical_corrected": {
+            "text_artifact": metadata["storage"]["artifacts"]["text"],
+            "text_sha256": canonical_integrity["value"],
+            "content_identity": metadata["content_identity"],
+        },
+        "diff_artifact": destination_artifact_reference(config, relative_dir / artifact_paths["diff"].name),
+        "integrity": {
+            "unmodified_source": _artifact_integrity(unmodified_source_path),
+            "canonical_corrected": canonical_integrity,
+            "diff": _artifact_integrity(artifact_paths["diff"]),
+        },
+        "local_diff_summary": diff_summary,
+        "gemini_edits": response["edits"],
+        "request": {key: response[key] for key in ("estimated_input_tokens", "attempts", "throttle_seconds", "usage")},
+    }
+    _write_text(artifact_paths["json"], json.dumps(payload, ensure_ascii=False, indent=2))
+    artifact_files = [
+        paths["chapter_msword"] / file_names["msword"],
+        unmodified_source_path,
+        canonical_text_path,
+        metadata_path,
+        artifact_paths["diff"],
+        artifact_paths["json"],
+    ]
+    chapter = {
+        "chapter_number": f"{chapter_number:03d}",
+        "status": "succeeded",
+        "correction_count": len(response["edits"]),
+        "local_diff_summary": diff_summary,
+        "unmodified_source_content_key": source_identity["content_key"],
+        "canonical_content_key": metadata["content_identity"]["content_key"],
+        "artifacts": {
+            "unmodified_source": destination_artifact_reference(
+                config,
+                Path("chapters") / "unmodified_source_text" / unmodified_source_path.name,
+            ),
+            "canonical_text": metadata["storage"]["artifacts"]["text"],
+            "canonical_metadata": metadata["storage"]["artifacts"]["metadata"],
+            **{key: destination_artifact_reference(config, relative_dir / path.name) for key, path in artifact_paths.items()},
+        },
+        "checkpoint_artifacts": [
+            {
+                "path": str(path.relative_to(paths["subject"])),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+            for path in artifact_files
+            if path.is_file()
+        ],
+    }
+    return chapter
+
+
+def write_proofreading_manifest(paths: dict[str, Path], settings: ProofreadingSettings, chapters: list[dict[str, Any]]) -> Path:
+    """Write the final canonical proofreading provenance manifest."""
+    manifest = {
+        "schema_version": PROOFREADING_SCHEMA_VERSION,
+        "provider": {"name": settings.provider, "model": settings.model},
+        "counts": {"succeeded": len(chapters), "failed": 0, "skipped": 0},
+        "chapters": [{key: value for key, value in chapter.items() if key != "checkpoint_artifacts"} for chapter in chapters],
+    }
+    manifest_path = paths["proofreading"] / PROOFREADING_MANIFEST_FILENAME
+    _write_text(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2))
+    return manifest_path
+
+
 def proofread_chapter_artifacts(
     config: dict[str, Any],
     paths: dict[str, Path],
@@ -450,30 +586,20 @@ def proofread_chapter_artifacts(
         )
 
     for chapter_index, unmodified_source_path in enumerate(source_paths, start=1):
-        source_bytes = unmodified_source_path.read_bytes()
-        source_text = source_bytes.decode("utf-8")
-        source_identity = build_content_identity(
-            config["naming"]["category_code"],
-            config["naming"]["subject_code"],
-            config.get("metadata_defaults", {}).get("language", "hi-Deva"),
-            source_text,
-        )
-        text_filename = _canonical_text_filename(unmodified_source_path.name)
-        file_names = _chapter_file_names(config, chapter_index)
-        if text_filename != file_names["text"]:
-            raise ProofreadingError(
-                "invalid_unmodified_source_artifact",
-                f"Unmodified source filename does not match chapter {chapter_index:03d}: {unmodified_source_path.name}",
-            )
-
         try:
             if progress:
                 print(
                     f"[proofread {chapter_index:02d}/{len(source_paths):02d}] "
-                    f"Unmodified source is ready ({len(source_text)} characters); starting Gemini request."
+                    f"Unmodified source is ready ({len(unmodified_source_path.read_text(encoding='utf-8'))} characters); starting Gemini request."
                 )
-            response = proofreader.proofread(
-                source_text,
+            chapter = proofread_single_chapter_artifacts(
+                config,
+                paths,
+                chapter_index,
+                unmodified_source_path,
+                converter_counts=converter_counts,
+                entry_point=entry_point,
+                proofreader=proofreader,
                 progress=(
                     lambda message: print(
                         f"[proofread {chapter_index:02d}/{len(source_paths):02d}] {message}"
@@ -487,93 +613,26 @@ def proofread_chapter_artifacts(
                 print(f"[proofread] chapter {chapter_index:03d}: failed ({exc.code}: {exc})")
             raise
 
-        canonical_text = _canonical_text_value(response["corrected_text"])
-        canonical_text_path = paths["text_and_metadata"] / text_filename
-        metadata_path = paths["text_and_metadata"] / file_names["metadata"]
-        _write_text(canonical_text_path, canonical_text)
-        metadata = build_chapter_metadata(
-            config,
-            chapter_index,
-            file_names,
-            canonical_text,
-            converter_counts or {},
-            utc_now(),
-            entry_point,
-        )
-        _write_text(metadata_path, json.dumps(metadata, ensure_ascii=False, indent=2))
-
-        canonical_artifact_text = canonical_text_path.read_text(encoding="utf-8")
-        rendered_diff, diff_summary = word_level_diff(source_text, canonical_artifact_text)
-        artifact_paths = _proofread_artifact_paths(proof_dir, text_filename)
-        _write_text(artifact_paths["diff"], "Word-level proof-reading diff. [-removed-] {+added+}\n\n" + rendered_diff)
-        relative_dir = Path("chapters") / PROOFREADING_OUTPUT_DIR
-        canonical_integrity = _artifact_integrity(canonical_text_path)
-        payload = {
-            "schema_version": PROOFREADING_SCHEMA_VERSION,
-            "status": "succeeded",
-            "created_at": utc_now(),
-            "provider": {"name": settings.provider, "model": settings.model},
-            "unmodified_source": {
-                "text_artifact": destination_artifact_reference(
-                    config,
-                    Path("chapters") / "unmodified_source_text" / unmodified_source_path.name,
-                ),
-                "text_sha256": hashlib.sha256(source_bytes).hexdigest(),
-                "content_identity": source_identity,
-            },
-            "canonical_corrected": {
-                "text_artifact": metadata["storage"]["artifacts"]["text"],
-                "text_sha256": canonical_integrity["value"],
-                "content_identity": metadata["content_identity"],
-            },
-            "diff_artifact": destination_artifact_reference(config, relative_dir / artifact_paths["diff"].name),
-            "integrity": {
-                "unmodified_source": _artifact_integrity(unmodified_source_path),
-                "canonical_corrected": canonical_integrity,
-                "diff": _artifact_integrity(artifact_paths["diff"]),
-            },
-            "local_diff_summary": diff_summary,
-            "gemini_edits": response["edits"],
-            "request": {key: response[key] for key in ("estimated_input_tokens", "attempts", "throttle_seconds", "usage")},
-        }
-        _write_text(artifact_paths["json"], json.dumps(payload, ensure_ascii=False, indent=2))
-        chapter = {
-            "chapter_number": f"{chapter_index:03d}",
-            "status": "succeeded",
-            "correction_count": len(response["edits"]),
-            "local_diff_summary": diff_summary,
-            "unmodified_source_content_key": source_identity["content_key"],
-            "canonical_content_key": metadata["content_identity"]["content_key"],
-            "artifacts": {
-                "unmodified_source": destination_artifact_reference(
-                    config,
-                    Path("chapters") / "unmodified_source_text" / unmodified_source_path.name,
-                ),
-                "canonical_text": metadata["storage"]["artifacts"]["text"],
-                "canonical_metadata": metadata["storage"]["artifacts"]["metadata"],
-                **{key: destination_artifact_reference(config, relative_dir / path.name) for key, path in artifact_paths.items()},
-            },
-        }
+        # The old all-or-nothing helper is a public compatibility surface. Its
+        # caller has no checkpoint state to persist, so keep that internal
+        # bookkeeping field out of its returned manifest/result.
+        chapter.pop("checkpoint_artifacts", None)
         result["chapters"].append(chapter)
         result["counts"]["succeeded"] += 1
         if progress:
+            file_names = _chapter_file_names(config, chapter_index)
+            text_filename = file_names["text"]
+            artifact_paths = _proofread_artifact_paths(proof_dir, text_filename)
             progress(
                 "proofread",
                 paths["chapter_msword"] / file_names["msword"],
-                canonical_text_path,
-                metadata_path,
+                paths["text_and_metadata"] / text_filename,
+                paths["text_and_metadata"] / file_names["metadata"],
                 unmodified_source_path,
                 artifact_paths["diff"],
                 artifact_paths["json"],
             )
 
-    manifest = {
-        "schema_version": PROOFREADING_SCHEMA_VERSION,
-        "provider": {"name": settings.provider, "model": settings.model},
-        "counts": result["counts"],
-        "chapters": result["chapters"],
-    }
-    manifest_path = proof_dir / PROOFREADING_MANIFEST_FILENAME
-    _write_text(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2))
+    manifest_path = write_proofreading_manifest(paths, settings, result["chapters"])
     result["manifest_path"] = manifest_path
     return result

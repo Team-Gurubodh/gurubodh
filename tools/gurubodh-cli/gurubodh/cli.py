@@ -55,6 +55,11 @@ def build_parser():
         description="Read the job config and dispatch to its declared pipeline.",
     )
     add_common_options(prep_subject_parser)
+    prep_subject_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a compatible incomplete prep-subject checkpoint without repeating successful chapter proofreads.",
+    )
 
     generate_chunks_parser = subparsers.add_parser(
         "generate-chunks",
@@ -127,7 +132,9 @@ def main(argv=None):
     register_namespaces()
 
     if args.command == "prep-subject":
-        run_configured_job(context, config_path, overwrite=args.overwrite)
+        if args.resume and args.overwrite:
+            parser.error("--resume and --overwrite are mutually exclusive for prep-subject.")
+        run_configured_job(context, config_path, overwrite=args.overwrite, resume=args.resume)
     elif args.command == "unicode-ingest":
         run_unicode_job(context, config_path, overwrite=args.overwrite)
     elif args.command == "legacy-convert":
