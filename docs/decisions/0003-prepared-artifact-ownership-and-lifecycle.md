@@ -13,12 +13,15 @@ outputs and audit evidence owned by other commands.
 
 ## Decision
 
-`prep-subject` owns canonical artifacts (`full_subject/`, chapter DOCX,
-proofread chapter text/metadata, and the candidate content manifest),
+`prep-subject` owns canonical proofread chapter text/metadata and the candidate
+content manifest,
 unmodified chapter input snapshots under `chapters/unmodified_source_text/`,
 and mandatory proof-reading provenance under `chapters/proofreading/`.
-`generate-chunks`
-owns v2 candidate semantic artifacts under `chapters/semantic_chunks/`. Their
+The separate `generate-docx` command owns derived exports under
+`chapters/msword/`; `prep-subject` may invalidate that path after canonical
+replacement but never generates it. The retired `full_subject/` path has no
+replacement. `generate-chunks` owns v2 candidate semantic artifacts under
+`chapters/semantic_chunks/`. Their
 audit reports are retained independently under
 `run_reports/prep-subject/` and `run_reports/generate-chunks/`.
 
@@ -43,10 +46,12 @@ embedding source/corrected text, prompts, credentials, or raw responses.
 
 An overwrite is scoped to the command's paths. It archives its earlier state
 record and discards only the associated staged workspace; it keeps the prior
-canonical tree and semantic outputs while the new job is incomplete. After successful canonical
-replacement, both v2 semantic artifacts and the legacy
-`chapters/semantic_chunks_and_embeddings/` path are invalidated, with an
-operator notice to regenerate candidate chunks. The legacy path is unsupported
+canonical tree, semantic outputs, derived chapter DOCX, and legacy
+`full_subject/` while the new job is incomplete. After successful canonical
+replacement, same-locale `chapters/msword/`, both v2 semantic artifacts, and
+the legacy `chapters/semantic_chunks_and_embeddings/` path are invalidated, with an
+operator notice to regenerate derived outputs; legacy `full_subject/` is
+removed. The legacy semantic path is unsupported
 for new ingestion; `generate-chunks --overwrite` removes it before creating
 v2 output. Local and R2 replacement are not a fully atomic multi-prefix
 release; versioned releases and a current pointer are deferred.
@@ -61,6 +66,10 @@ history without introducing premature revision or release infrastructure.
 ## Impact
 
 Operators must rerun `generate-chunks` after overwriting canonical content.
+They must also rerun `generate-docx` once that command is available if chapter
+DOCX exports are required. Old incomplete six-file prep checkpoints cannot
+resume under the text-only five-file contract and require `--overwrite`;
+already succeeded releases remain consumable by downstream commands.
 They must regenerate pre-language-root Hindi artifacts into `hi-IN` explicitly;
 the CLI never relocates or deletes those legacy artifacts automatically.
 Future commands must declare their owned paths before implementing overwrite.

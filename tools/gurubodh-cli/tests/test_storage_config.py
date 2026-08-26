@@ -321,9 +321,10 @@ class StorageConfigTests(unittest.TestCase):
             {
                 "metadata_filename": "chapter.json",
                 "text_filename": "chapter.txt",
-                "msword_filename": "chapter.docx",
             },
         )
+        self.assertEqual(set(metadata["storage"]["artifacts"]), {"metadata", "text"})
+        self.assertEqual(metadata["schema_version"], "1.4.0")
         self.assertEqual(metadata["storage"]["source"]["key"], "source_library/129_spand_rahasya/source.docx")
         self.assertEqual(
             metadata["storage"]["artifacts"]["metadata"]["key"],
@@ -704,6 +705,12 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(text_schema["properties"]["line_endings"]["const"], "LF")
         self.assertEqual(text_schema["properties"]["scope"]["const"], "artifact-bytes")
         self.assertEqual(text_schema["properties"]["value"]["pattern"], "^[a-f0-9]{64}$")
+        self.assertEqual(schema["properties"]["schema_version"]["const"], "1.4.0")
+        self.assertEqual(schema["properties"]["files"]["required"], ["metadata_filename", "text_filename"])
+        self.assertEqual(
+            schema["properties"]["storage"]["properties"]["artifacts"]["required"],
+            ["metadata", "text"],
+        )
 
     def test_r2_source_materializes_to_temporary_docx(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -760,10 +767,10 @@ class StorageConfigTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as temp_dir:
             subject_dir = Path(temp_dir) / "129_spand_rahasya"
-            output_file = subject_dir / "full_subject" / "full.txt"
+            output_file = subject_dir / "chapters" / "text_and_metadata" / "chapter.txt"
             output_file.parent.mkdir(parents=True)
             output_file.write_text("content", encoding="utf-8")
-            client = FakeR2Client({"cms_library/129_spand_rahasya/full_subject/full.txt"})
+            client = FakeR2Client({"cms_library/129_spand_rahasya/chapters/text_and_metadata/chapter.txt"})
 
             with redirect_stdout(StringIO()):
                 with self.assertRaises(SystemExit):
@@ -788,11 +795,13 @@ class StorageConfigTests(unittest.TestCase):
         message = str(error.exception)
         self.assertIn("R2 destination already contains prep-subject artifact locations.", message)
         self.assertIn("- r2://gurubodh-library-dev/cms_library/129_spand_rahasya/full_subject/", message)
-        self.assertIn("contents of these locations will be replaced and existing semantic chunk artifacts will be invalidated.", message)
-        self.assertIn("Audit history will be preserved. Unrelated subject files will be preserved.", message)
+        self.assertIn("prep-owned text/provenance artifacts will be replaced", message)
+        self.assertIn("chapter DOCX and semantic chunk artifacts will be invalidated", message)
+        self.assertIn("legacy full_subject artifacts will be removed", message)
+        self.assertIn("Audit history and unrelated subject files will be preserved.", message)
         self.assertIn("Run gurubodh generate-chunks --config <generate-chunks-job> before relying on RAG/chunk outputs.", message)
         self.assertEqual(message.count("R2 destination already contains"), 1)
-        self.assertEqual(client.prefix_check, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/chapters/chapter_content_manifest.json"))
+        self.assertEqual(client.prefix_check, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/full_subject/"))
 
     def test_r2_preflight_marks_destructive_replacement_pending_with_overwrite(self):
         config = json.loads(json.dumps(BASE_CONFIG))
@@ -819,7 +828,7 @@ class StorageConfigTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as temp_dir:
             subject_dir = Path(temp_dir) / "129_spand_rahasya"
-            output_file = subject_dir / "full_subject" / "full.txt"
+            output_file = subject_dir / "chapters" / "text_and_metadata" / "chapter.txt"
             output_file.parent.mkdir(parents=True)
             output_file.write_text("content", encoding="utf-8")
             client = FakeR2Client(
@@ -836,13 +845,12 @@ class StorageConfigTests(unittest.TestCase):
 
             progress = output.getvalue()
             self.assertIn("prepared 1 artifact file(s) for R2 upload", progress)
-            self.assertIn("deleted 1 object(s) from prep-subject-owned R2 paths", progress)
-            self.assertIn("[1/1] full subject: full (text)", progress)
-            self.assertEqual(client.deleted_prefix, ("gurubodh-library-dev", "cms_library/129_spand_rahasya/chapters/chapter_content_manifest.json"))
+            self.assertIn("deleted 0 object(s) from prep-subject-owned R2 paths", progress)
+            self.assertIn("chapter artifacts: 1 chapters / 1 files", progress)
             self.assertEqual(
                 client.existing_keys,
                 {
-                    "cms_library/129_spand_rahasya/full_subject/full.txt",
+                    "cms_library/129_spand_rahasya/chapters/text_and_metadata/chapter.txt",
                     "cms_library/129_spand_rahasya/chapters/stale.txt",
                     "cms_library/130_other_subject/full_subject/keep.txt",
                 },
@@ -851,9 +859,9 @@ class StorageConfigTests(unittest.TestCase):
                 client.uploads,
                 [
                     (
-                        "full.txt",
+                        "chapter.txt",
                         "gurubodh-library-dev",
-                        "cms_library/129_spand_rahasya/full_subject/full.txt",
+                        "cms_library/129_spand_rahasya/chapters/text_and_metadata/chapter.txt",
                     )
                 ],
             )
@@ -871,7 +879,6 @@ class StorageConfigTests(unittest.TestCase):
             for chapter in ("001", "002"):
                 stem = f"CAT020_SUB129_spand-rahasya_{chapter}_v01.01"
                 for directory, suffix in (
-                    ("chapters/msword", ".docx"),
                     ("chapters/text_and_metadata", ".txt"),
                     ("chapters/text_and_metadata", ".json"),
                     ("chapters/unmodified_source_text", "_unmodified_source.txt"),
@@ -892,14 +899,13 @@ class StorageConfigTests(unittest.TestCase):
                 publish_r2_destination(config, subject_dir, overwrite=False, r2_client=client)
 
             progress = output.getvalue()
-            self.assertIn("[1/3] chapter artifacts: 2 chapters / 12 files", progress)
-            self.assertIn("[01/02] CAT020_SUB129_spand-rahasya_001_v01.01 (DOCX, canonical text, canonical metadata, unmodified source, diff, proofreading details)", progress)
-            self.assertIn("[02/02] CAT020_SUB129_spand-rahasya_002_v01.01 (DOCX, canonical text, canonical metadata, unmodified source, diff, proofreading details)", progress)
+            self.assertIn("[1/3] chapter artifacts: 2 chapters / 10 files", progress)
+            self.assertIn("[01/02] CAT020_SUB129_spand-rahasya_001_v01.01 (canonical text, canonical metadata, unmodified source, diff, proofreading details)", progress)
+            self.assertIn("[02/02] CAT020_SUB129_spand-rahasya_002_v01.01 (canonical text, canonical metadata, unmodified source, diff, proofreading details)", progress)
             self.assertIn("[2/3] content manifest: chapters/chapter_content_manifest.json", progress)
             self.assertIn("[3/3] proofreading manifest: chapters/proofreading/proofreading_manifest.json", progress)
             uploaded_names = [name for name, _, _ in client.uploads]
-            self.assertEqual(uploaded_names[:6], [
-                "CAT020_SUB129_spand-rahasya_001_v01.01.docx",
+            self.assertEqual(uploaded_names[:5], [
                 "CAT020_SUB129_spand-rahasya_001_v01.01.txt",
                 "CAT020_SUB129_spand-rahasya_001_v01.01.json",
                 "CAT020_SUB129_spand-rahasya_001_v01.01_unmodified_source.txt",

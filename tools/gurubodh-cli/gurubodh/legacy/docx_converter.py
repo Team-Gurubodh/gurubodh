@@ -142,9 +142,10 @@ def ensure_font_table(xml_bytes, font_name):
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def convert_docx(path, font_name, legacy_converter, output_path, text_path, progress=None):
+def convert_docx(path, font_name, legacy_converter, output_path, text_path=None, progress=None):
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    text_path.parent.mkdir(parents=True, exist_ok=True)
+    if text_path is not None:
+        text_path.parent.mkdir(parents=True, exist_ok=True)
     extracted = []
     total_nodes = 0
     total_chars = 0
@@ -166,13 +167,15 @@ def convert_docx(path, font_name, legacy_converter, output_path, text_path, prog
                     data = ensure_font_table(data, font_name)
                 target.writestr(info, data)
 
-    text_path.write_text("\n\n".join(text for text in extracted if text.strip()) + "\n", encoding="utf-8")
+    if text_path is not None:
+        text_path.write_text("\n\n".join(text for text in extracted if text.strip()) + "\n", encoding="utf-8")
 
     if progress:
-        progress("prepare", output_path, text_path)
+        progress("prepare", output_path)
     else:
         print(f"wrote {output_path}")
-        print(f"wrote {text_path}")
+        if text_path is not None:
+            print(f"wrote {text_path}")
     if converter_counts:
         summary = ", ".join(f"{name}: {count}" for name, count in sorted(converter_counts.items()))
         print(f"converter groups: {summary}")

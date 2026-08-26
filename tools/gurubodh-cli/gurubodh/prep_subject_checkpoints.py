@@ -17,9 +17,10 @@ import time
 import uuid
 from typing import Any, Callable
 
+from gurubodh.content_identity import build_content_identity
 from gurubodh.content_manifest import write_chapter_content_manifest
 from gurubodh.locales import locale_spec
-from gurubodh.naming import chapter_output_filename, full_subject_output_filename
+from gurubodh.naming import chapter_output_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
 from gurubodh.pipelines.common import validate_and_split
 from gurubodh.proofreading import (
@@ -32,13 +33,18 @@ from gurubodh.storage import (
     CANONICAL_ARTIFACT_FILES,
     PREP_ARTIFACT_DIRS,
     R2StorageClient,
+    cleanup_local_legacy_full_subject,
+    cleanup_r2_legacy_full_subject,
     destination_artifact_reference,
     destination_object_key,
     invalidate_local_semantic_artifacts,
+    invalidate_local_chapter_docx_artifacts,
+    invalidate_r2_chapter_docx_artifacts,
     invalidate_r2_semantic_artifacts,
     is_local,
     is_r2,
     materialize_source,
+    preflight_relative_paths,
     subject_artifact_object_key,
     subject_artifact_prefix,
     upload_r2_file,
@@ -47,7 +53,7 @@ from gurubodh.time_utils import timestamp_for_filename, utc_now
 
 
 CHECKPOINT_SCHEMA_VERSION = 1
-CHECKPOINT_CONTRACT_VERSION = 1
+CHECKPOINT_CONTRACT_VERSION = 2
 RUN_STATE_RELATIVE_DIR = Path("run_state") / "prep-subject"
 JOB_STATE_RELATIVE_PATH = RUN_STATE_RELATIVE_DIR / "job-state.json"
 WORK_RELATIVE_DIR = Path(".work") / "prep-subject"
@@ -248,8 +254,11 @@ class PrepCheckpointManager:
 
     def _canonical_artifacts_exist(self) -> bool:
         if is_local(self.destination):
-            return any((self.subject_dir / relative).exists() for relative in (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES))
-        for relative in (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES):
+            return any(
+                (self.subject_dir / relative).exists()
+                for relative in preflight_relative_paths("prep-subject")
+            )
+        for relative in preflight_relative_paths("prep-subject"):
             key = destination_object_key(self.config, relative)
             if relative.suffix:
                 if self.client.exists(self.destination["bucket"], key):
@@ -324,6 +333,16 @@ class PrepCheckpointManager:
     def _validate_loaded_state(self) -> None:
         if self.state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION or not isinstance(self.state.get("job_id"), str):
             raise SystemExit("Unsupported or malformed prep-subject checkpoint. Re-run with --overwrite.")
+        stored_contract = (
+            self.state.get("compatibility", {})
+            .get("output_affecting_inputs", {})
+            .get("checkpoint_contract_version")
+        )
+        if stored_contract != CHECKPOINT_CONTRACT_VERSION and not self.overwrite:
+            raise SystemExit(
+                "The existing prep-subject checkpoint uses an incompatible artifact contract. "
+                "It cannot be resumed with the five-file text-only checkpoint; re-run with --overwrite."
+            )
         lease = self.state.get("lease") or {}
         if lease.get("active") and lease.get("owner_id") != self.owner_id and lease.get("expires_at_epoch", 0) > time.time():
             raise SystemExit(
@@ -403,6 +422,18 @@ class PrepCheckpointManager:
         self.state["preparation"] = preparation
         self.persist()
 
+    def discard_transient_preparation(self) -> None:
+        """Remove a prepared full-subject working DOCX after snapshots are durable."""
+        relative = self.workspace_relative / ".transient"
+        transient_dir = self.local_workspace_root / relative
+        if transient_dir.exists():
+            shutil.rmtree(transient_dir)
+        if self.is_r2:
+            self.client.delete_prefix(
+                self.destination["bucket"],
+                subject_artifact_object_key(self.destination, relative) + "/",
+            )
+
     def chapter_source_path(self, chapter: dict[str, Any]) -> Path:
         path = self.paths["unmodified_source_text"] / chapter["source_filename"]
         if not path.is_file() or _sha256(path) != chapter["source_sha256"]:
@@ -445,7 +476,6 @@ class PrepCheckpointManager:
         metadata_name = chapter_output_filename(self.config, number, ".json")
         stem = Path(text_name).stem
         return [
-            self.paths["chapter_msword"] / chapter_output_filename(self.config, number, ".docx"),
             self.paths["unmodified_source_text"] / chapter["source_filename"],
             self.paths["text_and_metadata"] / text_name,
             self.paths["text_and_metadata"] / metadata_name,
@@ -473,15 +503,38 @@ class PrepCheckpointManager:
                 }
                 if expected != current:
                     return False
-            metadata = _read_json(paths[3], "Checkpointed chapter metadata")
-            details = _read_json(paths[5], "Checkpointed proofreading details")
-            text_sha = _sha256(paths[2])
+            source_sha = _sha256(paths[0])
+            text_sha = _sha256(paths[1])
+            metadata = _read_json(paths[2], "Checkpointed chapter metadata")
+            details = _read_json(paths[4], "Checkpointed proofreading details")
+            locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
+            source_identity = build_content_identity(
+                self.config["naming"]["category_code"],
+                self.config["naming"]["subject_code"],
+                locale.language,
+                paths[0].read_text(encoding="utf-8"),
+            )
+            canonical_identity = build_content_identity(
+                self.config["naming"]["category_code"],
+                self.config["naming"]["subject_code"],
+                locale.language,
+                paths[1].read_text(encoding="utf-8"),
+            )
             return (
                 metadata["integrity"]["artifacts"]["text"]["value"] == text_sha
+                and metadata.get("content_identity") == canonical_identity
                 and details["canonical_corrected"]["text_sha256"] == text_sha
+                and details["canonical_corrected"].get("content_identity") == canonical_identity
+                and details["canonical_corrected"].get("text_artifact")
+                == metadata.get("storage", {}).get("artifacts", {}).get("text")
+                and source_sha == chapter.get("source_sha256")
+                and details["unmodified_source"].get("text_sha256") == source_sha
+                and details["unmodified_source"].get("content_identity") == source_identity
+                and details.get("integrity", {}).get("unmodified_source", {}).get("value") == source_sha
+                and details.get("integrity", {}).get("canonical_corrected", {}).get("value") == text_sha
                 and details.get("status") == "succeeded"
             )
-        except (KeyError, OSError, SystemExit, TypeError):
+        except (KeyError, OSError, SystemExit, TypeError, UnicodeDecodeError):
             return False
 
     def _reconciled_proofreading_summary(self, chapter: dict[str, Any]) -> dict[str, Any]:
@@ -572,13 +625,46 @@ class PrepCheckpointManager:
             self._publish_local()
         else:
             self._publish_r2()
-        self.state["state"] = "succeeded"
-        self.state["publication"]["state"] = "succeeded"
         if self.overwrite:
+            cleanup = self.state["publication"].setdefault("obsolete_artifact_cleanup", {})
             if is_local(self.destination):
+                cleanup["chapter_docx_invalidation"] = invalidate_local_chapter_docx_artifacts(
+                    self.subject_dir
+                )
+                self.persist()
+                cleanup["legacy_full_subject_cleanup"] = cleanup_local_legacy_full_subject(self.subject_dir)
+                self.persist()
                 self.state["publication"]["semantic_invalidation"] = invalidate_local_semantic_artifacts(self.subject_dir)
             else:
+                cleanup["chapter_docx_invalidation"] = invalidate_r2_chapter_docx_artifacts(
+                    self.config,
+                    self.client,
+                )
+                self.persist()
+                cleanup["legacy_full_subject_cleanup"] = cleanup_r2_legacy_full_subject(
+                    self.config,
+                    self.client,
+                )
+                self.persist()
                 self.state["publication"]["semantic_invalidation"] = invalidate_r2_semantic_artifacts(self.config, self.client)
+            self.persist()
+            docx_cleanup = cleanup["chapter_docx_invalidation"]
+            full_cleanup = cleanup["legacy_full_subject_cleanup"]
+            semantic_cleanup = self.state["publication"]["semantic_invalidation"]
+            print(
+                "[overwrite] Derived chapter DOCX invalidation: "
+                f"{'removed' if docx_cleanup['invalidated'] else 'not needed'}."
+            )
+            print(
+                "[overwrite] Legacy full_subject cleanup: "
+                f"{'removed' if full_cleanup['invalidated'] else 'not needed'}."
+            )
+            print(
+                "[overwrite] Semantic chunk invalidation: "
+                f"{'removed' if semantic_cleanup['invalidated'] else 'not needed'}."
+            )
+        self.state["state"] = "succeeded"
+        self.state["publication"]["state"] = "succeeded"
         self.persist()
         self._remove_completed_workspace()
 
@@ -598,6 +684,10 @@ class PrepCheckpointManager:
     def _replace_local_path(self, source: Path, target: Path, relative: Path, promotion_root: Path, backup_root: Path) -> None:
         candidate = promotion_root / relative
         candidate.parent.mkdir(parents=True, exist_ok=True)
+        if candidate.is_dir():
+            shutil.rmtree(candidate)
+        elif candidate.exists():
+            candidate.unlink()
         if source.is_dir():
             shutil.copytree(source, candidate)
         else:
@@ -630,6 +720,21 @@ class PrepCheckpointManager:
         uploads.sort(key=lambda item: item[0].relative_to(self.workspace_dir) == manifest_relative)
         for path, key in uploads:
             upload_r2_file(self.client, self.destination, path, key)
+        if self.overwrite:
+            uploaded_keys = {key for _, key in uploads}
+            stale_keys = []
+            for relative in PREP_ARTIFACT_DIRS:
+                prefix = destination_object_key(self.config, relative) + "/"
+                stale_keys.extend(
+                    key
+                    for key in self.client.list_keys(self.destination["bucket"], prefix)
+                    if key not in uploaded_keys
+                )
+            self.client.delete_keys(self.destination["bucket"], stale_keys)
+            self.state["publication"]["stale_prep_artifact_cleanup"] = {
+                "deleted_keys": stale_keys,
+                "deleted_count": len(stale_keys),
+            }
 
     def _remove_completed_workspace(self) -> None:
         if is_local(self.destination):
@@ -666,6 +771,7 @@ class PrepCheckpointManager:
             "job_id": self.state["job_id"],
             "run_id": self.state["run"]["run_id"],
             "entry_point": entry_point,
+            "overwrite": self.overwrite,
             "config_path": str(config_path) if config_path else None,
             "destination_backend": self.destination.get("backend", "local"),
             "subject": {
@@ -678,6 +784,24 @@ class PrepCheckpointManager:
             "failure_stage": "proofreading" if status == "incomplete" else ("global" if failure else None),
             "failure": failure,
             "counts": self.state["counts"],
+            "processing_summary": {
+                "source_materialization_status": "succeeded",
+                "source_docx_validation_status": (
+                    "succeeded" if self.state.get("preparation") else "failed_or_not_completed"
+                ),
+                "legacy_converter_counts": (self.state.get("preparation") or {}).get("converter_counts", {}),
+                "converted_text_nodes": (self.state.get("preparation") or {}).get("total_nodes", 0),
+                "converted_or_extracted_character_count": (self.state.get("preparation") or {}).get("total_chars", 0),
+                "chapters_detected": (self.state.get("preparation") or {}).get("chapters_detected", 0),
+                "unmodified_source_snapshots": len(self.state.get("chapters", [])),
+                "canonical_chapters_succeeded": self.state["counts"]["succeeded"],
+                "proofreading_manifest_status": (
+                    "published" if status == "succeeded" else "not_published"
+                ),
+                "chapter_content_manifest_status": (
+                    "published_last" if status == "succeeded" else "not_published"
+                ),
+            },
             "chapters": [
                 {
                     "chapter_number": chapter["chapter_number"],
@@ -689,6 +813,8 @@ class PrepCheckpointManager:
                 for chapter in self.state.get("chapters", [])
             ],
             "publication": self.state.get("publication"),
+            "preparation": self.state.get("preparation"),
+            "checkpoint_contract_version": CHECKPOINT_CONTRACT_VERSION,
         }
         _write_json_atomically(json_path, report)
         markdown_path.write_text(_render_report_markdown(report), encoding="utf-8")
@@ -732,7 +858,22 @@ def _render_report_markdown(report: dict[str, Any]) -> str:
         f"- Language: `{report['subject']['language']}`",
         f"- Language-specific artifact root: `{report['subject']['artifact_root']}`",
         f"- Proofreading template: `{report['proofreading_locale']['instruction_template']['id']}` v{report['proofreading_locale']['instruction_template']['version']} (`{report['proofreading_locale']['instruction_template']['sha256']}`)",
+        f"- Overwrite: `{report['overwrite']}`",
+        f"- Checkpoint artifact contract: `{report['checkpoint_contract_version']}` (five files per chapter)",
         f"- Counts: succeeded `{report['counts']['succeeded']}`, failed `{report['counts']['failed']}`, pending `{report['counts']['pending']}`",
+        "",
+        "## Processing",
+        "",
+        f"- Source materialization: `{report['processing_summary']['source_materialization_status']}`",
+        f"- Source DOCX validation: `{report['processing_summary']['source_docx_validation_status']}`",
+        f"- Legacy converter counts: `{json.dumps(report['processing_summary']['legacy_converter_counts'], ensure_ascii=False, sort_keys=True)}`",
+        f"- Converted text nodes: `{report['processing_summary']['converted_text_nodes']}`",
+        f"- Converted or extracted characters: `{report['processing_summary']['converted_or_extracted_character_count']}`",
+        f"- Chapters detected: `{report['processing_summary']['chapters_detected']}`",
+        f"- Unmodified-source snapshots: `{report['processing_summary']['unmodified_source_snapshots']}`",
+        f"- Canonical chapters succeeded: `{report['processing_summary']['canonical_chapters_succeeded']}`",
+        f"- Proofreading manifest: `{report['processing_summary']['proofreading_manifest_status']}`",
+        f"- Chapter content manifest: `{report['processing_summary']['chapter_content_manifest_status']}`",
     ]
     if report["failure"]:
         lines.extend(["", "## Failure", "", f"- {report['failure']['code']}: {report['failure']['message']}"])
@@ -741,6 +882,21 @@ def _render_report_markdown(report: dict[str, Any]) -> str:
         f"| {chapter['chapter_number']} | {chapter['state']} | {chapter['attempt_count']} | {chapter['outcome']} |"
         for chapter in report["chapters"]
     )
+    publication = report.get("publication") or {}
+    lines.extend(["", "## Publication", "", f"- State: `{publication.get('state', 'not_ready')}`"])
+    cleanup = publication.get("obsolete_artifact_cleanup") or {}
+    if cleanup:
+        docx = cleanup.get("chapter_docx_invalidation") or {}
+        full_subject = cleanup.get("legacy_full_subject_cleanup") or {}
+        lines.extend(
+            [
+                f"- Derived chapter DOCX invalidated: `{docx.get('invalidated', False)}`",
+                f"- Legacy full_subject removed: `{full_subject.get('invalidated', False)}`",
+            ]
+        )
+    semantic = publication.get("semantic_invalidation")
+    if semantic:
+        lines.append(f"- Semantic chunks invalidated: `{semantic.get('invalidated', False)}`")
     return "\n".join(lines) + "\n"
 
 
@@ -804,7 +960,7 @@ def run_resumable_prep_job(
     overwrite: bool,
     resume: bool,
     config_path: Path | None,
-    prepare_full_subject: Callable[[Path, Path, Path, Callable[..., None]], dict[str, Any]],
+    prepare_source_docx: Callable[[Path, Path, Callable[..., None]], dict[str, Any]],
     r2_client=None,
 ) -> dict[str, Any]:
     """Run either preparation pipeline with checkpointed proof-reading."""
@@ -824,11 +980,12 @@ def run_resumable_prep_job(
         result = manager.state.get("preparation") or {}
         if not manager.state.get("chapters"):
             try:
-                print("[prepare] Building the full-subject source and chapter snapshots in the checkpoint workspace.")
-                result = prepare_full_subject(
+                print("[prepare] Building chapter source snapshots from the configured DOCX in the checkpoint workspace.")
+                transient_dir = manager.workspace_dir / ".transient"
+                transient_dir.mkdir(parents=True, exist_ok=True)
+                result = prepare_source_docx(
                     source_path,
-                    paths["full_subject"] / full_subject_output_filename(config, ".docx"),
-                    paths["full_subject"] / full_subject_output_filename(config, ".txt"),
+                    transient_dir / "prepared-source.docx",
                     lambda *_: manager.heartbeat(),
                 )
                 split_outputs = validate_and_split(
@@ -847,11 +1004,13 @@ def run_resumable_prep_job(
                         "chapters_detected": len(split_outputs),
                     },
                 )
+                manager.discard_transient_preparation()
             except BaseException as exc:
                 manager.mark_global_failure(exc)
                 manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
                 raise
 
+        manager.discard_transient_preparation()
         reused = manager.reconcile_successes()
         consecutive_infrastructure_failures = 0
         locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])

@@ -23,18 +23,6 @@ def chapter_storage_references(config, file_names):
                 config,
                 file_names["text_relative_path"],
             ),
-            "msword": destination_artifact_reference(
-                config,
-                file_names["msword_relative_path"],
-            ),
-            "full_subject_msword": destination_artifact_reference(
-                config,
-                file_names["full_msword_relative_path"],
-            ),
-            "full_subject_text": destination_artifact_reference(
-                config,
-                file_names["full_text_relative_path"],
-            ),
         },
     }
 
@@ -101,7 +89,6 @@ def build_chapter_metadata(
         "files": {
             "metadata_filename": file_names["metadata"],
             "text_filename": file_names["text"],
-            "msword_filename": file_names["msword"],
         },
         "storage": chapter_storage_references(config, file_names),
         "processing": {

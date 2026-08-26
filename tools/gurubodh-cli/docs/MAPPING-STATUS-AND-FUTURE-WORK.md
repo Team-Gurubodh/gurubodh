@@ -12,9 +12,9 @@ The active conversion path is:
 ```text
 DOCX source file
   -> config/job-driven converter
-  -> Unicode DOCX
-  -> full-subject text
-  -> optional chapter DOCX/text/metadata outputs
+  -> transient Unicode DOCX when legacy conversion is required
+  -> ordered chapter source-text snapshots
+  -> canonical proofread chapter text/metadata and provenance
 ```
 
 The PDF extraction path has been removed because it was an earlier experiment

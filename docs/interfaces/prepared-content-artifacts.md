@@ -23,6 +23,12 @@ Source DOCX storage
 Preparation may use temporary local files internally. Temporary paths must not
 appear in generated metadata for R2-backed jobs.
 
+The configured source remains DOCX. Unicode input may be read directly;
+legacy-font preparation may create a transient Unicode DOCX inside the job
+workspace for chapter detection and extraction. Neither form is a published
+prep artifact. `chapters/msword/` is a derived export boundary reserved for
+`generate-docx`, and `full_subject/` is retired.
+
 ## Storage Backends
 
 Supported backends:
@@ -56,8 +62,6 @@ final segment of a validated `subject_dir` and `{subject-group}` remains visible
 above it.
 
 ```text
-cms_library/{subject-group}/{language}/full_subject/
-cms_library/{subject-group}/{language}/chapters/msword/
 cms_library/{subject-group}/{language}/chapters/text_and_metadata/
 cms_library/{subject-group}/{language}/chapters/unmodified_source_text/
 cms_library/{subject-group}/{language}/chapters/chapter_content_manifest.json
@@ -130,8 +134,11 @@ only, so it ignores both `unmodified_source_text/` and `proofreading/`.
 
 ## Metadata References
 
-Chapter metadata includes storage references for the source object and each
-chapter/full-subject artifact.
+Chapter metadata schema `1.4.0` includes storage references for the source
+object and the canonical metadata/text pair only. It omits the former
+`files.msword_filename`, `storage.artifacts.msword`,
+`storage.artifacts.full_subject_msword`, and
+`storage.artifacts.full_subject_text` fields.
 
 R2 references use:
 
@@ -210,7 +217,16 @@ its staged workspace, and starts a fresh job; it does not resume.
 
 All required proofreading must succeed in staging before canonical promotion.
 An unfinished overwrite leaves the previous canonical tree and its semantic
-chunks intact. Only a successful replacement invalidates semantic output.
+chunks, chapter DOCX exports, and legacy `full_subject/` intact. Only a
+successful replacement invalidates same-locale semantic output and
+`chapters/msword/` and removes same-locale legacy `full_subject/`. Cleanup is
+recorded in operational state and reports; other locales and unrelated paths
+are never included.
 There must be no concurrent writer for a subject: local jobs take an exclusive
 lock and R2 jobs use the active lease/heartbeat in job state. A stale lease is
 recoverable with `--resume`.
+
+The five-file checkpoint contract is version `2`. Earlier incomplete
+six-artifact checkpoints cannot resume and require `--overwrite`. Earlier
+succeeded releases remain valid canonical input for `generate-chunks` and
+future `generate-docx`, even when their metadata retains legacy references.

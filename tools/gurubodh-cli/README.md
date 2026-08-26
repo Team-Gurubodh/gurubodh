@@ -178,9 +178,9 @@ editable install.
 runs a sample local content job.
 
 Artifact ownership is command-scoped: `prep-subject`
-owns `full_subject/`, `chapters/msword/`, `chapters/text_and_metadata/`,
-`chapters/unmodified_source_text/`, `chapters/proofreading/`, and
-`chapters/chapter_content_manifest.json`; `generate-chunks` owns only
+owns `chapters/text_and_metadata/`, `chapters/unmodified_source_text/`,
+`chapters/proofreading/`, and `chapters/chapter_content_manifest.json`;
+`generate-chunks` owns only
 `chapters/semantic_chunks/`. The legacy
 `chapters/semantic_chunks_and_embeddings/` location is removed only by an
 explicit `generate-chunks --overwrite` migration run. Each command owns its own audit
@@ -192,6 +192,14 @@ semantic chunks because they may no longer match the prepared content; rerun
 `run_state/prep-subject/job-state.json` and staged checkpoints at
 `.work/prep-subject/{job-id}/`. Cross-prefix local/R2 replacement is not a
 fully atomic release protocol.
+
+`prep-subject` still accepts a DOCX source, but Unicode sources are read
+directly and legacy-font conversion uses only a transient Unicode working
+DOCX. It does not publish `full_subject/` or `chapters/msword/`. The latter is
+reserved for the separate `generate-docx` command. After a successful
+canonical overwrite, prep invalidates same-locale `chapters/msword/`, removes
+same-locale legacy `full_subject/`, and records both outcomes in job state and
+run reports. Failed or incomplete overwrites leave those paths untouched.
 
 ### Locale-scoped Hindi and Marathi preparation
 
@@ -330,16 +338,12 @@ The content manifest is written only after every chapter succeeds and lists
 only proofread canonical text/metadata. Therefore `generate-chunks` consumes
 proofread text automatically and ignores the unmodified/proofreading paths.
 
-During preparation, the CLI prints the local staging subject directory and the
-canonical output-directory mapping once. It then reports each artifact set by
-its shared filename stem and types (for example, `DOCX, canonical text,
-canonical metadata, unmodified source, diff, proofreading details`) rather
-than repeating full paths. This applies to both local and R2 destinations; R2
-runs then print their destination object-key publication progress separately.
-It also announces chapter splitting, every sequential Gemini request, local
-pacing waits, provider-requested retry waits, and structured-response handling.
-These progress messages contain counts and timing only; they never print chapter
-text or credentials.
+During preparation, the CLI reports source materialization and validation,
+chapter detection and source-text snapshot extraction, each sequential Gemini
+request, canonical text/metadata and proofreading completion, manifest
+publication, and overwrite invalidation. These messages contain paths, counts,
+and timing only; they never print chapter text or credentials and never claim
+to write full-subject or chapter DOCX artifacts.
 
 ```bash
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --overwrite
@@ -364,6 +368,15 @@ state and discards its workspace, but preserves existing canonical artifacts
 and semantic chunks until the replacement is successfully published. Do not
 run concurrent writers for a subject; a stale local lock or R2 lease can be
 recovered safely with `--resume`.
+
+The text-only prep checkpoint contract is version `2`. Incomplete checkpoints
+created under the earlier six-artifact contract cannot resume; finish them
+before upgrading or restart with `--overwrite`. A completed earlier release
+remains valid input for `generate-chunks` and the future `generate-docx`
+command, so it does not require another Gemini run merely because its metadata
+still contains legacy DOCX/full-subject references. Running
+`prep-subject --resume` against that old checkpoint requires `--overwrite` to
+replace it.
 
 `generate-chunks` now checks `job-state.json` and the canonical manifest before
 it creates or deletes any chunk output. It refuses incomplete, publishing, or
@@ -598,9 +611,10 @@ R2 uses object keys, not real folders. Prepared artifact keys preserve the local
 layout under the destination prefix:
 
 ```text
-cms_library/{subject_dir}/full_subject/
-cms_library/{subject_dir}/chapters/msword/
 cms_library/{subject_dir}/chapters/text_and_metadata/
+cms_library/{subject_dir}/chapters/unmodified_source_text/
+cms_library/{subject_dir}/chapters/proofreading/
+cms_library/{subject_dir}/chapters/chapter_content_manifest.json
 ```
 
 R2 objects may remain private. Generated metadata stores bucket/key references
@@ -673,11 +687,13 @@ Jobs configure the marker terms under `metadata_defaults`:
 If `summary_chapter_markers` is omitted, the CLI does not run summary chapter
 detection for that job.
 
-For R2 destinations, the tool checks only command-owned prefixes before
-processing starts. If an owned location already exists and `--overwrite` is not
-supplied, the job fails before doing DOCX conversion or chapter splitting. With
-`--overwrite`, it deletes and uploads only the command-owned locations; audit
-history from the other command and unrelated subject files are preserved.
+For R2 destinations, existing prep-owned output or a legacy `full_subject/`
+prefix requires `--overwrite`. Replacement and cleanup happen only after the
+complete candidate is staged; an incomplete run preserves published canonical
+content and derived outputs. Successful replacement removes stale prep-owned
+objects, invalidates same-locale DOCX and semantic outputs, removes legacy
+`full_subject/`, and preserves both commands' report history and unrelated
+objects.
 
 ## Cloudflare R2 Credentials
 
