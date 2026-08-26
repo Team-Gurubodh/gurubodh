@@ -3,7 +3,7 @@
   "pipeline": "unicode-docx-ingest",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
-    "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya.docx",
+    "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
     "font_encoding": "unicode",
     "file_format": "docx"
   },
