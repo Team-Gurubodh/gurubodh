@@ -1,18 +1,18 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "pipeline": "generate-chunks",
   "source": {
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
     "prefix": "cms_library",
-    "subject_dir": "123_spand_rahasya",
+    "subject_dir": "123_spand_rahasya/hi-IN",
     "url_base": null
   },
   "destination": {
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
     "prefix": "cms_library",
-    "subject_dir": "123_spand_rahasya",
+    "subject_dir": "123_spand_rahasya/hi-IN",
     "url_base": null
   },
   "naming": {

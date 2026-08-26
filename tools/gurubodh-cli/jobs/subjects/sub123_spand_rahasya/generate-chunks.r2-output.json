@@ -1,16 +1,16 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "pipeline": "generate-chunks",
   "source": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "123_spand_rahasya"
+    "subject_dir": "123_spand_rahasya/hi-IN"
   },
   "destination": {
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
     "prefix": "cms_library",
-    "subject_dir": "123_spand_rahasya",
+    "subject_dir": "123_spand_rahasya/hi-IN",
     "url_base": null
   },
   "naming": {

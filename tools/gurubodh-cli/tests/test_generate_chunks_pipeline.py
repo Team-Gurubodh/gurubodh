@@ -16,13 +16,13 @@ from gurubodh.project import ProjectContext
 
 def base_config(root_dir):
     return {
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "pipeline": "generate-chunks",
-        "source": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya"},
-        "destination": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya"},
+        "source": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya/hi-IN"},
+        "destination": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya/hi-IN"},
         "naming": {
             "category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya",
-            "version": "01", "subversion": "01", "language": "hi-Deva",
+            "version": "01", "subversion": "01", "language": "hi-IN",
         },
         "chunking": {
             "provider": "semantic-chunking", "model": "BAAI/bge-m3",
@@ -306,30 +306,30 @@ class GenerateChunksPipelineTests(unittest.TestCase):
 
     def test_r2_materializes_only_selected_manifest_artifacts(self):
         config = base_config(self.temp_dir.name)
-        config["source"] = {"backend": "r2", "bucket": "gurubodh-library-dev", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None}
+        config["source"] = {"backend": "r2", "bucket": "gurubodh-library-dev", "prefix": "cms_library", "subject_dir": "123_spand_rahasya/hi-IN", "url_base": None}
         config["destination"] = dict(config["source"])
         text_one, text_two = "पहला।\n", "दूसरा।\n"
         metadata_one = metadata_for(config, 1, text_one, "r2")
         metadata_two = metadata_for(config, 2, text_two, "r2")
         manifest = {
             "schema_version": 1, "identity_contract_version": 1,
-            "subject": {"category_code": "CAT001", "subject_code": "SUB123", "language": "hi-Deva"},
+            "subject": {"category_code": "CAT001", "subject_code": "SUB123", "language": "hi-IN"},
             "chapters": [
                 {"generated_chapter_number": metadata_one["document"]["chapter_number"], "content_key": metadata_one["content_identity"]["content_key"], "normalized_content_sha256": metadata_one["content_identity"]["normalized_content_sha256"], "metadata_artifact": metadata_one["storage"]["artifacts"]["metadata"], "text_artifact": metadata_one["storage"]["artifacts"]["text"]},
                 {"generated_chapter_number": metadata_two["document"]["chapter_number"], "content_key": metadata_two["content_identity"]["content_key"], "normalized_content_sha256": metadata_two["content_identity"]["normalized_content_sha256"], "metadata_artifact": metadata_two["storage"]["artifacts"]["metadata"], "text_artifact": metadata_two["storage"]["artifacts"]["text"]},
             ],
         }
-        prefix = "cms_library/123_spand_rahasya/chapters"
+        prefix = "cms_library/123_spand_rahasya/hi-IN/chapters"
         client = FakeR2Client({
             f"{prefix}/chapter_content_manifest.json": json.dumps(manifest, ensure_ascii=False),
             metadata_one["storage"]["artifacts"]["metadata"]["key"]: json.dumps(metadata_one, ensure_ascii=False),
             metadata_one["storage"]["artifacts"]["text"]["key"]: text_one,
             metadata_two["storage"]["artifacts"]["metadata"]["key"]: json.dumps(metadata_two, ensure_ascii=False),
             metadata_two["storage"]["artifacts"]["text"]["key"]: text_two,
-            "cms_library/123_spand_rahasya/chapters/text_and_metadata/unlisted.txt": "ignored",
-            "cms_library/123_spand_rahasya/chapters/unmodified_source_text/unlisted_unmodified_source.txt": "ignored",
-            "cms_library/123_spand_rahasya/chapters/proofreading/unlisted.proofread.json": "{}",
-            "cms_library/123_spand_rahasya/run_state/prep-subject/job-state.json": json.dumps({
+            "cms_library/123_spand_rahasya/hi-IN/chapters/text_and_metadata/unlisted.txt": "ignored",
+            "cms_library/123_spand_rahasya/hi-IN/chapters/unmodified_source_text/unlisted_unmodified_source.txt": "ignored",
+            "cms_library/123_spand_rahasya/hi-IN/chapters/proofreading/unlisted.proofread.json": "{}",
+            "cms_library/123_spand_rahasya/hi-IN/run_state/prep-subject/job-state.json": json.dumps({
                 "schema_version": 1,
                 "job_id": "test-job",
                 "state": "succeeded",
@@ -354,7 +354,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             f"{prefix}/chapter_content_manifest.json",
             metadata_two["storage"]["artifacts"]["metadata"]["key"],
             metadata_two["storage"]["artifacts"]["text"]["key"],
-            "cms_library/123_spand_rahasya/run_state/prep-subject/job-state.json",
+            "cms_library/123_spand_rahasya/hi-IN/run_state/prep-subject/job-state.json",
         ])
         self.assertTrue(any("/chapters/semantic_chunks/" in key for key in client.uploads))
 

@@ -193,6 +193,101 @@ semantic chunks because they may no longer match the prepared content; rerun
 `.work/prep-subject/{job-id}/`. Cross-prefix local/R2 replacement is not a
 fully atomic release protocol.
 
+### Locale-scoped Hindi and Marathi preparation
+
+The CLI initially supports exactly `hi-IN` (Hindi) and `mr-IN` (Marathi). A
+prep-subject job must explicitly declare its locale, `source_script` as
+`Devanagari`, and `output_text_encoding` as `UTF-8`. Hindi and Marathi use
+separate, locale-specific Gemini proofreading instructions while retaining the
+same structured response and edit categories.
+
+Every prepared release is rooted at `<subject-group>/<language>`, including
+canonical artifacts, semantic chunks, reports, checkpoints, and workspaces:
+
+```text
+cms_library/<subject-group>/hi-IN/
+cms_library/<subject-group>/mr-IN/
+```
+
+`subject_dir` must be a safe POSIX-relative nested path, retain a subject
+grouping, and end in the configured language. Absolute paths, empty segments,
+`.`, `..`, and backslashes are rejected. `generate-chunks` source and
+destination must use the same language-qualified `subject_dir`, and its
+`naming.language` must match the prepared manifest.
+
+```json
+{
+  "destination": {
+    "backend": "local",
+    "root_dir": "/path/to/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "metadata_defaults": {
+    "language": "mr-IN",
+    "source_script": "Devanagari",
+    "output_text_encoding": "UTF-8",
+    "summary_chapter_markers": []
+  }
+}
+```
+
+The matching Marathi chunk job uses `123_spand_rahasya/mr-IN` for both
+`source.subject_dir` and `destination.subject_dir`, and sets
+`naming.language` to `mr-IN`. This is a template only: supply an approved
+Marathi source DOCX and subject metadata before creating an executable job.
+
+```json
+{
+  "schema_version": "1.1.0",
+  "pipeline": "generate-chunks",
+  "source": {
+    "backend": "local",
+    "root_dir": "/path/to/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "destination": {
+    "backend": "local",
+    "root_dir": "/path/to/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "naming": {
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya",
+    "version": "01",
+    "subversion": "01",
+    "language": "mr-IN"
+  }
+}
+```
+
+Run the language-matched jobs in order:
+
+```bash
+gurubodh prep-subject --config <marathi-prep-subject-job>
+gurubodh generate-chunks --config <marathi-generate-chunks-job>
+```
+
+Proofreading details, aggregate proofreading manifests, checkpoints, and
+prep-subject reports record the selected language and instruction-template ID,
+version, and hash. They never record the full prompt, source/corrected text,
+or credentials.
+
+#### Migrating existing Hindi artifacts
+
+Existing Hindi artifacts directly under `cms_library/<subject-group>/` are
+legacy locations. The CLI never moves or deletes them automatically. Regenerate
+the subject with a maintained `hi-IN` prep job, verify its audit report and
+canonical manifest, then regenerate chunks using the matching `hi-IN` job.
+The first run to the new root does not overwrite the old root. Use
+`--overwrite` only when intentionally replacing an already-existing release in
+the same language root; it cannot modify the other language root.
+
+An incomplete checkpoint at the old unqualified root cannot be resumed into
+the new language root. Finish or preserve that old run deliberately, then start
+a new `hi-IN` preparation job. Retain legacy local/R2 artifacts until the new
+release has been verified; archival or deletion is an explicit operator action.
+
 ### Mandatory Gemini proofreading and canonical chapter artifacts
 
 `prep-subject` requires a `proofreading` object in every job and always reads
@@ -340,7 +435,7 @@ gurubodh generate-chunks \
 The output directory is scoped to:
 
 ```text
-<subject>/chapters/semantic_chunks/
+<subject-group>/<language>/chapters/semantic_chunks/
 ```
 
 It contains one `*.chunks.json` file per processed chapter and a
@@ -360,7 +455,7 @@ operator-readable Markdown audit reports under the generated subject artifact
 tree:
 
 ```text
-<subject>/run_reports/prep-subject/
+<subject-group>/<language>/run_reports/prep-subject/
 ```
 
 The JSON report is the source of truth for tooling. The Markdown report is a
@@ -381,7 +476,7 @@ Audit reports intentionally exclude secrets, environment variable values, API
 keys, request bodies, full source text, full chapter text, and DOCX contents.
 
 `generate-chunks` follows the same audit report convention and writes JSON and
-Markdown reports under `<subject>/run_reports/generate-chunks/`. Reports include generated
+Markdown reports under `<subject-group>/<language>/run_reports/generate-chunks/`. Reports include generated
 artifact references and aggregate counts, but exclude full source text and
 embedding vectors.
 
@@ -473,7 +568,7 @@ Local source and destination:
   "destination": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "129_spand_rahasya"
+    "subject_dir": "129_spand_rahasya/hi-IN"
   }
 }
 ```
@@ -493,7 +588,7 @@ Cloudflare R2 source and destination:
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
     "prefix": "cms_library",
-    "subject_dir": "129_spand_rahasya",
+    "subject_dir": "129_spand_rahasya/hi-IN",
     "url_base": null
   }
 }

@@ -50,20 +50,30 @@ cms_library/
 
 ## Artifact Layout
 
-Prepared artifact grouping is preserved as object-key prefixes:
+Prepared artifact grouping is preserved beneath a language-specific release
+root. Initially supported locales are `hi-IN` and `mr-IN`; `{language}` is the
+final segment of a validated `subject_dir` and `{subject-group}` remains visible
+above it.
 
 ```text
-cms_library/{subject_dir}/full_subject/
-cms_library/{subject_dir}/chapters/msword/
-cms_library/{subject_dir}/chapters/text_and_metadata/
-cms_library/{subject_dir}/chapters/unmodified_source_text/
-cms_library/{subject_dir}/chapters/chapter_content_manifest.json
-cms_library/{subject_dir}/chapters/proofreading/
-cms_library/{subject_dir}/run_state/prep-subject/job-state.json
-cms_library/{subject_dir}/.work/prep-subject/{job-id}/
+cms_library/{subject-group}/{language}/full_subject/
+cms_library/{subject-group}/{language}/chapters/msword/
+cms_library/{subject-group}/{language}/chapters/text_and_metadata/
+cms_library/{subject-group}/{language}/chapters/unmodified_source_text/
+cms_library/{subject-group}/{language}/chapters/chapter_content_manifest.json
+cms_library/{subject-group}/{language}/chapters/proofreading/
+cms_library/{subject-group}/{language}/run_state/prep-subject/job-state.json
+cms_library/{subject-group}/{language}/.work/prep-subject/{job-id}/
 ```
 
 R2 prefixes are object-key strings, not real folders.
+
+`subject_dir` must be a safe nested POSIX-relative path: it cannot be absolute,
+contain empty segments, `.`, `..`, or backslashes, and its final segment must
+equal the configured language. Prep-subject uses
+`metadata_defaults.language`; generate-chunks requires the same language in
+its naming, source root, destination root, prepared manifest, and candidate
+metadata. These roots are independent preparation and chunking release units.
 
 ## Prep-subject operational checkpoint
 
@@ -106,7 +116,8 @@ proofread text and proofread-derived metadata. The unmodified source text is
 the exact converted/extracted input submitted to Gemini; it is provenance only
 and has no metadata JSON. The proof-reading details JSON binds the unmodified
 and canonical text artifacts with storage references, checksums, content
-identities, provider/model provenance, request pacing/usage, local diff summary,
+identities, provider/model provenance, selected language, a stable
+instruction-template ID/version/hash, request pacing/usage, local diff summary,
 and Gemini edit explanations. It contains no full source/corrected text,
 prompts, API keys, or raw responses.
 
@@ -128,7 +139,7 @@ R2 references use:
 {
   "backend": "r2",
   "bucket": "gurubodh-library-dev",
-  "key": "cms_library/129_spand_rahasya/chapters/text_and_metadata/example.json",
+  "key": "cms_library/129_spand_rahasya/hi-IN/chapters/text_and_metadata/example.json",
   "url": null
 }
 ```

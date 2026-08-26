@@ -28,6 +28,12 @@ audit reports are retained independently under
 or publishing work from canonical consumption. Only state `succeeded` with a
 matching canonical content manifest authorizes `generate-chunks`.
 
+Each ownership boundary is scoped to the language-qualified subject release
+root defined by [Decision-0005](./0005-language-scoped-prepared-content-release-roots.md).
+Therefore Hindi and Marathi canonical trees, checkpoints, reports, semantic
+outputs, and overwrite effects are isolated even when they belong to the same
+subject grouping.
+
 The versioned text and metadata files in `chapters/text_and_metadata/` are the
 proofread source of truth. The corresponding unmodified-source file is
 provenance only; it never has metadata, is not manifest-listed, and cannot be a
@@ -55,6 +61,8 @@ history without introducing premature revision or release infrastructure.
 ## Impact
 
 Operators must rerun `generate-chunks` after overwriting canonical content.
+They must regenerate pre-language-root Hindi artifacts into `hi-IN` explicitly;
+the CLI never relocates or deletes those legacy artifacts automatically.
 Future commands must declare their owned paths before implementing overwrite.
 
 ## Review Trigger

@@ -1,15 +1,15 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "pipeline": "generate-chunks",
   "source": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra"
+    "subject_dir": "39_aacharan_shaastra/hi-IN"
   },
   "destination": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra"
+    "subject_dir": "39_aacharan_shaastra/hi-IN"
   },
   "naming": {
     "category_code": "CAT004",

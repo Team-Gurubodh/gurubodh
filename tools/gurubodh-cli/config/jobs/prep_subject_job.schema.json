@@ -3,11 +3,11 @@
   "$id": "https://gurubodh.local/schemas/prep_subject_job.schema.json",
   "title": "Gurubodh Prep Subject Job",
   "type": "object",
-  "required": ["schema_version", "pipeline", "source", "destination", "naming", "chapter_split", "proofreading"],
+  "required": ["schema_version", "pipeline", "source", "destination", "naming", "chapter_split", "metadata_defaults", "proofreading"],
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.3.0"
+      "const": "1.4.0"
     },
     "pipeline": {
       "type": "string",
@@ -215,18 +215,19 @@
     },
     "metadata_defaults": {
       "type": "object",
+      "required": ["language", "source_script", "output_text_encoding"],
       "properties": {
         "language": {
           "type": "string",
-          "default": "hi-Deva"
+          "enum": ["hi-IN", "mr-IN"]
         },
         "source_script": {
           "type": "string",
-          "default": "Devanagari"
+          "const": "Devanagari"
         },
         "output_text_encoding": {
           "type": "string",
-          "default": "UTF-8"
+          "const": "UTF-8"
         },
         "summary_chapter_markers": {
           "type": "array",

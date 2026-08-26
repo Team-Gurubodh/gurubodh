@@ -11,6 +11,7 @@ from unittest.mock import patch
 from gurubodh.config import proofreading_config, validate_pipeline_matches_source
 from gurubodh.content_identity import build_content_identity
 from gurubodh.content_manifest import write_chapter_content_manifest
+from gurubodh.locales import locale_spec
 from gurubodh.naming import chapter_output_filename, chapter_unmodified_source_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
 from gurubodh.proofreading import (
@@ -112,7 +113,7 @@ class ProofreadingTests(unittest.TestCase):
             "corrected_text": "यह सही वाक्य है।",
             "edits": [{"original": "गलत", "corrected": "सही", "category": "spelling", "reason": "वर्तनी"}],
         }])
-        proofreader = GeminiProofreader(self.settings(), client=client, types_module=FakeTypes)
+        proofreader = GeminiProofreader(self.settings(), locale=locale_spec("hi-IN"), client=client, types_module=FakeTypes)
 
         result = proofreader.proofread("यह गलत वाक्य है।")
 
@@ -122,10 +123,59 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(client.models.calls[0]["model"], "gemini-3.7-flash")
         self.assertNotIn("temperature", client.models.calls[0]["config"].kwargs)
 
+    def test_locale_selects_independently_authored_hindi_and_marathi_instructions(self):
+        response = {
+            "corrected_text": "योग्य मजकूर आहे.",
+            "edits": [{"original": "चुकीचा", "corrected": "योग्य", "category": "spelling", "reason": "शब्दलेखन"}],
+        }
+        hindi_client = FakeClient([response])
+        marathi_client = FakeClient([response])
+
+        GeminiProofreader(
+            self.settings(), locale=locale_spec("hi-IN"), client=hindi_client, types_module=FakeTypes
+        ).proofread("चुकीचा मजकूर आहे.")
+        GeminiProofreader(
+            self.settings(), locale=locale_spec("mr-IN"), client=marathi_client, types_module=FakeTypes
+        ).proofread("चुकीचा मजकूर आहे.")
+
+        hindi_instruction = hindi_client.models.calls[0]["config"].kwargs["system_instruction"]
+        marathi_instruction = marathi_client.models.calls[0]["config"].kwargs["system_instruction"]
+        self.assertIn("हिंदी भाषा संपादक", hindi_instruction)
+        self.assertIn("मराठी भाषा संपादक", marathi_instruction)
+        self.assertNotEqual(hindi_instruction, marathi_instruction)
+
+    def test_mismatched_gemini_prompt_locale_is_rejected_before_request(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = {
+                "pipeline": "unicode-docx-ingest",
+                "source": {"backend": "local", "root_dir": temp_dir, "relative_path": "source.docx", "font_encoding": "unicode", "file_format": "docx"},
+                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject/mr-IN"},
+                "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
+                "metadata_defaults": {"language": "mr-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
+                "_proofreading_config": self.settings(),
+            }
+            paths = destination_paths_for_subject(root / "subject" / "mr-IN")
+            ensure_job_dirs(paths)
+            source_path = paths["unmodified_source_text"] / chapter_unmodified_source_filename(config, 1)
+            source_path.write_text("चुकीचा मजकूर आहे.\n", encoding="utf-8")
+            client = FakeClient([{
+                "corrected_text": "योग्य मजकूर आहे.",
+                "edits": [{"original": "चुकीचा", "corrected": "योग्य", "category": "spelling", "reason": "शब्दलेखन"}],
+            }])
+            proofreader = GeminiProofreader(
+                self.settings(), locale=locale_spec("hi-IN"), client=client, types_module=FakeTypes
+            )
+
+            with self.assertRaisesRegex(ProofreadingError, "does not match chapter metadata language"):
+                proofread_chapter_artifacts(config, paths, proofreader=proofreader)
+
+            self.assertEqual(client.models.calls, [])
+
     def test_missing_gemini_credential_fails_before_a_request(self):
         with patch.dict(os.environ, {"GEMINI_API_KEY": ""}, clear=False):
             with self.assertRaisesRegex(ProofreadingError, "Set GEMINI_API_KEY"):
-                GeminiProofreader(self.settings()).proofread("यह गलत वाक्य है।")
+                GeminiProofreader(self.settings(), locale=locale_spec("hi-IN")).proofread("यह गलत वाक्य है।")
 
     def test_gemini_schema_omits_unsupported_additional_properties(self):
         self.assertNotIn("additionalProperties", EDIT_LIST_SCHEMA)
@@ -136,14 +186,14 @@ class ProofreadingTests(unittest.TestCase):
             "corrected_text": "यह सही वाक्य है।",
             "edits": [{"original": "यह गलत वाक्य है।", "corrected": "यह सही वाक्य है।", "category": "spelling", "reason": "वर्तनी"}],
         }])
-        proofreader = GeminiProofreader(self.settings(), client=client, types_module=FakeTypes)
+        proofreader = GeminiProofreader(self.settings(), locale=locale_spec("hi-IN"), client=client, types_module=FakeTypes)
 
         with self.assertRaisesRegex(ProofreadingError, "full chapter text"):
             proofreader.proofread("यह गलत वाक्य है।")
 
     def test_api_error_includes_safe_gemini_status(self):
         client = FakeClient([HttpError(400, "INVALID_ARGUMENT", "Unsupported request setting")])
-        proofreader = GeminiProofreader(self.settings(), client=client, types_module=FakeTypes)
+        proofreader = GeminiProofreader(self.settings(), locale=locale_spec("hi-IN"), client=client, types_module=FakeTypes)
 
         with self.assertRaisesRegex(ProofreadingError, r"HTTP 400 INVALID_ARGUMENT: Unsupported request setting"):
             proofreader.proofread("यह गलत है।")
@@ -156,6 +206,7 @@ class ProofreadingTests(unittest.TestCase):
         delays = []
         proofreader = GeminiProofreader(
             self.settings(initial_retry_delay_seconds=1, max_retry_delay_seconds=1),
+            locale=locale_spec("hi-IN"),
             client=client,
             types_module=FakeTypes,
             sleep=delays.append,
@@ -175,6 +226,7 @@ class ProofreadingTests(unittest.TestCase):
         delays, messages = [], []
         proofreader = GeminiProofreader(
             self.settings(),
+            locale=locale_spec("hi-IN"),
             client=client,
             types_module=FakeTypes,
             sleep=delays.append,
@@ -195,9 +247,9 @@ class ProofreadingTests(unittest.TestCase):
             config = {
                 "pipeline": "unicode-docx-ingest",
                 "source": {"backend": "local", "root_dir": temp_dir, "relative_path": "source.docx", "font_encoding": "unicode", "file_format": "docx"},
-                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject"},
+                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject/hi-IN"},
                 "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
-                "metadata_defaults": {"language": "hi-Deva", "summary_chapter_markers": ["सही"]},
+                "metadata_defaults": {"language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8", "summary_chapter_markers": ["सही"]},
                 "_proofreading_config": self.settings(),
             }
             paths = destination_paths_for_subject(root / "subject")
@@ -238,7 +290,7 @@ class ProofreadingTests(unittest.TestCase):
             self.assertFalse((paths["proofreading"] / f"{Path(text_name).stem}.proofread.txt").exists())
             self.assertEqual(text_path.read_text(encoding="utf-8"), "यह सही वाक्य है।\n")
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            self.assertEqual(metadata["content_identity"], build_content_identity("CAT001", "SUB123", "hi-Deva", "यह सही वाक्य है।"))
+            self.assertEqual(metadata["content_identity"], build_content_identity("CAT001", "SUB123", "hi-IN", "यह सही वाक्य है।"))
             self.assertEqual(metadata["content_stats"]["character_count"], len("यह सही वाक्य है।"))
             self.assertEqual(metadata["content"]["automated_tags"], ["summary_chapter", "उपसंहार"])
             self.assertEqual(metadata["integrity"]["artifacts"]["text"]["value"], hashlib.sha256(text_path.read_bytes()).hexdigest())
@@ -248,12 +300,17 @@ class ProofreadingTests(unittest.TestCase):
             self.assertEqual(details["canonical_corrected"]["text_sha256"], hashlib.sha256(text_path.read_bytes()).hexdigest())
             self.assertEqual(details["unmodified_source"]["text_artifact"]["path"], f"chapters/unmodified_source_text/{source_name}")
             self.assertEqual(details["canonical_corrected"]["text_artifact"], metadata["storage"]["artifacts"]["text"])
+            self.assertEqual(details["proofreading_locale"]["language"], "hi-IN")
+            self.assertEqual(details["proofreading_locale"]["instruction_template"]["id"], "hi-IN-proofreading")
+            self.assertRegex(details["proofreading_locale"]["instruction_template"]["sha256"], "^[a-f0-9]{64}$")
             self.assertNotIn(source_text, details_text)
             self.assertNotIn("यह सही वाक्य है।", details_text)
             content_manifest_path = write_chapter_content_manifest(config, paths)
             content_manifest = json.loads(content_manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(content_manifest["chapters"][0]["text_artifact"], metadata["storage"]["artifacts"]["text"])
             self.assertNotIn("unmodified_source_text", json.dumps(content_manifest))
+            proof_manifest = json.loads((paths["proofreading"] / "proofreading_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(proof_manifest["proofreading_locale"]["language"], "hi-IN")
 
     def test_proofreading_failure_does_not_write_canonical_artifacts_or_a_manifest(self):
         class FailingProofreader:
@@ -265,7 +322,8 @@ class ProofreadingTests(unittest.TestCase):
             config = {
                 "pipeline": "unicode-docx-ingest",
                 "source": {"backend": "local", "root_dir": temp_dir, "relative_path": "source.docx", "font_encoding": "unicode", "file_format": "docx"},
-                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject"},
+                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject/hi-IN"},
+                "metadata_defaults": {"language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
                 "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
                 "_proofreading_config": self.settings(),
             }

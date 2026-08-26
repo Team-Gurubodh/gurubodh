@@ -31,7 +31,9 @@ cms_library/
 ```
 
 Prepared artifact keys preserve the existing local artifact grouping under each
-subject:
+language-qualified subject release root. `subject_dir` keeps the subject
+grouping visible and ends in the configured locale, for example
+`123_spand_rahasya/hi-IN`:
 
 ```text
 cms_library/{subject_dir}/full_subject/

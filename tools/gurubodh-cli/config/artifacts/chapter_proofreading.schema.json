@@ -4,12 +4,30 @@
   "title": "Gurubodh canonical chapter proof-reading artifact",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "status", "created_at", "provider", "unmodified_source", "canonical_corrected", "diff_artifact", "integrity", "local_diff_summary", "gemini_edits", "request"],
+  "required": ["schema_version", "status", "created_at", "provider", "proofreading_locale", "unmodified_source", "canonical_corrected", "diff_artifact", "integrity", "local_diff_summary", "gemini_edits", "request"],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "status": {"const": "succeeded"},
     "created_at": {"type": "string", "format": "date-time"},
     "provider": {"type": "object"},
+    "proofreading_locale": {
+      "type": "object",
+      "required": ["language", "instruction_template"],
+      "properties": {
+        "language": {"enum": ["hi-IN", "mr-IN"]},
+        "instruction_template": {
+          "type": "object",
+          "required": ["id", "version", "sha256"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "version": {"type": "integer", "minimum": 1},
+            "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "unmodified_source": {"type": "object"},
     "canonical_corrected": {"type": "object"},
     "diff_artifact": {"type": "object"},

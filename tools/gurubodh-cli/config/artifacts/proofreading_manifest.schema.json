@@ -4,10 +4,19 @@
   "title": "Gurubodh proof-reading review manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "provider", "counts", "chapters"],
+  "required": ["schema_version", "provider", "proofreading_locale", "counts", "chapters"],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "provider": {"type": "object"},
+    "proofreading_locale": {
+      "type": "object",
+      "required": ["language", "instruction_template"],
+      "properties": {
+        "language": {"enum": ["hi-IN", "mr-IN"]},
+        "instruction_template": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
     "counts": {
       "type": "object",
       "required": ["succeeded", "failed", "skipped"],
