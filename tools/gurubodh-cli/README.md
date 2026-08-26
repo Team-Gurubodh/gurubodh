@@ -12,7 +12,7 @@ python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
 export GEMINI_API_KEY=...
-gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```
 
 ## Container Batch Runner
@@ -86,7 +86,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  prep-subject --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json
+  prep-subject --config jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2.json
 ```
 
 Then run its R2-backed chunk-generation job with the same named volume.
@@ -103,7 +103,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  generate-chunks --config jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
+  generate-chunks --config jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json
 ```
 
 If you already have the `bge-m3` cache and wish to reuse the same with the docker container, then use the following commands, replacing `--mount type=volume` by  `--mount type=bind`, as shown in the examples below:
@@ -117,7 +117,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.r2.json --overwrite
+  prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2.json --overwrite
 
 
 # Run the `generate-chunks` command
@@ -129,7 +129,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=bind,src="$HOME/.cache/huggingface/hub",dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  generate-chunks --config jobs/subjects/sub123_spand_rahasya/generate-chunks.r2.json --overwrite
+  generate-chunks --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2.json --overwrite
 
 # The `--env PYTHONUNBUFFERED=1` flag disables buffered `stdout` and `stderr`,
 # so logs appear immediately in docker logs or your terminal
@@ -174,7 +174,7 @@ path. In that case, run `python -m pip install -e .` after activation, or run
 `.venv/bin/python -m pip install -e .` without activation, to refresh the
 editable install.
 
-`gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`
+`gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json`
 runs a sample local content job.
 
 Artifact ownership is command-scoped: `prep-subject`
@@ -192,6 +192,101 @@ semantic chunks because they may no longer match the prepared content; rerun
 `run_state/prep-subject/job-state.json` and staged checkpoints at
 `.work/prep-subject/{job-id}/`. Cross-prefix local/R2 replacement is not a
 fully atomic release protocol.
+
+### Locale-scoped Hindi and Marathi preparation
+
+The CLI initially supports exactly `hi-IN` (Hindi) and `mr-IN` (Marathi). A
+prep-subject job must explicitly declare its locale, `source_script` as
+`Devanagari`, and `output_text_encoding` as `UTF-8`. Hindi and Marathi use
+separate, locale-specific Gemini proofreading instructions while retaining the
+same structured response and edit categories.
+
+Every prepared release is rooted at `<subject-group>/<language>`, including
+canonical artifacts, semantic chunks, reports, checkpoints, and workspaces:
+
+```text
+cms_library/<subject-group>/hi-IN/
+cms_library/<subject-group>/mr-IN/
+```
+
+`subject_dir` must be a safe POSIX-relative nested path, retain a subject
+grouping, and end in the configured language. Absolute paths, empty segments,
+`.`, `..`, and backslashes are rejected. `generate-chunks` source and
+destination must use the same language-qualified `subject_dir`, and its
+`naming.language` must match the prepared manifest.
+
+```json
+{
+  "destination": {
+    "backend": "local",
+    "root_dir": "/path/to/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "metadata_defaults": {
+    "language": "mr-IN",
+    "source_script": "Devanagari",
+    "output_text_encoding": "UTF-8",
+    "summary_chapter_markers": []
+  }
+}
+```
+
+The matching Marathi chunk job uses `123_spand_rahasya/mr-IN` for both
+`source.subject_dir` and `destination.subject_dir`, and sets
+`naming.language` to `mr-IN`. This is a template only: supply an approved
+Marathi source DOCX and subject metadata before creating an executable job.
+
+```json
+{
+  "schema_version": "1.1.0",
+  "pipeline": "generate-chunks",
+  "source": {
+    "backend": "local",
+    "root_dir": "/path/to/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "destination": {
+    "backend": "local",
+    "root_dir": "/path/to/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "naming": {
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya",
+    "version": "01",
+    "subversion": "01",
+    "language": "mr-IN"
+  }
+}
+```
+
+Run the language-matched jobs in order:
+
+```bash
+gurubodh prep-subject --config <marathi-prep-subject-job>
+gurubodh generate-chunks --config <marathi-generate-chunks-job>
+```
+
+Proofreading details, aggregate proofreading manifests, checkpoints, and
+prep-subject reports record the selected language and instruction-template ID,
+version, and hash. They never record the full prompt, source/corrected text,
+or credentials.
+
+#### Migrating existing Hindi artifacts
+
+Existing Hindi artifacts directly under `cms_library/<subject-group>/` are
+legacy locations. The CLI never moves or deletes them automatically. Regenerate
+the subject with a maintained `hi-IN` prep job, verify its audit report and
+canonical manifest, then regenerate chunks using the matching `hi-IN` job.
+The first run to the new root does not overwrite the old root. Use
+`--overwrite` only when intentionally replacing an already-existing release in
+the same language root; it cannot modify the other language root.
+
+An incomplete checkpoint at the old unqualified root cannot be resumed into
+the new language root. Finish or preserve that old run deliberately, then start
+a new `hi-IN` preparation job. Retain legacy local/R2 artifacts until the new
+release has been verified; archival or deletion is an explicit operator action.
 
 ### Mandatory Gemini proofreading and canonical chapter artifacts
 
@@ -247,7 +342,7 @@ These progress messages contain counts and timing only; they never print chapter
 text or credentials.
 
 ```bash
-gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --overwrite
 ```
 
 ### Resuming an interrupted prep job
@@ -259,7 +354,7 @@ an immutable JSON/Markdown run report, and exits non-zero with state
 `incomplete`. Resume it without paying for already checkpointed chapters:
 
 ```bash
-gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --resume
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --resume
 ```
 
 `--resume` and `--overwrite` are mutually exclusive. Resume requires the same
@@ -283,7 +378,7 @@ persists finalized chunk vectors:
 ```bash
 export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
 gurubodh generate-chunks \
-  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```
 
 ### Pinned BGE-M3 model and cache workflow
@@ -334,13 +429,13 @@ When run from outside `tools/gurubodh-cli`, pass `--project-root` just like
 ```bash
 gurubodh generate-chunks \
   --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```
 
 The output directory is scoped to:
 
 ```text
-<subject>/chapters/semantic_chunks/
+<subject-group>/<language>/chapters/semantic_chunks/
 ```
 
 It contains one `*.chunks.json` file per processed chapter and a
@@ -360,7 +455,7 @@ operator-readable Markdown audit reports under the generated subject artifact
 tree:
 
 ```text
-<subject>/run_reports/prep-subject/
+<subject-group>/<language>/run_reports/prep-subject/
 ```
 
 The JSON report is the source of truth for tooling. The Markdown report is a
@@ -381,7 +476,7 @@ Audit reports intentionally exclude secrets, environment variable values, API
 keys, request bodies, full source text, full chapter text, and DOCX contents.
 
 `generate-chunks` follows the same audit report convention and writes JSON and
-Markdown reports under `<subject>/run_reports/generate-chunks/`. Reports include generated
+Markdown reports under `<subject-group>/<language>/run_reports/generate-chunks/`. Reports include generated
 artifact references and aggregate counts, but exclude full source text and
 embedding vectors.
 
@@ -426,7 +521,7 @@ If running from another directory, pass the root explicitly:
 ```bash
 gurubodh prep-subject \
   --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```
 
 ## Future Command Surface
@@ -444,16 +539,16 @@ backends. Existing jobs that omit `backend` are treated as local jobs.
 Sample jobs are grouped by subject and split by backend:
 
 ```text
-jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
-jobs/subjects/sub039_aacharan_shastra/prep-subject.r2-output.json
-jobs/subjects/sub039_aacharan_shastra/generate-chunks.local.json
-jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2-output.json
-jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
-jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
-jobs/subjects/sub123_spand_rahasya/prep-subject.r2-output.json
-jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
-jobs/subjects/sub123_spand_rahasya/generate-chunks.r2-output.json
-jobs/subjects/sub123_spand_rahasya/generate-chunks.r2.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.local.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.local.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2-output.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2-output.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2.json
 ```
 
 Use `.local.json` for local source and local output. Use `.r2-output.json` for
@@ -473,7 +568,7 @@ Local source and destination:
   "destination": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "129_spand_rahasya"
+    "subject_dir": "129_spand_rahasya/hi-IN"
   }
 }
 ```
@@ -493,7 +588,7 @@ Cloudflare R2 source and destination:
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
     "prefix": "cms_library",
-    "subject_dir": "129_spand_rahasya",
+    "subject_dir": "129_spand_rahasya/hi-IN",
     "url_base": null
   }
 }

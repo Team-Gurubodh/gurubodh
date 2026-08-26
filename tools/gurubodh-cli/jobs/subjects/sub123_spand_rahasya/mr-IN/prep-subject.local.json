@@ -1,34 +1,30 @@
 {
-  "schema_version": "1.3.0",
-  "pipeline": "legacy-docx-to-unicode",
+  "schema_version": "1.4.0",
+  "pipeline": "unicode-docx-ingest",
   "source": {
-    "backend": "r2",
-    "bucket": "gurubodh-library-dev",
-    "key": "source_library/39_aacharan_shastra/aps_fonts/ms_word/sub039_aacharan_shastra.docx",
-    "font_encoding": "aps",
+    "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
+    "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_mr-IN.docx",
+    "font_encoding": "unicode",
     "file_format": "docx"
   },
   "destination": {
-    "backend": "r2",
-    "bucket": "gurubodh-library-dev",
-    "prefix": "cms_library",
-    "subject_dir": "39_aacharan_shaastra",
-    "url_base": null
+    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
   },
   "naming": {
-    "category_code": "CAT004",
-    "subject_code": "SUB039",
-    "title_slug": "aacharan-shastra",
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya",
     "version": "01",
     "subversion": "01"
   },
   "chapter_split": {
     "enabled": true,
-    "pattern_type": "literal",
-    "pattern": "प्रबोधन क्र"
+    "pattern_type": "regex",
+    "pattern": "स्पंद रहस्य.*?जानेवारी.*?2026"
   },
   "metadata_defaults": {
-    "language": "hi-IN",
+    "language": "mr-IN",
     "source_script": "Devanagari",
     "output_text_encoding": "UTF-8",
     "summary_chapter_markers": [

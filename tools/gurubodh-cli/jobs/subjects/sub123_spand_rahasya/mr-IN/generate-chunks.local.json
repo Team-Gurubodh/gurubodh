@@ -1,23 +1,23 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "pipeline": "generate-chunks",
   "source": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra"
+    "subject_dir": "123_spand_rahasya/mr-IN"
   },
   "destination": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra"
+    "subject_dir": "123_spand_rahasya/mr-IN"
   },
   "naming": {
-    "category_code": "CAT004",
-    "subject_code": "SUB039",
-    "title_slug": "aacharan-shastra",
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya",
     "version": "01",
     "subversion": "01",
-    "language": "hi-IN"
+    "language": "mr-IN"
   },
   "chunking": {
     "provider": "semantic-chunking",

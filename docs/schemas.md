@@ -32,6 +32,13 @@
   `tools/gurubodh-cli/config/artifacts/`.
 - Prep-subject job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
+- Prep-subject job schema `1.4.0` requires explicit `metadata_defaults.language`
+  and supports only `hi-IN` and `mr-IN`. Both require
+  `source_script: "Devanagari"` and `output_text_encoding: "UTF-8"`.
+  `destination.subject_dir` must be a safe nested POSIX-relative path whose
+  final segment equals that language. Generate-chunks job schema `1.1.0`
+  applies the same locale restriction to `naming.language` and requires source
+  and destination to use the same language-qualified subject root.
 - Prep-subject job `metadata_defaults.summary_chapter_markers` explicitly
   configures Devanagari search terms that add `summary_chapter` and
   `उपसंहार` to chapter metadata `content.automated_tags` when found in
@@ -59,6 +66,12 @@
   without a metadata JSON; `chapters/proofreading/` holds its local diff and
   provenance details. Only the proofread canonical pair is referenced by the
   chapter content manifest or eligible for `generate-chunks`.
+- Proofreading details and aggregate proofreading manifests use schema version
+  `2` to record the selected locale plus a stable instruction-template ID,
+  version, and SHA-256 hash. They never store the template text itself.
+  Checkpoint compatibility includes this safe template provenance, so a
+  template change requires a fresh overwrite rather than mixing resumed
+  artifacts.
 - `prep_subject_job_state.schema.json` defines the durable operational
   checkpoint at `run_state/prep-subject/job-state.json`. It records safe
   compatibility, lease, per-chapter state, artifact checksums, publication, and

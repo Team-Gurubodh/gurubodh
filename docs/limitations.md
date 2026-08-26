@@ -15,6 +15,9 @@
   metadata generation, metadata ingestion, `apps/gurubodh-web`, and
   `apps/gurubodh-chat`.
 - AI agents may not automatically discover every Markdown file unless rooted through `AGENTS.md`, `README.md`, or explicit user instructions.
+- Content preparation currently supports only Hindi (`hi-IN`) and Marathi
+  (`mr-IN`) Devanagari locales. It does not detect languages automatically and
+  rejects all other locale values.
 
 
 ## Technical Limitations

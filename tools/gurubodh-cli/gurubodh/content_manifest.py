@@ -39,7 +39,7 @@ def build_chapter_content_manifest(config, text_and_metadata_dir: Path) -> dict:
         "subject": {
             "category_code": config["naming"]["category_code"],
             "subject_code": config["naming"]["subject_code"],
-            "language": config.get("metadata_defaults", {}).get("language", "hi-Deva"),
+            "language": config["metadata_defaults"]["language"],
         },
         "chapters": chapters,
     }

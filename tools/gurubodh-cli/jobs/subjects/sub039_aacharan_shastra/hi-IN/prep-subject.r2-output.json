@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "pipeline": "legacy-docx-to-unicode",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
@@ -8,8 +8,11 @@
     "file_format": "docx"
   },
   "destination": {
-    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra"
+    "backend": "r2",
+    "bucket": "gurubodh-library-dev",
+    "prefix": "cms_library",
+    "subject_dir": "39_aacharan_shaastra/hi-IN",
+    "url_base": null
   },
   "naming": {
     "category_code": "CAT004",

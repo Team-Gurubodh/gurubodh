@@ -15,13 +15,14 @@ from gurubodh.storage import (
     ensure_local_destination,
     ensure_r2_destination_available,
     invalidate_local_semantic_artifacts,
+    invalidate_r2_semantic_artifacts,
     materialize_source,
     publish_r2_destination,
 )
 
 
 BASE_CONFIG = {
-    "schema_version": "1.3.0",
+    "schema_version": "1.4.0",
     "pipeline": "unicode-docx-ingest",
     "source": {
         "root_dir": "/tmp/source",
@@ -31,7 +32,7 @@ BASE_CONFIG = {
     },
     "destination": {
         "root_dir": "/tmp/destination",
-        "subject_dir": "129_spand_rahasya",
+        "subject_dir": "129_spand_rahasya/hi-IN",
     },
     "naming": {
         "category_code": "CAT020",
@@ -42,6 +43,11 @@ BASE_CONFIG = {
     },
     "chapter_split": {
         "enabled": False,
+    },
+    "metadata_defaults": {
+        "language": "hi-IN",
+        "source_script": "Devanagari",
+        "output_text_encoding": "UTF-8",
     },
     "proofreading": {},
 }
@@ -95,7 +101,7 @@ class StorageConfigTests(unittest.TestCase):
         config = load_prep_subject_job(self.write_config(BASE_CONFIG))
 
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
-        self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya")
+        self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya/hi-IN")
 
     def test_prep_subject_requires_strict_proofreading_configuration(self):
         missing = json.loads(json.dumps(BASE_CONFIG))
@@ -112,6 +118,58 @@ class StorageConfigTests(unittest.TestCase):
         permissive["proofreading"] = {"continue_on_error": True}
         with self.assertRaisesRegex(SystemExit, "continue_on_error must be false"):
             load_prep_subject_job(self.write_config(permissive))
+
+    def test_prep_subject_requires_an_explicit_supported_locale(self):
+        missing = json.loads(json.dumps(BASE_CONFIG))
+        missing["metadata_defaults"].pop("language")
+        with self.assertRaisesRegex(SystemExit, "metadata_defaults.language must be a non-empty string"):
+            load_prep_subject_job(self.write_config(missing))
+
+        unsupported = json.loads(json.dumps(BASE_CONFIG))
+        unsupported["metadata_defaults"]["language"] = "sa-IN"
+        unsupported["destination"]["subject_dir"] = "129_spand_rahasya/sa-IN"
+        with self.assertRaisesRegex(SystemExit, "Unsupported language"):
+            load_prep_subject_job(self.write_config(unsupported))
+
+    def test_prep_subject_rejects_invalid_locale_metadata_defaults(self):
+        source_script = json.loads(json.dumps(BASE_CONFIG))
+        source_script["metadata_defaults"]["source_script"] = "Latin"
+        with self.assertRaisesRegex(SystemExit, "source_script must be 'Devanagari'"):
+            load_prep_subject_job(self.write_config(source_script))
+
+        output_encoding = json.loads(json.dumps(BASE_CONFIG))
+        output_encoding["metadata_defaults"]["output_text_encoding"] = "UTF-16"
+        with self.assertRaisesRegex(SystemExit, "output_text_encoding must be 'UTF-8'"):
+            load_prep_subject_job(self.write_config(output_encoding))
+
+    def test_prep_subject_validates_safe_language_qualified_subject_roots(self):
+        for subject_dir in (
+            "/129_spand_rahasya/hi-IN",
+            "129_spand_rahasya//hi-IN",
+            "129_spand_rahasya/./hi-IN",
+            "129_spand_rahasya/../hi-IN",
+            "129_spand_rahasya\\hi-IN",
+            "hi-IN",
+        ):
+            with self.subTest(subject_dir=subject_dir):
+                config = json.loads(json.dumps(BASE_CONFIG))
+                config["destination"]["subject_dir"] = subject_dir
+                with self.assertRaises(SystemExit):
+                    load_prep_subject_job(self.write_config(config))
+
+        mismatch = json.loads(json.dumps(BASE_CONFIG))
+        mismatch["destination"]["subject_dir"] = "129_spand_rahasya/mr-IN"
+        with self.assertRaisesRegex(SystemExit, "final language partition"):
+            load_prep_subject_job(self.write_config(mismatch))
+
+    def test_prep_subject_accepts_marathi_language_qualified_root(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["metadata_defaults"]["language"] = "mr-IN"
+        config["destination"]["subject_dir"] = "129_spand_rahasya/mr-IN"
+
+        loaded = load_prep_subject_job(self.write_config(config))
+
+        self.assertEqual(loaded["_locale"].language, "mr-IN")
 
     def test_local_destination_ignores_unowned_files_without_overwrite(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -156,6 +214,49 @@ class StorageConfigTests(unittest.TestCase):
             self.assertFalse(legacy_file.parent.exists())
             self.assertEqual(len(result["deleted_paths"]), 2)
 
+    def test_semantic_invalidation_isolated_to_one_local_language_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hindi = Path(temp_dir) / "129_spand_rahasya" / "hi-IN"
+            marathi = Path(temp_dir) / "129_spand_rahasya" / "mr-IN"
+            hindi_chunk = hindi / "chapters" / "semantic_chunks" / "hindi.chunks.json"
+            marathi_chunk = marathi / "chapters" / "semantic_chunks" / "marathi.chunks.json"
+            hindi_chunk.parent.mkdir(parents=True)
+            marathi_chunk.parent.mkdir(parents=True)
+            hindi_chunk.write_text("{}", encoding="utf-8")
+            marathi_chunk.write_text("{}", encoding="utf-8")
+
+            invalidate_local_semantic_artifacts(hindi)
+
+            self.assertFalse(hindi_chunk.exists())
+            self.assertTrue(marathi_chunk.exists())
+
+    def test_semantic_invalidation_isolated_to_one_r2_language_root(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["destination"] = {
+            "backend": "r2",
+            "bucket": "gurubodh-library-dev",
+            "prefix": "cms_library",
+            "subject_dir": "129_spand_rahasya/hi-IN",
+        }
+        client = FakeR2Client(
+            {
+                "cms_library/129_spand_rahasya/hi-IN/chapters/semantic_chunks/hindi.chunks.json",
+                "cms_library/129_spand_rahasya/mr-IN/chapters/semantic_chunks/marathi.chunks.json",
+            }
+        )
+
+        result = invalidate_r2_semantic_artifacts(config, r2_client=client)
+
+        self.assertTrue(result["invalidated"])
+        self.assertNotIn(
+            "cms_library/129_spand_rahasya/hi-IN/chapters/semantic_chunks/hindi.chunks.json",
+            client.existing_keys,
+        )
+        self.assertIn(
+            "cms_library/129_spand_rahasya/mr-IN/chapters/semantic_chunks/marathi.chunks.json",
+            client.existing_keys,
+        )
+
     def test_r2_source_and_destination_shape_loads(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["source"] = {
@@ -169,7 +270,7 @@ class StorageConfigTests(unittest.TestCase):
             "backend": "r2",
             "bucket": "gurubodh-library-dev",
             "prefix": "cms_library",
-            "subject_dir": "129_spand_rahasya",
+            "subject_dir": "129_spand_rahasya/hi-IN",
             "url_base": None,
         }
 
@@ -191,7 +292,7 @@ class StorageConfigTests(unittest.TestCase):
             "backend": "r2",
             "bucket": "gurubodh-library-dev",
             "prefix": "cms_library",
-            "subject_dir": "129_spand_rahasya",
+            "subject_dir": "129_spand_rahasya/hi-IN",
             "url_base": None,
         }
 
@@ -226,7 +327,7 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(metadata["storage"]["source"]["key"], "source_library/129_spand_rahasya/source.docx")
         self.assertEqual(
             metadata["storage"]["artifacts"]["metadata"]["key"],
-            "cms_library/129_spand_rahasya/chapters/text_and_metadata/chapter.json",
+            "cms_library/129_spand_rahasya/hi-IN/chapters/text_and_metadata/chapter.json",
         )
         self.assertIsNone(metadata["storage"]["artifacts"]["metadata"]["url"])
 
@@ -271,15 +372,13 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_chapter_metadata_tags_summary_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
-        config["metadata_defaults"] = {
-            "summary_chapter_markers": [
+        config["metadata_defaults"]["summary_chapter_markers"] = [
                 "उपसंहार",
                 "उपसंहारात्मक",
                 "उपसंभारात्मक",
                 "उपसंभारात्त्मक",
                 "उपसंभार",
-            ],
-        }
+            ]
 
         for marker in [
             "उपसंहार",
@@ -337,9 +436,7 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_chapter_metadata_uses_configured_summary_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
-        config["metadata_defaults"] = {
-            "summary_chapter_markers": ["समाप्ति-सूत्र"],
-        }
+        config["metadata_defaults"]["summary_chapter_markers"] = ["समाप्ति-सूत्र"]
 
         metadata = build_chapter_metadata(
             config,
@@ -389,9 +486,7 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_chapter_metadata_configured_summary_markers_use_only_configured_terms(self):
         config = json.loads(json.dumps(BASE_CONFIG))
-        config["metadata_defaults"] = {
-            "summary_chapter_markers": ["समाप्ति-सूत्र"],
-        }
+        config["metadata_defaults"]["summary_chapter_markers"] = ["समाप्ति-सूत्र"]
 
         metadata = build_chapter_metadata(
             config,
@@ -416,9 +511,7 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_chapter_metadata_honors_empty_summary_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
-        config["metadata_defaults"] = {
-            "summary_chapter_markers": [],
-        }
+        config["metadata_defaults"]["summary_chapter_markers"] = []
 
         metadata = build_chapter_metadata(
             config,
@@ -453,9 +546,7 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_load_prep_subject_job_accepts_summary_chapter_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
-        config["metadata_defaults"] = {
-            "summary_chapter_markers": ["समाप्ति-सूत्र"],
-        }
+        config["metadata_defaults"]["summary_chapter_markers"] = ["समाप्ति-सूत्र"]
 
         loaded = load_prep_subject_job(self.write_config(config))
 
@@ -470,17 +561,19 @@ class StorageConfigTests(unittest.TestCase):
         for job_path in sorted(
             path
             for pattern in ("prep-subject.local.json", "prep-subject.r2-output.json", "prep-subject.r2.json")
-            for path in jobs_dir.glob(f"*/{pattern}")
+            for path in jobs_dir.glob(f"*/hi-IN/{pattern}")
         ):
             with self.subTest(job=str(job_path.relative_to(jobs_dir))):
                 config = load_prep_subject_job(job_path)
 
                 self.assertIn("summary_chapter_markers", config["metadata_defaults"])
+                self.assertEqual(config["metadata_defaults"]["language"], "hi-IN")
+                self.assertTrue(config["destination"]["subject_dir"].endswith("/hi-IN"))
 
     def test_maintained_generate_chunks_jobs_use_pinned_cached_model_loading(self):
         jobs_dir = Path(__file__).parents[1] / "jobs" / "subjects"
 
-        for job_path in jobs_dir.glob("*/generate-chunks*.json"):
+        for job_path in jobs_dir.glob("*/hi-IN/generate-chunks*.json"):
             with self.subTest(job=str(job_path.relative_to(jobs_dir))):
                 config = load_generate_chunks_job(job_path)
 
@@ -492,17 +585,40 @@ class StorageConfigTests(unittest.TestCase):
                 )
                 self.assertTrue(config["_semantic_chunk_config"].local_files_only)
                 self.assertEqual(config["naming"]["language"], "hi-IN")
+                self.assertTrue(config["source"]["subject_dir"].endswith("/hi-IN"))
+                self.assertEqual(config["source"]["subject_dir"], config["destination"]["subject_dir"])
                 self.assertGreaterEqual(config["_semantic_chunk_config"].threshold_percentile, 0.0)
                 self.assertLessEqual(config["_semantic_chunk_config"].threshold_percentile, 100.0)
                 self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)
 
+    def test_generate_chunks_requires_matching_marathi_language_root(self):
+        job_path = (
+            Path(__file__).parents[1]
+            / "jobs"
+            / "subjects"
+            / "sub123_spand_rahasya"
+            / "hi-IN"
+            / "generate-chunks.local.json"
+        )
+        config = json.loads(job_path.read_text(encoding="utf-8"))
+        config["source"]["subject_dir"] = "123_spand_rahasya/mr-IN"
+        config["destination"]["subject_dir"] = "123_spand_rahasya/mr-IN"
+        config["naming"]["language"] = "mr-IN"
+
+        loaded = load_generate_chunks_job(self.write_config(config))
+
+        self.assertEqual(loaded["naming"]["language"], "mr-IN")
+        config["destination"]["subject_dir"] = "different_subject/mr-IN"
+        with self.assertRaisesRegex(SystemExit, "same language-qualified root"):
+            load_generate_chunks_job(self.write_config(config))
+
     def test_generate_chunks_job_rejects_unpinned_model_revision(self):
         config = {
-            "schema_version": "1.0.0",
+            "schema_version": "1.1.0",
             "pipeline": "generate-chunks",
-            "source": {"backend": "r2", "bucket": "source", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None},
-            "destination": {"backend": "r2", "bucket": "destination", "prefix": "cms_library", "subject_dir": "123_spand_rahasya", "url_base": None},
-            "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01", "language": "hi-Deva"},
+            "source": {"backend": "r2", "bucket": "source", "prefix": "cms_library", "subject_dir": "123_spand_rahasya/hi-IN", "url_base": None},
+            "destination": {"backend": "r2", "bucket": "destination", "prefix": "cms_library", "subject_dir": "123_spand_rahasya/hi-IN", "url_base": None},
+            "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01", "language": "hi-IN"},
             "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_contextual_vectors": True, "device": None, "local_files_only": False},
         }
 
@@ -511,9 +627,7 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_load_prep_subject_job_rejects_invalid_summary_chapter_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
-        config["metadata_defaults"] = {
-            "summary_chapter_markers": "उपसंहार",
-        }
+        config["metadata_defaults"]["summary_chapter_markers"] = "उपसंहार"
 
         with self.assertRaises(SystemExit) as exc:
             load_prep_subject_job(self.write_config(config))

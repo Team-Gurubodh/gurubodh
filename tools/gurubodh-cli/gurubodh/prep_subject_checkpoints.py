@@ -18,6 +18,7 @@ import uuid
 from typing import Any, Callable
 
 from gurubodh.content_manifest import write_chapter_content_manifest
+from gurubodh.locales import locale_spec
 from gurubodh.naming import chapter_output_filename, full_subject_output_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
 from gurubodh.pipelines.common import validate_and_split
@@ -47,7 +48,6 @@ from gurubodh.time_utils import timestamp_for_filename, utc_now
 
 CHECKPOINT_SCHEMA_VERSION = 1
 CHECKPOINT_CONTRACT_VERSION = 1
-PROMPT_CONTRACT_VERSION = 1
 RUN_STATE_RELATIVE_DIR = Path("run_state") / "prep-subject"
 JOB_STATE_RELATIVE_PATH = RUN_STATE_RELATIVE_DIR / "job-state.json"
 WORK_RELATIVE_DIR = Path(".work") / "prep-subject"
@@ -86,6 +86,7 @@ def _safe_error(exc: BaseException) -> dict[str, str]:
 def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
     """Return only output-affecting inputs; operational pacing is excluded."""
     settings = config["_proofreading_config"]
+    locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])
     return {
         "pipeline": config["pipeline"],
         "chapter_split": {
@@ -101,7 +102,7 @@ def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
             "max_output_tokens": settings.max_output_tokens,
             "max_input_characters": settings.max_input_characters,
             "response_schema_version": 1,
-            "prompt_contract_version": PROMPT_CONTRACT_VERSION,
+            "locale": locale.proofreading_provenance(),
         },
         "checkpoint_contract_version": CHECKPOINT_CONTRACT_VERSION,
     }
@@ -548,7 +549,8 @@ class PrepCheckpointManager:
                     "to reprocess it before publication."
                 )
         proofread = [chapter["proofreading"] for chapter in chapters]
-        write_proofreading_manifest(self.paths, self.config["_proofreading_config"], proofread)
+        locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
+        write_proofreading_manifest(self.paths, self.config["_proofreading_config"], proofread, locale)
         manifest = write_chapter_content_manifest(self.config, self.paths)
         self.state["state"] = "ready_to_publish"
         self.state["publication"] = {
@@ -645,6 +647,12 @@ class PrepCheckpointManager:
 
     def write_report(self, config_path, entry_point: str, status: str, failure: dict[str, str] | None, reused: list[str], attempted: list[str]) -> dict[str, Any]:
         """Write immutable, text-free invocation reports at the destination."""
+        locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
+        artifact_root = (
+            subject_artifact_prefix(self.destination)
+            if self.is_r2
+            else str(self.subject_dir)
+        )
         timestamp = f"{timestamp_for_filename()}-{self.state['run']['run_id'][:8]}"
         base = f"prep-subject-{timestamp}"
         reports_dir = self.subject_dir / PREP_REPORT_RELATIVE_DIR
@@ -660,6 +668,13 @@ class PrepCheckpointManager:
             "entry_point": entry_point,
             "config_path": str(config_path) if config_path else None,
             "destination_backend": self.destination.get("backend", "local"),
+            "subject": {
+                "category_code": self.config["naming"]["category_code"],
+                "subject_code": self.config["naming"]["subject_code"],
+                "language": locale.language,
+                "artifact_root": artifact_root,
+            },
+            "proofreading_locale": locale.proofreading_provenance(),
             "failure_stage": "proofreading" if status == "incomplete" else ("global" if failure else None),
             "failure": failure,
             "counts": self.state["counts"],
@@ -712,6 +727,11 @@ def _render_report_markdown(report: dict[str, Any]) -> str:
         f"- Status: `{report['status']}`",
         f"- Job: `{report['job_id']}`",
         f"- Run: `{report['run_id']}`",
+        f"- Category: `{report['subject']['category_code']}`",
+        f"- Subject: `{report['subject']['subject_code']}`",
+        f"- Language: `{report['subject']['language']}`",
+        f"- Language-specific artifact root: `{report['subject']['artifact_root']}`",
+        f"- Proofreading template: `{report['proofreading_locale']['instruction_template']['id']}` v{report['proofreading_locale']['instruction_template']['version']} (`{report['proofreading_locale']['instruction_template']['sha256']}`)",
         f"- Counts: succeeded `{report['counts']['succeeded']}`, failed `{report['counts']['failed']}`, pending `{report['counts']['pending']}`",
     ]
     if report["failure"]:
@@ -834,7 +854,8 @@ def run_resumable_prep_job(
 
         reused = manager.reconcile_successes()
         consecutive_infrastructure_failures = 0
-        proofreader = GeminiProofreader(config["_proofreading_config"])
+        locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])
+        proofreader = GeminiProofreader(config["_proofreading_config"], locale=locale)
         for chapter in manager.state["chapters"]:
             if chapter["state"] == "succeeded":
                 continue

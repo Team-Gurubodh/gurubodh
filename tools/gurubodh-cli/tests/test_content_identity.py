@@ -15,22 +15,22 @@ class ContentIdentityTests(unittest.TestCase):
         self.assertEqual(normalized, "निन्दुपाठ\nअंतर  स्थान\nअंत")
 
     def test_equivalent_normalized_content_has_repeatable_identity(self):
-        first = build_content_identity("CAT001", "SUB123", "hi-Deva", "\nज्ञान  \r\nपाठ\t")
-        second = build_content_identity("CAT001", "SUB123", "hi-Deva", "ज्ञान  \nपाठ")
+        first = build_content_identity("CAT001", "SUB123", "hi-IN", "\nज्ञान  \r\nपाठ\t")
+        second = build_content_identity("CAT001", "SUB123", "hi-IN", "ज्ञान  \nपाठ")
         self.assertEqual(first, second)
         self.assertEqual(first["namespace"], str(GURUBODH_CONTENT_NAMESPACE))
 
     def test_identity_changes_for_internal_text_or_subject_language_identity(self):
-        base = build_content_identity("CAT001", "SUB123", "hi-Deva", "ज्ञान पाठ")
-        self.assertNotEqual(base["content_key"], build_content_identity("CAT001", "SUB123", "hi-Deva", "ज्ञान-पाठ")["content_key"])
-        self.assertNotEqual(base["content_key"], build_content_identity("CAT002", "SUB123", "hi-Deva", "ज्ञान पाठ")["content_key"])
-        self.assertNotEqual(base["content_key"], build_content_identity("CAT001", "SUB123", "sa-Deva", "ज्ञान पाठ")["content_key"])
+        base = build_content_identity("CAT001", "SUB123", "hi-IN", "ज्ञान पाठ")
+        self.assertNotEqual(base["content_key"], build_content_identity("CAT001", "SUB123", "hi-IN", "ज्ञान-पाठ")["content_key"])
+        self.assertNotEqual(base["content_key"], build_content_identity("CAT002", "SUB123", "hi-IN", "ज्ञान पाठ")["content_key"])
+        self.assertNotEqual(base["content_key"], build_content_identity("CAT001", "SUB123", "mr-IN", "ज्ञान पाठ")["content_key"])
 
     def test_content_key_rejects_blank_or_noncanonical_checksum(self):
         with self.assertRaisesRegex(ValueError, "non-blank"):
-            content_key("", "SUB123", "hi-Deva", "a" * 64)
+            content_key("", "SUB123", "hi-IN", "a" * 64)
         with self.assertRaisesRegex(ValueError, "lowercase hexadecimal"):
-            content_key("CAT001", "SUB123", "hi-Deva", "A" * 64)
+            content_key("CAT001", "SUB123", "hi-IN", "A" * 64)
 
 
 if __name__ == "__main__":

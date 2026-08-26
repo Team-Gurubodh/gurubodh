@@ -1,5 +1,6 @@
 import json
 import re
+from pathlib import PurePosixPath
 
 from gurubodh.constants import (
     CONVERSION_JOB_SCHEMA_VERSION,
@@ -12,6 +13,7 @@ from gurubodh.constants import (
     SUPPORTED_FONT_ENCODINGS,
 )
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
+from gurubodh.locales import locale_spec
 from gurubodh.proofreading import ProofreadingSettings
 
 
@@ -146,7 +148,29 @@ def validate_source_storage(source):
         optional_string_or_null(source, "url_base", "source")
 
 
-def validate_destination_storage(destination):
+def validate_language_partition(subject_dir, language, context):
+    if "\\" in subject_dir:
+        raise SystemExit(f"Config error: {context}.subject_dir must use POSIX path separators")
+    raw_segments = subject_dir.split("/")
+    if any(not segment for segment in raw_segments):
+        raise SystemExit(f"Config error: {context}.subject_dir must not contain empty path segments")
+    if any(segment in {".", ".."} for segment in raw_segments):
+        raise SystemExit(f"Config error: {context}.subject_dir must not contain '.' or '..' path segments")
+    path = PurePosixPath(subject_dir)
+    if path.is_absolute() or any(part in {".", ".."} for part in path.parts):
+        raise SystemExit(f"Config error: {context}.subject_dir must be a safe relative path")
+    if len(path.parts) < 2:
+        raise SystemExit(
+            f"Config error: {context}.subject_dir must retain a subject grouping before its language partition"
+        )
+    if path.parts[-1] != language:
+        raise SystemExit(
+            f"Config error: {context}.subject_dir final language partition must match {language!r}"
+        )
+    return str(path)
+
+
+def validate_destination_storage(destination, language):
     backend = storage_backend(destination, "destination")
     if backend == "local":
         require_string(destination, "root_dir", "destination")
@@ -154,10 +178,11 @@ def validate_destination_storage(destination):
         require_string(destination, "bucket", "destination")
         require_string(destination, "prefix", "destination")
         optional_string_or_null(destination, "url_base", "destination")
-    require_string(destination, "subject_dir", "destination")
+    subject_dir = require_string(destination, "subject_dir", "destination")
+    validate_language_partition(subject_dir, language, "destination")
 
 
-def validate_subject_artifact_storage(section, context):
+def validate_subject_artifact_storage(section, context, language):
     backend = storage_backend(section, context)
     if backend == "local":
         require_string(section, "root_dir", context)
@@ -165,7 +190,29 @@ def validate_subject_artifact_storage(section, context):
         require_string(section, "bucket", context)
         require_string(section, "prefix", context)
         optional_string_or_null(section, "url_base", context)
-    require_string(section, "subject_dir", context)
+    subject_dir = require_string(section, "subject_dir", context)
+    validate_language_partition(subject_dir, language, context)
+
+
+def validate_metadata_defaults(config):
+    metadata_defaults = require_object(config, "metadata_defaults", "root")
+    language = require_string(metadata_defaults, "language", "metadata_defaults")
+    try:
+        locale = locale_spec(language)
+    except ValueError as exc:
+        raise SystemExit(f"Config error: metadata_defaults.language is invalid: {exc}") from exc
+    source_script = require_string(metadata_defaults, "source_script", "metadata_defaults")
+    if source_script != locale.source_script:
+        raise SystemExit(
+            f"Config error: metadata_defaults.source_script must be {locale.source_script!r} for {language}"
+        )
+    output_text_encoding = require_string(metadata_defaults, "output_text_encoding", "metadata_defaults")
+    if output_text_encoding != locale.output_text_encoding:
+        raise SystemExit(
+            f"Config error: metadata_defaults.output_text_encoding must be {locale.output_text_encoding!r} for {language}"
+        )
+    optional_string_array(metadata_defaults, "summary_chapter_markers", "metadata_defaults")
+    return locale
 
 
 def validate_pipeline_matches_source(config, expected_pipeline=None):
@@ -238,7 +285,8 @@ def load_prep_subject_job(path):
     file_format = require_string(source, "file_format", "source", r"[A-Za-z0-9]+")
     if file_format.lower() != "docx":
         raise SystemExit("Config error: source.file_format must be docx")
-    validate_destination_storage(destination)
+    locale = validate_metadata_defaults(config)
+    validate_destination_storage(destination, locale.language)
 
     require_string(naming, "category_code", "naming", r"CAT[0-9]{3}")
     require_string(naming, "subject_code", "naming", r"SUB[0-9]{3}")
@@ -251,10 +299,7 @@ def load_prep_subject_job(path):
     if chapter_split.get("enabled"):
         prepare_chapter_split(chapter_split)
 
-    metadata_defaults = config.get("metadata_defaults", {})
-    if metadata_defaults and not isinstance(metadata_defaults, dict):
-        raise SystemExit("Config error: metadata_defaults must be an object")
-    optional_string_array(metadata_defaults, "summary_chapter_markers", "metadata_defaults")
+    config["_locale"] = locale
     config["_proofreading_config"] = proofreading_config(config)
     validate_pipeline_matches_source(config)
     return config
@@ -281,15 +326,22 @@ def load_generate_chunks_job(path):
     naming = require_object(config, "naming", "root")
     chunking = require_object(config, "chunking", "root")
 
-    validate_subject_artifact_storage(source, "source")
-    validate_subject_artifact_storage(destination, "destination")
-
     require_string(naming, "category_code", "naming", r"CAT[0-9]{3}")
     require_string(naming, "subject_code", "naming", r"SUB[0-9]{3}")
     require_string(naming, "title_slug", "naming", r"[A-Za-z0-9][A-Za-z0-9-]*")
     require_string(naming, "version", "naming", r"[0-9]{2}")
     require_string(naming, "subversion", "naming", r"[0-9]{2}")
-    require_string(naming, "language", "naming")
+    language = require_string(naming, "language", "naming")
+    try:
+        locale_spec(language)
+    except ValueError as exc:
+        raise SystemExit(f"Config error: naming.language is invalid: {exc}") from exc
+    validate_subject_artifact_storage(source, "source", language)
+    validate_subject_artifact_storage(destination, "destination", language)
+    if source["subject_dir"] != destination["subject_dir"]:
+        raise SystemExit(
+            "Config error: generate-chunks source.subject_dir and destination.subject_dir must use the same language-qualified root"
+        )
 
     chapters = config.get("chapters")
     if chapters is not None:

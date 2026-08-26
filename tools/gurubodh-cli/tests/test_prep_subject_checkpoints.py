@@ -30,16 +30,16 @@ def write_docx(path):
 
 def config(root):
     values = {
-        "schema_version": "1.3.0",
+        "schema_version": "1.4.0",
         "pipeline": "unicode-docx-ingest",
         "source": {
             "backend": "local", "root_dir": str(root), "relative_path": "source.docx",
             "font_encoding": "unicode", "file_format": "docx",
         },
-        "destination": {"backend": "local", "root_dir": str(root), "subject_dir": "subject"},
+        "destination": {"backend": "local", "root_dir": str(root), "subject_dir": "subject/hi-IN"},
         "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "checkpoint-test", "version": "01", "subversion": "01"},
         "chapter_split": {"enabled": True, "pattern_type": "literal", "pattern": "CHAPTER"},
-        "metadata_defaults": {"language": "hi-Deva"},
+        "metadata_defaults": {"language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
     }
     values["_proofreading_config"] = ProofreadingSettings(min_request_interval_seconds=0)
     return values
@@ -113,14 +113,22 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, "incomplete"):
                     run_resumable_prep_job(None, job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode)
 
-            subject = root / "subject"
+            subject = root / "subject" / "hi-IN"
             state_path = subject / JOB_STATE_RELATIVE_PATH
             state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(state["state"], "incomplete")
             self.assertEqual(state["counts"], {"succeeded": 1, "failed": 1, "pending": 0})
+            self.assertEqual(
+                state["compatibility"]["output_affecting_inputs"]["proofreading"]["locale"]["language"],
+                "hi-IN",
+            )
             self.assertNotIn("पहला गलत पाठ", state_path.read_text(encoding="utf-8"))
             report = next((subject / "run_reports" / "prep-subject").glob("*.json"))
+            report_payload = json.loads(report.read_text(encoding="utf-8"))
             self.assertNotIn("पहला गलत पाठ", report.read_text(encoding="utf-8"))
+            self.assertEqual(report_payload["subject"]["language"], "hi-IN")
+            self.assertEqual(report_payload["subject"]["artifact_root"], str(subject))
+            self.assertEqual(report_payload["proofreading_locale"]["instruction_template"]["id"], "hi-IN-proofreading")
             self.assertFalse((subject / "chapters" / "chapter_content_manifest.json").exists())
             self.assertEqual(len(first.calls), 2)
 
@@ -142,7 +150,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             write_docx(root / "source.docx")
             job_config = config(root)
             job_config["destination"] = {
-                "backend": "r2", "bucket": "test-bucket", "prefix": "cms_library", "subject_dir": "subject", "url_base": None,
+                "backend": "r2", "bucket": "test-bucket", "prefix": "cms_library", "subject_dir": "subject/hi-IN", "url_base": None,
             }
             client = FakeR2Client()
             first = FakeProofreader([
@@ -153,9 +161,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 with self.assertRaisesRegex(SystemExit, "incomplete"):
                     run_resumable_prep_job(None, job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode, r2_client=client)
 
-            state_key = "cms_library/subject/run_state/prep-subject/job-state.json"
+            state_key = "cms_library/subject/hi-IN/run_state/prep-subject/job-state.json"
             state = json.loads(client.objects[state_key].decode("utf-8"))
-            workspace_prefix = f"cms_library/subject/.work/prep-subject/{state['job_id']}/"
+            workspace_prefix = f"cms_library/subject/hi-IN/.work/prep-subject/{state['job_id']}/"
             self.assertEqual(state["state"], "incomplete")
             self.assertTrue(any(key.startswith(workspace_prefix) for key in client.objects))
 
@@ -165,7 +173,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
 
             state = json.loads(client.objects[state_key].decode("utf-8"))
             self.assertEqual(state["state"], "succeeded")
-            self.assertIn("cms_library/subject/chapters/chapter_content_manifest.json", client.objects)
+            self.assertIn("cms_library/subject/hi-IN/chapters/chapter_content_manifest.json", client.objects)
             self.assertFalse(any(key.startswith(workspace_prefix) for key in client.objects))
             self.assertEqual(len(second.calls), 1)
 

@@ -1,27 +1,27 @@
 {
-  "schema_version": "1.2.0",
-  "pipeline": "unicode-docx-ingest",
+  "schema_version": "1.4.0",
+  "pipeline": "legacy-docx-to-unicode",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
-    "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya.docx",
-    "font_encoding": "unicode",
+    "relative_path": "39_aacharan_shastra/aps_fonts/ms_word/sub039_aacharan_shastra.docx",
+    "font_encoding": "aps",
     "file_format": "docx"
   },
   "destination": {
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "123_spand_rahasya_proofread"
+    "subject_dir": "39_aacharan_shaastra/hi-IN"
   },
   "naming": {
-    "category_code": "CAT001",
-    "subject_code": "SUB123",
-    "title_slug": "spand-rahasya",
+    "category_code": "CAT004",
+    "subject_code": "SUB039",
+    "title_slug": "aacharan-shastra",
     "version": "01",
     "subversion": "01"
   },
   "chapter_split": {
     "enabled": true,
-    "pattern_type": "regex",
-    "pattern": "प्रबोधन.*?जनवरी.*?2026"
+    "pattern_type": "literal",
+    "pattern": "प्रबोधन क्र"
   },
   "metadata_defaults": {
     "language": "hi-IN",
@@ -36,11 +36,13 @@
     ]
   },
   "proofreading": {
-    "enabled": true,
     "provider": "google-ai-studio",
     "model": "gemini-3.6-flash",
     "max_output_tokens": 16384,
-    "continue_on_error": true,
+    "max_input_characters": 30000,
+    "max_retries": 3,
+    "initial_retry_delay_seconds": 2,
+    "max_retry_delay_seconds": 30,
     "min_request_interval_seconds": 6,
     "max_requests_per_minute": 8,
     "max_estimated_input_tokens_per_minute": 20000

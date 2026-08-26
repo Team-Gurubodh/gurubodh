@@ -87,7 +87,7 @@ def build_chapter_metadata(
     entry_point,
 ):
     defaults = config.get("metadata_defaults", {})
-    language = defaults.get("language", "hi-Deva")
+    language = defaults["language"]
     return {
         "schema_version": CHAPTER_METADATA_SCHEMA_VERSION,
         "document": {
