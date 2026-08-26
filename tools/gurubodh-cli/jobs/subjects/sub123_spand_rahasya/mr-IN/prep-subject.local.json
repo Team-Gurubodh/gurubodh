@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.4.0",
+  "pipeline": "unicode-docx-ingest",
+  "source": {
+    "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
+    "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_mr-IN.docx",
+    "font_encoding": "unicode",
+    "file_format": "docx"
+  },
+  "destination": {
+    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
+    "subject_dir": "123_spand_rahasya/mr-IN"
+  },
+  "naming": {
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya",
+    "version": "01",
+    "subversion": "01"
+  },
+  "chapter_split": {
+    "enabled": true,
+    "pattern_type": "regex",
+    "pattern": "प्रबोधन.*?जनवरी.*?2026"
+  },
+  "metadata_defaults": {
+    "language": "mr-IN",
+    "source_script": "Devanagari",
+    "output_text_encoding": "UTF-8",
+    "summary_chapter_markers": [
+      "उपसंहार",
+      "उपसंहारात्मक",
+      "उपसंभारात्मक",
+      "उपसंभारात्त्मक",
+      "उपसंभार"
+    ]
+  },
+  "proofreading": {
+    "provider": "google-ai-studio",
+    "model": "gemini-3.6-flash",
+    "max_output_tokens": 16384,
+    "max_input_characters": 30000,
+    "max_retries": 3,
+    "initial_retry_delay_seconds": 2,
+    "max_retry_delay_seconds": 30,
+    "min_request_interval_seconds": 6,
+    "max_requests_per_minute": 8,
+    "max_estimated_input_tokens_per_minute": 20000
+  }
+}

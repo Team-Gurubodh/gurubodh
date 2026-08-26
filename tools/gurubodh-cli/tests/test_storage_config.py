@@ -561,7 +561,7 @@ class StorageConfigTests(unittest.TestCase):
         for job_path in sorted(
             path
             for pattern in ("prep-subject.local.json", "prep-subject.r2-output.json", "prep-subject.r2.json")
-            for path in jobs_dir.glob(f"*/{pattern}")
+            for path in jobs_dir.glob(f"*/hi-IN/{pattern}")
         ):
             with self.subTest(job=str(job_path.relative_to(jobs_dir))):
                 config = load_prep_subject_job(job_path)
@@ -573,7 +573,7 @@ class StorageConfigTests(unittest.TestCase):
     def test_maintained_generate_chunks_jobs_use_pinned_cached_model_loading(self):
         jobs_dir = Path(__file__).parents[1] / "jobs" / "subjects"
 
-        for job_path in jobs_dir.glob("*/generate-chunks*.json"):
+        for job_path in jobs_dir.glob("*/hi-IN/generate-chunks*.json"):
             with self.subTest(job=str(job_path.relative_to(jobs_dir))):
                 config = load_generate_chunks_job(job_path)
 
@@ -592,7 +592,14 @@ class StorageConfigTests(unittest.TestCase):
                 self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)
 
     def test_generate_chunks_requires_matching_marathi_language_root(self):
-        job_path = Path(__file__).parents[1] / "jobs" / "subjects" / "sub123_spand_rahasya" / "generate-chunks.local.json"
+        job_path = (
+            Path(__file__).parents[1]
+            / "jobs"
+            / "subjects"
+            / "sub123_spand_rahasya"
+            / "hi-IN"
+            / "generate-chunks.local.json"
+        )
         config = json.loads(job_path.read_text(encoding="utf-8"))
         config["source"]["subject_dir"] = "123_spand_rahasya/mr-IN"
         config["destination"]["subject_dir"] = "123_spand_rahasya/mr-IN"

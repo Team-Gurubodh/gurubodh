@@ -12,7 +12,7 @@ python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
 export GEMINI_API_KEY=...
-gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```
 
 ## Container Batch Runner
@@ -86,7 +86,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  prep-subject --config jobs/subjects/sub039_aacharan_shastra/prep-subject.r2.json
+  prep-subject --config jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2.json
 ```
 
 Then run its R2-backed chunk-generation job with the same named volume.
@@ -103,7 +103,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  generate-chunks --config jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
+  generate-chunks --config jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json
 ```
 
 If you already have the `bge-m3` cache and wish to reuse the same with the docker container, then use the following commands, replacing `--mount type=volume` by  `--mount type=bind`, as shown in the examples below:
@@ -117,7 +117,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.r2.json --overwrite
+  prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2.json --overwrite
 
 
 # Run the `generate-chunks` command
@@ -129,7 +129,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=bind,src="$HOME/.cache/huggingface/hub",dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  generate-chunks --config jobs/subjects/sub123_spand_rahasya/generate-chunks.r2.json --overwrite
+  generate-chunks --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2.json --overwrite
 
 # The `--env PYTHONUNBUFFERED=1` flag disables buffered `stdout` and `stderr`,
 # so logs appear immediately in docker logs or your terminal
@@ -174,7 +174,7 @@ path. In that case, run `python -m pip install -e .` after activation, or run
 `.venv/bin/python -m pip install -e .` without activation, to refresh the
 editable install.
 
-`gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`
+`gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json`
 runs a sample local content job.
 
 Artifact ownership is command-scoped: `prep-subject`
@@ -342,7 +342,7 @@ These progress messages contain counts and timing only; they never print chapter
 text or credentials.
 
 ```bash
-gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --overwrite
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --overwrite
 ```
 
 ### Resuming an interrupted prep job
@@ -354,7 +354,7 @@ an immutable JSON/Markdown run report, and exits non-zero with state
 `incomplete`. Resume it without paying for already checkpointed chapters:
 
 ```bash
-gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json --resume
+gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --resume
 ```
 
 `--resume` and `--overwrite` are mutually exclusive. Resume requires the same
@@ -378,7 +378,7 @@ persists finalized chunk vectors:
 ```bash
 export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
 gurubodh generate-chunks \
-  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```
 
 ### Pinned BGE-M3 model and cache workflow
@@ -429,7 +429,7 @@ When run from outside `tools/gurubodh-cli`, pass `--project-root` just like
 ```bash
 gurubodh generate-chunks \
   --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```
 
 The output directory is scoped to:
@@ -521,7 +521,7 @@ If running from another directory, pass the root explicitly:
 ```bash
 gurubodh prep-subject \
   --project-root /Users/rajeev/Applications/gurubodh/tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```
 
 ## Future Command Surface
@@ -539,16 +539,16 @@ backends. Existing jobs that omit `backend` are treated as local jobs.
 Sample jobs are grouped by subject and split by backend:
 
 ```text
-jobs/subjects/sub039_aacharan_shastra/prep-subject.local.json
-jobs/subjects/sub039_aacharan_shastra/prep-subject.r2-output.json
-jobs/subjects/sub039_aacharan_shastra/generate-chunks.local.json
-jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2-output.json
-jobs/subjects/sub039_aacharan_shastra/generate-chunks.r2.json
-jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
-jobs/subjects/sub123_spand_rahasya/prep-subject.r2-output.json
-jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
-jobs/subjects/sub123_spand_rahasya/generate-chunks.r2-output.json
-jobs/subjects/sub123_spand_rahasya/generate-chunks.r2.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.local.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.local.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2-output.json
+jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2-output.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2-output.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2.json
 ```
 
 Use `.local.json` for local source and local output. Use `.r2-output.json` for
