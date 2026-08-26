@@ -1,10 +1,13 @@
+import io
 import json
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
 from gurubodh.prep_subject_checkpoints import JOB_STATE_RELATIVE_PATH, run_resumable_prep_job
 from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
 
@@ -100,6 +103,108 @@ def prepare_unicode(source_path, output_path, text_path, progress):
 
 
 class PrepSubjectCheckpointTests(unittest.TestCase):
+    def test_pipeline_banners_are_emitted_only_when_preparation_callback_runs(self):
+        pipeline_config = {"pipeline": "unicode-docx-ingest"}
+        unicode_output = io.StringIO()
+        with (
+            patch.object(unicode_docx_ingest, "validate_pipeline_matches_source"),
+            patch.object(unicode_docx_ingest, "run_resumable_prep_job", return_value={}) as unicode_runner,
+            redirect_stdout(unicode_output),
+        ):
+            unicode_docx_ingest.run_unicode_docx_ingest(None, pipeline_config, "prep-subject", resume=True)
+        self.assertEqual(unicode_output.getvalue(), "")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source.docx"
+            write_docx(source)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                unicode_runner.call_args.args[6](source, root / "output.docx", root / "output.txt")
+            self.assertIn("[prepare] Copying the Unicode source DOCX", output.getvalue())
+
+        legacy_config = {"pipeline": "legacy-docx-to-unicode"}
+        legacy_context = type("LegacyContext", (), {"legacy_converter": object()})()
+        legacy_output = io.StringIO()
+        with (
+            patch.object(legacy_docx_to_unicode, "validate_pipeline_matches_source"),
+            patch.object(legacy_docx_to_unicode, "target_devanagari_font", return_value="Nirmala UI"),
+            patch.object(legacy_docx_to_unicode, "run_resumable_prep_job", return_value={}) as legacy_runner,
+            redirect_stdout(legacy_output),
+        ):
+            legacy_docx_to_unicode.run_legacy_docx_to_unicode(legacy_context, legacy_config, "prep-subject", resume=True)
+        self.assertEqual(legacy_output.getvalue(), "")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = io.StringIO()
+            with patch.object(legacy_docx_to_unicode, "convert_docx", return_value={}) as convert:
+                with redirect_stdout(output):
+                    legacy_runner.call_args.args[6](root / "source.docx", root / "output.docx", root / "output.txt", lambda *_: None)
+            self.assertIn("[prepare] Converting the legacy source DOCX", output.getvalue())
+            self.assertTrue(convert.called)
+
+    def test_successful_fresh_and_overwrite_runs_report_published_completion(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job_config = config(root)
+
+            for overwrite in (False, True):
+                proofreader = FakeProofreader([
+                    "CHAPTER 1\nपहला सही पाठ。",
+                    "CHAPTER 2\nदूसरा सही पाठ。",
+                ])
+                output = io.StringIO()
+                with (
+                    patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=proofreader),
+                    redirect_stdout(output),
+                ):
+                    result = run_resumable_prep_job(
+                        None,
+                        job_config,
+                        "python3 -m gurubodh prep-subject",
+                        overwrite,
+                        False,
+                        None,
+                        prepare_unicode,
+                    )
+
+                expected = (
+                    f"prep-subject complete; canonical artifacts were published successfully to "
+                    f"{root / 'subject' / 'hi-IN'}. Chapters: 2 succeeded, 0 failed, 0 pending."
+                )
+                self.assertEqual(result["status"], "succeeded")
+                self.assertEqual(output.getvalue().rstrip().splitlines()[-1], expected)
+
+    def test_compatible_succeeded_resume_reports_already_complete_without_preparation_or_gemini(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job_config = config(root)
+            first = FakeProofreader([
+                "CHAPTER 1\nपहला सही पाठ。",
+                "CHAPTER 2\nदूसरा सही पाठ。",
+            ])
+            with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
+                run_resumable_prep_job(None, job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode)
+
+            resumed = FakeProofreader([])
+            output = io.StringIO()
+            with (
+                patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=resumed),
+                redirect_stdout(output),
+            ):
+                result = run_resumable_prep_job(None, job_config, "python3 -m gurubodh prep-subject", False, True, None, prepare_unicode)
+
+            self.assertTrue(result["already_complete"])
+            self.assertEqual(resumed.calls, [])
+            self.assertNotIn("[prepare]", output.getvalue())
+            self.assertEqual(
+                output.getvalue().rstrip(),
+                "prep-subject already complete; the compatible checkpoint is succeeded. No Gemini requests were made.",
+            )
+
     def test_resume_reuses_valid_success_and_publishes_only_after_all_chapters_succeed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

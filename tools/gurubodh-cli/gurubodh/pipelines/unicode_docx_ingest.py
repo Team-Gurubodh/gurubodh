@@ -6,6 +6,7 @@ import shutil
 
 
 def copy_unicode_docx(path, output_path, text_path, progress=None):
+    print("[prepare] Copying the Unicode source DOCX and extracting full-subject text.")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     text_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -30,7 +31,6 @@ def copy_unicode_docx(path, output_path, text_path, progress=None):
 
 def run_unicode_docx_ingest(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True, resume=False, r2_client=None):
     validate_pipeline_matches_source(config, PIPELINE_UNICODE_DOCX_INGEST)
-    print("[prepare] Copying the Unicode source DOCX and extracting full-subject text.")
     return run_resumable_prep_job(
         context,
         config,

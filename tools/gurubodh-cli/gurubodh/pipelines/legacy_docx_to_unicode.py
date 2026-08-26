@@ -6,10 +6,10 @@ from gurubodh.prep_subject_checkpoints import run_resumable_prep_job
 
 def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True, resume=False, r2_client=None):
     validate_pipeline_matches_source(config, PIPELINE_LEGACY_DOCX_TO_UNICODE)
-    print("[prepare] Converting the legacy source DOCX to Unicode and extracting full-subject text.")
     font_name = target_devanagari_font()
 
     def prepare(source_path, output_path, text_path, progress):
+        print("[prepare] Converting the legacy source DOCX to Unicode and extracting full-subject text.")
         return convert_docx(
             source_path,
             font_name,
