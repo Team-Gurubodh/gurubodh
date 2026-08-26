@@ -908,6 +908,13 @@ def run_resumable_prep_job(
             manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
             raise
         manager.write_report(config_path, entry_point, "succeeded", None, reused, attempted)
+        counts = manager.state["counts"]
+        artifact_root = subject_artifact_prefix(manager.destination) if manager.is_r2 else str(manager.subject_dir)
+        print(
+            "prep-subject complete; canonical artifacts were published successfully to "
+            f"{artifact_root}. Chapters: {counts['succeeded']} succeeded, "
+            f"{counts['failed']} failed, {counts['pending']} pending."
+        )
         return {"status": "succeeded", "already_complete": False, "counts": manager.state["counts"]}
     finally:
         manager.close()
