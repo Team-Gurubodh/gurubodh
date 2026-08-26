@@ -47,6 +47,10 @@
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
   of the generated chapter `.txt` artifact bytes. It does not checksum the
   metadata JSON artifact.
+- Chapter metadata schema `1.4.0` contains only canonical metadata/text names
+  in `files` and only canonical metadata/text references in
+  `storage.artifacts`. DOCX and full-subject fields from schema `1.3.0` are not
+  emitted as null or dangling references.
 - Chapter metadata also includes `content_identity`: a UUID v5 provenance key
   and normalized-content SHA-256 for the exact normalized chapter text within
   its category, subject, and language. This does not identify an editorial
@@ -79,6 +83,10 @@
   or full chapter text. `generate-chunks` requires this state to be `succeeded`
   and to bind the published chapter content manifest before it can mutate chunk
   output.
+  Checkpoint compatibility contract version `2` validates exactly the five
+  per-chapter canonical/provenance files. Old incomplete six-file checkpoints
+  require a fresh `prep-subject --overwrite`; old succeeded releases remain
+  downstream-consumable.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

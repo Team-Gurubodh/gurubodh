@@ -19,7 +19,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.3.0"
+      "const": "1.4.0"
     },
     "document": {
       "type": "object",
@@ -63,8 +63,7 @@
       "type": "object",
       "required": [
         "metadata_filename",
-        "text_filename",
-        "msword_filename"
+        "text_filename"
       ],
       "properties": {
         "metadata_filename": {
@@ -72,10 +71,6 @@
           "minLength": 1
         },
         "text_filename": {
-          "type": "string",
-          "minLength": 1
-        },
-        "msword_filename": {
           "type": "string",
           "minLength": 1
         }
@@ -93,25 +88,13 @@
           "type": "object",
           "required": [
             "metadata",
-            "text",
-            "msword",
-            "full_subject_msword",
-            "full_subject_text"
+            "text"
           ],
           "properties": {
             "metadata": {
               "$ref": "#/$defs/storage_reference"
             },
             "text": {
-              "$ref": "#/$defs/storage_reference"
-            },
-            "msword": {
-              "$ref": "#/$defs/storage_reference"
-            },
-            "full_subject_msword": {
-              "$ref": "#/$defs/storage_reference"
-            },
-            "full_subject_text": {
               "$ref": "#/$defs/storage_reference"
             }
           },

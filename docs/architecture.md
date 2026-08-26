@@ -102,8 +102,11 @@ flowchart LR
   - Own the published content lifecycle.
 - **Current implementation**: Python utility under
   `tools/gurubodh-cli/`, currently used for legacy DOCX Unicode
-  conversion, Unicode DOCX ingest, chapter splitting, and preparation artifact
-  publication to local storage or Cloudflare R2. Production R2 batch jobs run
+  conversion, Unicode DOCX ingest, text-only chapter splitting, canonical
+  proofread text/provenance publication, and derived semantic chunk generation
+  to local storage or Cloudflare R2. DOCX is a source/transient processing
+  format for `prep-subject`; chapter DOCX export is a separate command boundary.
+  Production R2 batch jobs run
   in the CPU-only `gurubodh-cli` container; native Python remains the
   development and debugging path. See
   [ADR-0013](./adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md).

@@ -8,14 +8,14 @@ def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, co
     validate_pipeline_matches_source(config, PIPELINE_LEGACY_DOCX_TO_UNICODE)
     font_name = target_devanagari_font()
 
-    def prepare(source_path, output_path, text_path, progress):
-        print("[prepare] Converting the legacy source DOCX to Unicode and extracting full-subject text.")
+    def prepare(source_path, output_path, progress):
+        print("[prepare] Converting the legacy source DOCX to a transient Unicode working copy.")
         return convert_docx(
             source_path,
             font_name,
             context.legacy_converter,
             output_path,
-            text_path,
+            None,
             progress=progress,
         )
 

@@ -36,10 +36,15 @@ grouping visible and ends in the configured locale, for example
 `123_spand_rahasya/hi-IN`:
 
 ```text
-cms_library/{subject_dir}/full_subject/
-cms_library/{subject_dir}/chapters/msword/
 cms_library/{subject_dir}/chapters/text_and_metadata/
+cms_library/{subject_dir}/chapters/unmodified_source_text/
+cms_library/{subject_dir}/chapters/proofreading/
+cms_library/{subject_dir}/chapters/chapter_content_manifest.json
 ```
+
+Source and transient Unicode DOCX processing is internal to `prep-subject`.
+Derived chapter DOCX exports use `chapters/msword/` and are owned by the
+separate `generate-docx` command; `full_subject/` is retired.
 
 Metadata stores storage references containing backend, bucket, object key, and
 an optional nullable URL. Public object URLs are not required.

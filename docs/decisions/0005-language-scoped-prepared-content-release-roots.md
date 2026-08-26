@@ -38,8 +38,8 @@ output-affecting checkpoint compatibility data.
 
 ## Rationale
 
-Putting language above the entire subject tree avoids shared `full_subject`,
-report, state, and workspace paths. It preserves existing artifact-relative
+Putting language above the entire subject tree avoids shared canonical,
+derived-output, report, state, and workspace paths. It preserves existing artifact-relative
 contracts and lets command-scoped overwrite/invalidation safely operate only
 within one language release.
 

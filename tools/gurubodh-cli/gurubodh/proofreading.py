@@ -18,7 +18,7 @@ from typing import Any, Callable
 from gurubodh.content_identity import build_content_identity
 from gurubodh.locales import LocaleSpec, locale_spec
 from gurubodh.metadata import build_chapter_metadata
-from gurubodh.naming import chapter_output_filename, full_subject_output_filename
+from gurubodh.naming import chapter_output_filename
 from gurubodh.storage import destination_artifact_reference
 from gurubodh.time_utils import utc_now
 
@@ -406,16 +406,11 @@ def _canonical_text_filename(unmodified_source_filename: str) -> str:
 def _chapter_file_names(config: dict[str, Any], chapter_number: int) -> dict[str, Any]:
     text_name = chapter_output_filename(config, chapter_number, ".txt")
     metadata_name = chapter_output_filename(config, chapter_number, ".json")
-    docx_name = chapter_output_filename(config, chapter_number, ".docx")
     return {
         "metadata": metadata_name,
         "text": text_name,
-        "msword": docx_name,
         "metadata_relative_path": Path("chapters") / "text_and_metadata" / metadata_name,
         "text_relative_path": Path("chapters") / "text_and_metadata" / text_name,
-        "msword_relative_path": Path("chapters") / "msword" / docx_name,
-        "full_msword_relative_path": Path("full_subject") / full_subject_output_filename(config, ".docx"),
-        "full_text_relative_path": Path("full_subject") / full_subject_output_filename(config, ".txt"),
     }
 
 
@@ -532,7 +527,6 @@ def proofread_single_chapter_artifacts(
     }
     _write_text(artifact_paths["json"], json.dumps(payload, ensure_ascii=False, indent=2))
     artifact_files = [
-        paths["chapter_msword"] / file_names["msword"],
         unmodified_source_path,
         canonical_text_path,
         metadata_path,
@@ -653,7 +647,6 @@ def proofread_chapter_artifacts(
             artifact_paths = _proofread_artifact_paths(proof_dir, text_filename)
             progress(
                 "proofread",
-                paths["chapter_msword"] / file_names["msword"],
                 paths["text_and_metadata"] / text_filename,
                 paths["text_and_metadata"] / file_names["metadata"],
                 unmodified_source_path,

@@ -9,9 +9,9 @@ outputs. It supports two pipelines:
   conversion, while still extracting text, splitting chapters, and writing
   metadata.
 
-The Word document is the source of truth. The preferred workflow is config
-based, so repeated runs produce the same directory layout, filenames,
-full-subject output, chapter output, and metadata.
+The Word document is the source input. The preferred workflow is config based,
+so repeated runs produce the same canonical proofread chapter text, metadata,
+source snapshots, and proofreading provenance.
 
 ## Day-One Commands
 
@@ -136,8 +136,8 @@ Supported `source.font_encoding` values are:
 
 - `aps`: convert APS-family legacy font runs to Unicode.
 - `shreelipi`: convert ShreeLipi-family legacy font runs to Unicode.
-- `unicode`: copy the source DOCX unchanged, extract Unicode text, and produce
-  the same full-subject and chapter outputs without font conversion.
+- `unicode`: read the source DOCX directly, extract ordered chapter text
+  snapshots, and publish no DOCX artifacts.
 
 The top-level `pipeline` field selects the processing route:
 
@@ -151,7 +151,7 @@ Unicode source:
 
 ```json
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "pipeline": "unicode-docx-ingest",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
@@ -161,7 +161,7 @@ Unicode source:
   },
   "destination": {
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "129_spand_rahasya"
+    "subject_dir": "129_spand_rahasya/hi-IN"
   },
   "chapter_split": {
     "enabled": true,
@@ -176,7 +176,7 @@ Legacy APS source:
 
 ```json
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "pipeline": "legacy-docx-to-unicode",
   "source": {
     "root_dir": "/Users/rajeev/Gurubodh_library/source_library",
@@ -205,43 +205,31 @@ The config writes output under:
 ```text
 destination.root_dir/destination.subject_dir/
   chapters/
-    msword/
     text_and_metadata/
-  full_subject/
+    unmodified_source_text/
+    proofreading/
+    chapter_content_manifest.json
+  run_state/prep-subject/
+    job-state.json
+  run_reports/prep-subject/
 ```
 
-If the subject output directory already exists, the CLI archives it under:
+Unicode sources are read directly. Legacy conversion may create a transient
+Unicode DOCX under `.work/prep-subject/<job-id>/` while detecting chapters and
+extracting text, then removes it once the chapter plan and source snapshots are
+durable. No full-subject DOCX/text or chapter DOCX is published.
 
-```text
-destination.root_dir/archive/
-```
-
-and then regenerates the subject output from the current job.
-
-Full-subject files are named from:
-
-```text
-category_code
-subject_code
-title_slug
-full
-vversion.subversion
-```
-
-Example:
-
-```text
-full_subject/
-  CAT020_SUB129_spand-rahasya_full_v01.01.docx
-  CAT020_SUB129_spand-rahasya_full_v01.01.txt
-```
+Each successful chapter checkpoint contains exactly five files: canonical text
+and metadata, its unmodified-source snapshot, its proofreading diff, and its
+proofreading details JSON. Checkpoint contract version `2` cannot resume an
+incomplete checkpoint created under the earlier six-artifact contract; restart
+such work with `--overwrite`. Existing succeeded older releases remain valid
+for `generate-chunks` and future `generate-docx` without another Gemini run.
 
 Chapter files use chapter numbers starting at `001`:
 
 ```text
 chapters/
-  msword/
-    CAT020_SUB129_spand-rahasya_001_v01.01.docx
   text_and_metadata/
     CAT020_SUB129_spand-rahasya_001_v01.01.txt
     CAT020_SUB129_spand-rahasya_001_v01.01.json
@@ -254,8 +242,12 @@ chapters/
 
 ## Metadata
 
-Chapter metadata uses schema `1.3.0` and records processing details separately
+Chapter metadata uses schema `1.4.0` and records processing details separately
 from conversion facts.
+
+Its `files` object contains only `metadata_filename` and `text_filename`, and
+`storage.artifacts` contains only `metadata` and `text`. DOCX and full-subject
+references from schema `1.3.0` are not emitted.
 
 When a job is run through the dispatcher:
 

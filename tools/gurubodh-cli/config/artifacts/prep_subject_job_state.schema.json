@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gurubodh.local/schemas/prep_subject_job_state.schema.json",
-  "title": "Gurubodh resumable prep-subject job state",
+  "title": "Gurubodh resumable text-only prep-subject job state",
+  "description": "Operational state for checkpoint contract version 2. Each successful chapter records exactly five canonical/provenance artifacts and never records full text or DOCX artifacts.",
   "type": "object",
   "required": ["schema_version", "job_id", "state", "created_at", "updated_at", "compatibility", "chapters", "counts", "publication", "run_reports"],
   "properties": {
@@ -34,8 +35,34 @@
           "state": {"enum": ["pending", "failed", "succeeded"]},
           "attempt_count": {"type": "integer", "minimum": 0},
           "latest_error": {"type": ["object", "null"]},
-          "successful_artifacts": {"type": "array"}
+          "successful_artifacts": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": {"type": "string", "minLength": 1},
+                "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+              },
+              "additionalProperties": false
+            }
+          }
         },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"state": {"const": "succeeded"}},
+              "required": ["state"]
+            },
+            "then": {
+              "properties": {
+                "successful_artifacts": {"minItems": 5, "maxItems": 5}
+              }
+            }
+          }
+        ],
         "additionalProperties": true
       }
     },

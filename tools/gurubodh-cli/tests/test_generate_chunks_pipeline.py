@@ -227,6 +227,38 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertIn("chunking_config_key", semantic_manifest["chunking"])
         self.assertEqual(payload["chunks"][0]["estimated_token_count"], 2)
 
+    def test_succeeded_old_contract_release_with_legacy_metadata_remains_consumable(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        metadata_path = subject / "chapters" / "text_and_metadata" / metadata["files"]["metadata_filename"]
+        legacy_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        legacy_metadata["schema_version"] = "1.3.0"
+        legacy_metadata["files"]["msword_filename"] = "legacy.docx"
+        legacy_metadata["storage"]["artifacts"].update(
+            {
+                "msword": {"backend": "local", "path": "chapters/msword/legacy.docx", "url": None},
+                "full_subject_msword": {"backend": "local", "path": "full_subject/legacy.docx", "url": None},
+                "full_subject_text": {"backend": "local", "path": "full_subject/legacy.txt", "url": None},
+            }
+        )
+        metadata_path.write_text(json.dumps(legacy_metadata, ensure_ascii=False) + "\n", encoding="utf-8")
+        write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        loaded, config_path = self.load(config)
+        segmenter = FakeSegmenter()
+
+        with redirect_stdout(StringIO()):
+            result = run_generate_chunks_job(
+                self.context,
+                loaded,
+                config_path=config_path,
+                segmenter=segmenter,
+                progress=lambda _: None,
+            )
+
+        self.assertEqual(result["processed_chapter_count"], 1)
+        self.assertEqual(segmenter.calls, 1)
+
     def test_invalid_manifest_references_fail_before_segmenting(self):
         config = base_config(self.temp_dir.name)
         metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
