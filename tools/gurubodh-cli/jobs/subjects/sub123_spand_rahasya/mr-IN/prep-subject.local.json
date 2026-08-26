@@ -21,7 +21,7 @@
   "chapter_split": {
     "enabled": true,
     "pattern_type": "regex",
-    "pattern": "प्रबोधन.*?जनवरी.*?2026"
+    "pattern": "स्पंद रहस्य.*?जानेवारी.*?2026"
   },
   "metadata_defaults": {
     "language": "mr-IN",
