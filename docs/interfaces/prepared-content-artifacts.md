@@ -66,7 +66,9 @@ cms_library/{subject-group}/{language}/chapters/text_and_metadata/
 cms_library/{subject-group}/{language}/chapters/unmodified_source_text/
 cms_library/{subject-group}/{language}/chapters/chapter_content_manifest.json
 cms_library/{subject-group}/{language}/chapters/proofreading/
+cms_library/{subject-group}/{language}/chapters/msword/
 cms_library/{subject-group}/{language}/run_state/prep-subject/job-state.json
+cms_library/{subject-group}/{language}/run_reports/generate-docx/
 cms_library/{subject-group}/{language}/.work/prep-subject/{job-id}/
 ```
 
@@ -75,9 +77,10 @@ R2 prefixes are object-key strings, not real folders.
 `subject_dir` must be a safe nested POSIX-relative path: it cannot be absolute,
 contain empty segments, `.`, `..`, or backslashes, and its final segment must
 equal the configured language. Prep-subject uses
-`metadata_defaults.language`; generate-chunks requires the same language in
-its naming, source root, destination root, prepared manifest, and candidate
-metadata. These roots are independent preparation and chunking release units.
+`metadata_defaults.language`; `generate-chunks` and `generate-docx` require the
+same language in their naming, source root, destination root, prepared
+manifest, and candidate metadata. These roots are independent per-locale
+release units.
 
 ## Prep-subject operational checkpoint
 
@@ -98,8 +101,9 @@ prefix; its multi-object publication remains recoverable but non-atomic.
 The lifecycle is `running`, `incomplete`, `ready_to_publish`, `publishing`,
 `succeeded`, or `failed`. Chapters are only `pending`, `failed`, or
 `succeeded`. A successful chapter is reusable only after its complete staged
-artifact set passes checksum validation. `generate-chunks` refuses any state
-other than `succeeded`, including before an overwrite can delete chunk output.
+artifact set passes checksum validation. `generate-chunks` and `generate-docx`
+refuse any state other than `succeeded`, including before an overwrite can
+delete derived output.
 
 ## Mandatory Canonical Gemini Proofreading
 
@@ -206,6 +210,31 @@ It is unsupported for new ingestion. `generate-chunks` fails when it exists
 unless `--overwrite` is supplied, which removes that legacy command-owned
 output before producing v2 chunks.
 
+## Derived DOCX Exports
+
+`generate-docx` consumes `chapter_content_manifest.json` as its only chapter
+selection and ordering authority. It applies the same safe-reference,
+identity, filename, checksum, and content-key validation used by
+`generate-chunks`, accepts valid succeeded legacy metadata schema `1.3.0`, and
+revalidates prep state plus source-manifest bytes immediately before publishing.
+
+For each selected canonical text file it writes the same versioned stem with a
+`.docx` suffix under `chapters/msword/`. The first paragraph is exactly
+`<title_slug>: prabodhan <three-digit chapter number>`. Remaining Word
+paragraphs map canonical blank-line-delimited paragraphs one-for-one; single
+LFs inside a paragraph become Word line breaks. The canonical artifact's one
+final LF is excluded from the displayed body and restored during validation.
+The fixed formatting contract `1.0.0` uses one-inch margins, Noto Sans
+Devanagari, 18-point Title and 11-point Normal styles, left-to-right direction,
+1.15 line spacing, and fixed paragraph spacing for both Hindi and Marathi.
+
+Every generated package is validated as ZIP/OOXML and its body is round-tripped
+back to the exact canonical text. Only after all files pass does the command
+write `docx_manifest.json`, which binds the source manifest SHA-256, canonical
+identities/text checksums, generated titles, formatting/title contracts, and
+DOCX SHA-256 values. Consumers must require and validate this readiness marker;
+DOCX remains a rebuildable human-readable export and never becomes canonical.
+
 ## Overwrite Behavior
 
 Without a flag, an incomplete checkpoint causes `prep-subject` to stop with
@@ -229,4 +258,14 @@ recoverable with `--resume`.
 The five-file checkpoint contract is version `2`. Earlier incomplete
 six-artifact checkpoints cannot resume and require `--overwrite`. Earlier
 succeeded releases remain valid canonical input for `generate-chunks` and
-future `generate-docx`, even when their metadata retains legacy references.
+`generate-docx`, even when their metadata retains legacy references.
+
+Without `--overwrite`, `generate-docx` refuses any existing
+`chapters/msword/`. Local overwrite validates the complete new set in staging
+before safely replacing that directory. R2 overwrite removes the old readiness
+manifest first, replaces only DOCX-owned objects, and publishes the new
+`docx_manifest.json` last; an interrupted prefix without that manifest is not
+ready and is recovered by rerunning with `--overwrite`. Reports remain
+append-only under `run_reports/generate-docx/`, and neither backend touches
+canonical artifacts, semantic chunks, `full_subject/`, other locales, or
+unrelated subject files.

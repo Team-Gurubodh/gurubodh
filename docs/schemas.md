@@ -8,11 +8,13 @@
 - `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_content_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_proofreading.schema.json`
+- `tools/gurubodh-cli/config/artifacts/docx_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/proofreading_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/prep_subject_job_state.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks.schema.json`
 - `tools/gurubodh-cli/config/artifacts/semantic_chunks_manifest.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
+- `tools/gurubodh-cli/config/jobs/generate_docx_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
 - `tools/seed-data-cli/config/glossary_artifact.schema.json`
@@ -39,6 +41,9 @@
   final segment equals that language. Generate-chunks job schema `1.1.0`
   applies the same locale restriction to `naming.language` and requires source
   and destination to use the same language-qualified subject root.
+  Generate-docx job schema `1.0.0` uses the same local/R2 subject-artifact
+  locations and safe language-qualified root rules, but requires only the
+  category, subject, title slug, and language naming identity needed for export.
 - Prep-subject job `metadata_defaults.summary_chapter_markers` explicitly
   configures Devanagari search terms that add `summary_chapter` and
   `उपसंहार` to chapter metadata `content.automated_tags` when found in
@@ -63,6 +68,13 @@
   retain chunking and token-counting provenance, and contain no retrieval
   vectors. The legacy `semantic_chunks_and_embeddings` path is unsupported for
   new output and is removed only with explicit overwrite.
+- The config-driven `generate-docx` command consumes the same exact
+  `chapters/chapter_content_manifest.json` readiness set and writes
+  `chapters/msword/docx_manifest.json` using schema `1.0.0`. The manifest binds
+  formatting/title contract `1.0.0`, ordered canonical identities and text
+  checksums, generated titles, DOCX references/checksums, and the exact source
+  manifest. DOCX files are rebuildable human-readable exports, not canonical
+  content and not chunking candidates.
 - Every prep-subject job requires strict Gemini proofreading. The canonical
   versioned chapter text and matching metadata under
   `chapters/text_and_metadata/` are derived from Gemini's corrected text.
@@ -80,9 +92,9 @@
   checkpoint at `run_state/prep-subject/job-state.json`. It records safe
   compatibility, lease, per-chapter state, artifact checksums, publication, and
   report references; it must never contain credentials, raw requests/responses,
-  or full chapter text. `generate-chunks` requires this state to be `succeeded`
-  and to bind the published chapter content manifest before it can mutate chunk
-  output.
+  or full chapter text. `generate-chunks` and `generate-docx` require this state
+  to be `succeeded` and to bind the published chapter content manifest before
+  either command can mutate its derived output.
   Checkpoint compatibility contract version `2` validates exactly the five
   per-chapter canonical/provenance files. Old incomplete six-file checkpoints
   require a fresh `prep-subject --overwrite`; old succeeded releases remain

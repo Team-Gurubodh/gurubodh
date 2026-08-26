@@ -342,6 +342,12 @@ class ProofreadingTests(unittest.TestCase):
         self.assertIn(Path("chapters") / "unmodified_source_text", owned_relative_paths("prep-subject"))
         self.assertNotIn(Path("chapters") / "proofreading", owned_relative_paths("generate-chunks"))
 
+    def test_generate_docx_owns_only_msword_and_its_audit_history(self):
+        self.assertEqual(
+            owned_relative_paths("generate-docx"),
+            (Path("chapters") / "msword", Path("run_reports") / "generate-docx"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

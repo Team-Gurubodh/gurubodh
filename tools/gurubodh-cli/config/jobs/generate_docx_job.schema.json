@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/jobs/generate_docx_job.schema.json",
+  "title": "Gurubodh generate-docx job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pipeline", "source", "destination", "naming"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "pipeline": { "const": "generate-docx" },
+    "source": { "$ref": "#/$defs/subjectArtifactLocation" },
+    "destination": { "$ref": "#/$defs/subjectArtifactLocation" },
+    "naming": { "$ref": "#/$defs/naming" }
+  },
+  "$defs": {
+    "subjectArtifactLocation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["backend", "root_dir", "subject_dir"],
+          "properties": {
+            "backend": { "const": "local" },
+            "root_dir": { "type": "string", "minLength": 1 },
+            "subject_dir": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["backend", "bucket", "prefix", "subject_dir", "url_base"],
+          "properties": {
+            "backend": { "const": "r2" },
+            "bucket": { "type": "string", "minLength": 1 },
+            "prefix": { "type": "string", "minLength": 1 },
+            "subject_dir": { "type": "string", "minLength": 1 },
+            "url_base": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "naming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_code", "subject_code", "title_slug", "language"],
+      "properties": {
+        "category_code": { "type": "string", "pattern": "^CAT[0-9]{3}$" },
+        "subject_code": { "type": "string", "pattern": "^SUB[0-9]{3}$" },
+        "title_slug": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$" },
+        "language": { "type": "string", "enum": ["hi-IN", "mr-IN"] }
+      }
+    }
+  }
+}

@@ -4,9 +4,14 @@ import hashlib
 import json
 import shutil
 import tempfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-from gurubodh.content_identity import validate_content_identity
+from gurubodh.canonical_source import (
+    CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH,
+    TEXT_AND_METADATA_RELATIVE_DIR,
+    materialize_source_subject,
+    validate_materialized_release,
+)
 from gurubodh.constants import (
     ENTRY_POINT_GENERATE_CHUNKS,
     SEMANTIC_CHUNKS_ARTIFACT_SCHEMA_VERSION,
@@ -14,7 +19,6 @@ from gurubodh.constants import (
     SEMANTIC_CHUNKS_OUTPUT_DIR,
 )
 from gurubodh.generate_chunks_audit import GenerateChunksAuditWriter
-from gurubodh.prep_subject_checkpoints import validate_generate_chunks_gate
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
 from gurubodh.ml.semantic_chunking.segmenter import ParagraphSegmenter, SemanticChunkingParagraphSegmenter
@@ -28,13 +32,10 @@ from gurubodh.storage import (
     optional_url,
     r2_existing_artifacts_error,
     subject_artifact_object_key,
-    subject_artifact_prefix,
     upload_r2_file,
 )
 
 
-TEXT_AND_METADATA_RELATIVE_DIR = Path("chapters") / "text_and_metadata"
-CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH = Path("chapters") / "chapter_content_manifest.json"
 SEMANTIC_CHUNKS_RELATIVE_DIR = Path("chapters") / SEMANTIC_CHUNKS_OUTPUT_DIR
 LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
 
@@ -68,9 +69,12 @@ def run_generate_chunks_job(
 
 
 def prepare_generate_chunks_job(config, overwrite, r2_client=None, progress=print):
-    source_subject, source_temp_dir, candidate_manifest = materialize_source_subject(config, r2_client, progress)
-    candidate_sources = validate_materialized_candidates(config, source_subject, candidate_manifest)
-    validate_generate_chunks_gate(config, source_subject, candidate_manifest, r2_client=r2_client)
+    source_subject, source_temp_dir, candidate_manifest = materialize_source_subject(
+        config, "generate-chunks", r2_client, progress
+    )
+    candidate_sources = validate_materialized_release(
+        config, source_subject, candidate_manifest, "generate-chunks", r2_client
+    )
     destination_subject, destination_temp_dir = destination_subject_dir(config)
     preflight = ensure_destination_available(config, destination_subject, overwrite, r2_client)
     paths = {
@@ -87,184 +91,6 @@ def prepare_generate_chunks_job(config, overwrite, r2_client=None, progress=prin
         "source_temp_dir": source_temp_dir, "destination_temp_dir": destination_temp_dir,
         "destination_preflight": preflight, "destination_output_prefix": destination_output_prefix(config),
     }
-
-
-def materialize_source_subject(config, r2_client=None, progress=print):
-    """Read the source manifest, then only selected manifest-referenced files."""
-    source = config["source"]
-    if is_local(source):
-        subject_dir = Path(source["root_dir"]).expanduser() / source["subject_dir"]
-        if not subject_dir.is_dir():
-            raise SystemExit(f"Configured source subject directory does not exist: {subject_dir}")
-        manifest = read_candidate_manifest(config, subject_dir / CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH)
-        return subject_dir, None, manifest
-
-    temp_dir = tempfile.TemporaryDirectory(prefix="gurubodh-generate-chunks-source-")
-    subject_dir = Path(temp_dir.name) / source["subject_dir"]
-    client = r2_client or R2StorageClient.from_env()
-    manifest_key = subject_artifact_object_key(source, CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH)
-    manifest_path = subject_dir / CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH
-    progress("Reading candidate chapter manifest from:")
-    progress(f"  r2://{source['bucket']}/{manifest_key}")
-    try:
-        client.download_file(source["bucket"], manifest_key, manifest_path)
-        manifest = read_candidate_manifest(config, manifest_path)
-        selected = manifest["selected_chapters"]
-        width = max(2, len(str(len(selected))))
-        for index, candidate in enumerate(selected, start=1):
-            for kind in ("metadata", "text"):
-                relative_path, key = artifact_relative_path(source, candidate[f"{kind}_artifact"], kind)
-                client.download_file(source["bucket"], key, subject_dir / relative_path)
-            progress(f"[{index:0{width}d}/{len(selected):0{width}d}] chapter {candidate['generated_chapter_number']} (metadata, text)")
-    except SystemExit:
-        temp_dir.cleanup()
-        raise
-    except Exception as exc:
-        temp_dir.cleanup()
-        raise SystemExit(f"R2 source materialization failed: {exc}") from exc
-    return subject_dir, temp_dir, manifest
-
-
-def read_candidate_manifest(config, manifest_path):
-    try:
-        raw = Path(manifest_path).read_bytes()
-        manifest = json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Candidate chapter manifest is missing or malformed: {manifest_path}: {exc}") from exc
-    if not isinstance(manifest, dict):
-        raise SystemExit("Candidate chapter manifest must be a JSON object.")
-    if manifest.get("schema_version") != 1:
-        raise SystemExit("Unsupported candidate chapter manifest schema_version; expected 1.")
-    if manifest.get("identity_contract_version") != 1:
-        raise SystemExit("Unsupported candidate chapter manifest identity_contract_version; expected 1.")
-    expected_subject = {
-        "category_code": config["naming"]["category_code"],
-        "subject_code": config["naming"]["subject_code"],
-        "language": config["naming"]["language"],
-    }
-    if manifest.get("subject") != expected_subject:
-        raise SystemExit("Candidate chapter manifest subject identity does not match the generate-chunks job configuration.")
-    entries = manifest.get("chapters")
-    if not isinstance(entries, list) or not entries:
-        raise SystemExit("Candidate chapter manifest must contain a non-empty chapters array.")
-    candidates, numbers = [], set()
-    for entry in entries:
-        number = entry.get("generated_chapter_number") if isinstance(entry, dict) else None
-        if not isinstance(number, str) or len(number) != 3 or not number.isdigit():
-            raise SystemExit("Candidate chapter manifest has an invalid generated_chapter_number.")
-        if number in numbers:
-            raise SystemExit(f"Candidate chapter manifest contains duplicate chapter number: {number}")
-        numbers.add(number)
-        if not isinstance(entry.get("content_key"), str) or not isinstance(entry.get("normalized_content_sha256"), str):
-            raise SystemExit(f"Candidate chapter manifest entry {number} is missing content identity fields.")
-        metadata_artifact, text_artifact = entry.get("metadata_artifact"), entry.get("text_artifact")
-        artifact_relative_path(config["source"], metadata_artifact, "metadata")
-        artifact_relative_path(config["source"], text_artifact, "text")
-        candidates.append({
-            "generated_chapter_number": number, "content_key": entry["content_key"],
-            "normalized_content_sha256": entry["normalized_content_sha256"],
-            "metadata_artifact": metadata_artifact, "text_artifact": text_artifact,
-        })
-    requested = set(config.get("chapters") or [])
-    missing = sorted(requested - numbers)
-    if missing:
-        raise SystemExit(f"Requested chapter number(s) are absent from the candidate manifest: {', '.join(missing)}")
-    return {
-        "path": Path(manifest_path), "sha256": hashlib.sha256(raw).hexdigest(),
-        "reference": source_manifest_reference(config), "chapters": candidates,
-        "selected_chapters": [candidate for candidate in candidates if not requested or candidate["generated_chapter_number"] in requested],
-    }
-
-
-def safe_relative_path(value, context):
-    if not isinstance(value, str) or not value or "\\" in value:
-        raise SystemExit(f"{context} must be a non-empty POSIX relative path.")
-    path = PurePosixPath(value)
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
-        raise SystemExit(f"{context} must not escape the subject artifact tree.")
-    return Path(*path.parts)
-
-
-def artifact_relative_path(source, reference, kind):
-    if not isinstance(reference, dict):
-        raise SystemExit(f"Candidate manifest {kind}_artifact must be an object.")
-    suffix = ".json" if kind == "metadata" else ".txt"
-    if is_local(source):
-        if reference.get("backend") != "local" or not isinstance(reference.get("path"), str) or "url" not in reference:
-            raise SystemExit(f"Candidate manifest {kind}_artifact must be a local storage reference.")
-        relative_path = safe_relative_path(reference["path"], f"candidate manifest {kind}_artifact.path")
-        if relative_path.parent != TEXT_AND_METADATA_RELATIVE_DIR or relative_path.suffix != suffix:
-            raise SystemExit(f"Candidate manifest {kind}_artifact must reference chapters/text_and_metadata/*{suffix}.")
-        return relative_path, None
-    if reference.get("backend") != "r2" or reference.get("bucket") != source["bucket"] or not isinstance(reference.get("key"), str) or "url" not in reference:
-        raise SystemExit(f"Candidate manifest {kind}_artifact must be an R2 reference in the configured source bucket.")
-    key, prefix = reference["key"], subject_artifact_prefix(source)
-    if not key.startswith(prefix):
-        raise SystemExit(f"Candidate manifest {kind}_artifact escapes the configured source subject prefix.")
-    relative_path = safe_relative_path(key.removeprefix(prefix), f"candidate manifest {kind}_artifact.key")
-    if key != subject_artifact_object_key(source, relative_path) or relative_path.parent != TEXT_AND_METADATA_RELATIVE_DIR or relative_path.suffix != suffix:
-        raise SystemExit(f"Candidate manifest {kind}_artifact must reference chapters/text_and_metadata/*{suffix}.")
-    return relative_path, key
-
-
-def source_manifest_reference(config):
-    source = config["source"]
-    if is_local(source):
-        return {"backend": "local", "path": str(CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH), "url": None}
-    key = subject_artifact_object_key(source, CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH)
-    return {"backend": "r2", "bucket": source["bucket"], "key": key, "url": optional_url(source.get("url_base"), key)}
-
-
-def subject_artifact_path(subject_dir, relative_path, context):
-    root = Path(subject_dir).resolve()
-    target = (root / relative_path).resolve()
-    if not target.is_relative_to(root):
-        raise SystemExit(f"{context} escapes the source subject artifact tree.")
-    return target
-
-
-def validate_materialized_candidates(config, source_subject, candidate_manifest):
-    """Verify every selected manifest entry, its metadata, and its text."""
-    sources = []
-    expected_subject = {
-        "category_code": config["naming"]["category_code"],
-        "subject_code": config["naming"]["subject_code"],
-        "language": config["naming"]["language"],
-    }
-    for candidate in candidate_manifest["selected_chapters"]:
-        metadata_relative, _ = artifact_relative_path(config["source"], candidate["metadata_artifact"], "metadata")
-        text_relative, _ = artifact_relative_path(config["source"], candidate["text_artifact"], "text")
-        metadata_path = subject_artifact_path(source_subject, metadata_relative, "Candidate metadata artifact")
-        text_path = subject_artifact_path(source_subject, text_relative, "Candidate text artifact")
-        if not metadata_path.is_file() or not text_path.is_file():
-            raise SystemExit(f"Candidate chapter {candidate['generated_chapter_number']} has a missing manifest-referenced artifact.")
-        try:
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            text_bytes, text = text_path.read_bytes(), text_path.read_text(encoding="utf-8")
-            document = metadata["document"]
-            storage = metadata["storage"]["artifacts"]
-            integrity = metadata["integrity"]["artifacts"]["text"]
-        except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError) as exc:
-            raise SystemExit(f"Candidate chapter {candidate['generated_chapter_number']} has malformed prepared metadata or text: {exc}") from exc
-        if {key: document.get(key) for key in expected_subject} != expected_subject:
-            raise SystemExit(f"Candidate chapter {candidate['generated_chapter_number']} metadata subject identity does not match the job.")
-        if document.get("chapter_number") != candidate["generated_chapter_number"]:
-            raise SystemExit(f"Candidate manifest and metadata disagree on chapter number for {candidate['generated_chapter_number']}.")
-        files = metadata.get("files", {})
-        if files.get("metadata_filename") != metadata_path.name or files.get("text_filename") != text_path.name:
-            raise SystemExit(f"Candidate chapter {candidate['generated_chapter_number']} metadata filenames disagree with manifest references.")
-        if storage.get("metadata") != candidate["metadata_artifact"] or storage.get("text") != candidate["text_artifact"]:
-            raise SystemExit(f"Candidate chapter {candidate['generated_chapter_number']} metadata storage references disagree with the manifest.")
-        if not isinstance(integrity, dict) or integrity.get("value") != hashlib.sha256(text_bytes).hexdigest():
-            raise SystemExit(f"Candidate chapter {candidate['generated_chapter_number']} source text checksum does not match metadata.")
-        try:
-            identity = validate_content_identity(metadata.get("content_identity"), document["category_code"], document["subject_code"], document["language"], text)
-        except (KeyError, ValueError) as exc:
-            raise SystemExit(f"Prepared chapter {metadata_path} has missing or invalid content_identity: {exc}") from exc
-        if identity["content_key"] != candidate["content_key"] or identity["normalized_content_sha256"] != candidate["normalized_content_sha256"]:
-            raise SystemExit(f"Candidate manifest and metadata content identity disagree for chapter {candidate['generated_chapter_number']}.")
-        sources.append({"chapter_number": candidate["generated_chapter_number"], "text_path": text_path, "metadata_path": metadata_path, "metadata": metadata})
-    return sources
 
 
 def destination_subject_dir(config):

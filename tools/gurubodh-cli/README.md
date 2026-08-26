@@ -106,6 +106,18 @@ docker run --rm \
   generate-chunks --config jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json
 ```
 
+Generate the independent human-readable Word export after preparation. This
+command needs no model cache and makes no Gemini or other external-model calls:
+
+```bash
+docker run --rm \
+  --env CLOUDFLARE_R2_ACCOUNT_ID \
+  --env CLOUDFLARE_R2_ACCESS_KEY_ID \
+  --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
+  ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
+  generate-docx --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.r2.json
+```
+
 If you already have the `bge-m3` cache and wish to reuse the same with the docker container, then use the following commands, replacing `--mount type=volume` by  `--mount type=bind`, as shown in the examples below:
 
 ```bash
@@ -180,11 +192,11 @@ runs a sample local content job.
 Artifact ownership is command-scoped: `prep-subject`
 owns `chapters/text_and_metadata/`, `chapters/unmodified_source_text/`,
 `chapters/proofreading/`, and `chapters/chapter_content_manifest.json`;
-`generate-chunks` owns only
-`chapters/semantic_chunks/`. The legacy
+`generate-chunks` owns only `chapters/semantic_chunks/`; `generate-docx` owns
+only `chapters/msword/`. The legacy
 `chapters/semantic_chunks_and_embeddings/` location is removed only by an
-explicit `generate-chunks --overwrite` migration run. Each command owns its own audit
-history. `--overwrite` replaces only the invoking command's owned paths, never
+explicit `generate-chunks --overwrite` migration run. Each command owns its own
+command-specific audit history. `--overwrite` replaces only the invoking command's owned paths, never
 the complete subject root. A successful `prep-subject --overwrite` invalidates
 semantic chunks because they may no longer match the prepared content; rerun
 `gurubodh generate-chunks --config <generate-chunks-job>` before using RAG output.
@@ -372,7 +384,7 @@ recovered safely with `--resume`.
 The text-only prep checkpoint contract is version `2`. Incomplete checkpoints
 created under the earlier six-artifact contract cannot resume; finish them
 before upgrading or restart with `--overwrite`. A completed earlier release
-remains valid input for `generate-chunks` and the future `generate-docx`
+remains valid input for `generate-chunks` and `generate-docx`
 command, so it does not require another Gemini run merely because its metadata
 still contains legacy DOCX/full-subject references. Running
 `prep-subject --resume` against that old checkpoint requires `--overwrite` to
@@ -461,6 +473,54 @@ For `--overwrite`, only the semantic chunk output directory (and, if present,
 the legacy combined-output directory), or the matching R2 prefixes, are
 replaced.
 
+### Generate chapter DOCX exports
+
+`gurubodh generate-docx` reads the authoritative
+`chapters/chapter_content_manifest.json`, requires the latest prep state to be
+`succeeded` and bound to those exact manifest bytes, then validates every
+manifest-listed metadata/text pair. It accepts current metadata schema `1.4.0`
+and valid succeeded legacy schema `1.3.0`; legacy DOCX/full-subject fields are
+ignored. It never reads unmodified-source text and never calls an external
+model.
+
+Run the maintained local job:
+
+```bash
+gurubodh generate-docx \
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.local.json
+```
+
+The command writes:
+
+```text
+<subject-group>/<language>/chapters/msword/
+  <canonical-versioned-chapter-stem>.docx
+  docx_manifest.json
+```
+
+Every document begins with the exact title
+`<title_slug>: prabodhan <three-digit chapter number>`. Canonical blank-line
+paragraphs become Word paragraphs and internal single LFs become Word line
+breaks. Formatting contract `1.0.0` fixes one-inch margins, Noto Sans
+Devanagari, 18-point Title and 11-point Normal styles, left-to-right direction,
+1.15 line spacing, and paragraph spacing for Hindi and Marathi. Each package
+and its exact canonical-text round trip are validated before publication.
+
+`docx_manifest.json` is the readiness marker. It binds the exact source
+manifest, canonical identities and text checksums, titles, formatting/title
+contracts, and generated DOCX checksums. DOCX is a rebuildable human-readable
+export; canonical proofread `.txt` remains authoritative and DOCX is never a
+chunking candidate.
+
+Without `--overwrite`, an existing `chapters/msword/` fails preflight. Local
+overwrite stages and validates the complete replacement before swapping only
+that directory. R2 overwrite removes the old readiness manifest first, uploads
+validated DOCX objects, and publishes `docx_manifest.json` last. A partial R2
+prefix without the manifest is not ready; rerun with `--overwrite`. The command
+does not remove `full_subject/`, invalidate semantic chunks, or alter canonical
+artifacts. A successful `prep-subject --overwrite` does invalidate the previous
+DOCX set, so rerun `generate-docx` afterward when exports are needed.
+
 ## Audit Trail Reports
 
 Each successful `prep-subject` run writes machine-readable JSON and
@@ -492,6 +552,13 @@ keys, request bodies, full source text, full chapter text, and DOCX contents.
 Markdown reports under `<subject-group>/<language>/run_reports/generate-chunks/`. Reports include generated
 artifact references and aggregate counts, but exclude full source text and
 embedding vectors.
+
+`generate-docx` writes successful and failed JSON/Markdown reports under
+`<subject-group>/<language>/run_reports/generate-docx/`. Reports include source
+manifest identity, formatting/title contracts, per-chapter canonical identity,
+generated title, output filename/checksum, and publication outcome. They exclude
+canonical text, DOCX contents, source DOCX contents, secrets, and environment
+values.
 
 ## Chapter Content Identity
 
@@ -562,6 +629,9 @@ jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2-output.json
 jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2-output.json
 jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.local.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.r2-output.json
+jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.r2.json
 ```
 
 Use `.local.json` for local source and local output. Use `.r2-output.json` for
@@ -627,6 +697,14 @@ under:
 
 ```text
 cms_library/{subject_dir}/chapters/semantic_chunks/
+```
+
+`generate-docx` uses the same subject-artifact backend model and publishes its
+ready export set plus append-only audits under:
+
+```text
+cms_library/{subject_dir}/chapters/msword/
+cms_library/{subject_dir}/run_reports/generate-docx/
 ```
 
 ## Chapter Text Integrity

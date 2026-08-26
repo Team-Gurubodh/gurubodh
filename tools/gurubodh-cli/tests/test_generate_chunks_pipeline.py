@@ -44,6 +44,7 @@ def metadata_for(config, chapter_number, text, backend="local"):
     text_name = chapter_output_filename(config, chapter_number, ".txt")
     metadata_name = chapter_output_filename(config, chapter_number, ".json")
     return {
+        "schema_version": "1.4.0",
         "document": {
             "category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"],
             "title_slug": config["naming"]["title_slug"], "chapter_number": f"{chapter_number:03d}",

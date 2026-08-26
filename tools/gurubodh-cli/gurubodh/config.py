@@ -5,7 +5,9 @@ from pathlib import PurePosixPath
 from gurubodh.constants import (
     CONVERSION_JOB_SCHEMA_VERSION,
     GENERATE_CHUNKS_JOB_SCHEMA_VERSION,
+    GENERATE_DOCX_JOB_SCHEMA_VERSION,
     PIPELINE_GENERATE_CHUNKS,
+    PIPELINE_GENERATE_DOCX,
     PIPELINE_ENTRY_POINTS,
     PIPELINE_LEGACY_DOCX_TO_UNICODE,
     PIPELINE_UNICODE_DOCX_INGEST,
@@ -88,6 +90,16 @@ def require_boolean(data, key, context):
     return value
 
 
+def require_exact_keys(data, required, optional, context):
+    keys = set(data)
+    missing = sorted(set(required) - keys)
+    unknown = sorted(keys - set(required) - set(optional))
+    if missing:
+        raise SystemExit(f"Config error: {context} is missing required field(s): {', '.join(missing)}")
+    if unknown:
+        raise SystemExit(f"Config error: {context} has unsupported field(s): {', '.join(unknown)}")
+
+
 def chapter_split_regex_flags(chapter_split):
     flags = chapter_split.get("flags", [])
     if not isinstance(flags, list):
@@ -167,6 +179,18 @@ def validate_language_partition(subject_dir, language, context):
         raise SystemExit(
             f"Config error: {context}.subject_dir final language partition must match {language!r}"
         )
+    return str(path)
+
+
+def validate_safe_posix_prefix(value, context):
+    if "\\" in value:
+        raise SystemExit(f"Config error: {context} must use POSIX path separators")
+    segments = value.split("/")
+    if any(not segment for segment in segments):
+        raise SystemExit(f"Config error: {context} must not contain empty path segments")
+    path = PurePosixPath(value)
+    if path.is_absolute() or any(part in {".", ".."} for part in path.parts):
+        raise SystemExit(f"Config error: {context} must be a safe relative path")
     return str(path)
 
 
@@ -371,4 +395,55 @@ def load_generate_chunks_job(path):
         )
     except SemanticChunkConfigError as exc:
         raise SystemExit(f"Config error: {exc}") from exc
+    return config
+
+
+def load_generate_docx_job(path):
+    config = read_json(path)
+    if not isinstance(config, dict):
+        raise SystemExit("Config error: root must be an object")
+    require_exact_keys(
+        config,
+        {"schema_version", "pipeline", "source", "destination", "naming"},
+        set(),
+        "root",
+    )
+    if config.get("schema_version") != GENERATE_DOCX_JOB_SCHEMA_VERSION:
+        raise SystemExit(f"Config error: schema_version must be {GENERATE_DOCX_JOB_SCHEMA_VERSION}")
+    if require_string(config, "pipeline", "root") != PIPELINE_GENERATE_DOCX:
+        raise SystemExit("Config error: pipeline must be generate-docx")
+
+    source = require_object(config, "source", "root")
+    destination = require_object(config, "destination", "root")
+    naming = require_object(config, "naming", "root")
+    require_exact_keys(
+        naming,
+        {"category_code", "subject_code", "title_slug", "language"},
+        set(),
+        "naming",
+    )
+    require_string(naming, "category_code", "naming", r"CAT[0-9]{3}")
+    require_string(naming, "subject_code", "naming", r"SUB[0-9]{3}")
+    require_string(naming, "title_slug", "naming", r"[A-Za-z0-9][A-Za-z0-9-]*")
+    language = require_string(naming, "language", "naming")
+    try:
+        locale_spec(language)
+    except ValueError as exc:
+        raise SystemExit(f"Config error: naming.language is invalid: {exc}") from exc
+
+    for section, context in ((source, "source"), (destination, "destination")):
+        backend = storage_backend(section, context)
+        expected = {"backend", "root_dir", "subject_dir"} if backend == "local" else {
+            "backend", "bucket", "prefix", "subject_dir", "url_base"
+        }
+        require_exact_keys(section, expected, set(), context)
+        validate_subject_artifact_storage(section, context, language)
+        if backend == "r2":
+            prefix = require_string(section, "prefix", context)
+            validate_safe_posix_prefix(prefix, f"{context}.prefix")
+    if source["subject_dir"] != destination["subject_dir"]:
+        raise SystemExit(
+            "Config error: generate-docx source.subject_dir and destination.subject_dir must use the same "
+            "language-qualified root"
+        )
     return config

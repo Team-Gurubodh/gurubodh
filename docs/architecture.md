@@ -103,9 +103,11 @@ flowchart LR
 - **Current implementation**: Python utility under
   `tools/gurubodh-cli/`, currently used for legacy DOCX Unicode
   conversion, Unicode DOCX ingest, text-only chapter splitting, canonical
-  proofread text/provenance publication, and derived semantic chunk generation
-  to local storage or Cloudflare R2. DOCX is a source/transient processing
-  format for `prep-subject`; chapter DOCX export is a separate command boundary.
+  proofread text/provenance publication, derived semantic chunk generation,
+  and rebuildable chapter DOCX export to local storage or Cloudflare R2. DOCX
+  is a source/transient processing format for `prep-subject`; `generate-docx`
+  separately renders canonical text as human-readable Word files without
+  making those files authoritative.
   Production R2 batch jobs run
   in the CPU-only `gurubodh-cli` container; native Python remains the
   development and debugging path. See
