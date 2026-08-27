@@ -384,13 +384,13 @@ before sending a request. Credentials remain environment-only via
 
 Every invocation creates a distinct, readable ID such as
 `20260827-012049-690a55` below `<lab-root>/proofread/runs/<run-id>/`.
-`output/` contains `<source-stem>_proofread.docx`,
-`<source-stem>_proofread.txt`, and an operator README linking to the main
-output and review artifacts. The DOCX uses Heading 2 for paragraphs that
-exactly match `प्रबोधनातील स्मरणीय मुद्दे` or `स्वामी विश्वसंदेश`.
-Extracted source text, readable diff, structured proofreading details, and a
-human-readable report remain under `report/`, with `run_manifest.json` at the
-run root. The manifest records source and generated-artifact SHA-256 values,
+The run-root `README.md` is the operator entry point and links to `output/`,
+`report/`, and `run_manifest.json`. `output/` contains
+`<source-stem>_proofread.docx` and `<source-stem>_proofread.txt`. The DOCX uses
+Heading 2 for paragraphs that exactly match `प्रबोधनातील स्मरणीय मुद्दे` or
+`स्वामी विश्वसंदेश`. Extracted source text, readable diff, structured
+proofreading details, and a human-readable report remain under `report/`.
+The manifest records source and generated-artifact SHA-256 values,
 locale/template provenance, command/package provenance, and the outcome. Lab
 artifacts are never canonical source text or CMS-ingestion input.
 

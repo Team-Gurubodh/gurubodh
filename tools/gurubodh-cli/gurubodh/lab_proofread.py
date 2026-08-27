@@ -137,7 +137,7 @@ def _write_final_reports(run_dir: Path, manifest: dict[str, Any]) -> Path:
     return manifest_path
 
 
-def _output_readme(manifest: dict[str, Any]) -> str:
+def _run_readme(manifest: dict[str, Any]) -> str:
     output = manifest["output"]
     return "\n".join(
         (
@@ -145,10 +145,11 @@ def _output_readme(manifest: dict[str, Any]) -> str:
             "",
             f"- Source: `{Path(manifest['source']['path']).name}`",
             f"- Locale: `{manifest['locale']['language']}`",
-            f"- Corrected DOCX: [`{Path(output['corrected_docx']).name}`]({Path(output['corrected_docx']).name})",
-            f"- Corrected text: [`{Path(output['corrected_text']).name}`]({Path(output['corrected_text']).name})",
-            f"- Readable diff: [`{output['readable_diff']}`](../{output['readable_diff']})",
-            f"- Structured details: [`{output['structured_details']}`](../{output['structured_details']})",
+            f"- Corrected DOCX: [`{output['corrected_docx']}`]({output['corrected_docx']})",
+            f"- Corrected text: [`{output['corrected_text']}`]({output['corrected_text']})",
+            f"- Readable diff: [`{output['readable_diff']}`]({output['readable_diff']})",
+            f"- Structured details: [`{output['structured_details']}`]({output['structured_details']})",
+            "- Run manifest: [`run_manifest.json`](run_manifest.json)",
             "",
             "This is a non-canonical lab artifact. It must not be used as CMS source content.",
         )
@@ -279,9 +280,10 @@ def run_lab_proofread(
                     "structured_details": _relative_path(run_dir, details_path),
                     "readable_diff": _relative_path(run_dir, diff_path),
                 },
+                "operator_readme": "README.md",
             }
         )
-        _write_text(run_dir / "output" / "README.md", _output_readme(manifest))
+        _write_text(run_dir / "README.md", _run_readme(manifest))
     except Exception as exc:
         manifest["outcome"] = "failed"
         manifest["error"] = str(exc)

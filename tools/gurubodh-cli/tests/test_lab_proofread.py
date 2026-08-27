@@ -71,13 +71,14 @@ class LabProofreadTests(unittest.TestCase):
         self.assertTrue((run_dir / "report" / "extracted_source.txt").is_file())
         self.assertTrue((run_dir / "output" / "source_proofread.txt").is_file())
         self.assertTrue((run_dir / "output" / "source_proofread.docx").is_file())
-        self.assertTrue((run_dir / "output" / "README.md").is_file())
+        self.assertTrue((run_dir / "README.md").is_file())
         self.assertTrue((run_dir / "report" / "proofreading.diff.txt").is_file())
         self.assertTrue((run_dir / "report" / "proofreading_details.json").is_file())
         corrected = (run_dir / "output" / "source_proofread.txt").read_text(encoding="utf-8")
         validate_chapter_docx(run_dir / "output" / "source_proofread.docx", corrected, "source: proofread")
         self.assertEqual(Document(run_dir / "output" / "source_proofread.docx").paragraphs[1].text, "यह सही वाक्य है।")
-        self.assertIn("non-canonical", (run_dir / "output" / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("non-canonical", (run_dir / "README.md").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["operator_readme"], "README.md")
         for relative, expected_sha256 in manifest["artifact_sha256"].items():
             self.assertEqual(hashlib.sha256((run_dir / relative).read_bytes()).hexdigest(), expected_sha256)
 
