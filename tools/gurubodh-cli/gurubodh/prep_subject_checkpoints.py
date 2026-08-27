@@ -904,13 +904,20 @@ def _is_global_proofreading_failure(exc: ProofreadingError) -> bool:
     return exc.code in {"missing_credentials", "missing_dependency"}
 
 
-def validate_generate_chunks_gate(config: dict[str, Any], source_subject: Path, candidate_manifest: dict[str, Any], r2_client=None) -> None:
-    """Require a completed prep checkpoint before semantic output can mutate.
+def validate_canonical_release_gate(
+    config: dict[str, Any],
+    source_subject: Path,
+    candidate_manifest: dict[str, Any],
+    *,
+    command_name: str,
+    r2_client=None,
+) -> None:
+    """Require a completed prep checkpoint before derived output can mutate.
 
-    The candidate manifest is already parsed here, but no chunk directory has
-    been created or deleted.  This is intentionally usable for both local and
-    R2 sources so an incomplete overwrite cannot erase previously generated
-    chunks.
+    The candidate manifest is already parsed here, but no derived-output
+    directory has been created or deleted. This is intentionally usable for
+    both local and R2 sources so an incomplete overwrite cannot erase a
+    previously generated output set.
     """
     source = config["source"]
     state_path = Path(source_subject) / JOB_STATE_RELATIVE_PATH
@@ -918,30 +925,34 @@ def validate_generate_chunks_gate(config: dict[str, Any], source_subject: Path, 
         client = r2_client or R2StorageClient.from_env()
         key = subject_artifact_object_key(source, JOB_STATE_RELATIVE_PATH)
         if not client.exists(source["bucket"], key):
-            raise SystemExit("generate-chunks requires a completed prep-subject job state; no checkpoint was found.")
+            raise SystemExit(f"{command_name} requires a completed prep-subject job state; no checkpoint was found.")
         client.download_file(source["bucket"], key, state_path)
     elif not state_path.is_file():
-        raise SystemExit("generate-chunks requires a completed prep-subject job state; no checkpoint was found.")
+        raise SystemExit(f"{command_name} requires a completed prep-subject job state; no checkpoint was found.")
     state = _read_json(state_path, "Prep-subject job state")
     if state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION or state.get("state") != "succeeded":
         raise SystemExit(
-            "generate-chunks refuses prepared content while the latest prep-subject job is not succeeded. "
+            f"{command_name} refuses prepared content while the latest prep-subject job is not succeeded. "
             "Use gurubodh prep-subject --resume to complete or recover the preparation job first."
         )
     publication = state.get("publication") or {}
+    if publication.get("state") != "succeeded":
+        raise SystemExit(
+            f"{command_name} refuses prepared content while the latest prep-subject publication is not succeeded."
+        )
     canonical = publication.get("canonical_manifest") or {}
     if canonical.get("sha256") != candidate_manifest.get("sha256"):
         raise SystemExit(
-            "generate-chunks refuses the candidate manifest because it does not match the completed prep-subject checkpoint."
+            f"{command_name} refuses the candidate manifest because it does not match the completed prep-subject checkpoint."
         )
     checkpoint_chapters = state.get("chapters")
     if not isinstance(checkpoint_chapters, list) or any(chapter.get("state") != "succeeded" for chapter in checkpoint_chapters):
-        raise SystemExit("generate-chunks requires every completed checkpoint chapter to be succeeded.")
+        raise SystemExit(f"{command_name} requires every completed checkpoint chapter to be succeeded.")
     expected_numbers = [chapter.get("chapter_number") for chapter in checkpoint_chapters]
     manifest_numbers = [chapter.get("generated_chapter_number") for chapter in candidate_manifest.get("chapters", [])]
     if expected_numbers != manifest_numbers or canonical.get("chapter_numbers") != expected_numbers:
         raise SystemExit(
-            "generate-chunks refuses the candidate manifest because its chapters do not match the completed checkpoint set."
+            f"{command_name} refuses the candidate manifest because its chapters do not match the completed checkpoint set."
         )
     checkpoint_keys = {
         chapter["chapter_number"]: (chapter.get("proofreading") or {}).get("canonical_content_key")
@@ -949,8 +960,21 @@ def validate_generate_chunks_gate(config: dict[str, Any], source_subject: Path, 
     }
     if any(checkpoint_keys.get(chapter["generated_chapter_number"]) != chapter.get("content_key") for chapter in candidate_manifest["chapters"]):
         raise SystemExit(
-            "generate-chunks refuses the candidate manifest because its chapter identities do not match the completed checkpoint."
+            f"{command_name} refuses the candidate manifest because its chapter identities do not match the completed checkpoint."
         )
+
+
+def validate_generate_chunks_gate(
+    config: dict[str, Any], source_subject: Path, candidate_manifest: dict[str, Any], r2_client=None
+) -> None:
+    """Backward-compatible command-specific wrapper for existing callers."""
+    validate_canonical_release_gate(
+        config,
+        source_subject,
+        candidate_manifest,
+        command_name="generate-chunks",
+        r2_client=r2_client,
+    )
 
 
 def run_resumable_prep_job(

@@ -30,6 +30,7 @@ SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks"
 LEGACY_SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
 PREP_REPORT_DIR = Path("run_reports") / "prep-subject"
 CHUNKS_REPORT_DIR = Path("run_reports") / "generate-chunks"
+DOCX_REPORT_DIR = Path("run_reports") / "generate-docx"
 
 
 def owned_relative_paths(command):
@@ -37,6 +38,8 @@ def owned_relative_paths(command):
         return (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES, PREP_REPORT_DIR)
     if command == "generate-chunks":
         return (SEMANTIC_ARTIFACT_DIR, CHUNKS_REPORT_DIR)
+    if command == "generate-docx":
+        return (DERIVED_CHAPTER_DOCX_ARTIFACT_DIR, DOCX_REPORT_DIR)
     raise ValueError(f"Unknown artifact owner: {command}")
 
 
@@ -46,6 +49,8 @@ def replaceable_relative_paths(command):
         return (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES)
     if command == "generate-chunks":
         return (SEMANTIC_ARTIFACT_DIR,)
+    if command == "generate-docx":
+        return (DERIVED_CHAPTER_DOCX_ARTIFACT_DIR,)
     raise ValueError(f"Unknown artifact owner: {command}")
 
 
@@ -79,6 +84,11 @@ def r2_existing_artifacts_error(command, bucket, keys, artifact_label):
         overwrite_effect = (
             "With --overwrite, only semantic chunk artifacts will be replaced.\n"
             "Canonical prepared content, prep audit history, and unrelated subject files will be preserved."
+        )
+    elif command == "generate-docx":
+        overwrite_effect = (
+            "With --overwrite, only chapters/msword/ will be replaced.\n"
+            "Canonical prepared content, semantic chunks, audit history, and unrelated subject files will be preserved."
         )
     else:
         raise ValueError(f"Unknown artifact owner: {command}")

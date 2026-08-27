@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/artifacts/docx_manifest.schema.json",
+  "title": "Gurubodh derived DOCX manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "formatting_contract_version",
+    "created_at",
+    "command",
+    "subject",
+    "source_candidate_manifest",
+    "formatting",
+    "title_template",
+    "counts",
+    "chapters"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "formatting_contract_version": { "const": "1.0.0" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "command": {
+      "type": "object",
+      "required": ["pipeline", "package_version", "build_provenance"],
+      "properties": {
+        "pipeline": { "const": "generate-docx" },
+        "package_version": { "type": "string" },
+        "build_provenance": { "type": "object" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category_code", "subject_code", "title_slug", "language"],
+      "properties": {
+        "category_code": { "type": "string", "pattern": "^CAT[0-9]{3}$" },
+        "subject_code": { "type": "string", "pattern": "^SUB[0-9]{3}$" },
+        "title_slug": { "type": "string" },
+        "language": { "enum": ["hi-IN", "mr-IN"] }
+      }
+    },
+    "source_candidate_manifest": { "$ref": "#/$defs/boundArtifact" },
+    "formatting": { "type": "object" },
+    "title_template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "template"],
+      "properties": {
+        "id": { "const": "title-slug-prabodhan-chapter" },
+        "version": { "const": "1.0.0" },
+        "template": { "const": "<title_slug>: prabodhan <chapter_number>" }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chapter_count", "docx_file_count"],
+      "properties": {
+        "chapter_count": { "type": "integer", "minimum": 1 },
+        "docx_file_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "chapter_number",
+          "content_key",
+          "normalized_content_sha256",
+          "source_text",
+          "generated_title",
+          "docx_artifact",
+          "docx_sha256"
+        ],
+        "properties": {
+          "chapter_number": { "type": "string", "pattern": "^[0-9]{3}$" },
+          "content_key": { "type": "string" },
+          "normalized_content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "source_text": { "$ref": "#/$defs/boundArtifact" },
+          "generated_title": { "type": "string" },
+          "docx_artifact": { "type": "object" },
+          "docx_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "boundArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "sha256"],
+      "properties": {
+        "reference": { "type": "object" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

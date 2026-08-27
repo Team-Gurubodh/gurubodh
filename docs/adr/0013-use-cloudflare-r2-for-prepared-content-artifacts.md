@@ -40,11 +40,17 @@ cms_library/{subject_dir}/chapters/text_and_metadata/
 cms_library/{subject_dir}/chapters/unmodified_source_text/
 cms_library/{subject_dir}/chapters/proofreading/
 cms_library/{subject_dir}/chapters/chapter_content_manifest.json
+cms_library/{subject_dir}/chapters/msword/
+cms_library/{subject_dir}/run_reports/generate-docx/
 ```
 
 Source and transient Unicode DOCX processing is internal to `prep-subject`.
 Derived chapter DOCX exports use `chapters/msword/` and are owned by the
 separate `generate-docx` command; `full_subject/` is retired.
+Each ready DOCX set contains one version-aligned `.docx` per manifest chapter
+and a `docx_manifest.json` readiness marker uploaded after all DOCX objects.
+The manifest binds exact source-manifest bytes, canonical identities, source
+text checksums, formatting/title contracts, and generated file checksums.
 
 Metadata stores storage references containing backend, bucket, object key, and
 an optional nullable URL. Public object URLs are not required.

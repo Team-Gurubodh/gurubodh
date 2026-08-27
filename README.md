@@ -95,7 +95,7 @@ pass the root explicitly:
 ```bash
 gurubodh prep-subject \
   --project-root tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/prep-subject.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```
 
 `make cli-help`
@@ -105,7 +105,7 @@ Shows the command-line help for `gurubodh`.
 `make cli-run-sample`
 
 Runs the sample Gurubodh CLI job using
-`tools/gurubodh-cli/jobs/subjects/sub123_spand_rahasya/prep-subject.local.json`.
+`tools/gurubodh-cli/jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json`.
 
 Manifest-bound semantic chunk generation requires a local model cache directory:
 
@@ -113,8 +113,21 @@ Manifest-bound semantic chunk generation requires a local model cache directory:
 export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
 gurubodh generate-chunks \
   --project-root tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/generate-chunks.local.json
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```
+
+Generate rebuildable Word exports from the exact canonical proofread chapters:
+
+```bash
+gurubodh generate-docx \
+  --project-root tools/gurubodh-cli \
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.local.json
+```
+
+`generate-docx` reads only manifest-listed canonical text, writes one validated
+DOCX per chapter plus `docx_manifest.json` under `chapters/msword/`, and never
+changes canonical text or metadata. Rerun it after a successful
+`prep-subject --overwrite` invalidates the previous DOCX export set.
 
 ### Repository Tooling
 

@@ -2,9 +2,10 @@ import argparse
 import sys
 
 from gurubodh.docx.namespaces import register_namespaces
-from gurubodh.config import load_generate_chunks_job
+from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
+from gurubodh.pipelines.generate_docx import run_generate_docx_job
 from gurubodh.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
 from gurubodh.project import resolve_project_context, resolve_project_path
 
@@ -68,6 +69,13 @@ def build_parser():
     )
     add_common_options(generate_chunks_parser)
 
+    generate_docx_parser = subparsers.add_parser(
+        "generate-docx",
+        help="Generate validated DOCX exports from canonical proofread chapter text.",
+        description="Generate one candidate-manifest-bound DOCX export per canonical chapter.",
+    )
+    add_common_options(generate_docx_parser)
+
     add_planned_command(subparsers, "regenerate-embeddings")
 
     compare_tokenizers_parser = subparsers.add_parser(
@@ -117,6 +125,19 @@ def main(argv=None):
             "generate-chunks complete: "
             f"{result['processed_chapter_count']} chapter(s), {result['total_chunk_count']} chunk(s)"
         )
+        return
+
+    if args.command == "generate-docx":
+        context = resolve_project_context(args.project_root)
+        config_path = resolve_project_path(context, args.config)
+        config = load_generate_docx_job(config_path)
+        try:
+            result = run_generate_docx_job(
+                context, config, overwrite=args.overwrite, config_path=config_path
+            )
+        except Exception as exc:
+            parser.error(str(exc))
+        print(f"generate-docx complete: {result['processed_chapter_count']} chapter DOCX file(s)")
         return
 
     if args.command == "compare-tokenizers":

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "pipeline": "generate-docx",
+  "source": {
+    "backend": "r2",
+    "bucket": "gurubodh-library-dev",
+    "prefix": "cms_library",
+    "subject_dir": "123_spand_rahasya/hi-IN",
+    "url_base": null
+  },
+  "destination": {
+    "backend": "r2",
+    "bucket": "gurubodh-library-dev",
+    "prefix": "cms_library",
+    "subject_dir": "123_spand_rahasya/hi-IN",
+    "url_base": null
+  },
+  "naming": {
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya",
+    "language": "hi-IN"
+  }
+}

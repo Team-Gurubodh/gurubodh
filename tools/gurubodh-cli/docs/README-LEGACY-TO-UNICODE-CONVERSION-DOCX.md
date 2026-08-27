@@ -224,7 +224,20 @@ and metadata, its unmodified-source snapshot, its proofreading diff, and its
 proofreading details JSON. Checkpoint contract version `2` cannot resume an
 incomplete checkpoint created under the earlier six-artifact contract; restart
 such work with `--overwrite`. Existing succeeded older releases remain valid
-for `generate-chunks` and future `generate-docx` without another Gemini run.
+for `generate-chunks` and `generate-docx` without another Gemini run.
+
+To create readable chapter Word exports after preparation, run the separate
+manifest-bound command. It renders proofread canonical text rather than the
+source/transient DOCX and does not reconstruct original Word formatting:
+
+```bash
+gurubodh generate-docx \
+  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.local.json
+```
+
+The result is one validated DOCX per canonical chapter plus
+`chapters/msword/docx_manifest.json`. A successful prep overwrite invalidates
+that directory, so rerun `generate-docx` afterward when exports are needed.
 
 Chapter files use chapter numbers starting at `001`:
 

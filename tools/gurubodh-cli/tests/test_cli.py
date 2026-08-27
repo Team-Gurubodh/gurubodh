@@ -12,6 +12,7 @@ class CliTests(unittest.TestCase):
         expected_order = [
             "prep-subject",
             "generate-chunks",
+            "generate-docx",
             "regenerate-embeddings",
             "compare-tokenizers",
             "update-metadata",
@@ -42,9 +43,22 @@ class CliTests(unittest.TestCase):
             self.assertIn(f"[planned] {command_help}", normalized_help)
 
         self.assertIn("generate-chunks", help_text)
+        self.assertIn("generate-docx", help_text)
         self.assertIn("compare-tokenizers", help_text)
         self.assertNotIn("[planned] Generate semantic text chunks from prepared chapter text files.", normalized_help)
         self.assertNotIn("[planned] Compare BGE-M3 and optional Sarvam token counts for chapter text.", normalized_help)
+
+    def test_generate_docx_has_overwrite_but_no_resume(self):
+        parser = build_parser()
+        generate_docx = next(
+            action.choices["generate-docx"]
+            for action in parser._actions
+            if hasattr(action, "choices") and action.choices and "generate-docx" in action.choices
+        )
+        help_text = generate_docx.format_help()
+
+        self.assertIn("--overwrite", help_text)
+        self.assertNotIn("--resume", help_text)
 
     def test_planned_command_exits_with_clear_message(self):
         stderr = StringIO()

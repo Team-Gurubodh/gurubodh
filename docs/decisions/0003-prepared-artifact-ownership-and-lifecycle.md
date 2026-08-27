@@ -23,13 +23,15 @@ replacement but never generates it. The retired `full_subject/` path has no
 replacement. `generate-chunks` owns v2 candidate semantic artifacts under
 `chapters/semantic_chunks/`. Their
 audit reports are retained independently under
-`run_reports/prep-subject/` and `run_reports/generate-chunks/`.
+`run_reports/prep-subject/`, `run_reports/generate-chunks/`, and
+`run_reports/generate-docx/`.
 
 `prep-subject` also owns its operational state under
 `run_state/prep-subject/` and its non-canonical staged workspace under
 `.work/prep-subject/{job-id}/`. A durable job-state gate separates incomplete
 or publishing work from canonical consumption. Only state `succeeded` with a
 matching canonical content manifest authorizes `generate-chunks`.
+The same succeeded-state and exact-manifest gate authorizes `generate-docx`.
 
 Each ownership boundary is scoped to the language-qualified subject release
 root defined by [Decision-0005](./0005-language-scoped-prepared-content-release-roots.md).
@@ -66,8 +68,11 @@ history without introducing premature revision or release infrastructure.
 ## Impact
 
 Operators must rerun `generate-chunks` after overwriting canonical content.
-They must also rerun `generate-docx` once that command is available if chapter
-DOCX exports are required. Old incomplete six-file prep checkpoints cannot
+They must also rerun `generate-docx` if chapter DOCX exports are required.
+`generate-docx --overwrite` replaces only its complete `chapters/msword/` set;
+local publication uses staged directory replacement, while R2 removes the old
+readiness manifest before replacement and publishes the new manifest last.
+Old incomplete six-file prep checkpoints cannot
 resume under the text-only five-file contract and require `--overwrite`;
 already succeeded releases remain consumable by downstream commands.
 They must regenerate pre-language-root Hindi artifacts into `hi-IN` explicitly;
