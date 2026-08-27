@@ -1,113 +1,21 @@
-# Semantic Chunking
+# Semantic chunking
 
-Semantic chunking is an internal content capability for grouping Hindi/Indic
-chapter text into semantically coherent chunks. It may use a local model only
-for temporary contextual similarity while finding boundaries.
+Semantic chunking groups Hindi and Marathi chapter text into coherent chunks. Maintained `generate-chunks` jobs derive manifest-bound artifacts from a successful prepared release. See [Generate chunks](workflows/generate-chunks.md) for the supported workflow; this page covers the local model boundary.
 
-The module lives under:
+## Runtime and model cache
 
-```text
-gurubodh/ml/semantic_chunking/
-```
-
-It is installable as part of the `gurubodh` Python package. It is not yet
-called by the existing DOCX preparation pipelines.
-
-## Purpose
-
-The module is being integrated for issue #130 so Gurubodh can evaluate a local
-alternative to API-backed paragraph segmentation. It may support two related
-future needs:
-
-- display paragraphing for long chapter text that currently has no paragraphs;
-- candidate semantic chunks for later CMS ingestion and RAG workflows.
-
-## Runtime
-
-The Gurubodh CLI project now requires Python `>=3.12,<3.13`.
-
-Semantic chunking dependencies are installed with the main Gurubodh CLI
-package:
-
-```text
-numpy>=1.26,<2
-transformers>=4.41,<4.50
-sentence-transformers>=3.0,<4
-```
-
-`sentence-transformers` also brings heavier ML runtime dependencies. Semantic
-chunking requires `GURUBODH_MODEL_CACHE_DIR` to point at the local model cache
-before a command is run:
+Semantic chunking is installed with the `gurubodh` package and requires Python `>=3.12,<3.13`. Before a local model operation, set its cache location:
 
 ```bash
-export GURUBODH_MODEL_CACHE_DIR=~/.cache/huggingface/hub
+export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
 ```
 
-The BGE-M3 model is not loaded at import time or when lightweight config/parser
-objects are constructed. It is loaded lazily only when semantic chunking needs
-contextual similarity or tokenizer access, and one `SemanticChunker` instance
-reuses the loaded model across files in a run.
+The BGE-M3 model loads lazily only when contextual similarity or tokenization is required; reuse a chunker instance across documents. Maintained jobs require the immutable BGE-M3 revision `5617a9f61b028005a4858fdac845db406aefb181` and normally set `local_files_only: true`. Cache bootstrap and Docker use are documented in [R2 production runs](operations/r2-production-runs.md).
 
-## Python API
+## Experimental interface
 
-Use one `SemanticChunker` instance across many documents so the contextual
-similarity model is loaded only once:
+The package retains lower-level experimental helpers for local evaluation, but they are not exposed through the supported `gurubodh` command surface. Do not invoke an internal module for a maintained or publishable workflow; use the config-driven `generate-chunks` command instead.
 
-```python
-from gurubodh.ml.semantic_chunking import SemanticChunkConfig, SemanticChunker
+The internal output contract includes model/configuration metadata, zero-based end-exclusive character spans, chunk checksums, estimated BGE-M3 token counts, and a source/chunks checksum round trip. Existing output is intentionally protected unless a caller explicitly requests replacement. Finalized embedding vectors are not persisted.
 
-config = SemanticChunkConfig(
-    threshold_percentile=80,
-    min_chars=650,
-    window_size=3,
-)
-
-chunker = SemanticChunker(config)
-document = chunker.chunk_text(raw_text, source_name="chapter.txt")
-
-for chunk in document.chunks:
-    print(chunk.index, chunk.char_count, chunk.estimated_token_count, chunk.text)
-```
-
-## Standalone Evaluation
-
-For local experiments with `.txt` files:
-
-```bash
-gurubodh generate-chunks \
-  --source-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters/text_and_metadata \
-  --output-dir /Users/rajeev/Gurubodh_library/cms_library/39_aacharan_shaastra/chapters \
-  --model-name BAAI/bge-m3 \
-  --threshold-percentile 82 \
-  --min-chars 700 \
-  --window-size 3 \
-  --batch-size 16 \
-  --device cpu
-```
-
-This command writes exploratory JSON and Markdown outputs under
-`semantic_chunks_bge_m3/` inside the requested output directory. These outputs
-are not part of the existing content artifact contract. If that output directory
-already contains files, the command fails unless `--overwrite` is supplied.
-The command prints line-based progress while it runs, including model-cache
-resolution, model loading, per-chapter read/segment/validate/write steps, and
-final file/chunk totals.
-
-## Integration Boundary
-
-Current behavior returns chunk text, sentence ranges, exact zero-based
-end-exclusive character spans into the source text, provider/model metadata,
-per-chunk checksums, and `estimated_token_count` for each chunk. The token
-estimate is counted with the BGE-M3 tokenizer, without special tokens. It is
-not an API billing metric, and it is not exactly the token count used by the
-chunking algorithm, because breakpoint detection encodes overlapping contextual
-sentence windows. No finalized chunk vector is retained. Before writing a
-chapter's outputs, the command removes Python-recognized Unicode whitespace
-with `str.isspace()`, hashes
-the source text, hashes the ordered chunks, and requires those checksums to
-match.
-
-The config-driven `generate-chunks` command uses the `ParagraphSegmenter`
-boundary after validating its candidate manifest. Future embedding work should
-reuse the internal text-encoding helper rather than make generated candidate
-chunks own vectors.
+The token estimate is BGE-M3 input size without special tokens, not an API billing metric. It is distinct from the tokenization used by overlapping contextual windows while finding chunk boundaries.
