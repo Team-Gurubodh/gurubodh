@@ -3,6 +3,8 @@ import sys
 
 from gurubodh.docx.namespaces import register_namespaces
 from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
+from gurubodh.constants import ENTRY_POINT_LAB_PROOFREAD
+from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
 from gurubodh.pipelines.generate_docx import run_generate_docx_job
@@ -76,6 +78,27 @@ def build_parser():
     )
     add_common_options(generate_docx_parser)
 
+    lab_parser = subparsers.add_parser(
+        "lab",
+        help="Run explicitly non-canonical local experimentation commands.",
+        description="Run explicitly non-canonical local experimentation commands.",
+    )
+    lab_subparsers = lab_parser.add_subparsers(dest="lab_command", required=True)
+    lab_proofread_parser = lab_subparsers.add_parser(
+        "proofread",
+        help="Proofread one local DOCX into a distinct non-canonical lab run.",
+    )
+    lab_proofread_parser.add_argument(
+        "--source", required=True, help="Explicit local DOCX source to read without modifying."
+    )
+    lab_proofread_parser.add_argument("--locale", required=True, help="Proofreading locale: hi-IN or mr-IN.")
+    lab_proofread_parser.add_argument(
+        "--lab-root", required=True, help="Explicit root for non-canonical lab output."
+    )
+    lab_proofread_parser.add_argument(
+        "--project-root", help="Gurubodh CLI project root, used only for the bundled legacy converter."
+    )
+
     add_planned_command(subparsers, "regenerate-embeddings")
 
     compare_tokenizers_parser = subparsers.add_parser(
@@ -112,6 +135,17 @@ def main(argv=None):
 
     if args.command in PLANNED_COMMANDS:
         parser.error(f"{args.command} is planned but not implemented yet.")
+
+    if args.command == "lab" and args.lab_command == "proofread":
+        try:
+            context = resolve_project_context(args.project_root)
+            result = run_lab_proofread(
+                context, args.source, args.locale, args.lab_root, progress=print
+            )
+        except Exception as exc:
+            parser.error(str(exc))
+        print(f"lab proofread complete: {result['run_directory']}")
+        return
 
     if args.command == "generate-chunks":
         context = resolve_project_context(args.project_root)

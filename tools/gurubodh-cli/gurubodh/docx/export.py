@@ -55,7 +55,8 @@ def paragraph_values(text):
 
 def _set_font(style, size, language):
     style.font.name = FONT_NAME
-    style.font.size = Pt(size)
+    if size is not None:
+        style.font.size = Pt(size)
     rpr = style.element.get_or_add_rPr()
     fonts = rpr.get_or_add_rFonts()
     for attribute in ("ascii", "hAnsi", "eastAsia", "cs"):
@@ -110,7 +111,7 @@ def _normalize_package(path):
         normalized_path.unlink(missing_ok=True)
 
 
-def write_chapter_docx(path, text, title, language):
+def write_chapter_docx(path, text, title, language, heading_2_values=()):
     path = Path(path)
     values = paragraph_values(text)
     document = Document()
@@ -126,8 +127,10 @@ def write_chapter_docx(path, text, title, language):
         section.right_margin = Inches(MARGIN_INCHES)
     normal = document.styles["Normal"]
     title_style = document.styles["Title"]
+    heading_2_style = document.styles["Heading 2"]
     _set_font(normal, BODY_FONT_SIZE_PT, language)
     _set_font(title_style, TITLE_FONT_SIZE_PT, language)
+    _set_font(heading_2_style, None, language)
     normal.paragraph_format.space_after = Pt(BODY_SPACE_AFTER_PT)
     normal.paragraph_format.line_spacing = LINE_SPACING
     title_style.paragraph_format.space_after = Pt(TITLE_SPACE_AFTER_PT)
@@ -135,17 +138,18 @@ def write_chapter_docx(path, text, title, language):
     heading = document.add_paragraph(style="Title")
     _set_ltr(heading)
     _add_preserved_text(heading, title)
+    heading_2_text = frozenset(heading_2_values)
     for value in values:
-        paragraph = document.add_paragraph(style="Normal")
+        paragraph = document.add_paragraph(style="Heading 2" if value.strip() in heading_2_text else "Normal")
         _set_ltr(paragraph)
         _add_preserved_text(paragraph, value)
     path.parent.mkdir(parents=True, exist_ok=True)
     document.save(path)
     _normalize_package(path)
-    validate_chapter_docx(path, text, title)
+    validate_chapter_docx(path, text, title, heading_2_values=heading_2_values)
 
 
-def validate_chapter_docx(path, canonical_text, title):
+def validate_chapter_docx(path, canonical_text, title, heading_2_values=()):
     path = Path(path)
     if not zipfile.is_zipfile(path):
         raise ValueError(f"Generated DOCX is not a ZIP/OOXML package: {path}")
@@ -167,4 +171,9 @@ def validate_chapter_docx(path, canonical_text, title):
     reconstructed = "\n\n".join(actual_values) + "\n"
     if reconstructed != canonical_text:
         raise ValueError("Generated DOCX body fails the canonical artifact-final-newline round trip.")
+    heading_2_text = frozenset(heading_2_values)
+    for paragraph in document.paragraphs[1:]:
+        expected_heading = paragraph.text.strip() in heading_2_text
+        if expected_heading != (paragraph.style.name == "Heading 2"):
+            raise ValueError("Generated DOCX heading-2 mapping does not match the configured exact paragraphs.")
     return True

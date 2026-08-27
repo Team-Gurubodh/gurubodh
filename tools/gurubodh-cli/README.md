@@ -361,6 +361,43 @@ to write full-subject or chapter DOCX artifacts.
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --overwrite
 ```
 
+### Local lab proofreading
+
+`gurubodh lab proofread` is an explicitly non-canonical, local-only workflow
+for experimenting with one DOCX. It does not use a job JSON file and never
+writes to `cms_library/`, changes the supplied source, or writes beside it.
+Provide the source, a supported locale, and a non-canonical lab root explicitly:
+
+```bash
+gurubodh lab proofread \
+  --source /path/to/Gurubodh_library/lab/proofread/source-files/some_name.docx \
+  --locale hi-IN \
+  --lab-root /path/to/Gurubodh_library/lab
+```
+
+Only `hi-IN` and `mr-IN` are supported. The command detects supported APS and
+Shri-Lipi legacy fonts and converts them only in a temporary workspace under
+the lab run; Unicode DOCX is read directly. It makes one structured Gemini
+request, rejecting extracted text that exceeds the configured request limit
+before sending a request. Credentials remain environment-only via
+`GEMINI_API_KEY`.
+
+Every invocation starts with a distinct, readable ID such as
+`20260827-012049-690a55` under `<lab-root>/proofread/runs/active/`. The
+command prints that ID and path immediately, then atomically moves the run to
+`runs/succeeded/` or `runs/failed/` and prints the final path. A process that
+is interrupted before an outcome is recorded remains in `runs/active/` for
+operator review.
+The run-root `README.md` is the operator entry point and links to `output/`,
+`report/`, and `run_manifest.json`. `output/` contains
+`<source-stem>_proofread.docx` and `<source-stem>_proofread.txt`. The DOCX uses
+Heading 2 for paragraphs that exactly match `प्रबोधनातील स्मरणीय मुद्दे` or
+`स्वामी विश्वसंदेश`. Extracted source text, readable diff, structured
+proofreading details, and a human-readable report remain under `report/`.
+The manifest records source and generated-artifact SHA-256 values,
+locale/template provenance, command/package provenance, and the outcome. Lab
+artifacts are never canonical source text or CMS-ingestion input.
+
 ### Resuming an interrupted prep job
 
 Each successful chapter is written and checksum-validated in the staged

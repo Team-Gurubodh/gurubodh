@@ -13,6 +13,7 @@ class CliTests(unittest.TestCase):
             "prep-subject",
             "generate-chunks",
             "generate-docx",
+            "lab",
             "regenerate-embeddings",
             "compare-tokenizers",
             "update-metadata",
@@ -59,6 +60,19 @@ class CliTests(unittest.TestCase):
 
         self.assertIn("--overwrite", help_text)
         self.assertNotIn("--resume", help_text)
+
+    def test_lab_proofread_requires_explicit_source_locale_and_lab_root(self):
+        parser = build_parser()
+        lab = next(
+            action.choices["lab"]
+            for action in parser._actions
+            if hasattr(action, "choices") and action.choices and "lab" in action.choices
+        )
+        proofread = next(action.choices["proofread"] for action in lab._actions if getattr(action, "choices", None))
+        help_text = proofread.format_help()
+        self.assertIn("--source", help_text)
+        self.assertIn("--locale", help_text)
+        self.assertIn("--lab-root", help_text)
 
     def test_planned_command_exits_with_clear_message(self):
         stderr = StringIO()
