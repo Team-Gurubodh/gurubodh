@@ -175,6 +175,8 @@ def run_lab_proofread(
     source_path = Path(source).expanduser().resolve()
     run_id, run_dir = _run_directory(root)
     manifest = _base_manifest(run_id, run_dir, source_path, locale, context)
+    if progress:
+        progress(f"Lab proofread run ID: {run_id} (output: {run_dir})")
 
     try:
         if source_path.suffix.lower() != ".docx":

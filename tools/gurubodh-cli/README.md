@@ -384,6 +384,9 @@ before sending a request. Credentials remain environment-only via
 
 Every invocation creates a distinct, readable ID such as
 `20260827-012049-690a55` below `<lab-root>/proofread/runs/<run-id>/`.
+The command prints that run ID and its output path immediately when the run
+directory is created, including when a later validation or proofreading step
+fails.
 The run-root `README.md` is the operator entry point and links to `output/`,
 `report/`, and `run_manifest.json`. `output/` contains
 `<source-stem>_proofread.docx` and `<source-stem>_proofread.txt`. The DOCX uses

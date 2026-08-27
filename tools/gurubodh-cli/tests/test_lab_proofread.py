@@ -54,11 +54,15 @@ class LabProofreadTests(unittest.TestCase):
         source = self.source_docx()
         source_before = source.read_bytes()
         proofreader = FakeProofreader()
-        result = run_lab_proofread(self.context, source, "hi-IN", self.root / "lab", proofreader=proofreader)
+        progress = []
+        result = run_lab_proofread(
+            self.context, source, "hi-IN", self.root / "lab", proofreader=proofreader, progress=progress.append
+        )
 
         run_dir = result["run_directory"]
         self.assertTrue(run_dir.is_relative_to((self.root / "lab").resolve()))
         self.assertRegex(result["run_id"], r"^\d{8}-\d{6}-[a-f0-9]{6}$")
+        self.assertEqual(progress[0], f"Lab proofread run ID: {result['run_id']} (output: {run_dir})")
         self.assertEqual(source.read_bytes(), source_before)
         self.assertEqual(len(proofreader.calls), 1)
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
