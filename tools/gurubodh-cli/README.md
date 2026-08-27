@@ -361,6 +361,36 @@ to write full-subject or chapter DOCX artifacts.
 gurubodh prep-subject --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json --overwrite
 ```
 
+### Local lab proofreading
+
+`gurubodh lab proofread` is an explicitly non-canonical, local-only workflow
+for experimenting with one DOCX. It does not use a job JSON file and never
+writes to `cms_library/`, changes the supplied source, or writes beside it.
+Provide the source, a supported locale, and a non-canonical lab root explicitly:
+
+```bash
+gurubodh lab proofread \
+  --source /path/to/Gurubodh_library/lab/proofread/source-files/some_name.docx \
+  --locale hi-IN \
+  --lab-root /path/to/Gurubodh_library/lab
+```
+
+Only `hi-IN` and `mr-IN` are supported. The command detects supported APS and
+Shri-Lipi legacy fonts and converts them only in a temporary workspace under
+the lab run; Unicode DOCX is read directly. It makes one structured Gemini
+request, rejecting extracted text that exceeds the configured request limit
+before sending a request. Credentials remain environment-only via
+`GEMINI_API_KEY`.
+
+Every invocation creates a distinct directory below
+`<lab-root>/proofread/runs/<run-id>/` containing the corrected text and a
+newly rendered, validated DOCX under `output/`, extracted source text,
+readable diff, structured proofreading details, and a human-readable report
+under `report/`, plus `run_manifest.json`. The manifest records source and
+generated-artifact SHA-256 values, locale/template provenance, command/package
+provenance, and the outcome. Lab artifacts are never canonical source text or
+CMS-ingestion input.
+
 ### Resuming an interrupted prep job
 
 Each successful chapter is written and checksum-validated in the staged
