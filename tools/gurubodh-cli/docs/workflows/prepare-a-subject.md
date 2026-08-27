@@ -51,6 +51,6 @@ An overwrite replaces only preparation-owned paths after a complete candidate is
 
 ## Source handling and migration
 
-Unicode DOCX sources are read directly. Supported APS and Shri-Lipi sources are converted only in a transient workspace; canonical output is always UTF-8 Unicode text. See [Legacy DOCX conversion](../README-LEGACY-TO-UNICODE-CONVERSION-DOCX.md).
+Unicode DOCX sources are read directly. Supported APS and Shri-Lipi sources are converted only in a transient workspace; canonical output is always UTF-8 Unicode text. See [Legacy DOCX conversion](../reference/legacy-docx-conversion.md).
 
 Older Hindi artifacts directly below `cms_library/<subject-group>/` are legacy locations. The CLI does not move or delete them automatically. Regenerate and verify the language-qualified release, then deliberately archive or delete the legacy artifacts as an operator action.

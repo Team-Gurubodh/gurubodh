@@ -18,9 +18,9 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 ## Reference
 
 - [Reference index](reference/README.md) — job configuration, storage, and command-reference links.
-- [Legacy DOCX conversion](README-LEGACY-TO-UNICODE-CONVERSION-DOCX.md) — background and source conversion details.
-- [Semantic chunking](README-SEMANTIC-CHUNKING.md) — local model and standalone evaluation background.
-- [Legacy font mapping status](MAPPING-STATUS-AND-FUTURE-WORK.md) — implementation notes and known mapping risks; not an operator runbook.
+- [Legacy DOCX conversion](reference/legacy-docx-conversion.md) — source conversion details.
+- [Semantic chunking](reference/semantic-chunking.md) — local model and experimental-interface boundary.
+- [Legacy font mapping status](reference/legacy-font-mapping-status-and-future-work.md) — implementation notes and known mapping risks; not an operator runbook.
 
 ## Documentation convention
 

@@ -1,6 +1,6 @@
 # Legacy DOCX conversion
 
-`prep-subject` converts DOCX source files into Gurubodh canonical artifacts. This reference explains how it chooses its two supported source-handling pipelines; for normal operation, start with [Prepare a subject](workflows/prepare-a-subject.md).
+`prep-subject` converts DOCX source files into Gurubodh canonical artifacts. This reference explains how it chooses its two supported source-handling pipelines; for normal operation, start with [Prepare a subject](../workflows/prepare-a-subject.md).
 
 ## Source-handling pipelines
 
@@ -15,7 +15,7 @@ Canonical output is always UTF-8 Unicode text. Preparation does not publish a co
 
 ## Configuration
 
-Configured sources must be `.docx`. A preparation job declares source and destination, pipeline, supported source-font encoding, chapter split, naming, metadata defaults, locale, and a mandatory proofreading contract. Review [Job configurations](reference/job-configurations.md) and the current job schema before editing a maintained job.
+Configured sources must be `.docx`. A preparation job declares source and destination, pipeline, supported source-font encoding, chapter split, naming, metadata defaults, locale, and a mandatory proofreading contract. Review [Job configurations](job-configurations.md) and the current job schema before editing a maintained job.
 
 ```json
 {
@@ -34,4 +34,4 @@ The `subject_dir` is language-qualified. Legacy artifacts in an unqualified subj
 
 ## Project-root resolution
 
-Run jobs from `tools/gurubodh-cli`, or pass `--project-root` when elsewhere. The CLI otherwise uses `GURUBODH_CLI_ROOT` and then searches upward for both `config/jobs/prep_subject_job.schema.json` and `jobs/subjects/`. See [Getting started](getting-started.md) for examples.
+Run jobs from `tools/gurubodh-cli`, or pass `--project-root` when elsewhere. The CLI otherwise uses `GURUBODH_CLI_ROOT` and then searches upward for both `config/jobs/prep_subject_job.schema.json` and `jobs/subjects/`. See [Getting started](../getting-started.md) for examples.

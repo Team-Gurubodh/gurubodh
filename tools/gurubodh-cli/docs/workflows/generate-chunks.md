@@ -31,4 +31,4 @@ Chunk artifacts bind back to canonical content through checksums and content ide
 
 Without `--overwrite`, an existing chunk output fails preflight. With it, only the command-owned semantic-chunk output (and the legacy combined-output location when present) is replaced. Do not run another writer for that subject and locale at the same time.
 
-For an exploratory directory-based run rather than a maintained job, see [Semantic chunking](../README-SEMANTIC-CHUNKING.md). Those results are non-canonical and are not preparation artifacts.
+For the lower-level experimental boundary, see [Semantic chunking](../reference/semantic-chunking.md). Those results are non-canonical and are not preparation artifacts.
