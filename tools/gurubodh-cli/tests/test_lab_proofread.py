@@ -61,12 +61,17 @@ class LabProofreadTests(unittest.TestCase):
 
         run_dir = result["run_directory"]
         self.assertTrue(run_dir.is_relative_to((self.root / "lab").resolve()))
+        self.assertEqual(run_dir.parent.name, "succeeded")
         self.assertRegex(result["run_id"], r"^\d{8}-\d{6}-[a-f0-9]{6}$")
-        self.assertEqual(progress[0], f"Lab proofread run ID: {result['run_id']} (output: {run_dir})")
+        active_dir = run_dir.parent.parent / "active" / result["run_id"]
+        self.assertEqual(progress[0], f"Lab proofread run ID: {result['run_id']} (output: {active_dir})")
+        self.assertEqual(progress[-1], f"Lab proofread run succeeded: {run_dir}")
+        self.assertFalse(active_dir.exists())
         self.assertEqual(source.read_bytes(), source_before)
         self.assertEqual(len(proofreader.calls), 1)
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
         self.assertEqual(manifest["outcome"], "succeeded")
+        self.assertEqual(manifest["run_directory"], str(run_dir))
         self.assertTrue(manifest["non_canonical"])
         self.assertEqual(manifest["source"]["sha256"], hashlib.sha256(source_before).hexdigest())
         self.assertEqual(manifest["source"]["font_encoding"], "unicode")
@@ -131,6 +136,7 @@ class LabProofreadTests(unittest.TestCase):
         source = self.source_docx(text="बहुत लंबा पाठ")
         before = source.read_bytes()
         proofreader = FakeProofreader()
+        progress = []
         with self.assertRaisesRegex(ProofreadingError, "configured proofreading limit"):
             run_lab_proofread(
                 self.context,
@@ -139,12 +145,19 @@ class LabProofreadTests(unittest.TestCase):
                 self.root / "lab",
                 proofreader=proofreader,
                 settings=ProofreadingSettings(max_input_characters=5),
+                progress=progress.append,
             )
         self.assertEqual(proofreader.calls, [])
         self.assertEqual(source.read_bytes(), before)
-        manifests = list((self.root / "lab" / "proofread" / "runs").glob("*/run_manifest.json"))
+        runs = self.root / "lab" / "proofread" / "runs"
+        manifests = list((runs / "failed").glob("*/run_manifest.json"))
         self.assertEqual(len(manifests), 1)
-        self.assertEqual(json.loads(manifests[0].read_text(encoding="utf-8"))["outcome"], "failed")
+        failed_dir = manifests[0].parent.resolve()
+        manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+        self.assertEqual(manifest["outcome"], "failed")
+        self.assertEqual(manifest["run_directory"], str(failed_dir))
+        self.assertEqual(list((runs / "active").iterdir()), [])
+        self.assertEqual(progress[-1], f"Lab proofread run failed: {failed_dir}")
 
     def test_rejects_canonical_lab_root_and_invalid_locale(self):
         source = self.source_docx()

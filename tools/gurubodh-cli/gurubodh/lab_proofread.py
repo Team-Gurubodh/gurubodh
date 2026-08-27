@@ -55,12 +55,19 @@ def _run_directory(lab_root: Path) -> tuple[str, Path]:
     readable_time = f"{timestamp[:10].replace('-', '')}-{timestamp[11:19].replace(':', '')}"
     while True:
         run_id = f"{readable_time}-{uuid.uuid4().hex[:6]}"
-        run_dir = lab_root / "proofread" / "runs" / run_id
+        run_dir = lab_root / "proofread" / "runs" / "active" / run_id
         try:
             run_dir.mkdir(parents=True, exist_ok=False)
         except FileExistsError:
             continue
         return run_id, run_dir
+
+
+def _finalize_run(run_dir: Path, outcome: str) -> Path:
+    """Atomically move an active run into its terminal outcome directory."""
+    final_dir = run_dir.parent.parent / outcome / run_dir.name
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
+    return run_dir.replace(final_dir)
 
 
 def _relative_path(run_dir: Path, path: Path) -> str:
@@ -289,8 +296,16 @@ def run_lab_proofread(
     except Exception as exc:
         manifest["outcome"] = "failed"
         manifest["error"] = str(exc)
-        _write_final_reports(run_dir, manifest)
+        final_dir = _finalize_run(run_dir, "failed")
+        manifest["run_directory"] = str(final_dir)
+        _write_final_reports(final_dir, manifest)
+        if progress:
+            progress(f"Lab proofread run failed: {final_dir}")
         raise
 
-    manifest_path = _write_final_reports(run_dir, manifest)
-    return {"run_id": run_id, "run_directory": run_dir, "manifest_path": manifest_path}
+    final_dir = _finalize_run(run_dir, "succeeded")
+    manifest["run_directory"] = str(final_dir)
+    manifest_path = _write_final_reports(final_dir, manifest)
+    if progress:
+        progress(f"Lab proofread run succeeded: {final_dir}")
+    return {"run_id": run_id, "run_directory": final_dir, "manifest_path": manifest_path}
