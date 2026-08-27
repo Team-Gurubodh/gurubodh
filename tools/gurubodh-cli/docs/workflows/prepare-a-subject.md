@@ -4,8 +4,9 @@
 
 ## Run a maintained job
 
+After configuring `GEMINI_API_KEY` as described in [Environment setup](../environment-setup.md), run:
+
 ```bash
-export GEMINI_API_KEY=...
 gurubodh prep-subject \
   --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```

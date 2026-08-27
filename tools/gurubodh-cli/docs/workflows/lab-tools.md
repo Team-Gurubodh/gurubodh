@@ -4,8 +4,9 @@
 
 ## Proofread one DOCX
 
+After configuring `GEMINI_API_KEY` as described in [Environment setup](../environment-setup.md), run:
+
 ```bash
-export GEMINI_API_KEY=...
 gurubodh lab proofread \
   --source /path/to/lab/proofread/source-files/example.docx \
   --locale hi-IN \

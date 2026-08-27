@@ -16,7 +16,7 @@ gurubodh prep-subject \
   --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
 ```
 
-This prepares canonical, proofread chapter artifacts locally. It needs an environment-only Gemini API key. Do not add credentials to a job file, command history, image, or repository configuration. See [Getting started](docs/getting-started.md) before using `--overwrite`, R2, or an unfamiliar job.
+This prepares canonical, proofread chapter artifacts locally. It needs an environment-only Gemini API key. Do not add credentials to a job file, command history, image, or repository configuration. See [Environment setup](docs/environment-setup.md) for the runtime and variables, and [Getting started](docs/getting-started.md) before using `--overwrite`, R2, or an unfamiliar job.
 
 ## What you can do today
 
@@ -41,6 +41,7 @@ source DOCX → prep-subject → canonical chapter artifacts
 ## Choose the right guide
 
 - New contributor or first local run: [Getting started](docs/getting-started.md)
+- Runtime, credentials, model cache, or Docker setup: [Environment setup](docs/environment-setup.md)
 - Normal content preparation: [Prepare a subject](docs/workflows/prepare-a-subject.md)
 - Chunk generation and the pinned local model cache: [Generate chunks](docs/workflows/generate-chunks.md)
 - Rebuildable chapter Word exports: [Generate DOCX exports](docs/workflows/generate-docx.md)

@@ -4,13 +4,7 @@ Semantic chunking groups Hindi and Marathi chapter text into coherent chunks. Ma
 
 ## Runtime and model cache
 
-Semantic chunking is installed with the `gurubodh` package and requires Python `>=3.12,<3.13`. Before a local model operation, set its cache location:
-
-```bash
-export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
-```
-
-The BGE-M3 model loads lazily only when contextual similarity or tokenization is required; reuse a chunker instance across documents. Maintained jobs require the immutable BGE-M3 revision `5617a9f61b028005a4858fdac845db406aefb181` and normally set `local_files_only: true`. Cache bootstrap and Docker use are documented in [R2 production runs](../operations/r2-production-runs.md).
+Semantic chunking is installed with the `gurubodh` package and requires Python `>=3.12,<3.13`. The BGE-M3 model loads lazily only when contextual similarity or tokenization is required; reuse a chunker instance across documents. Model-cache location, immutable revision, cached-only behavior, and Docker safeguards are defined in [Environment setup](../environment-setup.md).
 
 ## Experimental interface
 

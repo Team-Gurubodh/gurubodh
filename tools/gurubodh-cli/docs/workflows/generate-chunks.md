@@ -8,12 +8,13 @@
 - A maintained job whose source and destination use the same language-qualified `subject_dir` and whose `naming.language` matches the manifest.
 - The exact pinned BGE-M3 model snapshot in the configured local cache.
 
-Maintained jobs use the immutable BGE-M3 revision `5617a9f61b028005a4858fdac845db406aefb181` with `local_files_only: true`. Bootstrap or repair the cache deliberately before the job; normal jobs do not perform an unexpected model lookup. Full cache and container guidance is in [R2 production runs](../operations/r2-production-runs.md).
+Configure and, when necessary, deliberately bootstrap that cache through [Environment setup](../environment-setup.md). Maintained jobs use cached-only loading, so a normal job never silently repairs or replaces its model files.
 
 ## Run a local job
 
+After setting `GURUBODH_MODEL_CACHE_DIR` through [Environment setup](../environment-setup.md), run:
+
 ```bash
-export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
 gurubodh generate-chunks \
   --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```

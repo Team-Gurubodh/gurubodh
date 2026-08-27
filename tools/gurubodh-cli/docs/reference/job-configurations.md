@@ -22,15 +22,7 @@ cms_library/<subject-group>/<language>/
 
 ## Credentials
 
-R2 jobs receive credentials from the calling environment:
-
-```bash
-export CLOUDFLARE_R2_ACCOUNT_ID=...
-export CLOUDFLARE_R2_ACCESS_KEY_ID=...
-export CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
-```
-
-Preparation and lab proofreading read `GEMINI_API_KEY` from the environment. Do not put these values in JSON, documentation, images, shell history, or the repository.
+Credentials are environment-only: preparation and lab proofreading use Gemini, while R2 jobs use the Cloudflare R2 variables. Their names, scopes, and secret-handling rules are defined in [Environment setup](../environment-setup.md). Do not put a credential in a job file.
 
 ## Schema and artifact references
 

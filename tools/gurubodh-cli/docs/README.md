@@ -4,6 +4,7 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 
 ## First steps and workflows
 
+- [Environment setup](environment-setup.md) — runtimes, credentials, model cache, Docker variables, and setup failures.
 - [Getting started](getting-started.md) — install the CLI, understand job locations, and perform a safe local preparation run.
 - [Prepare a subject](workflows/prepare-a-subject.md) — canonical preparation, proofreading, resume, and replacement behavior.
 - [Generate chunks](workflows/generate-chunks.md) — derive semantic chunks from a prepared release.
