@@ -398,6 +398,39 @@ The manifest records source and generated-artifact SHA-256 values,
 locale/template provenance, command/package provenance, and the outcome. Lab
 artifacts are never canonical source text or CMS-ingestion input.
 
+### Local lab DOCX assembly
+
+`gurubodh lab assemble-docx` and `gurubodh lab append-docx` are explicitly
+non-canonical, local-only utilities for controlled DOCX files created by
+`generate-docx`. They do not use a job JSON file or project-root option, and
+they are not general-purpose Word document mergers. The original canonical text
+and generated chapter exports remain authoritative and unchanged.
+
+To assemble the direct DOCX children of a directory, in case-insensitive
+natural filename order, run:
+
+```bash
+gurubodh lab assemble-docx /path/to/chapters/msword /path/to/combined.docx
+```
+
+The command ignores `~$` Word temporary files and the output itself when it is
+inside the input directory. It copies each existing document body, including
+its title paragraph, with a page break between documents. Existing outputs
+require `--overwrite`. Inputs are validated before a sibling temporary file is
+validated and atomically published.
+
+To append one controlled export to another while preserving the source file:
+
+```bash
+gurubodh lab append-docx /path/to/source.docx /path/to/destination.docx
+```
+
+Appending inserts a page break by default. Use `--no-page-break` to omit it;
+`--page-break` explicitly selects the default. Source text and paragraph
+structure are retained, while copied paragraphs use the destination DOCX's
+title/body style template and font definitions. The destination is replaced
+only after its assembled temporary DOCX validates successfully.
+
 ### Resuming an interrupted prep job
 
 Each successful chapter is written and checksum-validated in the staged

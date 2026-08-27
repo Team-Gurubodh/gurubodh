@@ -74,6 +74,27 @@ class CliTests(unittest.TestCase):
         self.assertIn("--locale", help_text)
         self.assertIn("--lab-root", help_text)
 
+    def test_lab_docx_commands_have_required_arguments_and_page_break_validation(self):
+        parser = build_parser()
+        lab = next(
+            action.choices["lab"]
+            for action in parser._actions
+            if hasattr(action, "choices") and action.choices and "lab" in action.choices
+        )
+        lab_commands = next(action.choices for action in lab._actions if getattr(action, "choices", None))
+        assemble_help = lab_commands["assemble-docx"].format_help()
+        append_help = lab_commands["append-docx"].format_help()
+
+        self.assertIn("input_directory", assemble_help)
+        self.assertIn("output", assemble_help)
+        self.assertIn("--overwrite", assemble_help)
+        self.assertIn("source", append_help)
+        self.assertIn("destination", append_help)
+        self.assertIn("--page-break", append_help)
+        self.assertIn("--no-page-break", append_help)
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            parser.parse_args(["lab", "append-docx", "a.docx", "b.docx", "--page-break", "--no-page-break"])
+
     def test_planned_command_exits_with_clear_message(self):
         stderr = StringIO()
 

@@ -4,6 +4,7 @@ import sys
 from gurubodh.docx.namespaces import register_namespaces
 from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
 from gurubodh.constants import ENTRY_POINT_LAB_PROOFREAD
+from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
@@ -98,6 +99,28 @@ def build_parser():
     lab_proofread_parser.add_argument(
         "--project-root", help="Gurubodh CLI project root, used only for the bundled legacy converter."
     )
+    lab_assemble_docx_parser = lab_subparsers.add_parser(
+        "assemble-docx",
+        help="Assemble controlled local Gurubodh DOCX exports into one non-canonical DOCX.",
+    )
+    lab_assemble_docx_parser.add_argument("input_directory", help="Directory containing direct-child DOCX exports.")
+    lab_assemble_docx_parser.add_argument("output", help="Local DOCX file to create.")
+    lab_assemble_docx_parser.add_argument(
+        "--overwrite", action="store_true", help="Replace an existing output DOCX."
+    )
+    lab_append_docx_parser = lab_subparsers.add_parser(
+        "append-docx",
+        help="Append one controlled local Gurubodh DOCX export to another non-canonically.",
+    )
+    lab_append_docx_parser.add_argument("source", help="Local DOCX export to append.")
+    lab_append_docx_parser.add_argument("destination", help="Local DOCX export to replace atomically.")
+    page_break_group = lab_append_docx_parser.add_mutually_exclusive_group()
+    page_break_group.add_argument(
+        "--page-break", dest="page_break", action="store_true", default=True, help="Insert a page break before the appended content (default)."
+    )
+    page_break_group.add_argument(
+        "--no-page-break", dest="page_break", action="store_false", help="Append without a page break."
+    )
 
     add_planned_command(subparsers, "regenerate-embeddings")
 
@@ -145,6 +168,29 @@ def main(argv=None):
         except Exception as exc:
             parser.error(str(exc))
         print(f"lab proofread complete: {result['run_directory']}")
+        return
+
+    if args.command == "lab" and args.lab_command == "assemble-docx":
+        try:
+            result = run_lab_assemble_docx(args.input_directory, args.output, overwrite=args.overwrite)
+        except Exception as exc:
+            parser.error(str(exc))
+        print("lab assemble-docx sources:")
+        for source in result["sources"]:
+            print(f"- {source}")
+        print(f"lab assemble-docx complete: {len(result['sources'])} document(s) -> {result['output']}")
+        return
+
+    if args.command == "lab" and args.lab_command == "append-docx":
+        try:
+            result = run_lab_append_docx(args.source, args.destination, page_break=args.page_break)
+        except Exception as exc:
+            parser.error(str(exc))
+        print(f"lab append-docx source: {result['source']}")
+        print(
+            f"lab append-docx complete: {result['destination']} "
+            f"(page break: {'yes' if result['page_break'] else 'no'})"
+        )
         return
 
     if args.command == "generate-chunks":
