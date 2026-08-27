@@ -9,7 +9,7 @@ from unittest.mock import patch
 from docx import Document
 
 from gurubodh.docx.export import validate_chapter_docx
-from gurubodh.lab_proofread import run_lab_proofread
+from gurubodh.lab_proofread import LAB_HEADING_2_PARAGRAPHS, run_lab_proofread
 from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
 from gurubodh.project import ProjectContext
 
@@ -58,6 +58,7 @@ class LabProofreadTests(unittest.TestCase):
 
         run_dir = result["run_directory"]
         self.assertTrue(run_dir.is_relative_to((self.root / "lab").resolve()))
+        self.assertRegex(result["run_id"], r"^\d{8}-\d{6}-[a-f0-9]{6}$")
         self.assertEqual(source.read_bytes(), source_before)
         self.assertEqual(len(proofreader.calls), 1)
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
@@ -68,12 +69,15 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(manifest["locale"]["language"], "hi-IN")
         self.assertEqual(manifest["command"]["name"], "lab proofread")
         self.assertTrue((run_dir / "report" / "extracted_source.txt").is_file())
-        self.assertTrue((run_dir / "output" / "corrected_proofread.txt").is_file())
+        self.assertTrue((run_dir / "output" / "source_proofread.txt").is_file())
+        self.assertTrue((run_dir / "output" / "source_proofread.docx").is_file())
+        self.assertTrue((run_dir / "output" / "README.md").is_file())
         self.assertTrue((run_dir / "report" / "proofreading.diff.txt").is_file())
         self.assertTrue((run_dir / "report" / "proofreading_details.json").is_file())
-        corrected = (run_dir / "output" / "corrected_proofread.txt").read_text(encoding="utf-8")
-        validate_chapter_docx(run_dir / "output" / "corrected_proofread.docx", corrected, "source: proofread")
-        self.assertEqual(Document(run_dir / "output" / "corrected_proofread.docx").paragraphs[1].text, "यह सही वाक्य है।")
+        corrected = (run_dir / "output" / "source_proofread.txt").read_text(encoding="utf-8")
+        validate_chapter_docx(run_dir / "output" / "source_proofread.docx", corrected, "source: proofread")
+        self.assertEqual(Document(run_dir / "output" / "source_proofread.docx").paragraphs[1].text, "यह सही वाक्य है।")
+        self.assertIn("non-canonical", (run_dir / "output" / "README.md").read_text(encoding="utf-8"))
         for relative, expected_sha256 in manifest["artifact_sha256"].items():
             self.assertEqual(hashlib.sha256((run_dir / relative).read_bytes()).hexdigest(), expected_sha256)
 
@@ -83,6 +87,21 @@ class LabProofreadTests(unittest.TestCase):
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
         self.assertEqual(manifest["locale"]["language"], "mr-IN")
         self.assertEqual(manifest["locale"]["instruction_template"]["id"], "mr-IN-proofreading")
+
+    def test_exact_configured_marathi_paragraphs_render_as_heading_2(self):
+        source = self.root / "source.docx"
+        document = Document()
+        document.add_paragraph("प्रबोधनातील स्मरणीय मुद्दे")
+        document.add_paragraph("स्वामी विश्वसंदेश")
+        document.add_paragraph("ही सामान्य ओळ आहे।")
+        document.save(source)
+        result = run_lab_proofread(self.context, source, "mr-IN", self.root / "lab", proofreader=FakeProofreader())
+        output = result["run_directory"] / "output"
+        corrected = (output / "source_proofread.txt").read_text(encoding="utf-8")
+        docx_path = output / "source_proofread.docx"
+        validate_chapter_docx(docx_path, corrected, "source: proofread", LAB_HEADING_2_PARAGRAPHS)
+        paragraphs = Document(docx_path).paragraphs[1:]
+        self.assertEqual([paragraph.style.name for paragraph in paragraphs], ["Heading 2", "Heading 2", "Normal"])
 
     def test_legacy_font_source_uses_transient_conversion_path(self):
         source = self.source_docx(text="fdn")
@@ -128,4 +147,3 @@ class LabProofreadTests(unittest.TestCase):
             run_lab_proofread(self.context, source, "hi-IN", self.root / "cms_library")
         with self.assertRaisesRegex(ValueError, "Unsupported language"):
             run_lab_proofread(self.context, source, "en-IN", self.root / "lab")
-

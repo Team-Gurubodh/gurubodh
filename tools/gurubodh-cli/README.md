@@ -382,14 +382,17 @@ request, rejecting extracted text that exceeds the configured request limit
 before sending a request. Credentials remain environment-only via
 `GEMINI_API_KEY`.
 
-Every invocation creates a distinct directory below
-`<lab-root>/proofread/runs/<run-id>/` containing the corrected text and a
-newly rendered, validated DOCX under `output/`, extracted source text,
-readable diff, structured proofreading details, and a human-readable report
-under `report/`, plus `run_manifest.json`. The manifest records source and
-generated-artifact SHA-256 values, locale/template provenance, command/package
-provenance, and the outcome. Lab artifacts are never canonical source text or
-CMS-ingestion input.
+Every invocation creates a distinct, readable ID such as
+`20260827-012049-690a55` below `<lab-root>/proofread/runs/<run-id>/`.
+`output/` contains `<source-stem>_proofread.docx`,
+`<source-stem>_proofread.txt`, and an operator README linking to the main
+output and review artifacts. The DOCX uses Heading 2 for paragraphs that
+exactly match `प्रबोधनातील स्मरणीय मुद्दे` or `स्वामी विश्वसंदेश`.
+Extracted source text, readable diff, structured proofreading details, and a
+human-readable report remain under `report/`, with `run_manifest.json` at the
+run root. The manifest records source and generated-artifact SHA-256 values,
+locale/template provenance, command/package provenance, and the outcome. Lab
+artifacts are never canonical source text or CMS-ingestion input.
 
 ### Resuming an interrupted prep job
 

@@ -27,6 +27,7 @@ from gurubodh.time_utils import utc_now
 
 COMMAND_NAME = "lab proofread"
 MANIFEST_SCHEMA_VERSION = 1
+LAB_HEADING_2_PARAGRAPHS = frozenset(("प्रबोधनातील स्मरणीय मुद्दे", "स्वामी विश्वसंदेश"))
 
 
 def _sha256(path: Path) -> str:
@@ -50,10 +51,16 @@ def _safe_lab_root(lab_root: str | Path) -> Path:
 
 
 def _run_directory(lab_root: Path) -> tuple[str, Path]:
-    run_id = f"{utc_now().replace(':', '').replace('-', '').replace('+00:00', 'Z')}-{uuid.uuid4().hex}"
-    run_dir = lab_root / "proofread" / "runs" / run_id
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_id, run_dir
+    timestamp = utc_now()
+    readable_time = f"{timestamp[:10].replace('-', '')}-{timestamp[11:19].replace(':', '')}"
+    while True:
+        run_id = f"{readable_time}-{uuid.uuid4().hex[:6]}"
+        run_dir = lab_root / "proofread" / "runs" / run_id
+        try:
+            run_dir.mkdir(parents=True, exist_ok=False)
+        except FileExistsError:
+            continue
+        return run_id, run_dir
 
 
 def _relative_path(run_dir: Path, path: Path) -> str:
@@ -130,6 +137,24 @@ def _write_final_reports(run_dir: Path, manifest: dict[str, Any]) -> Path:
     return manifest_path
 
 
+def _output_readme(manifest: dict[str, Any]) -> str:
+    output = manifest["output"]
+    return "\n".join(
+        (
+            "# Corrected proofreading output",
+            "",
+            f"- Source: `{Path(manifest['source']['path']).name}`",
+            f"- Locale: `{manifest['locale']['language']}`",
+            f"- Corrected DOCX: [`{Path(output['corrected_docx']).name}`]({Path(output['corrected_docx']).name})",
+            f"- Corrected text: [`{Path(output['corrected_text']).name}`]({Path(output['corrected_text']).name})",
+            f"- Readable diff: [`{output['readable_diff']}`](../{output['readable_diff']})",
+            f"- Structured details: [`{output['structured_details']}`](../{output['structured_details']})",
+            "",
+            "This is a non-canonical lab artifact. It must not be used as CMS source content.",
+        )
+    ) + "\n"
+
+
 def run_lab_proofread(
     context: Any,
     source: str | Path,
@@ -198,7 +223,8 @@ def run_lab_proofread(
             source_text, progress=progress
         )
         corrected_text = _canonical_text(response["corrected_text"])
-        corrected_text_path = run_dir / "output" / "corrected_proofread.txt"
+        output_stem = f"{source_path.stem}_proofread"
+        corrected_text_path = run_dir / "output" / f"{output_stem}.txt"
         _write_text(corrected_text_path, corrected_text)
         diff_text, diff_summary = word_level_diff(source_text, corrected_text)
         diff_path = run_dir / "report" / "proofreading.diff.txt"
@@ -232,8 +258,14 @@ def run_lab_proofread(
             },
         )
         title = f"{source_path.stem}: proofread"
-        corrected_docx_path = run_dir / "output" / "corrected_proofread.docx"
-        write_chapter_docx(corrected_docx_path, corrected_text, title, locale.language)
+        corrected_docx_path = run_dir / "output" / f"{output_stem}.docx"
+        write_chapter_docx(
+            corrected_docx_path,
+            corrected_text,
+            title,
+            locale.language,
+            heading_2_values=LAB_HEADING_2_PARAGRAPHS,
+        )
         manifest.update(
             {
                 "outcome": "succeeded",
@@ -243,11 +275,13 @@ def run_lab_proofread(
                     "corrected_docx": _relative_path(run_dir, corrected_docx_path),
                     "docx_title": title,
                     "formatting": formatting_defaults(),
+                    "heading_2_exact_paragraphs": sorted(LAB_HEADING_2_PARAGRAPHS),
                     "structured_details": _relative_path(run_dir, details_path),
                     "readable_diff": _relative_path(run_dir, diff_path),
                 },
             }
         )
+        _write_text(run_dir / "output" / "README.md", _output_readme(manifest))
     except Exception as exc:
         manifest["outcome"] = "failed"
         manifest["error"] = str(exc)
