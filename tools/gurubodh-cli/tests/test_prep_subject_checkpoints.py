@@ -403,9 +403,45 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 },
             )
             self.assertEqual(report["run_metrics"]["r2_object_upload_requests"]["attempts_total"], 12)
+            self.assertEqual(
+                report["run_metrics"]["r2_object_upload_requests"]["breakdown"],
+                {
+                    "checkpoint_source_snapshots": {
+                        "attempts_total": 2,
+                        "attempts_succeeded": 2,
+                        "attempts_failed": 0,
+                        "definition": "Initial retained source snapshots committed with the chapter plan.",
+                    },
+                    "checkpoint_chapter_artifacts": {
+                        "attempts_total": 4,
+                        "attempts_succeeded": 4,
+                        "attempts_failed": 0,
+                        "definition": "New canonical text, metadata, diff, and provenance artifacts from successful chapters.",
+                    },
+                    "checkpoint_state_commits": {
+                        "attempts_total": 6,
+                        "attempts_succeeded": 6,
+                        "attempts_failed": 0,
+                        "definition": "Job-state JSON commits for checkpoint, publication, workspace, or advisory-lease transitions.",
+                    },
+                    "checkpoint_state_archives": {
+                        "attempts_total": 0,
+                        "attempts_succeeded": 0,
+                        "attempts_failed": 0,
+                        "definition": "Prior job-state archives created by --overwrite.",
+                    },
+                    "canonical_publication_artifacts": {
+                        "attempts_total": 0,
+                        "attempts_succeeded": 0,
+                        "attempts_failed": 0,
+                        "definition": "Final canonical prep artifacts and readiness manifests published from the workspace.",
+                    },
+                },
+            )
             markdown_key = report_key.removesuffix(".json") + ".md"
             self.assertIn("## Run metrics", client.objects[markdown_key].decode("utf-8"))
             self.assertIn("R2 object-upload request attempts", client.objects[markdown_key].decode("utf-8"))
+            self.assertIn("### R2 upload breakdown", client.objects[markdown_key].decode("utf-8"))
 
             # Simulate a crash after chapter 001 artifacts uploaded but before
             # their state commit. Resumption must reconcile them without a new

@@ -61,6 +61,17 @@ WORK_RELATIVE_DIR = Path(".work") / "prep-subject"
 PREP_REPORT_RELATIVE_DIR = Path("run_reports") / "prep-subject"
 LEASE_SECONDS = 120
 INFRASTRUCTURE_FAILURE_CIRCUIT_BREAKER = 2
+R2_UPLOAD_BREAKDOWN_DEFINITIONS = {
+    "checkpoint_source_snapshots": "Initial retained source snapshots committed with the chapter plan.",
+    "checkpoint_chapter_artifacts": "New canonical text, metadata, diff, and provenance artifacts from successful chapters.",
+    "checkpoint_state_commits": "Job-state JSON commits for checkpoint, publication, workspace, or advisory-lease transitions.",
+    "checkpoint_state_archives": "Prior job-state archives created by --overwrite.",
+    "canonical_publication_artifacts": "Final canonical prep artifacts and readiness manifests published from the workspace.",
+}
+
+
+def _attempt_counters() -> dict[str, int]:
+    return {"attempts_total": 0, "attempts_succeeded": 0, "attempts_failed": 0}
 
 
 def _sha256(path: Path) -> str:
@@ -148,15 +159,15 @@ class PrepCheckpointManager:
         self.state: dict[str, Any] | None = None
         self.metrics = {
             "gemini_generate_content_requests": {
-                "attempts_total": 0,
-                "attempts_succeeded": 0,
-                "attempts_failed": 0,
+                **_attempt_counters(),
             },
             "r2_object_upload_requests": (
                 {
-                    "attempts_total": 0,
-                    "attempts_succeeded": 0,
-                    "attempts_failed": 0,
+                    **_attempt_counters(),
+                    "breakdown": {
+                        category: _attempt_counters()
+                        for category in R2_UPLOAD_BREAKDOWN_DEFINITIONS
+                    },
                 }
                 if is_r2(self.destination)
                 else None
@@ -262,6 +273,7 @@ class PrepCheckpointManager:
         self._upload_r2_file(
             archive_path,
             destination_object_key(self.config, archive_relative),
+            category="checkpoint_state_archives",
         )
         self.client.delete_prefix(
             self.destination["bucket"],
@@ -386,7 +398,12 @@ class PrepCheckpointManager:
         # R2 heartbeats are deliberately in-memory only. The lease is advisory,
         # and a progress signal must not become a workspace scan or state commit.
 
-    def persist(self, checkpoint_artifacts: list[Path] | None = None, count_r2_uploads: bool = True) -> None:
+    def persist(
+        self,
+        checkpoint_artifacts: list[Path] | None = None,
+        checkpoint_artifact_category: str | None = None,
+        count_r2_uploads: bool = True,
+    ) -> None:
         if not self.state:
             return
         self.state["updated_at"] = utc_now()
@@ -398,6 +415,7 @@ class PrepCheckpointManager:
                 self._upload_r2_file(
                     path,
                     destination_object_key(self.config, relative),
+                    category=checkpoint_artifact_category,
                     count_r2_uploads=count_r2_uploads,
                 )
             # The job state is the commit record, and must be uploaded after all
@@ -405,21 +423,34 @@ class PrepCheckpointManager:
             self._upload_r2_file(
                 self.state_path,
                 destination_object_key(self.config, JOB_STATE_RELATIVE_PATH),
+                category="checkpoint_state_commits",
                 count_r2_uploads=count_r2_uploads,
             )
 
-    def _upload_r2_file(self, path: Path, key: str, *, count_r2_uploads: bool = True) -> None:
+    def _upload_r2_file(
+        self,
+        path: Path,
+        key: str,
+        *,
+        category: str | None = None,
+        count_r2_uploads: bool = True,
+    ) -> None:
         counters = self.metrics["r2_object_upload_requests"]
         if count_r2_uploads and counters is not None:
+            if category not in R2_UPLOAD_BREAKDOWN_DEFINITIONS:
+                raise RuntimeError(f"Missing or invalid R2 upload metric category: {category!r}")
             counters["attempts_total"] += 1
+            counters["breakdown"][category]["attempts_total"] += 1
         try:
             upload_r2_file(self.client, self.destination, path, key)
         except BaseException:
             if count_r2_uploads and counters is not None:
                 counters["attempts_failed"] += 1
+                counters["breakdown"][category]["attempts_failed"] += 1
             raise
         if count_r2_uploads and counters is not None:
             counters["attempts_succeeded"] += 1
+            counters["breakdown"][category]["attempts_succeeded"] += 1
 
     def materialize_source(self) -> Path:
         path, self.source_temp_dir = materialize_source(
@@ -449,7 +480,10 @@ class PrepCheckpointManager:
             )
         self.state["chapters"] = chapters
         self.state["preparation"] = preparation
-        self.persist(checkpoint_artifacts=source_paths)
+        self.persist(
+            checkpoint_artifacts=source_paths,
+            checkpoint_artifact_category="checkpoint_source_snapshots",
+        )
 
     def discard_transient_preparation(self) -> None:
         """Remove a prepared full-subject working DOCX after snapshots are durable."""
@@ -617,7 +651,8 @@ class PrepCheckpointManager:
                 # Source snapshots are committed once with the chapter plan.
                 # A chapter success commits only newly generated durable output.
                 if not str(record["path"]).startswith("chapters/unmodified_source_text/")
-            ]
+            ],
+            checkpoint_artifact_category="checkpoint_chapter_artifacts",
         )
 
     def mark_chapter_failure(self, chapter: dict[str, Any], exc: BaseException) -> None:
@@ -784,7 +819,7 @@ class PrepCheckpointManager:
                 )
         uploads.sort(key=lambda item: item[0].relative_to(self.workspace_dir) == manifest_relative)
         for path, key in uploads:
-            self._upload_r2_file(path, key)
+            self._upload_r2_file(path, key, category="canonical_publication_artifacts")
         if self.overwrite:
             uploaded_keys = {key for _, key in uploads}
             stale_keys = []
@@ -923,11 +958,22 @@ class PrepCheckpointManager:
             },
             "r2_object_upload_requests": (
                 {
-                    **self.metrics["r2_object_upload_requests"],
+                    **{
+                        key: value
+                        for key, value in self.metrics["r2_object_upload_requests"].items()
+                        if key != "breakdown"
+                    },
                     "definition": (
                         "R2 object-upload request attempts in this invocation caused by checkpoint commits or "
                         "canonical prep publication; excludes reads, lists, deletes, and audit-report uploads."
                     ),
+                    "breakdown": {
+                        category: {
+                            **counters,
+                            "definition": R2_UPLOAD_BREAKDOWN_DEFINITIONS[category],
+                        }
+                        for category, counters in self.metrics["r2_object_upload_requests"]["breakdown"].items()
+                    },
                 }
                 if self.metrics["r2_object_upload_requests"] is not None
                 else None
@@ -1006,6 +1052,20 @@ def _render_report_markdown(report: dict[str, Any]) -> str:
             "- R2 object-upload request attempts: "
             f"`{r2['attempts_total']}` total, `{r2['attempts_succeeded']}` succeeded, "
             f"`{r2['attempts_failed']}` failed. {r2['definition']}"
+        )
+        lines.extend(
+            [
+                "",
+                "### R2 upload breakdown",
+                "",
+                "| Category | Total | Succeeded | Failed |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        lines.extend(
+            f"| {category} — {counters['definition']} | {counters['attempts_total']} | "
+            f"{counters['attempts_succeeded']} | {counters['attempts_failed']} |"
+            for category, counters in r2["breakdown"].items()
         )
     if report["failure"]:
         lines.extend(["", "## Failure", "", f"- {report['failure']['code']}: {report['failure']['message']}"])
