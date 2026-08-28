@@ -204,7 +204,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 )
                 self.assertEqual(result["status"], "succeeded")
                 self.assertIn(expected, output.getvalue())
+                self.assertTrue(output.getvalue().startswith("=" * 72 + "\n"))
                 self.assertIn("WARNING: prep-subject is single-writer per destination.", output.getvalue())
+                self.assertIn("checkpoint/workspace artifacts.\n", output.getvalue())
                 self.assertIn("prep-subject metrics: Gemini generate_content attempts 2 (2 succeeded, 0 failed).", output.getvalue())
 
             subject = root / "subject" / "hi-IN"
