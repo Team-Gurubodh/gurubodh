@@ -1128,7 +1128,7 @@ def run_resumable_prep_job(
             "\n".join(
                 (
                     "=" * 72,
-                    "WARNING: prep-subject is single-writer per destination.",
+                    "IMPORTANT: prep-subject is single-writer per destination.",
                     "Run only one local or R2 writer for this subject at a time.",
                     "Concurrent runs can duplicate Gemini calls and overwrite",
                     "checkpoint/workspace artifacts.",
