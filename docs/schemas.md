@@ -53,8 +53,10 @@
   generated chapter text. If omitted, summary chapter detection is disabled for
   that job.
 - Chapter metadata includes `integrity.artifacts.text` for the SHA-256 checksum
-  of the generated chapter `.txt` artifact bytes. It does not checksum the
-  metadata JSON artifact.
+  of the generated canonical chapter `.txt` artifact bytes: UTF-8 with no CR
+  bytes, LF internal line boundaries, and exactly one final LF. It does not
+  checksum the metadata JSON artifact. This exact-byte integrity contract is
+  distinct from content identity's v1 comparison normalization.
 - Chapter metadata schema `1.4.0` contains only canonical metadata/text names
   in `files` and only canonical metadata/text references in
   `storage.artifacts`. DOCX and full-subject fields from schema `1.3.0` are not

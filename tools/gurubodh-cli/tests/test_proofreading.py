@@ -312,6 +312,55 @@ class ProofreadingTests(unittest.TestCase):
             proof_manifest = json.loads((paths["proofreading"] / "proofreading_manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(proof_manifest["proofreading_locale"]["language"], "hi-IN")
 
+    def test_proofreading_normalizes_canonical_text_to_lf_only_bytes(self):
+        class MixedLineEndingProofreader:
+            def proofread(self, text, progress=None):
+                return {
+                    "corrected_text": "पहला\r\nदूसरा\rतीसरा\r\n",
+                    "edits": [],
+                    "estimated_input_tokens": 20,
+                    "attempts": 1,
+                    "throttle_seconds": 0,
+                    "usage": {"input_tokens": 10},
+                }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config = {
+                "pipeline": "unicode-docx-ingest",
+                "source": {"backend": "local", "root_dir": temp_dir, "relative_path": "source.docx", "font_encoding": "unicode", "file_format": "docx"},
+                "destination": {"backend": "local", "root_dir": temp_dir, "subject_dir": "subject/hi-IN"},
+                "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01"},
+                "metadata_defaults": {"language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
+                "_proofreading_config": self.settings(),
+            }
+            paths = destination_paths_for_subject(root / "subject")
+            ensure_job_dirs(paths)
+            source_path = paths["unmodified_source_text"] / chapter_unmodified_source_filename(config, 1)
+            source_path.write_bytes("पहला स्रोत।\n".encode("utf-8"))
+
+            proofread_chapter_artifacts(config, paths, proofreader=MixedLineEndingProofreader())
+
+            text_path = paths["text_and_metadata"] / chapter_output_filename(config, 1, ".txt")
+            text_bytes = text_path.read_bytes()
+            expected_bytes = "पहला\nदूसरा\nतीसरा\n".encode("utf-8")
+            self.assertEqual(text_bytes, expected_bytes)
+            self.assertNotIn(b"\r", text_bytes)
+            self.assertTrue(text_bytes.endswith(b"\n"))
+            self.assertFalse(text_bytes.endswith(b"\n\n"))
+
+            metadata_path = text_path.with_suffix(".json")
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            expected_text = expected_bytes.decode("utf-8").removesuffix("\n")
+            self.assertEqual(metadata["integrity"]["artifacts"]["text"]["value"], hashlib.sha256(text_bytes).hexdigest())
+            self.assertEqual(metadata["content_identity"], build_content_identity("CAT001", "SUB123", "hi-IN", expected_text))
+            details_path = paths["proofreading"] / f"{text_path.stem}.proofread.json"
+            details = json.loads(details_path.read_text(encoding="utf-8"))
+            self.assertEqual(details["canonical_corrected"]["text_sha256"], hashlib.sha256(text_bytes).hexdigest())
+
+            manifest = json.loads(write_chapter_content_manifest(config, paths).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["chapters"][0]["content_key"], metadata["content_identity"]["content_key"])
+
     def test_proofreading_failure_does_not_write_canonical_artifacts_or_a_manifest(self):
         class FailingProofreader:
             def proofread(self, text, progress=None):
