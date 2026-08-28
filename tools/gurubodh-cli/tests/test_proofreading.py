@@ -216,7 +216,26 @@ class ProofreadingTests(unittest.TestCase):
         result = proofreader.proofread("यह गलत है।")
 
         self.assertEqual(result["attempts"], 2)
+        self.assertEqual(result["successful_request_attempts"], 1)
+        self.assertEqual(result["failed_request_attempts"], 1)
         self.assertEqual(delays, [1.0])
+
+    def test_terminal_api_failure_records_every_request_attempt(self):
+        client = FakeClient([HttpError(503), HttpError(503)])
+        proofreader = GeminiProofreader(
+            self.settings(max_retries=1),
+            locale=locale_spec("hi-IN"),
+            client=client,
+            types_module=FakeTypes,
+            sleep=lambda _: None,
+            random_value=lambda: 0,
+        )
+
+        with self.assertRaises(ProofreadingError) as raised:
+            proofreader.proofread("यह गलत है।")
+
+        self.assertEqual(raised.exception.request_attempts, 2)
+        self.assertEqual(raised.exception.successful_request_attempts, 0)
 
     def test_proofreader_reports_provider_retry_delay_to_operator(self):
         client = FakeClient([

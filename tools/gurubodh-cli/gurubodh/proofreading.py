@@ -52,11 +52,23 @@ EDIT_LIST_SCHEMA = {
 
 
 class ProofreadingError(RuntimeError):
-    def __init__(self, code: str, message: str, retryable: bool = False, retry_after_seconds: float | None = None):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        retryable: bool = False,
+        retry_after_seconds: float | None = None,
+        request_attempts: int = 0,
+        successful_request_attempts: int = 0,
+    ):
         super().__init__(message)
         self.code = code
         self.retryable = retryable
         self.retry_after_seconds = retry_after_seconds
+        # These are deliberately request-level counters, not chapter counters.
+        # They let resumable callers audit retries and terminal API failures.
+        self.request_attempts = request_attempts
+        self.successful_request_attempts = successful_request_attempts
 
 
 @dataclass(frozen=True)
@@ -329,7 +341,14 @@ class GeminiProofreader:
                     contents=f"<source-text>\n{text}\n</source-text>",
                     config=self._config(),
                 )
-                corrected, edits = _validated_response(response.text, text)
+                try:
+                    corrected, edits = _validated_response(response.text, text)
+                except ProofreadingError as exc:
+                    # The request itself completed even if its response violated
+                    # the proofreading contract.
+                    exc.request_attempts = attempts
+                    exc.successful_request_attempts = 1
+                    raise
                 if progress:
                     progress("Gemini response received; validating and writing canonical artifacts.")
                 return {
@@ -337,6 +356,8 @@ class GeminiProofreader:
                     "edits": edits,
                     "estimated_input_tokens": estimated_tokens,
                     "attempts": attempts,
+                    "successful_request_attempts": 1,
+                    "failed_request_attempts": attempts - 1,
                     "throttle_seconds": round(total_throttle_seconds, 3),
                     "usage": usage_summary(getattr(response, "usage_metadata", None)),
                 }
@@ -348,7 +369,12 @@ class GeminiProofreader:
                 if not retryable or attempts > self.settings.max_retries:
                     code = "rate_limited" if status_code == 429 else "api_error"
                     detail = _api_error_detail(exc, status_code)
-                    raise ProofreadingError(code, f"Gemini proofreading request failed ({detail}).", retryable=retryable) from exc
+                    raise ProofreadingError(
+                        code,
+                        f"Gemini proofreading request failed ({detail}).",
+                        retryable=retryable,
+                        request_attempts=attempts,
+                    ) from exc
                 retry_after = _retry_after_seconds(exc)
                 delay = retry_after if retry_after is not None else min(
                     self.settings.max_retry_delay_seconds,
@@ -537,6 +563,10 @@ def proofread_single_chapter_artifacts(
         "chapter_number": f"{chapter_number:03d}",
         "status": "succeeded",
         "correction_count": len(response["edits"]),
+        # Internal checkpoint bookkeeping. The caller removes this before
+        # recording canonical chapter provenance.
+        "gemini_request_attempts": response["attempts"],
+        "gemini_successful_request_attempts": response.get("successful_request_attempts", response["attempts"]),
         "local_diff_summary": diff_summary,
         "unmodified_source_content_key": source_identity["content_key"],
         "canonical_content_key": metadata["content_identity"]["content_key"],
@@ -639,6 +669,8 @@ def proofread_chapter_artifacts(
         # caller has no checkpoint state to persist, so keep that internal
         # bookkeeping field out of its returned manifest/result.
         chapter.pop("checkpoint_artifacts", None)
+        chapter.pop("gemini_request_attempts", None)
+        chapter.pop("gemini_successful_request_attempts", None)
         result["chapters"].append(chapter)
         result["counts"]["succeeded"] += 1
         if progress:

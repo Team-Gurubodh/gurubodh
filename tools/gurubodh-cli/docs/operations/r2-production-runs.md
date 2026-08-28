@@ -21,6 +21,8 @@ The image runs as a non-root user and contains Python 3.12, Node for the APS con
 
 Complete [Environment setup](../environment-setup.md) for R2 credentials, Gemini scope, named-volume creation, `HF_HUB_OFFLINE=1`, and secret-handling rules. Use a maintained `.r2.json` job and an immutable image reference.
 
+`prep-subject` has one writer per destination. Its R2 advisory lease is only a guardrail and does not provide reliable distributed mutual exclusion. Do not overlap runners for the same subject and locale: they can duplicate Gemini requests and overwrite checkpoint/workspace artifacts.
+
 ## Bootstrap the model cache
 
 Only R2 chunk generation needs the BGE-M3 cache. After creating `gurubodh-bge-m3-cache` as described in [Environment setup](../environment-setup.md), prepare or repair it explicitly using the exact snapshot required by maintained jobs:

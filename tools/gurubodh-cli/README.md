@@ -53,7 +53,7 @@ source DOCX → prep-subject → canonical chapter artifacts
 
 - Start with a `.local.json` maintained job. R2 jobs and Docker are for operators who have read the production runbook.
 - Treat `--overwrite` as a deliberate replacement operation. It is scoped to the invoking command's artifacts, but it is not an atomic, versioned R2 release.
-- Never run two writers for the same subject and locale concurrently.
+- `prep-subject` is a single-writer operation per destination. The local advisory lock and R2 advisory lease are guardrails only, not reliable distributed mutual exclusion; concurrent runs can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
 - Run `gurubodh <command> --help` for the exact installed command interface; job schemas under `config/jobs/` define the machine-validated configuration.
 
 ## Documentation map
