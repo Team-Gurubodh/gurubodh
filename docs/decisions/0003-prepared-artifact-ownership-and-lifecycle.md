@@ -54,8 +54,9 @@ replacement, same-locale `chapters/msword/`, both v2 semantic artifacts, and
 the legacy `chapters/semantic_chunks_and_embeddings/` path are invalidated, with an
 operator notice to regenerate derived outputs; legacy `full_subject/` is
 removed. The legacy semantic path is unsupported
-for new ingestion; `generate-chunks --overwrite` removes it before creating
-v2 output. Local and R2 replacement are not a fully atomic multi-prefix
+for new ingestion; `generate-chunks --overwrite` preserves it during preflight,
+staged generation, staged validation, and source revalidation, then records its
+cleanup after successful v2 publication. Local and R2 replacement are not a fully atomic multi-prefix
 release; versioned releases and a current pointer are deferred.
 
 ## Rationale
@@ -72,6 +73,9 @@ They must also rerun `generate-docx` if chapter DOCX exports are required.
 `generate-docx --overwrite` replaces only its complete `chapters/msword/` set;
 local publication uses staged directory replacement, while R2 removes the old
 readiness manifest before replacement and publishes the new manifest last.
+`generate-chunks` uses the same staged state machine, local swap, source
+revalidation, readiness-manifest-last R2 publication, and durable success/failure
+audit lifecycle. R2 remains readiness-based rather than atomic.
 Old incomplete six-file prep checkpoints cannot
 resume under the text-only five-file contract and require `--overwrite`;
 already succeeded releases remain consumable by downstream commands.

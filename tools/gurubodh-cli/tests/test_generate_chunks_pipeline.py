@@ -5,6 +5,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from gurubodh.config import load_generate_chunks_job
 from gurubodh.content_identity import build_content_identity
@@ -122,6 +123,81 @@ def write_candidate_manifest(root_dir, config, chapters):
     return path, payload
 
 
+def r2_release(chapter_texts):
+    config = base_config("unused")
+    location = {
+        "backend": "r2",
+        "bucket": "gurubodh-library-dev",
+        "prefix": "cms_library",
+        "subject_dir": "123_spand_rahasya/hi-IN",
+        "url_base": None,
+    }
+    config["source"] = dict(location)
+    config["destination"] = dict(location)
+    metadata_items = [
+        metadata_for(config, index, value, "r2")
+        for index, value in enumerate(chapter_texts, start=1)
+    ]
+    manifest = {
+        "schema_version": 1,
+        "identity_contract_version": 1,
+        "subject": {
+            "category_code": "CAT001",
+            "subject_code": "SUB123",
+            "language": "hi-IN",
+        },
+        "chapters": [
+            {
+                "generated_chapter_number": metadata["document"]["chapter_number"],
+                "content_key": metadata["content_identity"]["content_key"],
+                "normalized_content_sha256": metadata["content_identity"]["normalized_content_sha256"],
+                "metadata_artifact": metadata["storage"]["artifacts"]["metadata"],
+                "text_artifact": metadata["storage"]["artifacts"]["text"],
+            }
+            for metadata in metadata_items
+        ],
+    }
+    manifest_text = json.dumps(manifest, ensure_ascii=False)
+    root = "cms_library/123_spand_rahasya/hi-IN"
+    objects = {
+        f"{root}/chapters/chapter_content_manifest.json": manifest_text,
+        f"{root}/run_state/prep-subject/job-state.json": json.dumps(
+            {
+                "schema_version": 1,
+                "job_id": "test-job",
+                "state": "succeeded",
+                "publication": {
+                    "state": "succeeded",
+                    "canonical_manifest": {
+                        "sha256": hashlib.sha256(manifest_text.encode("utf-8")).hexdigest(),
+                        "chapter_numbers": [
+                            metadata["document"]["chapter_number"]
+                            for metadata in metadata_items
+                        ],
+                    },
+                },
+                "chapters": [
+                    {
+                        "chapter_number": metadata["document"]["chapter_number"],
+                        "state": "succeeded",
+                        "proofreading": {
+                            "canonical_content_key": metadata["content_identity"]["content_key"]
+                        },
+                    }
+                    for metadata in metadata_items
+                ],
+            },
+            ensure_ascii=False,
+        ),
+    }
+    for metadata, text_value in zip(metadata_items, chapter_texts):
+        objects[metadata["storage"]["artifacts"]["metadata"]["key"]] = json.dumps(
+            metadata, ensure_ascii=False
+        )
+        objects[metadata["storage"]["artifacts"]["text"]["key"]] = text_value
+    return config, objects
+
+
 class FakeSegmenter:
     provider_metadata = {}
 
@@ -146,9 +222,11 @@ class FakeSegmenter:
 
 
 class FakeR2Client:
-    def __init__(self, objects):
+    def __init__(self, objects, fail_chunk_upload=False):
         self.objects = dict(objects)
+        self.fail_chunk_upload = fail_chunk_upload
         self.downloads, self.uploads, self.deleted_prefixes = [], [], []
+        self.events = []
 
     def list_keys(self, bucket, prefix):
         return sorted(key for key in self.objects if key.startswith(prefix))
@@ -166,10 +244,20 @@ class FakeR2Client:
 
     def upload_file(self, path, bucket, key):
         self.uploads.append(key)
+        self.events.append(("upload", key))
+        if self.fail_chunk_upload and key.endswith(".chunks.json"):
+            raise RuntimeError("simulated chunk upload failure")
         self.objects[key] = Path(path).read_text(encoding="utf-8")
+
+    def delete_keys(self, bucket, keys):
+        self.events.append(("delete_keys", tuple(keys)))
+        for key in keys:
+            self.objects.pop(key, None)
+        return list(keys)
 
     def delete_prefix(self, bucket, prefix):
         self.deleted_prefixes.append(prefix)
+        self.events.append(("delete_prefix", prefix))
         deleted = [key for key in self.objects if key.startswith(prefix)]
         for key in deleted:
             del self.objects[key]
@@ -221,7 +309,9 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertNotIn("dense_embedding", rendered)
         self.assertNotIn('"embedding"', rendered)
         self.assertNotIn("embedding", json.dumps(semantic_manifest, ensure_ascii=False))
-        self.assertNotIn("embedding", json.dumps(audit, ensure_ascii=False))
+        rendered_audit = json.dumps(audit, ensure_ascii=False)
+        self.assertNotIn("dense_embedding", rendered_audit)
+        self.assertNotIn('"embedding":', rendered_audit)
         self.assertEqual(payload["source_references"]["candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
         self.assertEqual(semantic_manifest["source_candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
         self.assertEqual(semantic_manifest["chapters"][0]["chunk_artifact_sha256"], hashlib.sha256(chunk_path.read_bytes()).hexdigest())
@@ -320,7 +410,14 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         config["chapters"] = ["003"]
         loaded, config_path = self.load(config)
         with self.assertRaisesRegex(SystemExit, "absent from the candidate manifest"):
-            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
+            run_generate_chunks_job(
+                self.context,
+                loaded,
+                overwrite=True,
+                config_path=config_path,
+                segmenter=FakeSegmenter(),
+                progress=lambda _: None,
+            )
 
     def test_legacy_output_requires_overwrite_and_is_removed(self):
         config = base_config(self.temp_dir.name)
@@ -354,6 +451,145 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "latest prep-subject job is not succeeded"):
             run_generate_chunks_job(self.context, loaded, overwrite=True, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
         self.assertTrue(previous.is_file())
+
+    def test_generation_failure_on_overwrite_preserves_chunks_and_audits_lifecycle_state(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        output = subject / "chapters" / "semantic_chunks"
+        output.mkdir(parents=True)
+        previous = output / "previous.chunks.json"
+        previous.write_text("previous", encoding="utf-8")
+        loaded, config_path = self.load(config)
+        segmenter = FakeSegmenter()
+
+        with patch.object(segmenter, "segment", side_effect=RuntimeError("model failed")):
+            with self.assertRaisesRegex(RuntimeError, "model failed"):
+                run_generate_chunks_job(
+                    self.context,
+                    loaded,
+                    overwrite=True,
+                    config_path=config_path,
+                    segmenter=segmenter,
+                    progress=lambda _: None,
+                )
+
+        self.assertEqual(previous.read_text(encoding="utf-8"), "previous")
+        report = json.loads(
+            next((subject / "run_reports" / "generate-chunks").glob("*.json")).read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(report["run_identity"]["status"], "failed")
+        self.assertEqual(report["failure"]["state"], "generation")
+        self.assertEqual(report["chapters"][0]["status"], "failed")
+
+    def test_staged_validation_and_source_revalidation_preserve_existing_chunks(self):
+        for failing_state in ("staged_validation", "source_revalidation"):
+            with self.subTest(failing_state=failing_state):
+                root = Path(self.temp_dir.name) / failing_state
+                config = base_config(root)
+                metadata = write_prepared_chapter(root, config, 1)
+                write_candidate_manifest(root, config, [metadata])
+                subject = root / config["source"]["subject_dir"]
+                output = subject / "chapters" / "semantic_chunks"
+                output.mkdir(parents=True)
+                previous = output / "previous.chunks.json"
+                previous.write_text("previous", encoding="utf-8")
+                loaded, config_path = self.load(config)
+                target = (
+                    "gurubodh.pipelines.generate_chunks.validate_chunk_staged_package"
+                    if failing_state == "staged_validation"
+                    else "gurubodh.pipelines.generate_chunks.revalidate_source_release"
+                )
+                with patch(target, side_effect=RuntimeError(f"{failing_state} failed")):
+                    with self.assertRaisesRegex(RuntimeError, f"{failing_state} failed"):
+                        run_generate_chunks_job(
+                            self.context,
+                            loaded,
+                            overwrite=True,
+                            config_path=config_path,
+                            segmenter=FakeSegmenter(),
+                            progress=lambda _: None,
+                        )
+                self.assertEqual(previous.read_text(encoding="utf-8"), "previous")
+                report = json.loads(
+                    next((subject / "run_reports" / "generate-chunks").glob("*.json")).read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(report["failure"]["state"], failing_state)
+
+    def test_r2_overwrite_publishes_chunk_manifest_last_and_preserves_other_commands(self):
+        config, objects = r2_release(["पहला।\n"])
+        root = "cms_library/123_spand_rahasya/hi-IN"
+        manifest_key = f"{root}/chapters/semantic_chunks/semantic_chunks_manifest.json"
+        old_chunk = f"{root}/chapters/semantic_chunks/old.chunks.json"
+        docx = f"{root}/chapters/msword/keep.docx"
+        objects.update({manifest_key: "old manifest", old_chunk: "old", docx: "keep"})
+        client = FakeR2Client(objects)
+        loaded, config_path = self.load(config)
+
+        result = run_generate_chunks_job(
+            self.context,
+            loaded,
+            overwrite=True,
+            config_path=config_path,
+            segmenter=FakeSegmenter(),
+            r2_client=client,
+            progress=lambda _: None,
+        )
+
+        output_uploads = [
+            key
+            for event, key in client.events
+            if event == "upload" and "/chapters/semantic_chunks/" in key
+        ]
+        self.assertEqual(output_uploads[-1], manifest_key)
+        delete_index = next(
+            index
+            for index, event in enumerate(client.events)
+            if event[0] == "delete_keys" and manifest_key in event[1]
+        )
+        first_upload_index = next(
+            index
+            for index, event in enumerate(client.events)
+            if event[0] == "upload" and event[1].endswith(".chunks.json")
+        )
+        self.assertLess(delete_index, first_upload_index)
+        self.assertEqual(client.objects[docx], "keep")
+        self.assertTrue(result["publication"]["manifest_published_last"])
+
+    def test_r2_chunk_upload_failure_removes_readiness_and_uploads_failure_audit(self):
+        config, objects = r2_release(["पहला।\n"])
+        root = "cms_library/123_spand_rahasya/hi-IN"
+        manifest_key = f"{root}/chapters/semantic_chunks/semantic_chunks_manifest.json"
+        objects[manifest_key] = "old manifest"
+        client = FakeR2Client(objects, fail_chunk_upload=True)
+        loaded, config_path = self.load(config)
+
+        with self.assertRaisesRegex(SystemExit, "simulated chunk upload failure"):
+            run_generate_chunks_job(
+                self.context,
+                loaded,
+                overwrite=True,
+                config_path=config_path,
+                segmenter=FakeSegmenter(),
+                r2_client=client,
+                progress=lambda _: None,
+            )
+
+        self.assertNotIn(manifest_key, client.objects)
+        failure_reports = [
+            value
+            for key, value in client.objects.items()
+            if "/run_reports/generate-chunks/" in key and key.endswith(".json")
+        ]
+        self.assertEqual(len(failure_reports), 1)
+        report = json.loads(failure_reports[0])
+        self.assertEqual(report["failure"]["state"], "publication")
+        self.assertEqual(report["publication"]["status"], "failed")
 
     def test_r2_materializes_only_selected_manifest_artifacts(self):
         config = base_config(self.temp_dir.name)
@@ -405,6 +641,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             f"{prefix}/chapter_content_manifest.json",
             metadata_two["storage"]["artifacts"]["metadata"]["key"],
             metadata_two["storage"]["artifacts"]["text"]["key"],
+            "cms_library/123_spand_rahasya/hi-IN/run_state/prep-subject/job-state.json",
+            f"{prefix}/chapter_content_manifest.json",
             "cms_library/123_spand_rahasya/hi-IN/run_state/prep-subject/job-state.json",
         ])
         self.assertTrue(any("/chapters/semantic_chunks/" in key for key in client.uploads))

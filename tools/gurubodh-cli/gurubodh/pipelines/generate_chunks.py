@@ -2,14 +2,13 @@
 
 import hashlib
 import json
-import shutil
-import tempfile
 from pathlib import Path
 
 from gurubodh.canonical_source import (
     CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH,
     TEXT_AND_METADATA_RELATIVE_DIR,
     materialize_source_subject,
+    revalidate_source_release,
     validate_materialized_release,
 )
 from gurubodh.constants import (
@@ -18,6 +17,13 @@ from gurubodh.constants import (
     SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
     SEMANTIC_CHUNKS_OUTPUT_DIR,
 )
+from gurubodh.derived_artifact_lifecycle import (
+    AuditResult,
+    DerivedArtifactDefinition,
+    SourceRelease,
+    destination_subject_dir,
+    run_derived_artifact_lifecycle,
+)
 from gurubodh.generate_chunks_audit import GenerateChunksAuditWriter
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
@@ -25,14 +31,10 @@ from gurubodh.ml.semantic_chunking.segmenter import ParagraphSegmenter, Semantic
 from gurubodh.naming import chapter_chunks_output_filename
 from gurubodh.storage import (
     CHUNKS_REPORT_DIR,
-    R2StorageClient,
     destination_artifact_reference,
-    is_local,
     is_r2,
     optional_url,
-    r2_existing_artifacts_error,
     subject_artifact_object_key,
-    upload_r2_file,
 )
 
 
@@ -40,107 +42,8 @@ SEMANTIC_CHUNKS_RELATIVE_DIR = Path("chapters") / SEMANTIC_CHUNKS_OUTPUT_DIR
 LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
 
 
-def run_generate_chunks_job(
-    context, config, entry_point=ENTRY_POINT_GENERATE_CHUNKS, overwrite=False,
-    config_path=None, segmenter: ParagraphSegmenter | None = None, r2_client=None, progress=print,
-):
-    semantic_config = config["_semantic_chunk_config"]
-    client = r2_client if (is_r2(config["source"]) or is_r2(config["destination"])) else None
-    if client is None and (is_r2(config["source"]) or is_r2(config["destination"])):
-        client = R2StorageClient.from_env()
-    job = prepare_generate_chunks_job(config, overwrite, r2_client=client, progress=progress)
-    try:
-        # Every source check completed before the lazy segmenter can load a model.
-        segmenter = segmenter or SemanticChunkingParagraphSegmenter(semantic_config, progress=progress)
-        result = write_chunk_artifacts(config, job, semantic_config, segmenter, progress=progress)
-        audit = GenerateChunksAuditWriter(context, config_path, config, entry_point, overwrite, job, result)
-        result["audit_report_references"] = audit_report_references(config, audit.paths)
-        write_chunk_manifest(job["paths"]["chunk_manifest"], config, job, semantic_config, result)
-        progress("[manifest] wrote semantic_chunks_manifest.json")
-        if is_r2(config["destination"]):
-            audit.write_r2_pending()
-            publish_generate_chunks_r2(config, job, overwrite, r2_client=client, before_upload=audit.before_r2_upload)
-            audit.announce_locations()
-        else:
-            audit.write_local_success()
-        return result
-    finally:
-        cleanup_job(job)
-
-
-def prepare_generate_chunks_job(config, overwrite, r2_client=None, progress=print):
-    source_subject, source_temp_dir, candidate_manifest = materialize_source_subject(
-        config, "generate-chunks", r2_client, progress
-    )
-    candidate_sources = validate_materialized_release(
-        config, source_subject, candidate_manifest, "generate-chunks", r2_client
-    )
-    destination_subject, destination_temp_dir = destination_subject_dir(config)
-    preflight = ensure_destination_available(config, destination_subject, overwrite, r2_client)
-    paths = {
-        "source_subject": source_subject,
-        "source_text_and_metadata": source_subject / TEXT_AND_METADATA_RELATIVE_DIR,
-        "candidate_manifest": source_subject / CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH,
-        "destination_subject": destination_subject,
-        "semantic_chunks": destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR,
-        "chunk_manifest": destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR / "semantic_chunks_manifest.json",
-    }
-    paths["semantic_chunks"].mkdir(parents=True, exist_ok=True)
-    return {
-        "paths": paths, "candidate_sources": candidate_sources, "candidate_manifest": candidate_manifest,
-        "source_temp_dir": source_temp_dir, "destination_temp_dir": destination_temp_dir,
-        "destination_preflight": preflight, "destination_output_prefix": destination_output_prefix(config),
-    }
-
-
-def destination_subject_dir(config):
-    destination = config["destination"]
-    if is_local(destination):
-        return Path(destination["root_dir"]).expanduser() / destination["subject_dir"], None
-    temp_dir = tempfile.TemporaryDirectory(prefix="gurubodh-generate-chunks-output-")
-    return Path(temp_dir.name) / destination["subject_dir"], temp_dir
-
-
 def destination_output_prefix(config):
     return subject_artifact_object_key(config["destination"], SEMANTIC_CHUNKS_RELATIVE_DIR) + "/" if is_r2(config["destination"]) else None
-
-
-def legacy_output_prefix(config):
-    return subject_artifact_object_key(config["destination"], LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR) + "/" if is_r2(config["destination"]) else None
-
-
-def ensure_destination_available(config, destination_subject, overwrite, r2_client=None):
-    destination = config["destination"]
-    if is_local(destination):
-        output_dir, legacy_dir = destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR, destination_subject / LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR
-        existing = [path for path in (output_dir, legacy_dir) if path.exists()]
-        if existing and not overwrite:
-            if legacy_dir.exists():
-                raise SystemExit(f"Legacy combined semantic chunk/vector output exists and is unsupported: {legacy_dir}. Re-run with --overwrite to generate v2 semantic chunks.")
-            raise SystemExit(f"Semantic chunk output already exists. Re-run with --overwrite to replace: {output_dir}")
-        removed = []
-        if overwrite:
-            for path in (output_dir, legacy_dir):
-                if path.is_dir():
-                    shutil.rmtree(path)
-                    removed.append(str(path))
-                elif path.exists():
-                    path.unlink()
-                    removed.append(str(path))
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return {"backend": "local", "status": "replaced_for_overwrite" if removed else "passed", "path": str(output_dir), "legacy_path": str(legacy_dir), "existed_before_run": bool(existing), "removed_for_overwrite": bool(removed), "removed_paths": removed}
-    client = r2_client or R2StorageClient.from_env()
-    v2_prefix, legacy_prefix = destination_output_prefix(config), legacy_output_prefix(config)
-    exists_v2, exists_legacy = client.prefix_has_objects(destination["bucket"], v2_prefix), client.prefix_has_objects(destination["bucket"], legacy_prefix)
-    if (exists_v2 or exists_legacy) and not overwrite:
-        prefixes = [prefix for prefix, exists in ((v2_prefix, exists_v2), (legacy_prefix, exists_legacy)) if exists]
-        label = "legacy combined semantic chunk/vector output" if exists_legacy else "semantic chunk output"
-        raise SystemExit(r2_existing_artifacts_error("generate-chunks", destination["bucket"], prefixes, label))
-    deleted = []
-    if overwrite:
-        deleted.extend(client.delete_prefix(destination["bucket"], v2_prefix))
-        deleted.extend(client.delete_prefix(destination["bucket"], legacy_prefix))
-    return {"backend": "r2", "status": "deleted_for_overwrite" if deleted else "passed", "bucket": destination["bucket"], "prefix": v2_prefix, "legacy_prefix": legacy_prefix, "deleted_keys": deleted, "existed_before_run": exists_v2 or exists_legacy, "removed_for_overwrite": bool(deleted)}
 
 
 def chunking_metadata(semantic_config: SemanticChunkConfig):
@@ -200,32 +103,63 @@ def chapter_summary(config, source, document, chunk_filename, artifact_sha256):
     }
 
 
-def write_chunk_artifacts(config, job, semantic_config, segmenter, progress=print):
+def write_chunk_artifacts(
+    config, job, semantic_config, segmenter, progress=print, result=None
+):
     chapters = job["candidate_sources"]
-    result = {
+    initial = {
         "source_chapter_count": len(job["candidate_manifest"]["chapters"]), "processed_chapter_count": 0,
         "skipped_chapter_count": len(job["candidate_manifest"]["chapters"]) - len(chapters), "failed_chapter_count": 0,
         "chunk_artifacts_written": 0, "chunk_manifest_written": False, "total_chunk_count": 0,
         "total_estimated_token_count": 0, "chapters": [], "audit_report_references": None,
     }
+    if result is None:
+        result = initial
+    else:
+        audit_references = result.get("audit_report_references")
+        result.clear()
+        result.update(initial)
+        result["audit_report_references"] = audit_references
     for position, source in enumerate(chapters, 1):
         prefix = f"[{position}/{len(chapters)}] {source['text_path'].name}:"
-        progress(f"{prefix} reading source text")
-        text = source["text_path"].read_text(encoding="utf-8")
-        progress(f"{prefix} segmenting {len(text)} characters")
-        document = segmenter.segment(text, source_name=source["text_path"].name)
-        progress(f"{prefix} validating chunks")
-        validate_document_for_source(text, document)
         filename = chapter_chunks_output_filename(config, int(source["chapter_number"]))
-        path = job["paths"]["semantic_chunks"] / filename
-        path.write_text(json.dumps(chunk_artifact_payload(config, job, source, document, semantic_config, filename), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        artifact_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
-        result["processed_chapter_count"] += 1
-        result["chunk_artifacts_written"] += 1
-        result["total_chunk_count"] += document.chunk_count
-        result["total_estimated_token_count"] += document.estimated_token_count
-        result["chapters"].append(chapter_summary(config, source, document, filename, artifact_sha256))
-        progress(f"{prefix} wrote {document.chunk_count} chunk(s)")
+        in_progress = {
+            "chapter_number": source["chapter_number"],
+            "status": "running",
+            "source_text_filename": source["text_path"].name,
+            "source_metadata_filename": source["metadata_path"].name,
+            "chunk_filename": filename,
+            "source_text_artifact": source["metadata"]["storage"]["artifacts"]["text"],
+            "source_metadata_artifact": source["metadata"]["storage"]["artifacts"]["metadata"],
+            "content_key": source["metadata"]["content_identity"]["content_key"],
+            "normalized_content_sha256": source["metadata"]["content_identity"]["normalized_content_sha256"],
+            "chunk_count": 0,
+            "estimated_token_count": 0,
+            "error": None,
+        }
+        result["chapters"].append(in_progress)
+        try:
+            progress(f"{prefix} reading source text")
+            text = source["text_path"].read_text(encoding="utf-8")
+            progress(f"{prefix} segmenting {len(text)} characters")
+            document = segmenter.segment(text, source_name=source["text_path"].name)
+            progress(f"{prefix} validating chunks")
+            validate_document_for_source(text, document)
+            path = job["paths"]["semantic_chunks"] / filename
+            path.write_text(json.dumps(chunk_artifact_payload(config, job, source, document, semantic_config, filename), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            artifact_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+            summary = chapter_summary(config, source, document, filename, artifact_sha256)
+            result["chapters"][-1] = summary
+            result["processed_chapter_count"] += 1
+            result["chunk_artifacts_written"] += 1
+            result["total_chunk_count"] += document.chunk_count
+            result["total_estimated_token_count"] += document.estimated_token_count
+            progress(f"{prefix} wrote {document.chunk_count} chunk(s)")
+        except BaseException as error:
+            in_progress["status"] = "failed"
+            in_progress["error"] = str(error)[:500] or error.__class__.__name__
+            result["failed_chapter_count"] += 1
+            raise
     return result
 
 
@@ -234,15 +168,15 @@ def destination_output_location(config, job):
     if is_r2(destination):
         prefix = job["destination_output_prefix"]
         return {"backend": "r2", "bucket": destination["bucket"], "prefix": prefix, "url": optional_url(destination.get("url_base"), prefix.rstrip("/"))}
-    return {"backend": "local", "path": str(job["paths"]["semantic_chunks"]), "url": None}
+    return {"backend": "local", "path": str(job["paths"]["final_semantic_chunks"]), "url": None}
 
 
 def audit_report_references(config, paths):
     return {"json": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["json"].name), "markdown": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["markdown"].name)}
 
 
-def write_chunk_manifest(path, config, job, semantic_config, result):
-    payload = {
+def build_chunk_manifest(config, job, semantic_config, result):
+    return {
         "schema_version": SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
         "run": {"pipeline": config["pipeline"], "source_backend": config["source"].get("backend", "local"), "destination_backend": config["destination"].get("backend", "local"), "output_directory": destination_output_location(config, job)},
         "document": {"category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"], "title_slug": config["naming"]["title_slug"], "language": config["naming"]["language"], "version": f"v{config['naming']['version']}.{config['naming']['subversion']}"},
@@ -250,47 +184,210 @@ def write_chunk_manifest(path, config, job, semantic_config, result):
         "counts": {"total_chapter_count": result["source_chapter_count"], "processed_chapter_count": result["processed_chapter_count"], "skipped_chapter_count": result["skipped_chapter_count"], "failed_chapter_count": result["failed_chapter_count"], "total_chunk_count": result["total_chunk_count"], "total_estimated_token_count": result["total_estimated_token_count"]},
         "chapters": result["chapters"], "audit_reports": result["audit_report_references"],
     }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def validate_chunk_staged_package(config, job, result, staged_output, readiness_manifest):
+    manifest = json.loads(Path(readiness_manifest).read_text(encoding="utf-8"))
+    expected_names = {chapter["chunk_filename"] for chapter in result["chapters"]}
+    actual_names = {path.name for path in Path(staged_output).glob("*.chunks.json")}
+    if expected_names != actual_names:
+        raise ValueError("Staged chunk files do not exactly match generated chapter results.")
+    if manifest.get("chapters") != result["chapters"]:
+        raise ValueError("Semantic chunk readiness manifest chapters do not match staged artifacts.")
+    counts = manifest.get("counts", {})
+    expected_counts = {
+        "total_chapter_count": result["source_chapter_count"],
+        "processed_chapter_count": result["processed_chapter_count"],
+        "skipped_chapter_count": result["skipped_chapter_count"],
+        "failed_chapter_count": result["failed_chapter_count"],
+        "total_chunk_count": result["total_chunk_count"],
+        "total_estimated_token_count": result["total_estimated_token_count"],
+    }
+    if counts != expected_counts:
+        raise ValueError("Semantic chunk readiness manifest counts do not match generation results.")
+    for chapter in result["chapters"]:
+        path = Path(staged_output) / chapter["chunk_filename"]
+        if hashlib.sha256(path.read_bytes()).hexdigest() != chapter["chunk_artifact_sha256"]:
+            raise ValueError(f"Staged chunk checksum changed for chapter {chapter['chapter_number']}.")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("source_references", {}).get("candidate_manifest") != candidate_manifest_binding(job):
+            raise ValueError(f"Staged chunk source binding is invalid for chapter {chapter['chapter_number']}.")
     result["chunk_manifest_written"] = True
 
 
-def publish_generate_chunks_r2(config, job, overwrite, r2_client=None, before_upload=None):
-    destination, client = config["destination"], r2_client or R2StorageClient.from_env()
-    subject_dir = job["paths"]["destination_subject"]
-    uploads = []
-    for root in (subject_dir / SEMANTIC_CHUNKS_RELATIVE_DIR, subject_dir / "run_reports" / "generate-chunks"):
-        for path in sorted(root.rglob("*")):
-            if path.is_file():
-                uploads.append((path, subject_artifact_object_key(destination, path.relative_to(subject_dir))))
-    chunks = sorted([item for item in uploads if item[0].name.endswith(".chunks.json")], key=lambda item: item[0].name)
-    manifest = [item for item in uploads if item[0].name == "semantic_chunks_manifest.json"]
-    reports = [item for item in uploads if item[0].parent.name == "generate-chunks"]
-    groups = [("chunks", chunks), ("manifest", manifest), ("reports", reports)]
-    uploads = [item for _, items in groups for item in items]
-    existing = [key for _, key in uploads if client.exists(destination["bucket"], key)]
-    if existing and not overwrite:
-        raise SystemExit(r2_existing_artifacts_error("generate-chunks", destination["bucket"], existing[:10], "generate-chunks target objects"))
-    if before_upload:
-        before_upload(uploads)
-    print(f"Publishing {len(uploads)} semantic chunk artifact(s) to:")
-    print(f"  r2://{destination['bucket']}/{destination['prefix']}/{destination['subject_dir']}/")
-    nonempty = [(kind, items) for kind, items in groups if items]
-    for group_index, (kind, items) in enumerate(nonempty, start=1):
-        if kind == "chunks":
-            print(f"[{group_index}/{len(nonempty)}] semantic chunk artifacts: {len(items)} chapters")
-            for chapter_index, (path, key) in enumerate(items, start=1):
-                upload_r2_file(client, destination, path, key)
-                print(f"  [{chapter_index:02d}/{len(items):02d}] {path.stem.removesuffix('.chunks')}")
-        else:
-            for path, key in items:
-                upload_r2_file(client, destination, path, key)
-            label = "semantic chunk manifest: semantic_chunks_manifest.json" if kind == "manifest" else f"generate-chunks audit: {', '.join(path.name for path, _ in items)}"
-            print(f"[{group_index}/{len(nonempty)}] {label}")
-    print(f"Published {len(uploads)} semantic chunk artifact(s) successfully.")
-    return uploads
+class GenerateChunksWorkflow:
+    def __init__(
+        self,
+        context,
+        config,
+        config_path,
+        entry_point,
+        overwrite,
+        destination_subject,
+        segmenter,
+    ):
+        self.config = config
+        self.semantic_config = config["_semantic_chunk_config"]
+        self.destination_subject = Path(destination_subject)
+        self.segmenter = segmenter
+        self.job = None
+        self.result = {
+            "source_chapter_count": 0,
+            "processed_chapter_count": 0,
+            "skipped_chapter_count": 0,
+            "failed_chapter_count": 0,
+            "chunk_artifacts_written": 0,
+            "chunk_manifest_written": False,
+            "total_chunk_count": 0,
+            "total_estimated_token_count": 0,
+            "chapters": [],
+            "audit_report_references": None,
+        }
+        self.audit = GenerateChunksAuditWriter(
+            context,
+            config_path,
+            config,
+            entry_point,
+            overwrite,
+            destination_subject,
+        )
+        self.result["audit_report_references"] = audit_report_references(
+            config, self.audit.paths
+        )
+
+    def materialize_and_validate_source(self, r2_client, progress):
+        subject, temporary, manifest = materialize_source_subject(
+            self.config, "generate-chunks", r2_client, progress
+        )
+        try:
+            sources = validate_materialized_release(
+                self.config,
+                subject,
+                manifest,
+                "generate-chunks",
+                r2_client,
+            )
+        except BaseException:
+            if temporary:
+                temporary.cleanup()
+            raise
+        self.result["source_chapter_count"] = len(manifest["chapters"])
+        self.result["skipped_chapter_count"] = len(manifest["chapters"]) - len(sources)
+        return SourceRelease(subject, manifest, sources, temporary)
+
+    def generate_staged_artifacts(self, source, staged_output, progress):
+        self.job = {
+            "paths": {
+                "source_subject": source.subject_dir,
+                "source_text_and_metadata": source.subject_dir / TEXT_AND_METADATA_RELATIVE_DIR,
+                "candidate_manifest": source.subject_dir / CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH,
+                "destination_subject": self.destination_subject,
+                "semantic_chunks": staged_output,
+                "final_semantic_chunks": self.destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR,
+                "chunk_manifest": staged_output / "semantic_chunks_manifest.json",
+            },
+            "candidate_sources": source.sources,
+            "candidate_manifest": source.candidate_manifest,
+            "destination_output_prefix": destination_output_prefix(self.config),
+        }
+        # Every source check completed before the lazy segmenter can load a model.
+        segmenter = self.segmenter or SemanticChunkingParagraphSegmenter(
+            self.semantic_config, progress=progress
+        )
+        self.result = write_chunk_artifacts(
+            self.config,
+            self.job,
+            self.semantic_config,
+            segmenter,
+            progress=progress,
+            result=self.result,
+        )
+        self.result["audit_report_references"] = audit_report_references(
+            self.config, self.audit.paths
+        )
+        return self.result
+
+    def build_readiness_manifest(self, source, generation):
+        return build_chunk_manifest(
+            self.config, self.job, self.semantic_config, generation
+        )
+
+    def validate_staged_package(
+        self, source, generation, staged_output, readiness_manifest
+    ):
+        validate_chunk_staged_package(
+            self.config,
+            self.job,
+            generation,
+            staged_output,
+            readiness_manifest,
+        )
+
+    def write_audit(
+        self,
+        status,
+        lifecycle,
+        source,
+        generation,
+        publication,
+        failure,
+        announce,
+    ):
+        report = self.audit.write(
+            status=status,
+            candidate_manifest=source.candidate_manifest if source else None,
+            result=generation if generation is not None else self.result,
+            publication=publication,
+            failure=failure,
+            lifecycle=lifecycle.as_dict(),
+            destination_subject=self.destination_subject,
+            announce=announce,
+        )
+        return AuditResult(report, self.audit.paths)
 
 
-def cleanup_job(job):
-    for key in ("source_temp_dir", "destination_temp_dir"):
-        if job.get(key):
-            job[key].cleanup()
+def run_generate_chunks_job(
+    context,
+    config,
+    entry_point=ENTRY_POINT_GENERATE_CHUNKS,
+    overwrite=False,
+    config_path=None,
+    segmenter: ParagraphSegmenter | None = None,
+    r2_client=None,
+    progress=print,
+):
+    definition = DerivedArtifactDefinition(
+        command_name="generate-chunks",
+        output_relative_dir=SEMANTIC_CHUNKS_RELATIVE_DIR,
+        readiness_manifest_filename="semantic_chunks_manifest.json",
+        report_relative_dir=CHUNKS_REPORT_DIR,
+        legacy_output_relative_dirs=(LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR,),
+    )
+    destination_subject, destination_temporary = destination_subject_dir(
+        config, definition.command_name
+    )
+    workflow = GenerateChunksWorkflow(
+        context,
+        config,
+        config_path,
+        entry_point,
+        overwrite,
+        destination_subject,
+        segmenter,
+    )
+    lifecycle = run_derived_artifact_lifecycle(
+        config,
+        definition,
+        workflow,
+        overwrite=overwrite,
+        r2_client=r2_client,
+        progress=progress,
+        destination_subject=destination_subject,
+        destination_temporary=destination_temporary,
+        source_revalidator=revalidate_source_release,
+    )
+    result = lifecycle.generation
+    result["publication"] = lifecycle.publication
+    result["audit_report"] = lifecycle.audit_report
+    result["lifecycle"] = lifecycle.lifecycle
+    return result

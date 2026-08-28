@@ -86,7 +86,15 @@ class GenerateDocxAuditWriter:
             "markdown": destination_artifact_reference(self.config, DOCX_REPORT_DIR / self.paths["markdown"].name),
         }
 
-    def build(self, status, candidate_manifest, chapters, publication, failure=None):
+    def build(
+        self,
+        status,
+        candidate_manifest,
+        chapters,
+        publication,
+        failure=None,
+        lifecycle=None,
+    ):
         naming = self.config["naming"]
         manifest = candidate_manifest or {}
         return {
@@ -117,12 +125,29 @@ class GenerateDocxAuditWriter:
             },
             "chapters": chapters,
             "publication": publication,
+            "lifecycle": lifecycle,
             "failure": failure,
             "report_files": self.references(),
         }
 
-    def write(self, status, candidate_manifest, chapters, publication, failure=None, announce=True):
-        report = self.build(status, candidate_manifest, chapters, publication, failure)
+    def write(
+        self,
+        status,
+        candidate_manifest,
+        chapters,
+        publication,
+        failure=None,
+        lifecycle=None,
+        announce=True,
+    ):
+        report = self.build(
+            status,
+            candidate_manifest,
+            chapters,
+            publication,
+            failure,
+            lifecycle,
+        )
         write_report(self.paths, report, _markdown(report))
         if announce:
             print_report_locations(COMMAND_NAME, self.paths)

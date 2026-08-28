@@ -1,6 +1,7 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
-from gurubodh.audit import AuditReportBuilder, print_report_locations, report_basename, report_paths, write_report
+from gurubodh.audit import AuditReportBuilder, print_report_locations, report_paths, write_report
 from gurubodh.constants import SEMANTIC_CHUNKS_OUTPUT_DIR
 from gurubodh.naming import version_label
 from gurubodh.storage import (
@@ -14,7 +15,7 @@ from gurubodh.storage import (
 COMMAND_NAME = "generate-chunks"
 
 
-def job_identity(config, job):
+def job_identity(config, candidate_manifest, destination_subject):
     destination = config["destination"]
     source = config["source"]
     identity = {
@@ -25,32 +26,32 @@ def job_identity(config, job):
         "version": config["naming"]["version"],
         "subversion": config["naming"]["subversion"],
         "version_label": version_label(config),
-        "source_subject": source_subject_reference(source, job),
+        "source_subject": source_subject_reference(source),
         "chunking_model": {
             "provider": config["chunking"]["provider"],
             "model": config["chunking"]["model"],
             "model_revision": config["chunking"]["model_revision"],
         },
         "source_candidate_manifest": {
-            "reference": job["candidate_manifest"]["reference"],
-            "sha256": job["candidate_manifest"]["sha256"],
+            "reference": (candidate_manifest or {}).get("reference"),
+            "sha256": (candidate_manifest or {}).get("sha256"),
         },
     }
     if is_r2(destination):
         identity["destination_output"] = {
             "backend": "r2",
             "bucket": destination["bucket"],
-            "prefix": job["destination_output_prefix"],
+            "prefix": f"{subject_artifact_prefix(destination)}chapters/{SEMANTIC_CHUNKS_OUTPUT_DIR}/",
         }
     else:
         identity["destination_output"] = {
             "backend": "local",
-            "path": str(job["paths"]["semantic_chunks"]),
+            "path": str(Path(destination_subject) / "chapters" / SEMANTIC_CHUNKS_OUTPUT_DIR),
         }
     return identity
 
 
-def source_subject_reference(source, job):
+def source_subject_reference(source):
     if is_r2(source):
         return {
             "backend": "r2",
@@ -59,33 +60,7 @@ def source_subject_reference(source, job):
         }
     return {
         "backend": "local",
-        "path": str(job["paths"]["source_subject"]),
-    }
-
-
-def local_publish_audit(job):
-    return {
-        "backend": "local",
-        "status": "succeeded",
-        "destination_output_path": str(job["paths"]["semantic_chunks"]),
-        "existed_before_run": job["destination_preflight"]["existed_before_run"],
-        "removed_for_overwrite": job["destination_preflight"]["removed_for_overwrite"],
-    }
-
-
-def r2_publish_audit(config, job, status="pending", uploads=None):
-    uploads = uploads or []
-    destination = config["destination"]
-    return {
-        "backend": "r2",
-        "status": status,
-        "bucket": destination["bucket"],
-        "destination_output_prefix": job["destination_output_prefix"],
-        "existing_prefix_check_status": job["destination_preflight"]["status"],
-        "deleted_for_overwrite_count": len(job["destination_preflight"].get("deleted_keys", [])),
-        "artifact_files_prepared_for_upload": len(uploads) if uploads else None,
-        "uploaded_artifact_count": len(uploads) if status == "succeeded" else None,
-        "failure_message": None,
+        "path": str(Path(source["root_dir"]).expanduser() / source["subject_dir"]),
     }
 
 
@@ -96,7 +71,7 @@ def report_references(config, paths):
     }
 
 
-def processing_summary(result, publish_audit):
+def processing_summary(result, publication):
     return {
         "source_chapter_count": result["source_chapter_count"],
         "processed_chapter_count": result["processed_chapter_count"],
@@ -107,7 +82,7 @@ def processing_summary(result, publish_audit):
         "total_chunk_count": result["total_chunk_count"],
         "total_estimated_token_count": result["total_estimated_token_count"],
         "output_directory_name": SEMANTIC_CHUNKS_OUTPUT_DIR,
-        "publish_status": publish_audit["status"],
+        "publish_status": publication["status"],
     }
 
 
@@ -115,7 +90,7 @@ def operator_notes(report):
     notes = []
     if report["processing_summary"]["processed_chapter_count"] == 0:
         notes.append("No chapters were processed; review the chapter filter and source artifacts.")
-    if report["publish_audit"]["backend"] == "r2":
+    if report["publication"]["backend"] == "r2":
         notes.append("If R2 publishing fails, check Cloudflare R2 credentials, bucket, prefix, and object permissions.")
     if report["run_identity"]["overwrite"]:
         notes.append("Overwrite was enabled only for semantic chunk outputs.")
@@ -142,7 +117,7 @@ def render_markdown(report):
         f"- Image revision: `{report['run_identity']['build_provenance']['image_revision'] or 'not an image run'}`",
         f"- Model revision: `{report['job_identity']['chunking_model']['model_revision']}`",
         f"- Language: `{report['job_identity']['language']}`",
-        f"- Candidate manifest SHA-256: `{report['job_identity']['source_candidate_manifest']['sha256']}`",
+        f"- Candidate manifest SHA-256: `{report['job_identity']['source_candidate_manifest']['sha256'] or 'unavailable'}`",
         "",
         "## Processing Summary",
         "",
@@ -174,8 +149,19 @@ def render_markdown(report):
             )
     else:
         lines.append("No chapter chunk artifacts were generated.")
+    if report.get("failure"):
+        lines.extend(
+            [
+                "",
+                "## Failure",
+                "",
+                f"- State: `{report['failure']['state']}`",
+                f"- Error type: `{report['failure']['error_type']}`",
+                f"- Message: {report['failure']['message']}",
+            ]
+        )
     lines.extend(["", "## Publish Audit", ""])
-    for key, value in report["publish_audit"].items():
+    for key, value in report["publication"].items():
         lines.append(f"- {key}: `{value}`")
     lines.extend(["", "## Operator Notes", ""])
     for note in report["final_outcome"]["operator_notes"]:
@@ -184,54 +170,73 @@ def render_markdown(report):
 
 
 class GenerateChunksAuditWriter:
-    def __init__(self, context, config_path, config, entry_point, overwrite, job, result):
-        self.context = context
-        self.config_path = config_path
+    def __init__(self, context, config_path, config, entry_point, overwrite, destination_subject):
         self.config = config
-        self.entry_point = entry_point
-        self.overwrite = overwrite
-        self.job = job
-        self.result = result
         self.builder = AuditReportBuilder(COMMAND_NAME, entry_point, context, config_path, config, overwrite)
-        basename = report_basename(config, COMMAND_NAME, self.builder.filename_timestamp)
-        self.paths = report_paths(job["paths"]["destination_subject"], basename, COMMAND_NAME)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        naming = config["naming"]
+        basename = (
+            f"{naming['category_code']}_{naming['subject_code']}_{naming['title_slug']}_"
+            f"{COMMAND_NAME}_{timestamp}"
+        )
+        self.paths = report_paths(destination_subject, basename, COMMAND_NAME)
         self.report = None
 
-    def build(self, publish_audit):
+    def build(
+        self,
+        status,
+        candidate_manifest,
+        result,
+        publication,
+        failure,
+        lifecycle,
+        destination_subject,
+    ):
         report = {
             "schema_version": "1.0.0",
-            "run_identity": self.builder.run_identity("succeeded"),
-            "job_identity": job_identity(self.config, self.job),
+            "run_identity": self.builder.run_identity(status, error=failure),
+            "job_identity": job_identity(self.config, candidate_manifest, destination_subject),
             "configuration_snapshot": self.builder.safe_config_snapshot(),
-            "processing_summary": processing_summary(self.result, publish_audit),
-            "chapters": self.result["chapters"],
-            "publish_audit": publish_audit,
+            "processing_summary": processing_summary(result, publication),
+            "chapters": result["chapters"],
+            "publication": publication,
+            "publish_audit": publication,
+            "lifecycle": lifecycle,
+            "failure": failure,
             "final_outcome": {
-                "status": "succeeded",
-                "output_location": str(self.job["paths"]["semantic_chunks"]),
+                "status": status,
+                "output_location": str(
+                    Path(destination_subject) / "chapters" / SEMANTIC_CHUNKS_OUTPUT_DIR
+                ),
                 "report_files": report_references(self.config, self.paths),
-                "failed_stage": None,
+                "failed_stage": failure.get("state") if failure else None,
                 "operator_notes": [],
             },
         }
         report["final_outcome"]["operator_notes"] = operator_notes(report)
         return report
 
-    def write(self, publish_audit, announce=True):
-        self.report = self.build(publish_audit)
+    def write(
+        self,
+        status,
+        candidate_manifest,
+        result,
+        publication,
+        failure=None,
+        lifecycle=None,
+        destination_subject=None,
+        announce=True,
+    ):
+        self.report = self.build(
+            status,
+            candidate_manifest,
+            result,
+            publication,
+            failure,
+            lifecycle,
+            destination_subject,
+        )
         write_report(self.paths, self.report, render_markdown(self.report))
         if announce:
             print_report_locations(COMMAND_NAME, self.paths)
         return self.report
-
-    def announce_locations(self):
-        print_report_locations(COMMAND_NAME, self.paths)
-
-    def write_local_success(self):
-        return self.write(local_publish_audit(self.job))
-
-    def write_r2_pending(self):
-        return self.write(r2_publish_audit(self.config, self.job), announce=False)
-
-    def before_r2_upload(self, uploads):
-        return self.write(r2_publish_audit(self.config, self.job, status="succeeded", uploads=uploads), announce=False)
