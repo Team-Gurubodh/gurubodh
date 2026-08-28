@@ -103,6 +103,14 @@ class StorageConfigTests(unittest.TestCase):
         self.assertEqual(config["source"]["relative_path"], "subject/source.docx")
         self.assertEqual(config["destination"]["subject_dir"], "129_spand_rahasya/hi-IN")
 
+    def test_prep_subject_rejects_disabled_shreelipi_encoding(self):
+        config = json.loads(json.dumps(BASE_CONFIG))
+        config["pipeline"] = "legacy-docx-to-unicode"
+        config["source"]["font_encoding"] = "shreelipi"
+
+        with self.assertRaisesRegex(SystemExit, "source.font_encoding must be one of: aps, unicode"):
+            load_prep_subject_job(self.write_config(config))
+
     def test_prep_subject_requires_strict_proofreading_configuration(self):
         missing = json.loads(json.dumps(BASE_CONFIG))
         missing.pop("proofreading")

@@ -20,6 +20,7 @@ from typing import Any, Callable
 from gurubodh.content_identity import build_content_identity
 from gurubodh.content_manifest import write_chapter_content_manifest
 from gurubodh.locales import locale_spec
+from gurubodh.legacy.font_detection import validate_supported_source_fonts
 from gurubodh.naming import chapter_output_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
 from gurubodh.pipelines.common import validate_and_split
@@ -994,6 +995,7 @@ def run_resumable_prep_job(
     try:
         manager.open()
         source_path = manager.materialize_source()
+        validate_supported_source_fonts(source_path)
         outcome = manager.begin(_sha256(source_path))
         if outcome == "already_complete":
             print("prep-subject already complete; the compatible checkpoint is succeeded. No Gemini requests were made.")

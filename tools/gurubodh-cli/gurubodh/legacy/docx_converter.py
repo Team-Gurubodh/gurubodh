@@ -6,7 +6,13 @@ from xml.etree import ElementTree as ET
 from gurubodh.docx.namespaces import NS, W, XML_SPACE
 from gurubodh.docx.text import iter_docx_text_parts
 from gurubodh.legacy.converter import convert_text_groups
-from gurubodh.legacy.font_detection import is_legacy_font, rfonts_values, run_converter
+from gurubodh.legacy.font_detection import (
+    _styles,
+    _theme_fonts,
+    effective_run_converter,
+    is_legacy_font,
+    rfonts_values,
+)
 
 
 def target_devanagari_font():
@@ -63,7 +69,7 @@ def set_text_node(text_node, text):
         del text_node.attrib[XML_SPACE]
 
 
-def collect_paragraph_groups(root):
+def collect_paragraph_groups(root, styles, defaults, theme_fonts):
     groups = []
     for paragraph in root.findall(".//w:p", NS):
         current_converter = None
@@ -85,7 +91,7 @@ def collect_paragraph_groups(root):
             current_text_nodes = []
 
         for run in paragraph.findall("w:r", NS):
-            converter = run_converter(run)
+            converter = effective_run_converter(run, paragraph, styles, defaults, theme_fonts)
             nodes = run.findall("w:t", NS)
             if not converter or not nodes:
                 flush_group()
@@ -99,9 +105,9 @@ def collect_paragraph_groups(root):
     return groups
 
 
-def convert_xml_part(xml_bytes, font_name, legacy_converter):
+def convert_xml_part(xml_bytes, font_name, legacy_converter, styles, defaults, theme_fonts):
     root = ET.fromstring(xml_bytes)
-    groups = collect_paragraph_groups(root)
+    groups = collect_paragraph_groups(root, styles, defaults, theme_fonts)
     converted_texts = convert_text_groups(groups, legacy_converter)
 
     extracted_text = []
@@ -152,12 +158,16 @@ def convert_docx(path, font_name, legacy_converter, output_path, text_path=None,
     converter_counts = {}
 
     with zipfile.ZipFile(path) as source:
+        styles, defaults = _styles(source)
+        theme_fonts = _theme_fonts(source)
         text_part_names = set(iter_docx_text_parts(source))
         with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as target:
             for info in source.infolist():
                 data = source.read(info.filename)
                 if info.filename in text_part_names:
-                    data, part_text, nodes, chars, counts = convert_xml_part(data, font_name, legacy_converter)
+                    data, part_text, nodes, chars, counts = convert_xml_part(
+                        data, font_name, legacy_converter, styles, defaults, theme_fonts
+                    )
                     extracted.extend(part_text)
                     total_nodes += nodes
                     total_chars += chars

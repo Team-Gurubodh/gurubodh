@@ -248,9 +248,7 @@ def validate_pipeline_matches_source(config, expected_pipeline=None):
     if pipeline == PIPELINE_UNICODE_DOCX_INGEST and not source_is_unicode(config):
         raise SystemExit("Config error: unicode-docx-ingest requires source.font_encoding=unicode")
     if pipeline == PIPELINE_LEGACY_DOCX_TO_UNICODE and not source_is_legacy(config):
-        raise SystemExit(
-            "Config error: legacy-docx-to-unicode requires source.font_encoding to be aps or shreelipi"
-        )
+        raise SystemExit("Config error: legacy-docx-to-unicode requires source.font_encoding=aps")
 
 
 def proofreading_config(config):

@@ -5,7 +5,6 @@ const path = require("path");
 
 const CONVERTERS = {
   aps: path.join(__dirname, "vendor", "hindietools_aps_prakash_to_unicode.js"),
-  shreelipi: path.join(__dirname, "vendor", "hindietools_shreelipi_to_unicode.js"),
 };
 
 function loadConverter(converterName) {

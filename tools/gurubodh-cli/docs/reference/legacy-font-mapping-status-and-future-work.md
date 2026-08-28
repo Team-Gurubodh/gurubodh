@@ -51,7 +51,9 @@ The DOCX converter detects APS-like font names and routes those text runs throug
 
 ### ShreeLipi / Sri-Lipi conversion
 
-ShreeLipi conversion should be treated as incomplete until the exact mappings are verified for the source fonts being converted.
+ShreeLipi conversion is disabled at runtime. Gurubodh rejects ShreeLipi,
+Sri-Lipi, and Shree Dev source families before conversion, proofreading, or
+canonical publication because verified mappings are unavailable.
 
 The important lesson from earlier experiments is that "ShreeLipi" is not one universal encoding. Different ShreeLipi-era fonts can assign different glyphs to the same Latin or extended-ASCII character positions.
 
@@ -63,13 +65,9 @@ SHREE-DEV7-0712
 SHREE-DEV7-0722
 ```
 
-The current local ShreeLipi vendor file is:
-
-```text
-scripts/vendor/hindietools_shreelipi_to_unicode.js
-```
-
-That file should not be assumed correct for every ShreeLipi or Shree Dev7 document. A partially converted output with residual legacy characters usually means the mapping is wrong, not merely that the output Unicode font is wrong.
+The former generic local ShreeLipi mapping has been removed. A partially
+converted output with residual legacy characters usually means the mapping is
+wrong, not merely that the output Unicode font is wrong.
 
 Output fonts such as Mangal, Noto Sans Devanagari, or Kohinoor Devanagari only affect rendering after conversion. They cannot repair an incorrect legacy to Unicode mapping.
 
@@ -103,7 +101,8 @@ SHREE-DEV7-0712 -> shree_dev7_0712
 SHREE-DEV7-0722 -> shree_dev7_0722
 ```
 
-Only use a generic converter when the mapping has been manually verified for the source document.
+Do not use a generic converter. Any future support requires a verified,
+font-specific mapping and approval to reintroduce it.
 
 ### 4. Add one local mapping per encoding
 
@@ -117,7 +116,8 @@ scripts/vendor/shree_dev7_0712_to_unicode.js
 scripts/vendor/shree_dev7_0722_to_unicode.js
 ```
 
-Then update `scripts/legacy_font_convert.js` so each mapping has a distinct converter key.
+Then update `scripts/legacy_font_convert.js` so each verified mapping has a
+distinct converter key and a centrally reviewed source-font allowlist entry.
 
 ### 5. Add automated mapping tests
 
@@ -135,6 +135,6 @@ Fixtures should include cases for matra placement, reph forms, half letters, con
 
 ## Practical recommendation
 
-Use the current workflow for APS documents, with manual review of outputs.
-
-Pause ShreeLipi production conversion until exact mappings are available for the specific fonts found in the source DOCX files.
+Use the current workflow for approved Unicode and APS documents, with manual
+review of outputs. ShreeLipi production conversion is disabled until exact,
+font-specific mappings and golden fixtures are available.

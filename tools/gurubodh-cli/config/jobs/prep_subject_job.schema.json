@@ -43,7 +43,7 @@
         },
         "font_encoding": {
           "type": "string",
-          "enum": ["aps", "shreelipi", "unicode"]
+          "enum": ["aps", "unicode"]
         },
         "file_format": {
           "type": "string",
@@ -294,7 +294,7 @@
           "source": {
             "properties": {
               "font_encoding": {
-                "enum": ["aps", "shreelipi"]
+                "const": "aps"
               }
             }
           }

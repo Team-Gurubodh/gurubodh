@@ -7,19 +7,20 @@ import json
 from pathlib import Path
 import tempfile
 import uuid
-import zipfile
-from xml.etree import ElementTree as ET
 from typing import Any, Callable
 
 from gurubodh import __version__
 from gurubodh.audit import resolved_build_provenance
 from gurubodh.constants import ENTRY_POINT_LAB_PROOFREAD
 from gurubodh.docx.export import formatting_defaults, write_chapter_docx
-from gurubodh.docx.namespaces import NS
-from gurubodh.docx.text import extract_docx_text, iter_docx_text_parts
+from gurubodh.docx.text import extract_docx_text
 from gurubodh.docx.validate import validate_docx
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
-from gurubodh.legacy.font_detection import run_converter
+from gurubodh.legacy.font_detection import (
+    detect_converter_for_font,
+    source_fonts,
+    validate_supported_source_fonts,
+)
 from gurubodh.locales import locale_spec
 from gurubodh.proofreading import GeminiProofreader, ProofreadingError, ProofreadingSettings, word_level_diff
 from gurubodh.time_utils import utc_now
@@ -83,15 +84,13 @@ def _artifact_checksums(run_dir: Path) -> dict[str, str]:
 
 
 def _detect_font_encodings(source: Path) -> list[str]:
-    detected: set[str] = set()
-    with zipfile.ZipFile(source) as package:
-        for name in iter_docx_text_parts(package):
-            root = ET.fromstring(package.read(name))
-            for run in root.findall(".//w:r", NS):
-                converter = run_converter(run)
-                if converter:
-                    detected.add(converter)
-    return sorted(detected)
+    return sorted(
+        {
+            converter
+            for source_font in source_fonts(source)
+            if (converter := detect_converter_for_font(source_font.family))
+        }
+    )
 
 
 def _canonical_text(text: str) -> str:
@@ -192,6 +191,7 @@ def run_lab_proofread(
             raise FileNotFoundError(f"Source DOCX does not exist: {source_path}")
         validate_docx(source_path)
         manifest["source"]["sha256"] = _sha256(source_path)
+        validate_supported_source_fonts(source_path)
         encodings = _detect_font_encodings(source_path)
         manifest["source"]["font_encoding"] = "+".join(encodings) if encodings else "unicode"
 

@@ -7,7 +7,7 @@ This is the authoritative guide to the local and container environment needed to
 | Task | Runtime | Credentials | Model cache | Additional requirement |
 | --- | --- | --- | --- | --- |
 | Local `prep-subject`, Unicode source | Python 3.12 virtual environment | `GEMINI_API_KEY` | None | Local source and destination paths from the job |
-| Local `prep-subject`, APS or ShreeLipi source | Python 3.12 virtual environment | `GEMINI_API_KEY` | None | Local Node installation for the bundled converter |
+| Local `prep-subject`, APS source | Python 3.12 virtual environment | `GEMINI_API_KEY` | None | Local Node installation for the bundled converter |
 | Local `generate-chunks` | Python 3.12 virtual environment | None | `GURUBODH_MODEL_CACHE_DIR` with the job's pinned snapshot | A completed matching preparation release |
 | Local `generate-docx` | Python 3.12 virtual environment | None | None | A completed matching preparation release |
 | Local `lab proofread` | Python 3.12 virtual environment | `GEMINI_API_KEY` | None | Node only when a legacy-font source is detected |
@@ -31,7 +31,7 @@ gurubodh --help
 
 The editable install keeps the `gurubodh` command linked to the checked-out source. If the virtual environment was copied or moved, recreate it or run `make cli-install` again so its generated wrappers use the current path.
 
-Unicode-only preparation needs no local Node installation. Legacy APS and ShreeLipi conversion runs the bundled JavaScript converter through `node`, so install Node locally before running a legacy-font job. The production image already includes Node.
+Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`, so install Node locally before running an APS job. The production image already includes Node.
 
 Run maintained job files from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Getting started](getting-started.md) explains project-root detection.
 
