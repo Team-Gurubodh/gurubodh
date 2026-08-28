@@ -5,7 +5,7 @@ import unittest
 import zipfile
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
 from gurubodh.prep_subject_checkpoints import JOB_STATE_RELATIVE_PATH, run_resumable_prep_job
@@ -26,9 +26,9 @@ DOCUMENT_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 """
 
 
-def write_docx(path):
+def write_docx(path, xml=DOCUMENT_XML):
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("word/document.xml", DOCUMENT_XML)
+        archive.writestr("word/document.xml", xml)
 
 
 def config(root):
@@ -105,6 +105,30 @@ def prepare_unicode(source_path, output_path, progress):
 
 
 class PrepSubjectCheckpointTests(unittest.TestCase):
+    def test_unsupported_source_font_fails_before_preparation_or_canonical_artifacts(self):
+        unsafe_xml = DOCUMENT_XML.replace(
+            "<w:r><w:t>विषय परीक्षण</w:t></w:r>",
+            '<w:r><w:rPr><w:rFonts w:ascii="SHREE-DEV7-0708" /></w:rPr><w:t>विषय परीक्षण</w:t></w:r>',
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx", unsafe_xml)
+            prepare = Mock(side_effect=prepare_unicode)
+
+            with self.assertRaisesRegex(ValueError, "conversion is disabled"):
+                run_resumable_prep_job(
+                    None,
+                    config(root),
+                    "python3 -m gurubodh prep-subject",
+                    False,
+                    False,
+                    None,
+                    prepare,
+                )
+
+            prepare.assert_not_called()
+            self.assertFalse((root / "subject" / "hi-IN" / "chapters").exists())
+
     def test_pipeline_banners_are_emitted_only_when_preparation_callback_runs(self):
         pipeline_config = {"pipeline": "unicode-docx-ingest"}
         unicode_output = io.StringIO()

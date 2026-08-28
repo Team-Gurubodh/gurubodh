@@ -13,7 +13,7 @@ gurubodh lab proofread \
   --lab-root /path/to/lab
 ```
 
-Only `hi-IN` and `mr-IN` are supported. The command handles Unicode or supported legacy fonts in a temporary workspace and sends one structured Gemini request. Each invocation gets a unique run under `<lab-root>/proofread/runs/active/`, which is moved atomically to `succeeded/` or `failed/` when an outcome is recorded. The run-root `README.md` links to output, report, and manifest.
+Only `hi-IN` and `mr-IN` are supported. The command handles approved Unicode or APS fonts in a temporary workspace and sends one structured Gemini request. It rejects ShreeLipi/Sri-Lipi/Shree Dev and every unapproved source font before conversion or proofreading. Each invocation gets a unique run under `<lab-root>/proofread/runs/active/`, which is moved atomically to `succeeded/` or `failed/` when an outcome is recorded. The run-root `README.md` links to output, report, and manifest.
 
 The output includes a proofread DOCX and text; reports include extracted source, a readable diff, structured details, and provenance. None becomes CMS input or canonical subject text.
 

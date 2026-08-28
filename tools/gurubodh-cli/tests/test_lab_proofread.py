@@ -9,6 +9,7 @@ from unittest.mock import patch
 from docx import Document
 
 from gurubodh.docx.export import validate_chapter_docx
+from gurubodh.legacy.font_detection import UnsupportedSourceFontError
 from gurubodh.lab_proofread import LAB_HEADING_2_PARAGRAPHS, run_lab_proofread
 from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
 from gurubodh.project import ProjectContext
@@ -116,7 +117,9 @@ class LabProofreadTests(unittest.TestCase):
     def test_legacy_font_source_uses_transient_conversion_path(self):
         source = self.source_docx(text="fdn")
         document = Document(source)
-        document.paragraphs[0].runs[0].font.name = "APS-DV-Prakash"
+        style = document.styles.add_style("APS Legacy", 1)
+        style.font.name = "APS-DV-Prakash"
+        document.paragraphs[0].style = "APS Legacy"
         document.save(source)
         proofreader = FakeProofreader()
 
@@ -131,6 +134,22 @@ class LabProofreadTests(unittest.TestCase):
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
         self.assertEqual(manifest["source"]["font_encoding"], "aps")
         self.assertEqual(manifest["source"]["legacy_conversion"]["converter_counts"], {"aps": 1})
+
+    def test_unsupported_font_fails_before_conversion_or_proofreading(self):
+        source = self.source_docx(text="fdn")
+        document = Document(source)
+        document.paragraphs[0].runs[0].font.name = "SHREE-DEV7-0708"
+        document.save(source)
+        proofreader = FakeProofreader()
+
+        with (
+            patch("gurubodh.lab_proofread.convert_docx") as convert,
+            self.assertRaisesRegex(UnsupportedSourceFontError, "conversion is disabled"),
+        ):
+            run_lab_proofread(self.context, source, "hi-IN", self.root / "lab", proofreader=proofreader)
+
+        convert.assert_not_called()
+        self.assertEqual(proofreader.calls, [])
 
     def test_over_limit_fails_before_a_proofreading_request_and_preserves_the_source(self):
         source = self.source_docx(text="बहुत लंबा पाठ")

@@ -37,6 +37,9 @@
 - Prep-subject job schema `1.4.0` requires explicit `metadata_defaults.language`
   and supports only `hi-IN` and `mr-IN`. Both require
   `source_script: "Devanagari"` and `output_text_encoding: "UTF-8"`.
+  Its source encoding values are `unicode` and `aps`; `shreelipi` is rejected
+  as an intentional safety-boundary change recorded in
+  [Decision-0006](./decisions/0006-source-font-safety-boundary.md).
   `destination.subject_dir` must be a safe nested POSIX-relative path whose
   final segment equals that language. Generate-chunks job schema `1.1.0`
   applies the same locale restriction to `naming.language` and requires source
