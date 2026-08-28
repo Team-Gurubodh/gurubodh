@@ -286,6 +286,24 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
         self.assertEqual(segmenter.calls, 0)
 
+    def test_cr_bearing_text_claiming_lf_is_rejected_before_segmenting(self):
+        config = base_config(self.temp_dir.name)
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1)
+        write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        text_path = subject / "chapters" / "text_and_metadata" / metadata["files"]["text_filename"]
+        text_path.write_bytes("पहला\r\nदूसरा\n".encode("utf-8"))
+        metadata_path = subject / "chapters" / "text_and_metadata" / metadata["files"]["metadata_filename"]
+        updated_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        updated_metadata["integrity"]["artifacts"]["text"]["value"] = hashlib.sha256(text_path.read_bytes()).hexdigest()
+        metadata_path.write_text(json.dumps(updated_metadata, ensure_ascii=False) + "\n", encoding="utf-8")
+        loaded, config_path = self.load(config)
+        segmenter = FakeSegmenter()
+
+        with self.assertRaisesRegex(SystemExit, "source text checksum does not match metadata"):
+            run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
+        self.assertEqual(segmenter.calls, 0)
+
     def test_chapter_filter_uses_manifest_and_reports_absent_number(self):
         config = base_config(self.temp_dir.name)
         first = write_prepared_chapter(self.temp_dir.name, config, 1)

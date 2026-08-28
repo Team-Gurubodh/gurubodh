@@ -378,7 +378,7 @@ def usage_summary(usage: Any) -> dict[str, int] | None:
 
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+    path.write_bytes((text if text.endswith("\n") else text + "\n").encode("utf-8"))
 
 
 def _proofread_artifact_paths(proofreading_dir: Path, text_filename: str) -> dict[str, Path]:
@@ -415,8 +415,8 @@ def _chapter_file_names(config: dict[str, Any], chapter_number: int) -> dict[str
 
 
 def _canonical_text_value(corrected_text: str) -> str:
-    """Match the prepared text convention of one artifact-final LF."""
-    return corrected_text.rstrip("\n")
+    """Normalize canonical artifact line endings without applying identity normalization."""
+    return corrected_text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
 
 
 def _validate_proofreader_locale(proofreader: Any, locale: LocaleSpec) -> None:

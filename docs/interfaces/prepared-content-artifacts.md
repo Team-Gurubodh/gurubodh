@@ -129,6 +129,12 @@ instruction-template ID/version/hash, request pacing/usage, local diff summary,
 and Gemini edit explanations. It contains no full source/corrected text,
 prompts, API keys, or raw responses.
 
+Every newly published canonical `.txt` is UTF-8 bytes with no carriage-return
+byte: internal line boundaries use LF and the file has exactly one final LF.
+`integrity.artifacts.text` checks those exact emitted bytes. This byte-format
+normalization only converts CRLF and lone CR before the final-LF convention; it
+does not apply the separate content-identity normalization rules below.
+
 `chapters/proofreading/proofreading_manifest.json` remains an aggregate
 operational provenance artifact. It is not part of the five per-chapter files.
 
@@ -190,6 +196,10 @@ chapter content keys and their metadata/text references. It does not retain
 history or create a chapter registry. Existing prepared trees must be fully
 regenerated with `gurubodh prep-subject --overwrite` before `generate-chunks`;
 the chunk command refuses metadata without valid content identity.
+An already published canonical text artifact containing a carriage return is
+malformed even if its metadata claims `line_endings: LF`; it is not repaired by
+derived commands and requires that intentional `prep-subject --overwrite`
+regeneration before either derived command can consume it.
 
 ## Candidate Semantic Chunks
 
