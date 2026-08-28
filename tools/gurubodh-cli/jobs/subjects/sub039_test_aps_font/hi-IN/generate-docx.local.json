@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "pipeline": "generate-docx",
+  "source": {
+    "backend": "local",
+    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
+    "subject_dir": "39_test_aps_font/hi-IN"
+  },
+  "destination": {
+    "backend": "local",
+    "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
+    "subject_dir": "39_test_aps_font/hi-IN"
+  },
+  "naming": {
+    "category_code": "CAT004",
+    "subject_code": "SUB039",
+    "title_slug": "aacharan-shastra",
+    "language": "hi-IN"
+  }
+}
