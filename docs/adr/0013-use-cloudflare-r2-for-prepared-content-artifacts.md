@@ -41,7 +41,9 @@ cms_library/{subject_dir}/chapters/unmodified_source_text/
 cms_library/{subject_dir}/chapters/proofreading/
 cms_library/{subject_dir}/chapters/chapter_content_manifest.json
 cms_library/{subject_dir}/chapters/msword/
+cms_library/{subject_dir}/chapters/semantic_chunks/
 cms_library/{subject_dir}/run_reports/generate-docx/
+cms_library/{subject_dir}/run_reports/generate-chunks/
 ```
 
 Source and transient Unicode DOCX processing is internal to `prep-subject`.
@@ -51,6 +53,13 @@ Each ready DOCX set contains one version-aligned `.docx` per manifest chapter
 and a `docx_manifest.json` readiness marker uploaded after all DOCX objects.
 The manifest binds exact source-manifest bytes, canonical identities, source
 text checksums, formatting/title contracts, and generated file checksums.
+
+Derived semantic chunks follow the same readiness-based R2 publication rule.
+`semantic_chunks_manifest.json` is uploaded after all validated chunk objects.
+On overwrite, each derived command removes its old readiness manifest before
+replacement uploads and publishes the new readiness manifest last. This is not
+an atomic multi-object release; a prefix without its readiness manifest is
+incomplete.
 
 Metadata stores storage references containing backend, bucket, object key, and
 an optional nullable URL. Public object URLs are not required.

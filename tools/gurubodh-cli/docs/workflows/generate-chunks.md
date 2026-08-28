@@ -19,7 +19,7 @@ gurubodh generate-chunks \
   --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
 ```
 
-The command validates the candidate manifest and its selected metadata/text pairs before initializing the model. It writes one `*.chunks.json` per chapter, a `semantic_chunks_manifest.json`, and run reports under:
+The command validates the candidate manifest and its selected metadata/text pairs before initializing the model. It generates one `*.chunks.json` per chapter and `semantic_chunks_manifest.json` in a unique staged workspace, validates the complete package, then revalidates the canonical release immediately before publication. The manifest is the readiness marker. Published output and run reports live under:
 
 ```text
 <subject-group>/<language>/chapters/semantic_chunks/
@@ -30,6 +30,10 @@ Chunk artifacts bind back to canonical content through checksums and content ide
 
 ## Replacement and standalone experiments
 
-Without `--overwrite`, an existing chunk output fails preflight. With it, only the command-owned semantic-chunk output (and the legacy combined-output location when present) is replaced. Do not run another writer for that subject and locale at the same time.
+Without `--overwrite`, an existing chunk output fails preflight without modifying it. With `--overwrite`, the prior local chunk set remains in place through generation, staged validation, and source revalidation; publication then swaps only the complete `chapters/semantic_chunks/` directory. A failed pre-publication rerun therefore leaves the prior ready set intact. The unsupported legacy `chapters/semantic_chunks_and_embeddings/` location is not removed during preflight. On a successful overwrite it is removed after the v2 output publishes, and that cleanup is recorded in the audit.
+
+For R2 overwrite, the old readiness manifest is removed before replacement objects upload, validated chunk artifacts upload next, and `semantic_chunks_manifest.json` publishes last. A failed upload leaves no readiness manifest for the partial replacement. This is a readiness protocol, not an atomic multi-object replacement; do not run another writer for that subject and locale at the same time.
+
+Every success or failure writes JSON and Markdown audit reports. Failure reports include the active lifecycle state, bounded error information, the known prior/publication state, upload and deletion progress, and per-chapter progress. R2 failure reports are uploaded when the reporting path remains available.
 
 For the lower-level experimental boundary, see [Semantic chunking](../reference/semantic-chunking.md). Those results are non-canonical and are not preparation artifacts.

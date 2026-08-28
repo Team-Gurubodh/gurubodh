@@ -77,4 +77,12 @@ docker run --rm \
 
 DOCX generation needs R2 credentials but neither Gemini nor model cache. All commands download inputs to temporary container storage and upload their owned outputs to R2.
 
+## Derived-output readiness and failed retries
+
+`generate-chunks` and `generate-docx` share one staged lifecycle. Both validate all staged objects and revalidate the canonical source before R2 publication begins. Their readiness markers are `semantic_chunks_manifest.json` and `docx_manifest.json` respectively.
+
+An overwrite removes the old command readiness manifest first, replaces only the command-owned prefix, uploads the validated readiness manifest last, and publishes non-readiness success audits afterward. If an artifact upload fails, the command attempts to remove the readiness manifest and upload a failure audit under `run_reports/<command>/`. Treat a prefix without its readiness manifest as incomplete and rerun with `--overwrite` only after reviewing the failure audit.
+
+This multi-object sequence is not atomic: readers may observe object deletion or replacement while an overwrite is in progress, and concurrent writers are unsupported. A versioned-release/current-pointer protocol is not implemented. Schedule one derived writer per command, subject, and locale, and rely on the readiness marker—not prefix contents alone—before consumption.
+
 Audit reports identify the baked source revision and provenance source. After a maintained configuration change, build and publish a new image, then use its new immutable tag or digest. Review [Artifact lifecycle](../concepts/artifact-lifecycle.md) and the relevant workflow before any `--overwrite` retry.
