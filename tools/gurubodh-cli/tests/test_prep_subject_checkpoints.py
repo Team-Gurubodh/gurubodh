@@ -203,7 +203,11 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     f"{root / 'subject' / 'hi-IN'}. Chapters: 2 succeeded, 0 failed, 0 pending."
                 )
                 self.assertEqual(result["status"], "succeeded")
-                self.assertEqual(output.getvalue().rstrip().splitlines()[-1], expected)
+                self.assertIn(expected, output.getvalue())
+                self.assertTrue(output.getvalue().startswith("=" * 72 + "\n"))
+                self.assertIn("IMPORTANT: prep-subject is single-writer per destination.", output.getvalue())
+                self.assertIn("checkpoint/workspace artifacts.\n", output.getvalue())
+                self.assertIn("prep-subject metrics: Gemini generate_content attempts 2 (2 succeeded, 0 failed).", output.getvalue())
 
             subject = root / "subject" / "hi-IN"
             self.assertFalse((subject / "full_subject").exists())
@@ -288,19 +292,26 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertTrue(result["already_complete"])
             self.assertEqual(resumed.calls, [])
             self.assertNotIn("[prepare]", output.getvalue())
-            self.assertEqual(
-                output.getvalue().rstrip(),
+            self.assertIn(
                 "prep-subject already complete; the compatible checkpoint is succeeded. No Gemini requests were made.",
+                output.getvalue(),
             )
+            self.assertIn("prep-subject metrics: Gemini generate_content attempts 0 (0 succeeded, 0 failed).", output.getvalue())
 
     def test_resume_reuses_valid_success_and_publishes_only_after_all_chapters_succeed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             write_docx(root / "source.docx")
             job_config = config(root)
+            failed_request = ProofreadingError(
+                "api_error",
+                "temporary provider failure",
+                retryable=True,
+                request_attempts=2,
+            )
             first = FakeProofreader([
                 "CHAPTER 1\nपहला सही पाठ।",
-                ProofreadingError("api_error", "temporary provider failure", retryable=True),
+                failed_request,
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
                 with self.assertRaisesRegex(SystemExit, "incomplete"):
@@ -346,9 +357,15 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 "backend": "r2", "bucket": "test-bucket", "prefix": "cms_library", "subject_dir": "subject/hi-IN", "url_base": None,
             }
             client = FakeR2Client()
+            failed_request = ProofreadingError(
+                "api_error",
+                "temporary provider failure",
+                retryable=True,
+                request_attempts=2,
+            )
             first = FakeProofreader([
                 "CHAPTER 1\nपहला सही पाठ।",
-                ProofreadingError("api_error", "temporary provider failure", retryable=True),
+                failed_request,
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
                 with self.assertRaisesRegex(SystemExit, "incomplete"):
@@ -360,6 +377,79 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertEqual(state["state"], "incomplete")
             self.assertTrue(any(key.startswith(workspace_prefix) for key in client.objects))
             self.assertFalse(any("/.transient/" in key for key in client.objects))
+            self.assertEqual(client.uploads.count(state_key), 6)
+            source_uploads = [
+                key
+                for key in client.uploads
+                if key.startswith(workspace_prefix) and "/unmodified_source_text/" in key
+            ]
+            self.assertEqual(len(source_uploads), 2)
+            self.assertTrue(all(client.uploads.count(key) == 1 for key in source_uploads))
+            checkpoint_artifact_uploads = [
+                key
+                for key in client.uploads
+                if key.startswith(workspace_prefix) and key != state_key
+            ]
+            self.assertTrue(all(client.uploads.count(key) == 1 for key in checkpoint_artifact_uploads))
+            report_key = next(key for key in client.objects if "/run_reports/prep-subject/" in key and key.endswith(".json"))
+            report = json.loads(client.objects[report_key].decode("utf-8"))
+            self.assertEqual(
+                report["run_metrics"]["gemini_generate_content_requests"],
+                {
+                    "attempts_total": 3,
+                    "attempts_succeeded": 1,
+                    "attempts_failed": 2,
+                    "definition": "Actual Gemini generate_content request attempts in this invocation, including retries and terminal failures; excludes reused checkpoints and local pacing waits.",
+                },
+            )
+            self.assertEqual(report["run_metrics"]["r2_object_upload_requests"]["attempts_total"], 12)
+            self.assertEqual(
+                report["run_metrics"]["r2_object_upload_requests"]["breakdown"],
+                {
+                    "checkpoint_source_snapshots": {
+                        "attempts_total": 2,
+                        "attempts_succeeded": 2,
+                        "attempts_failed": 0,
+                        "definition": "Initial retained source snapshots committed with the chapter plan.",
+                    },
+                    "checkpoint_chapter_artifacts": {
+                        "attempts_total": 4,
+                        "attempts_succeeded": 4,
+                        "attempts_failed": 0,
+                        "definition": "New canonical text, metadata, diff, and provenance artifacts from successful chapters.",
+                    },
+                    "checkpoint_state_commits": {
+                        "attempts_total": 6,
+                        "attempts_succeeded": 6,
+                        "attempts_failed": 0,
+                        "definition": "Job-state JSON commits for checkpoint, publication, workspace, or advisory-lease transitions.",
+                    },
+                    "checkpoint_state_archives": {
+                        "attempts_total": 0,
+                        "attempts_succeeded": 0,
+                        "attempts_failed": 0,
+                        "definition": "Prior job-state archives created by --overwrite.",
+                    },
+                    "canonical_publication_artifacts": {
+                        "attempts_total": 0,
+                        "attempts_succeeded": 0,
+                        "attempts_failed": 0,
+                        "definition": "Final canonical prep artifacts and readiness manifests published from the workspace.",
+                    },
+                },
+            )
+            markdown_key = report_key.removesuffix(".json") + ".md"
+            self.assertIn("## Run metrics", client.objects[markdown_key].decode("utf-8"))
+            self.assertIn("R2 object-upload request attempts", client.objects[markdown_key].decode("utf-8"))
+            self.assertIn("### R2 upload breakdown", client.objects[markdown_key].decode("utf-8"))
+
+            # Simulate a crash after chapter 001 artifacts uploaded but before
+            # their state commit. Resumption must reconcile them without a new
+            # Gemini request for that chapter.
+            state["chapters"][0]["state"] = "pending"
+            state["chapters"][0]["successful_artifacts"] = []
+            state["chapters"][0]["proofreading"] = None
+            client.objects[state_key] = json.dumps(state).encode("utf-8")
 
             second = FakeProofreader(["CHAPTER 2\nदूसरा सही पाठ।"])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=second):

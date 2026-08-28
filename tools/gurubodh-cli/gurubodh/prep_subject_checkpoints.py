@@ -61,6 +61,17 @@ WORK_RELATIVE_DIR = Path(".work") / "prep-subject"
 PREP_REPORT_RELATIVE_DIR = Path("run_reports") / "prep-subject"
 LEASE_SECONDS = 120
 INFRASTRUCTURE_FAILURE_CIRCUIT_BREAKER = 2
+R2_UPLOAD_BREAKDOWN_DEFINITIONS = {
+    "checkpoint_source_snapshots": "Initial retained source snapshots committed with the chapter plan.",
+    "checkpoint_chapter_artifacts": "New canonical text, metadata, diff, and provenance artifacts from successful chapters.",
+    "checkpoint_state_commits": "Job-state JSON commits for checkpoint, publication, workspace, or advisory-lease transitions.",
+    "checkpoint_state_archives": "Prior job-state archives created by --overwrite.",
+    "canonical_publication_artifacts": "Final canonical prep artifacts and readiness manifests published from the workspace.",
+}
+
+
+def _attempt_counters() -> dict[str, int]:
+    return {"attempts_total": 0, "attempts_succeeded": 0, "attempts_failed": 0}
 
 
 def _sha256(path: Path) -> str:
@@ -146,6 +157,22 @@ class PrepCheckpointManager:
         self.destination = config["destination"]
         self.r2_client = r2_client
         self.state: dict[str, Any] | None = None
+        self.metrics = {
+            "gemini_generate_content_requests": {
+                **_attempt_counters(),
+            },
+            "r2_object_upload_requests": (
+                {
+                    **_attempt_counters(),
+                    "breakdown": {
+                        category: _attempt_counters()
+                        for category in R2_UPLOAD_BREAKDOWN_DEFINITIONS
+                    },
+                }
+                if is_r2(self.destination)
+                else None
+            ),
+        }
         self.owner_id = str(uuid.uuid4())
         self.local_lock_path: Path | None = None
         self.local_lock_created = False
@@ -212,8 +239,9 @@ class PrepCheckpointManager:
                 self.local_lock_path.unlink(missing_ok=True)
                 return self._acquire_local_lock()
             raise SystemExit(
-                f"Another prep-subject writer is active for {self.subject_dir}. "
-                "Wait for it to finish, or use --resume after an interrupted writer's lease has expired."
+                f"Another prep-subject writer appears active for {self.subject_dir}; the local advisory lock is not "
+                "reliable mutual exclusion. Wait for it to finish, or use --resume after an interrupted writer's "
+                "advisory lock has expired."
             ) from exc
         os.write(descriptor, self.owner_id.encode("utf-8"))
         os.close(descriptor)
@@ -242,11 +270,10 @@ class PrepCheckpointManager:
             return
         archive_path = self.subject_dir / archive_relative
         _write_json_atomically(archive_path, self.state)
-        upload_r2_file(
-            self.client,
-            self.destination,
+        self._upload_r2_file(
             archive_path,
             destination_object_key(self.config, archive_relative),
+            category="checkpoint_state_archives",
         )
         self.client.delete_prefix(
             self.destination["bucket"],
@@ -292,6 +319,10 @@ class PrepCheckpointManager:
                     "configuration. Re-run with --overwrite; checkpoints from different inputs are never mixed."
                 )
             elif self.state.get("state") == "succeeded":
+                self.state["run"] = self.state.get("run", {}) | {
+                    "run_id": str(uuid.uuid4()),
+                    "last_started_at": utc_now(),
+                }
                 return "already_complete"
         elif self.resume:
             raise SystemExit("No prep-subject checkpoint exists to resume. Run without --resume to start a new job.")
@@ -347,8 +378,8 @@ class PrepCheckpointManager:
         lease = self.state.get("lease") or {}
         if lease.get("active") and lease.get("owner_id") != self.owner_id and lease.get("expires_at_epoch", 0) > time.time():
             raise SystemExit(
-                "Another prep-subject process holds an active destination lease. Wait for it to finish or resume "
-                "after its lease expires."
+                "Another prep-subject process appears to hold an active destination advisory lease. This is not "
+                "reliable mutual exclusion; wait for it to finish or resume after its advisory lease expires."
             )
 
     def _claim_lease(self) -> None:
@@ -364,34 +395,62 @@ class PrepCheckpointManager:
         self._claim_lease()
         if self.local_lock_created and self.local_lock_path:
             os.utime(self.local_lock_path, None)
-        self.persist()
+        # R2 heartbeats are deliberately in-memory only. The lease is advisory,
+        # and a progress signal must not become a workspace scan or state commit.
 
-    def persist(self) -> None:
+    def persist(
+        self,
+        checkpoint_artifacts: list[Path] | None = None,
+        checkpoint_artifact_category: str | None = None,
+        count_r2_uploads: bool = True,
+    ) -> None:
         if not self.state:
             return
         self.state["updated_at"] = utc_now()
         self.state["counts"] = _counts(self.state.get("chapters", []))
         _write_json_atomically(self.state_path, self.state)
         if self.is_r2:
-            self._sync_workspace_to_r2()
-            upload_r2_file(
-                self.client,
-                self.destination,
+            for path in checkpoint_artifacts or []:
+                relative = path.relative_to(self.subject_dir)
+                self._upload_r2_file(
+                    path,
+                    destination_object_key(self.config, relative),
+                    category=checkpoint_artifact_category,
+                    count_r2_uploads=count_r2_uploads,
+                )
+            # The job state is the commit record, and must be uploaded after all
+            # durable workspace artifacts for this checkpoint event.
+            self._upload_r2_file(
                 self.state_path,
                 destination_object_key(self.config, JOB_STATE_RELATIVE_PATH),
+                category="checkpoint_state_commits",
+                count_r2_uploads=count_r2_uploads,
             )
 
-    def _sync_workspace_to_r2(self) -> None:
-        if not self.workspace_dir.exists():
-            return
-        for path in sorted(item for item in self.workspace_dir.rglob("*") if item.is_file()):
-            relative = path.relative_to(self.subject_dir)
-            upload_r2_file(
-                self.client,
-                self.destination,
-                path,
-                destination_object_key(self.config, relative),
-            )
+    def _upload_r2_file(
+        self,
+        path: Path,
+        key: str,
+        *,
+        category: str | None = None,
+        count_r2_uploads: bool = True,
+    ) -> None:
+        counters = self.metrics["r2_object_upload_requests"]
+        if count_r2_uploads and counters is not None:
+            if category not in R2_UPLOAD_BREAKDOWN_DEFINITIONS:
+                raise RuntimeError(f"Missing or invalid R2 upload metric category: {category!r}")
+            counters["attempts_total"] += 1
+            counters["breakdown"][category]["attempts_total"] += 1
+        try:
+            upload_r2_file(self.client, self.destination, path, key)
+        except BaseException:
+            if count_r2_uploads and counters is not None:
+                counters["attempts_failed"] += 1
+                counters["breakdown"][category]["attempts_failed"] += 1
+            raise
+        if count_r2_uploads and counters is not None:
+            counters["attempts_succeeded"] += 1
+            counters["breakdown"][category]["attempts_succeeded"] += 1
 
     def materialize_source(self) -> Path:
         path, self.source_temp_dir = materialize_source(
@@ -421,7 +480,10 @@ class PrepCheckpointManager:
             )
         self.state["chapters"] = chapters
         self.state["preparation"] = preparation
-        self.persist()
+        self.persist(
+            checkpoint_artifacts=source_paths,
+            checkpoint_artifact_category="checkpoint_source_snapshots",
+        )
 
     def discard_transient_preparation(self) -> None:
         """Remove a prepared full-subject working DOCX after snapshots are durable."""
@@ -447,12 +509,14 @@ class PrepCheckpointManager:
     def reconcile_successes(self) -> list[str]:
         """Validate saved successes and repair a crash between artifact and state writes."""
         reused = []
+        changed = False
         for chapter in self.state.get("chapters", []):
             valid = self._validate_success_artifacts(chapter)
             if chapter.get("state") == "succeeded":
                 if valid:
                     reused.append(chapter["chapter_number"])
                 else:
+                    changed = True
                     chapter["state"] = "pending"
                     chapter["successful_artifacts"] = []
                     chapter["proofreading"] = None
@@ -462,13 +526,15 @@ class PrepCheckpointManager:
                     }
                     chapter["updated_at"] = utc_now()
             elif valid:
+                changed = True
                 chapter["state"] = "succeeded"
                 chapter["successful_artifacts"] = self._expected_artifact_records(chapter)
                 chapter["proofreading"] = self._reconciled_proofreading_summary(chapter)
                 chapter["latest_error"] = None
                 chapter["updated_at"] = utc_now()
                 reused.append(chapter["chapter_number"])
-        self.persist()
+        if changed:
+            self.persist()
         return reused
 
     def _expected_artifact_paths(self, chapter: dict[str, Any]) -> list[Path]:
@@ -572,15 +638,48 @@ class PrepCheckpointManager:
         chapter["succeeded_at"] = utc_now()
         chapter["latest_error"] = None
         chapter["successful_artifacts"] = result.pop("checkpoint_artifacts")
+        request_metrics = {
+            "attempts": result.pop("gemini_request_attempts", 0),
+            "successful_request_attempts": result.pop("gemini_successful_request_attempts", 0),
+        }
         chapter["proofreading"] = result
-        self.persist()
+        self._record_gemini_success(request_metrics)
+        self.persist(
+            checkpoint_artifacts=[
+                self.paths["subject"] / record["path"]
+                for record in chapter["successful_artifacts"]
+                # Source snapshots are committed once with the chapter plan.
+                # A chapter success commits only newly generated durable output.
+                if not str(record["path"]).startswith("chapters/unmodified_source_text/")
+            ],
+            checkpoint_artifact_category="checkpoint_chapter_artifacts",
+        )
 
     def mark_chapter_failure(self, chapter: dict[str, Any], exc: BaseException) -> None:
         chapter["state"] = "failed"
         chapter["attempt_count"] += 1
         chapter["updated_at"] = utc_now()
         chapter["latest_error"] = _safe_error(exc)
+        self._record_gemini_failure(exc)
         self.persist()
+
+    def _record_gemini_success(self, result: dict[str, Any]) -> None:
+        attempts = int(result.get("attempts", 0))
+        succeeded = int(result.get("successful_request_attempts", attempts))
+        succeeded = min(max(succeeded, 0), attempts)
+        counters = self.metrics["gemini_generate_content_requests"]
+        counters["attempts_total"] += attempts
+        counters["attempts_succeeded"] += succeeded
+        counters["attempts_failed"] += attempts - succeeded
+
+    def _record_gemini_failure(self, exc: BaseException) -> None:
+        attempts = int(getattr(exc, "request_attempts", 0))
+        succeeded = int(getattr(exc, "successful_request_attempts", 0))
+        succeeded = min(max(succeeded, 0), attempts)
+        counters = self.metrics["gemini_generate_content_requests"]
+        counters["attempts_total"] += attempts
+        counters["attempts_succeeded"] += succeeded
+        counters["attempts_failed"] += attempts - succeeded
 
     def mark_global_failure(self, exc: BaseException) -> None:
         self.state["state"] = "failed"
@@ -720,7 +819,7 @@ class PrepCheckpointManager:
                 )
         uploads.sort(key=lambda item: item[0].relative_to(self.workspace_dir) == manifest_relative)
         for path, key in uploads:
-            upload_r2_file(self.client, self.destination, path, key)
+            self._upload_r2_file(path, key, category="canonical_publication_artifacts")
         if self.overwrite:
             uploaded_keys = {key for _, key in uploads}
             stale_keys = []
@@ -753,6 +852,13 @@ class PrepCheckpointManager:
 
     def write_report(self, config_path, entry_point: str, status: str, failure: dict[str, str] | None, reused: list[str], attempted: list[str]) -> dict[str, Any]:
         """Write immutable, text-free invocation reports at the destination."""
+        if self.is_r2 and self.state.get("lease", {}).get("owner_id") == self.owner_id:
+            # Release the advisory lease before snapshotting metrics into the
+            # immutable report. This is an actual state transition, not a
+            # heartbeat, and permits an immediate --resume after an incomplete
+            # invocation.
+            self.state["lease"] = self.state["lease"] | {"active": False, "released_at": utc_now()}
+            self.persist()
         locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
         artifact_root = (
             subject_artifact_prefix(self.destination)
@@ -785,6 +891,7 @@ class PrepCheckpointManager:
             "failure_stage": "proofreading" if status == "incomplete" else ("global" if failure else None),
             "failure": failure,
             "counts": self.state["counts"],
+            "run_metrics": self._report_metrics(),
             "processing_summary": {
                 "source_materialization_status": "succeeded",
                 "source_docx_validation_status": (
@@ -826,19 +933,73 @@ class PrepCheckpointManager:
         self.state["run_reports"].append(references)
         if self.is_r2:
             for path in (json_path, markdown_path):
-                upload_r2_file(
-                    self.client,
-                    self.destination,
+                # Audit-report writes do not count as R2 publication or
+                # checkpoint upload attempts, so the report is immutable.
+                self._upload_r2_file(
                     path,
                     destination_object_key(self.config, PREP_REPORT_RELATIVE_DIR / path.name),
+                    count_r2_uploads=False,
                 )
-        self.persist()
+        # R2 reports are immutable standalone records. Avoid a follow-up state
+        # write solely to index those reports, so audit creation cannot add an
+        # uncounted checkpoint upload after the report has captured its metrics.
+        if not self.is_r2:
+            self.persist()
         return references
+
+    def _report_metrics(self) -> dict[str, Any]:
+        return {
+            "gemini_generate_content_requests": {
+                **self.metrics["gemini_generate_content_requests"],
+                "definition": (
+                    "Actual Gemini generate_content request attempts in this invocation, including retries and "
+                    "terminal failures; excludes reused checkpoints and local pacing waits."
+                ),
+            },
+            "r2_object_upload_requests": (
+                {
+                    **{
+                        key: value
+                        for key, value in self.metrics["r2_object_upload_requests"].items()
+                        if key != "breakdown"
+                    },
+                    "definition": (
+                        "R2 object-upload request attempts in this invocation caused by checkpoint commits or "
+                        "canonical prep publication; excludes reads, lists, deletes, and audit-report uploads."
+                    ),
+                    "breakdown": {
+                        category: {
+                            **counters,
+                            "definition": R2_UPLOAD_BREAKDOWN_DEFINITIONS[category],
+                        }
+                        for category, counters in self.metrics["r2_object_upload_requests"]["breakdown"].items()
+                    },
+                }
+                if self.metrics["r2_object_upload_requests"] is not None
+                else None
+            ),
+        }
+
+    def print_metrics_summary(self) -> None:
+        gemini = self.metrics["gemini_generate_content_requests"]
+        summary = (
+            "prep-subject metrics: Gemini generate_content attempts "
+            f"{gemini['attempts_total']} ({gemini['attempts_succeeded']} succeeded, "
+            f"{gemini['attempts_failed']} failed)"
+        )
+        r2 = self.metrics["r2_object_upload_requests"]
+        if r2 is not None:
+            summary += (
+                "; R2 object-upload attempts "
+                f"{r2['attempts_total']} ({r2['attempts_succeeded']} succeeded, {r2['attempts_failed']} failed)"
+            )
+        print(summary + ".")
 
     def close(self) -> None:
         if self.state and self.state.get("lease", {}).get("owner_id") == self.owner_id:
             self.state["lease"] = self.state.get("lease", {}) | {"active": False, "released_at": utc_now()}
-            self.persist()
+            if not self.is_r2:
+                self.persist()
         if self.local_lock_created and self.local_lock_path:
             self.local_lock_path.unlink(missing_ok=True)
         if self.source_temp_dir:
@@ -875,7 +1036,37 @@ def _render_report_markdown(report: dict[str, Any]) -> str:
         f"- Canonical chapters succeeded: `{report['processing_summary']['canonical_chapters_succeeded']}`",
         f"- Proofreading manifest: `{report['processing_summary']['proofreading_manifest_status']}`",
         f"- Chapter content manifest: `{report['processing_summary']['chapter_content_manifest_status']}`",
+        "",
+        "## Run metrics",
+        "",
     ]
+    gemini = report["run_metrics"]["gemini_generate_content_requests"]
+    lines.append(
+        "- Gemini `generate_content` request attempts: "
+        f"`{gemini['attempts_total']}` total, `{gemini['attempts_succeeded']}` succeeded, "
+        f"`{gemini['attempts_failed']}` failed. {gemini['definition']}"
+    )
+    r2 = report["run_metrics"]["r2_object_upload_requests"]
+    if r2 is not None:
+        lines.append(
+            "- R2 object-upload request attempts: "
+            f"`{r2['attempts_total']}` total, `{r2['attempts_succeeded']}` succeeded, "
+            f"`{r2['attempts_failed']}` failed. {r2['definition']}"
+        )
+        lines.extend(
+            [
+                "",
+                "### R2 upload breakdown",
+                "",
+                "| Category | Total | Succeeded | Failed |",
+                "| --- | ---: | ---: | ---: |",
+            ]
+        )
+        lines.extend(
+            f"| {category} — {counters['definition']} | {counters['attempts_total']} | "
+            f"{counters['attempts_succeeded']} | {counters['attempts_failed']} |"
+            for category, counters in r2["breakdown"].items()
+        )
     if report["failure"]:
         lines.extend(["", "## Failure", "", f"- {report['failure']['code']}: {report['failure']['message']}"])
     lines.extend(["", "## Chapters", "", "| Chapter | State | Attempts | Outcome |", "| --- | --- | ---: | --- |"])
@@ -993,13 +1184,34 @@ def run_resumable_prep_job(
     reused: list[str] = []
     attempted: list[str] = []
     try:
+        print(
+            "\n".join(
+                (
+                    "=" * 72,
+                    "IMPORTANT: prep-subject is single-writer per destination.",
+                    "Run only one local or R2 writer for this subject at a time.",
+                    "Concurrent runs can duplicate Gemini calls and overwrite",
+                    "checkpoint/workspace artifacts.",
+                    "The local advisory lock and R2 advisory lease are guardrails,",
+                    "not reliable mutual exclusion.",
+                    "=" * 72,
+                )
+            )
+        )
         manager.open()
         source_path = manager.materialize_source()
         validate_supported_source_fonts(source_path)
         outcome = manager.begin(_sha256(source_path))
         if outcome == "already_complete":
             print("prep-subject already complete; the compatible checkpoint is succeeded. No Gemini requests were made.")
-            return {"status": "succeeded", "already_complete": True, "counts": manager.state["counts"]}
+            manager.write_report(config_path, entry_point, "succeeded", None, reused, attempted)
+            manager.print_metrics_summary()
+            return {
+                "status": "succeeded",
+                "already_complete": True,
+                "counts": manager.state["counts"],
+                "metrics": manager._report_metrics(),
+            }
 
         paths = manager.paths
         ensure_job_dirs(paths)
@@ -1034,6 +1246,7 @@ def run_resumable_prep_job(
             except BaseException as exc:
                 manager.mark_global_failure(exc)
                 manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
+                manager.print_metrics_summary()
                 raise
 
         manager.discard_transient_preparation()
@@ -1066,6 +1279,7 @@ def run_resumable_prep_job(
                 if _is_global_proofreading_failure(exc):
                     manager.mark_global_failure(exc)
                     manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
+                    manager.print_metrics_summary()
                     raise SystemExit(str(exc)) from exc
                 if exc.code in {"api_error", "rate_limited"}:
                     consecutive_infrastructure_failures += 1
@@ -1077,6 +1291,7 @@ def run_resumable_prep_job(
         if any(chapter["state"] != "succeeded" for chapter in manager.state["chapters"]):
             manager.mark_incomplete()
             manager.write_report(config_path, entry_point, "incomplete", None, reused, attempted)
+            manager.print_metrics_summary()
             raise SystemExit(
                 "prep-subject is incomplete; successful chapter checkpoints were retained. "
                 "Re-run with --resume to retry failed or pending chapters."
@@ -1091,6 +1306,7 @@ def run_resumable_prep_job(
             manager.state["failure"] = _safe_error(exc)
             manager.persist()
             manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
+            manager.print_metrics_summary()
             raise
         manager.write_report(config_path, entry_point, "succeeded", None, reused, attempted)
         counts = manager.state["counts"]
@@ -1100,6 +1316,12 @@ def run_resumable_prep_job(
             f"{artifact_root}. Chapters: {counts['succeeded']} succeeded, "
             f"{counts['failed']} failed, {counts['pending']} pending."
         )
-        return {"status": "succeeded", "already_complete": False, "counts": manager.state["counts"]}
+        manager.print_metrics_summary()
+        return {
+            "status": "succeeded",
+            "already_complete": False,
+            "counts": manager.state["counts"],
+            "metrics": manager._report_metrics(),
+        }
     finally:
         manager.close()

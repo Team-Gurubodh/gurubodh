@@ -48,7 +48,11 @@ gurubodh prep-subject \
   --overwrite
 ```
 
-An overwrite replaces only preparation-owned paths after a complete candidate is staged. It invalidates same-locale semantic chunks and DOCX exports because they can no longer be bound to the new canonical manifest. It is not a concurrent-writer or atomic-publication protocol; run one writer per subject and locale.
+An overwrite replaces only preparation-owned paths after a complete candidate is staged. It invalidates same-locale semantic chunks and DOCX exports because they can no longer be bound to the new canonical manifest. `prep-subject` is a single-writer operation per destination: run one writer per subject and locale. Its local advisory lock and R2 advisory lease are guardrails, not reliable mutual exclusion; concurrent runs can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
+
+For R2, checkpoints are append-only commits. Initial source snapshots upload once with the chapter plan state commit; each successful chapter uploads only its newly generated text, metadata, diff, and provenance artifacts before the state that marks that chapter successful. Failure state changes upload state only, and advisory heartbeats upload neither workspace artifacts nor state. The job-state JSON is uploaded last for each checkpoint event.
+
+Every invocation writes JSON and Markdown audit reports with run metrics and prints the same concise summary. `gemini_generate_content_requests` counts actual request attempts (including retries and terminal failures, excluding checkpoint reuse and local waits). R2 jobs also record `r2_object_upload_requests`: checkpoint and canonical-publication upload attempts, excluding reads, lists, deletes, and audit-report uploads. Both metrics expose total, succeeded, and failed attempts. R2 audit reports additionally break uploads down by source snapshots, successful chapter artifacts, state commits, overwrite archives, and canonical publication; the terminal prints totals only.
 
 ## Source handling and migration
 
