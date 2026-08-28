@@ -37,7 +37,7 @@ jobs:
             IMAGE_VERSION=smoke-${{ github.sha }}
             IMAGE_CREATED=${{ github.event.repository.updated_at }}
       - name: Run CLI unit tests
-        run: docker run --rm --workdir /opt/gurubodh-cli --entrypoint python gurubodh-cli:smoke -m unittest discover -s tests -v
+        run: docker run --rm --volume "${{ github.workspace }}/tools/gurubodh-cli/tests:/opt/gurubodh-cli/tests:ro" --workdir /opt/gurubodh-cli --entrypoint python gurubodh-cli:smoke -m unittest discover -s tests -v
       - name: Verify CLI and bundled Node converter runtime
         run: |
           docker run --rm gurubodh-cli:smoke --help
