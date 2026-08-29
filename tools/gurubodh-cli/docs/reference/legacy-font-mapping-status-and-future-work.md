@@ -39,6 +39,17 @@ The local mapping file is:
 scripts/vendor/hindietools_aps_prakash_to_unicode.js
 ```
 
+Its current SHA-256 is:
+
+```text
+b3500e3e91b548e3ccd0f85150719c05d527dc21c4677871002b8b64e05bcae7
+```
+
+The file was imported with the initial monorepo commit (`5801b4e`, 2026-06-20).
+It contains no source URL, retrieval date, or licence notice, so the project
+does not assert any further provenance. Its original online source is not
+currently known.
+
 The dispatcher is:
 
 ```text
@@ -46,6 +57,24 @@ scripts/legacy_font_convert.js
 ```
 
 The DOCX converter detects APS-like font names and routes those text runs through the APS converter. APS conversion runs locally and offline as long as `node` and the local project files are available.
+
+### APS regression evidence
+
+`tests/fixtures/aps_prakash_golden.json` pins the vendored mapping checksum and
+contains small, non-sensitive APS-to-Unicode examples. The test suite runs them
+through the production Python adapter and bundled Node converter, and also
+checks DOCX handling for APS text split between runs, inherited APS paragraph
+styles, and adjacent Unicode text.
+
+The fixtures cover matras, rephs, half letters and conjuncts, anusvar,
+chandrabindu, visarga, nukta, digits, punctuation, whitespace, and the APS
+post-processing rule. Their expected Unicode values were manually checked
+against the vendored replacement table and Devanagari orthography. They are
+regression evidence for this pinned local implementation—not proof that it is
+an authoritative or universally correct APS encoding specification.
+
+Continue to manually review converted source material. A source document may
+still use a legacy sequence that is not represented by the small fixture set.
 
 ## What remains risky
 
@@ -121,7 +150,9 @@ distinct converter key and a centrally reviewed source-font allowlist entry.
 
 ### 5. Add automated mapping tests
 
-Add small local tests that run each mapping against known samples and compare the output to expected Unicode.
+Maintain small local tests that run each mapping against known samples and compare the output to expected Unicode. For APS, the initial golden corpus is
+`tests/fixtures/aps_prakash_golden.json`. Expand it only with a documented
+verification method and source provenance.
 
 Example direction:
 
