@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from gurubodh.canonical_source import revalidate_source_release
+from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import (
     R2StorageClient,
     is_local,
@@ -40,6 +41,7 @@ class DerivedArtifactDefinition:
     output_relative_dir: Path
     readiness_manifest_filename: str
     report_relative_dir: Path
+    readiness_manifest_artifact_name: str | None = None
     legacy_output_relative_dirs: tuple[Path, ...] = ()
 
 
@@ -544,10 +546,17 @@ def run_derived_artifact_lifecycle(
             trace.enter(LifecycleState.STAGED_VALIDATION)
             manifest_payload = workflow.build_readiness_manifest(source, generation)
             readiness_manifest = staged_output / definition.readiness_manifest_filename
-            readiness_manifest.write_text(
-                json.dumps(manifest_payload, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            if definition.readiness_manifest_artifact_name:
+                write_json_artifact(
+                    readiness_manifest,
+                    manifest_payload,
+                    definition.readiness_manifest_artifact_name,
+                )
+            else:
+                readiness_manifest.write_text(
+                    json.dumps(manifest_payload, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
             _validate_stage_layout(staged_output, readiness_manifest)
             workflow.validate_staged_package(
                 source, generation, staged_output, readiness_manifest

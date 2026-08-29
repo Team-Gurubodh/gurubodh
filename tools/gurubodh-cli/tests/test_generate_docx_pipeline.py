@@ -476,7 +476,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
     def test_invalid_dedicated_job_fails_before_pipeline(self):
         config = base_config(self.temp_dir.name)
         config["schema_version"] = "9.9.9"
-        with self.assertRaisesRegex(SystemExit, "schema_version must be 1.0.0"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.schema_version must equal \"1\.0\.0\""):
             self.load(config)
         config = base_config(self.temp_dir.name)
         config["source"]["subject_dir"] = "../hi-IN"
@@ -484,11 +484,11 @@ class GenerateDocxPipelineTests(unittest.TestCase):
             self.load(config)
         config = base_config(self.temp_dir.name)
         config["naming"]["title_slug"] = "unsafe slug"
-        with self.assertRaisesRegex(SystemExit, "invalid value"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.naming\.title_slug must match"):
             self.load(config)
         config = base_config(self.temp_dir.name)
         config["destination"]["backend"] = "unsupported"
-        with self.assertRaisesRegex(SystemExit, "must be local or r2"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.destination\.backend must equal"):
             self.load(config)
 
 

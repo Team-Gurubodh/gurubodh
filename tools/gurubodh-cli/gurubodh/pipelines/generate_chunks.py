@@ -29,6 +29,7 @@ from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
 from gurubodh.ml.semantic_chunking.segmenter import ParagraphSegmenter, SemanticChunkingParagraphSegmenter
 from gurubodh.naming import chapter_chunks_output_filename
+from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import (
     CHUNKS_REPORT_DIR,
     destination_artifact_reference,
@@ -146,7 +147,13 @@ def write_chunk_artifacts(
             progress(f"{prefix} validating chunks")
             validate_document_for_source(text, document)
             path = job["paths"]["semantic_chunks"] / filename
-            path.write_text(json.dumps(chunk_artifact_payload(config, job, source, document, semantic_config, filename), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            write_json_artifact(
+                path,
+                chunk_artifact_payload(
+                    config, job, source, document, semantic_config, filename
+                ),
+                "semantic chunks",
+            )
             artifact_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
             summary = chapter_summary(config, source, document, filename, artifact_sha256)
             result["chapters"][-1] = summary
@@ -360,6 +367,7 @@ def run_generate_chunks_job(
         command_name="generate-chunks",
         output_relative_dir=SEMANTIC_CHUNKS_RELATIVE_DIR,
         readiness_manifest_filename="semantic_chunks_manifest.json",
+        readiness_manifest_artifact_name="semantic chunks manifest",
         report_relative_dir=CHUNKS_REPORT_DIR,
         legacy_output_relative_dirs=(LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR,),
     )

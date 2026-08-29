@@ -91,22 +91,24 @@ class ProofreadingTests(unittest.TestCase):
         self.assertIn("\n\nदूसरा", rendered)
         self.assertEqual(summary["changed_segments"], 1)
 
-    def test_proofreading_configuration_defaults_and_rejects_unknown_options(self):
+    def test_proofreading_runtime_configuration_applies_defaults_and_cross_field_rule(self):
         self.assertEqual(proofreading_config({"proofreading": {}}).model, "gemini-3.7-flash")
         with self.assertRaisesRegex(SystemExit, "proofreading is required"):
             proofreading_config({})
-        with self.assertRaisesRegex(SystemExit, "proofreading.enabled must be true"):
-            proofreading_config({"proofreading": {"enabled": False}})
-        with self.assertRaisesRegex(SystemExit, "continue_on_error must be false"):
-            proofreading_config({"proofreading": {"continue_on_error": True}})
-        with self.assertRaisesRegex(SystemExit, "unsupported proofreading option"):
-            proofreading_config({"proofreading": {"api_key": "not-allowed"}})
-        with self.assertRaisesRegex(SystemExit, "unsupported proofreading option"):
-            proofreading_config({"proofreading": {"temperature": 0}})
+        with self.assertRaisesRegex(SystemExit, "max_retry_delay_seconds must be at least"):
+            proofreading_config({
+                "proofreading": {
+                    "initial_retry_delay_seconds": 10,
+                    "max_retry_delay_seconds": 5,
+                }
+            })
 
-    def test_proofreading_validation_does_not_bypass_pipeline_source_validation(self):
-        with self.assertRaisesRegex(SystemExit, "requires source.font_encoding=unicode"):
-            validate_pipeline_matches_source({"pipeline": "unicode-docx-ingest", "source": {"font_encoding": "aps"}})
+    def test_pipeline_runtime_validation_rejects_the_wrong_entry_point(self):
+        with self.assertRaisesRegex(SystemExit, "cannot be processed"):
+            validate_pipeline_matches_source(
+                {"pipeline": "unicode-docx-ingest"},
+                "legacy-docx-to-unicode",
+            )
 
     def test_one_structured_response_produces_corrected_text_and_edit_list(self):
         client = FakeClient([{

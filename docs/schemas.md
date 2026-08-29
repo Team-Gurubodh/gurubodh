@@ -29,6 +29,45 @@
 
 ## Ownership Guidance
 
+### Gurubodh CLI runtime authority
+
+The Gurubodh CLI executes its Draft 2020-12 job and artifact schemas at runtime.
+They are not documentation-only contracts:
+
+- `prep-subject`, `generate-chunks`, and `generate-docx` validate the parsed raw
+  job JSON against the matching schema before adding runtime-only values or
+  using any configuration field.
+- Schema-governed JSON payloads are built in memory and validated before JSON
+  serialization, checksum calculation, staging, local publication, or R2
+  upload. This covers chapter metadata, chapter content manifests, chapter
+  proofreading details, proofreading manifests, prep-subject job state,
+  semantic chunks, semantic chunk manifests, and DOCX manifests.
+- The validator explicitly uses JSON Schema Draft 2020-12, validates schema
+  definitions before use, checks declared formats, and caches compiled
+  validators. The `jsonschema` dependency and schema files are included in the
+  installed CLI distribution; source-tree and container execution use the same
+  files under `tools/gurubodh-cli/config/`.
+- Validation failures are deterministic and identify the config/artifact,
+  available file path, exact JSONPath-like location, and actionable rule. A
+  normal validation failure exits without exposing raw content, credentials,
+  environment values, or third-party exception dumps.
+
+The JSON Schemas own structural rules such as object shape, required fields,
+types, constants/enums, patterns, bounds, conditionals, unique arrays, and
+`additionalProperties`. Python validation remains only for runtime semantics
+that are not fully represented by those schemas: safe language-qualified POSIX
+paths, regex compilation, locale-derived invariants, matching source and
+destination release roots, artifact/checksum identity, and runtime model/cache
+behavior.
+
+The prep-subject `metadata_defaults` object retains its existing explicit
+`additionalProperties: true` extension point in schema `1.4.0`; only declared
+properties have schema-defined behavior today. All other strict job objects
+continue to reject unknown properties. The same schema now declares
+`source.file_format` as `const: "docx"`, aligning the executable contract with
+the only format the maintained prep pipelines support. See
+[Decision-0007](./decisions/0007-executable-cli-json-schema-boundaries.md).
+
 - Gurubodh CLI job schemas belong under `tools/gurubodh-cli/config/jobs/`.
 - Gurubodh CLI artifact schemas belong under
   `tools/gurubodh-cli/config/artifacts/`.
