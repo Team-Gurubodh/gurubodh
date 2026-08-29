@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "converter": "aps",
+  "fixture_provenance": {
+    "source_font_family": "APS-DV-Prakash",
+    "source_document_identifier": "Synthetic, non-sensitive mapping vectors; no source document is committed.",
+    "initial_verification": "Issue #248 implementation: mapping-table and Devanagari-orthography review.",
+    "confidence_note": "These cases establish regression expectations for the supported, pinned APS implementation. They are not independent proof of a complete or authoritative APS mapping."
+  },
+  "mapping": {
+    "vendor_file": "scripts/vendor/hindietools_aps_prakash_to_unicode.js",
+    "sha256": "b3500e3e91b548e3ccd0f85150719c05d527dc21c4677871002b8b64e05bcae7",
+    "source_provenance": "Imported with the initial monorepo commit (5801b4e, 2026-06-20). The imported file has no source URL, retrieval date, or licence notice; none is asserted here.",
+    "validation_method": "Each case is a small, non-sensitive APS sequence manually checked against the vendored converter's declared replacement table and Devanagari orthography. This is regression evidence for the pinned local mapping, not an authoritative APS encoding specification."
+  },
+  "cases": [
+    {
+      "id": "prebase-i-matra",
+      "categories": ["matra"],
+      "legacy_input": "efkeâ",
+      "expected_unicode": "कि"
+    },
+    {
+      "id": "reph-after-long-a-matra",
+      "categories": ["reph", "matra"],
+      "legacy_input": "keâe&",
+      "expected_unicode": "र्का"
+    },
+    {
+      "id": "reph-with-prebase-i-matra",
+      "categories": ["reph", "matra"],
+      "legacy_input": "efkeâ&",
+      "expected_unicode": "र्कि"
+    },
+    {
+      "id": "half-letter-and-conjuncts",
+      "categories": ["half-letter", "conjunct"],
+      "legacy_input": "# keâdkeâ ß Ø ›",
+      "expected_unicode": "क्ष् क्क श्र् प्र् व्र्"
+    },
+    {
+      "id": "combining-marks-and-nukta",
+      "categories": ["anusvar", "chandrabindu", "visarga", "nukta"],
+      "legacy_input": "keâb keâB keâŠ keâÌ Ìkeâ",
+      "expected_unicode": "कं कँ कः क़ क़"
+    },
+    {
+      "id": "digits-and-punctuation",
+      "categories": ["digits", "punctuation", "whitespace", "postprocess"],
+      "legacy_input": "keâ ~ Ô, (123)",
+      "expected_unicode": "क। ॐ, (१२३)"
+    }
+  ]
+}
