@@ -275,6 +275,7 @@ def run_generate_docx_job(
         command_name="generate-docx",
         output_relative_dir=DOCX_RELATIVE_DIR,
         readiness_manifest_filename=DOCX_MANIFEST_FILENAME,
+        readiness_manifest_artifact_name="DOCX manifest",
         report_relative_dir=DOCX_REPORT_DIR,
     )
     destination_subject, destination_temporary = destination_subject_dir(

@@ -47,7 +47,7 @@
         },
         "file_format": {
           "type": "string",
-          "pattern": "^[A-Za-z0-9]+$"
+          "const": "docx"
         }
       },
       "required": ["font_encoding", "file_format"],

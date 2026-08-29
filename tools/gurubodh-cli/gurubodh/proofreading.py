@@ -15,10 +15,12 @@ import re
 import time
 from typing import Any, Callable
 
+from gurubodh.constants import ENTRY_POINT_PREP_SUBJECT
 from gurubodh.content_identity import build_content_identity
 from gurubodh.locales import LocaleSpec, locale_spec
 from gurubodh.metadata import build_chapter_metadata
 from gurubodh.naming import chapter_output_filename
+from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import destination_artifact_reference
 from gurubodh.time_utils import utc_now
 
@@ -468,7 +470,7 @@ def proofread_single_chapter_artifacts(
     chapter_number: int,
     unmodified_source_path: Path,
     converter_counts: dict[str, int] | None = None,
-    entry_point: str = "",
+    entry_point: str = ENTRY_POINT_PREP_SUBJECT,
     proofreader: GeminiProofreader | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
@@ -512,7 +514,7 @@ def proofread_single_chapter_artifacts(
         utc_now(),
         entry_point,
     )
-    _write_text(metadata_path, json.dumps(metadata, ensure_ascii=False, indent=2))
+    write_json_artifact(metadata_path, metadata, "chapter metadata")
 
     canonical_artifact_text = canonical_text_path.read_text(encoding="utf-8")
     rendered_diff, diff_summary = word_level_diff(source_text, canonical_artifact_text)
@@ -551,7 +553,7 @@ def proofread_single_chapter_artifacts(
         "gemini_edits": response["edits"],
         "request": {key: response[key] for key in ("estimated_input_tokens", "attempts", "throttle_seconds", "usage")},
     }
-    _write_text(artifact_paths["json"], json.dumps(payload, ensure_ascii=False, indent=2))
+    write_json_artifact(artifact_paths["json"], payload, "chapter proofreading")
     artifact_files = [
         unmodified_source_path,
         canonical_text_path,
@@ -606,15 +608,14 @@ def write_proofreading_manifest(
         "chapters": [{key: value for key, value in chapter.items() if key != "checkpoint_artifacts"} for chapter in chapters],
     }
     manifest_path = paths["proofreading"] / PROOFREADING_MANIFEST_FILENAME
-    _write_text(manifest_path, json.dumps(manifest, ensure_ascii=False, indent=2))
-    return manifest_path
+    return write_json_artifact(manifest_path, manifest, "proofreading manifest")
 
 
 def proofread_chapter_artifacts(
     config: dict[str, Any],
     paths: dict[str, Path],
     converter_counts: dict[str, int] | None = None,
-    entry_point: str = "",
+    entry_point: str = ENTRY_POINT_PREP_SUBJECT,
     progress: Callable[..., None] | None = None,
     proofreader: GeminiProofreader | None = None,
 ) -> dict[str, Any]:

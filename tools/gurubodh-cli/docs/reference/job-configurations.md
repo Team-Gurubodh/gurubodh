@@ -2,6 +2,13 @@
 
 Maintained jobs live below `jobs/subjects/<subject-group>/<language>/`. Read a job and its matching schema before changing it. Job JSON may contain paths and operational settings, but never credentials.
 
+Each command validates the parsed job against its declared Draft 2020-12 schema
+before it derives runtime settings or reads a source. Structural failures list
+the job path and exact JSON location, for example
+`$.chunking.model_revision`. Unknown properties are rejected wherever the
+schema declares `additionalProperties: false`; `metadata_defaults` retains its
+documented schema-1.4.0 extension point.
+
 ## Select a backend
 
 | Filename convention | Source | Destination |
@@ -27,3 +34,8 @@ Credentials are environment-only: preparation and lab proofreading use Gemini, w
 ## Schema and artifact references
 
 Use the schemas in `config/jobs/` for required fields and validation. Generated artifact schemas are in `config/artifacts/`; their lifecycle and ownership are explained in [Artifact lifecycle](../concepts/artifact-lifecycle.md).
+
+The installed package includes both schema directories. Maintainers adding a
+job or artifact schema must add it to the shared validator mapping, route its
+producer through the validate-before-write helper, and add runtime tests for a
+valid payload and a rejected pre-write payload.

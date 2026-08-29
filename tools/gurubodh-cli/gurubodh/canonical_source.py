@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 
 from gurubodh.content_identity import validate_content_identity
 from gurubodh.prep_subject_checkpoints import validate_canonical_release_gate
+from gurubodh.schema_validation import validate_artifact
 from gurubodh.storage import (
     R2StorageClient,
     is_local,
@@ -67,12 +68,7 @@ def read_candidate_manifest(config, manifest_path, command_name):
         manifest = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Candidate chapter manifest is missing or malformed: {manifest_path}: {exc}") from exc
-    if not isinstance(manifest, dict):
-        raise SystemExit("Candidate chapter manifest must be a JSON object.")
-    if manifest.get("schema_version") != 1:
-        raise SystemExit("Unsupported candidate chapter manifest schema_version; expected 1.")
-    if manifest.get("identity_contract_version") != 1:
-        raise SystemExit("Unsupported candidate chapter manifest identity_contract_version; expected 1.")
+    validate_artifact(manifest, "chapter content manifest", manifest_path)
     expected_subject = {
         "category_code": config["naming"]["category_code"],
         "subject_code": config["naming"]["subject_code"],

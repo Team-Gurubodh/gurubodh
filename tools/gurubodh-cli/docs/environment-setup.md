@@ -31,6 +31,11 @@ gurubodh --help
 
 The editable install keeps the `gurubodh` command linked to the checked-out source. If the virtual environment was copied or moved, recreate it or run `make cli-install` again so its generated wrappers use the current path.
 
+Installation also provides the Draft 2020-12 `jsonschema` runtime and bundles
+the CLI job/artifact schema files. If startup reports a missing or invalid
+bundled schema, reinstall the package from a complete checkout or image; do not
+copy individual schema files into the environment by hand.
+
 Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`, so install Node locally before running an APS job. The production image already includes Node.
 
 Run maintained job files from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Getting started](getting-started.md) explains project-root detection.

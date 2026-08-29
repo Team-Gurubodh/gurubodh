@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from gurubodh.content_identity import validate_content_identity
+from gurubodh.schema_validation import write_json_artifact
 
 
 CHAPTER_CONTENT_MANIFEST_FILENAME = "chapter_content_manifest.json"
@@ -48,5 +49,4 @@ def build_chapter_content_manifest(config, text_and_metadata_dir: Path) -> dict:
 def write_chapter_content_manifest(config, paths) -> Path:
     path = paths["text_and_metadata"].parent / CHAPTER_CONTENT_MANIFEST_FILENAME
     payload = build_chapter_content_manifest(config, paths["text_and_metadata"])
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return path
+    return write_json_artifact(path, payload, "chapter content manifest")

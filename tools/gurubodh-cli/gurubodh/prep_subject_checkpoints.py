@@ -30,6 +30,7 @@ from gurubodh.proofreading import (
     proofread_single_chapter_artifacts,
     write_proofreading_manifest,
 )
+from gurubodh.schema_validation import validated_artifact_json
 from gurubodh.storage import (
     CANONICAL_ARTIFACT_FILES,
     PREP_ARTIFACT_DIRS,
@@ -78,10 +79,19 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _write_json_atomically(path: Path, payload: dict[str, Any]) -> None:
+def _write_json_atomically(
+    path: Path,
+    payload: dict[str, Any],
+    artifact_name: str | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    serialized = (
+        validated_artifact_json(payload, artifact_name, path)
+        if artifact_name
+        else json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    )
+    temporary.write_text(serialized, encoding="utf-8")
     os.replace(temporary, path)
 
 
@@ -263,6 +273,8 @@ class PrepCheckpointManager:
         archive_name = f"{timestamp_for_filename()}-{self.state.get('job_id', 'unknown')}-job-state.json"
         archive_relative = RUN_STATE_RELATIVE_DIR / "archive" / archive_name
         if is_local(self.destination):
+            # Archives preserve earlier checkpoint contracts verbatim; only the
+            # live job-state path is governed by the current state schema.
             _write_json_atomically(self.subject_dir / archive_relative, self.state)
             workspace = self.workspace_dir
             if workspace.exists():
@@ -408,7 +420,11 @@ class PrepCheckpointManager:
             return
         self.state["updated_at"] = utc_now()
         self.state["counts"] = _counts(self.state.get("chapters", []))
-        _write_json_atomically(self.state_path, self.state)
+        _write_json_atomically(
+            self.state_path,
+            self.state,
+            "prep-subject job state",
+        )
         if self.is_r2:
             for path in checkpoint_artifacts or []:
                 relative = path.relative_to(self.subject_dir)

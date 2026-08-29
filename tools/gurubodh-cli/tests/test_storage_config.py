@@ -108,46 +108,46 @@ class StorageConfigTests(unittest.TestCase):
         config["pipeline"] = "legacy-docx-to-unicode"
         config["source"]["font_encoding"] = "shreelipi"
 
-        with self.assertRaisesRegex(SystemExit, "source.font_encoding must be one of: aps, unicode"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.source\.font_encoding must equal \"aps\""):
             load_prep_subject_job(self.write_config(config))
 
     def test_prep_subject_requires_strict_proofreading_configuration(self):
         missing = json.loads(json.dumps(BASE_CONFIG))
         missing.pop("proofreading")
-        with self.assertRaisesRegex(SystemExit, "proofreading is required"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.proofreading is required"):
             load_prep_subject_job(self.write_config(missing))
 
         disabled = json.loads(json.dumps(BASE_CONFIG))
         disabled["proofreading"] = {"enabled": False}
-        with self.assertRaisesRegex(SystemExit, "proofreading.enabled must be true"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.proofreading\.enabled must equal true"):
             load_prep_subject_job(self.write_config(disabled))
 
         permissive = json.loads(json.dumps(BASE_CONFIG))
         permissive["proofreading"] = {"continue_on_error": True}
-        with self.assertRaisesRegex(SystemExit, "continue_on_error must be false"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.proofreading\.continue_on_error must equal false"):
             load_prep_subject_job(self.write_config(permissive))
 
     def test_prep_subject_requires_an_explicit_supported_locale(self):
         missing = json.loads(json.dumps(BASE_CONFIG))
         missing["metadata_defaults"].pop("language")
-        with self.assertRaisesRegex(SystemExit, "metadata_defaults.language must be a non-empty string"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.language is required"):
             load_prep_subject_job(self.write_config(missing))
 
         unsupported = json.loads(json.dumps(BASE_CONFIG))
         unsupported["metadata_defaults"]["language"] = "sa-IN"
         unsupported["destination"]["subject_dir"] = "129_spand_rahasya/sa-IN"
-        with self.assertRaisesRegex(SystemExit, "Unsupported language"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.language must be one of"):
             load_prep_subject_job(self.write_config(unsupported))
 
     def test_prep_subject_rejects_invalid_locale_metadata_defaults(self):
         source_script = json.loads(json.dumps(BASE_CONFIG))
         source_script["metadata_defaults"]["source_script"] = "Latin"
-        with self.assertRaisesRegex(SystemExit, "source_script must be 'Devanagari'"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.source_script must equal \"Devanagari\""):
             load_prep_subject_job(self.write_config(source_script))
 
         output_encoding = json.loads(json.dumps(BASE_CONFIG))
         output_encoding["metadata_defaults"]["output_text_encoding"] = "UTF-16"
-        with self.assertRaisesRegex(SystemExit, "output_text_encoding must be 'UTF-8'"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.output_text_encoding must equal \"UTF-8\""):
             load_prep_subject_job(self.write_config(output_encoding))
 
     def test_prep_subject_validates_safe_language_qualified_subject_roots(self):
@@ -631,7 +631,7 @@ class StorageConfigTests(unittest.TestCase):
             "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_contextual_vectors": True, "device": None, "local_files_only": False},
         }
 
-        with self.assertRaisesRegex(SystemExit, "chunking.model_revision must be a non-empty string"):
+        with self.assertRaisesRegex(SystemExit, r"\$\.chunking\.model_revision must be string; found null"):
             load_generate_chunks_job(self.write_config(config))
 
     def test_load_prep_subject_job_rejects_invalid_summary_chapter_markers(self):
@@ -642,7 +642,7 @@ class StorageConfigTests(unittest.TestCase):
             load_prep_subject_job(self.write_config(config))
 
         self.assertIn(
-            "metadata_defaults.summary_chapter_markers must be an array of strings",
+            "$.metadata_defaults.summary_chapter_markers must be array; found string",
             str(exc.exception),
         )
 
