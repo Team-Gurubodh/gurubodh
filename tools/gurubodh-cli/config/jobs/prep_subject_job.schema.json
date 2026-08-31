@@ -254,6 +254,12 @@
         "min_request_interval_seconds": { "type": "number", "minimum": 0, "default": 6 },
         "max_requests_per_minute": { "type": "integer", "minimum": 1, "default": 8 },
         "max_estimated_input_tokens_per_minute": { "type": "integer", "minimum": 1, "default": 20000 },
+        "request_timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 120 },
+        "request_progress_interval_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 15 },
+        "unavailable_max_retries": { "type": "integer", "minimum": 1, "maximum": 2, "default": 2 },
+        "unavailable_first_retry_delay_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 30 },
+        "unavailable_second_retry_delay_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 90 },
+        "unavailable_cooldown_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 120 },
         "continue_on_error": { "const": false }
       }
     }

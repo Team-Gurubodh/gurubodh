@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 import difflib
+from email.utils import parsedate_to_datetime
 import hashlib
 import json
 import math
@@ -12,6 +13,7 @@ import os
 from pathlib import Path
 import random
 import re
+import threading
 import time
 from typing import Any, Callable
 
@@ -62,6 +64,8 @@ class ProofreadingError(RuntimeError):
         retry_after_seconds: float | None = None,
         request_attempts: int = 0,
         successful_request_attempts: int = 0,
+        request_diagnostics: dict[str, Any] | None = None,
+        terminal_retry_exhaustion_reason: str | None = None,
     ):
         super().__init__(message)
         self.code = code
@@ -71,6 +75,8 @@ class ProofreadingError(RuntimeError):
         # They let resumable callers audit retries and terminal API failures.
         self.request_attempts = request_attempts
         self.successful_request_attempts = successful_request_attempts
+        self.request_diagnostics = request_diagnostics
+        self.terminal_retry_exhaustion_reason = terminal_retry_exhaustion_reason
 
 
 @dataclass(frozen=True)
@@ -85,6 +91,33 @@ class ProofreadingSettings:
     min_request_interval_seconds: float = 6.0
     max_requests_per_minute: int = 8
     max_estimated_input_tokens_per_minute: int = 20000
+    request_timeout_seconds: float = 120.0
+    request_progress_interval_seconds: float = 15.0
+    unavailable_max_retries: int = 2
+    unavailable_first_retry_delay_seconds: float = 30.0
+    unavailable_second_retry_delay_seconds: float = 90.0
+    unavailable_cooldown_seconds: float = 120.0
+
+    def __post_init__(self) -> None:
+        positive_settings = (
+            "request_timeout_seconds",
+            "request_progress_interval_seconds",
+            "unavailable_first_retry_delay_seconds",
+            "unavailable_second_retry_delay_seconds",
+            "unavailable_cooldown_seconds",
+        )
+        for name in positive_settings:
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be greater than zero")
+        if (
+            isinstance(self.unavailable_max_retries, bool)
+            or not isinstance(self.unavailable_max_retries, int)
+            or not 1 <= self.unavailable_max_retries <= 2
+        ):
+            raise ValueError("unavailable_max_retries must be between 1 and 2")
+        if self.request_progress_interval_seconds > self.request_timeout_seconds:
+            raise ValueError("request_progress_interval_seconds must not exceed request_timeout_seconds")
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> "ProofreadingSettings":
@@ -104,6 +137,12 @@ class ProofreadingSettings:
             "min_request_interval_seconds": self.min_request_interval_seconds,
             "max_requests_per_minute": self.max_requests_per_minute,
             "max_estimated_input_tokens_per_minute": self.max_estimated_input_tokens_per_minute,
+            "request_timeout_seconds": self.request_timeout_seconds,
+            "request_progress_interval_seconds": self.request_progress_interval_seconds,
+            "unavailable_max_retries": self.unavailable_max_retries,
+            "unavailable_first_retry_delay_seconds": self.unavailable_first_retry_delay_seconds,
+            "unavailable_second_retry_delay_seconds": self.unavailable_second_retry_delay_seconds,
+            "unavailable_cooldown_seconds": self.unavailable_cooldown_seconds,
         }
 
 
@@ -192,10 +231,58 @@ def _status_code(exc: Exception) -> int | None:
     return None
 
 
+def _valid_delay(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    delay = float(value)
+    return delay if math.isfinite(delay) and delay >= 0 else None
+
+
+def _retry_after_header_seconds(exc: Exception) -> float | None:
+    """Read a bounded Retry-After hint without retaining response content."""
+    headers = getattr(getattr(exc, "response", None), "headers", None)
+    if not headers:
+        return None
+    try:
+        retry_after_ms = headers.get("retry-after-ms")
+        if retry_after_ms is not None:
+            return _valid_delay(float(retry_after_ms) / 1000)
+        value = headers.get("retry-after")
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if value is None:
+        return None
+    try:
+        numeric = _valid_delay(float(value))
+    except (TypeError, ValueError):
+        numeric = None
+    if numeric is not None:
+        return numeric
+    if not isinstance(value, str):
+        return None
+    try:
+        date_value = parsedate_to_datetime(value)
+        if date_value.tzinfo is None:
+            return None
+        return _valid_delay((date_value - utc_now_datetime()).total_seconds())
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+
+
+def utc_now_datetime():
+    """A small seam for parsing date-based HTTP retry hints."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc)
+
+
 def _retry_after_seconds(exc: Exception) -> float | None:
-    value = getattr(exc, "retry_after_seconds", None)
-    if isinstance(value, (int, float)) and value >= 0:
-        return float(value)
+    value = _valid_delay(getattr(exc, "retry_after_seconds", None))
+    if value is not None:
+        return value
+    header_value = _retry_after_header_seconds(exc)
+    if header_value is not None:
+        return header_value
     for message in (getattr(exc, "message", None), str(exc)):
         if not isinstance(message, str):
             continue
@@ -205,22 +292,81 @@ def _retry_after_seconds(exc: Exception) -> float | None:
             flags=re.IGNORECASE,
         )
         if match:
-            return float(match.group(1))
+            return _valid_delay(float(match.group(1)))
     return None
 
 
 def _api_error_detail(exc: Exception, status_code: int | None) -> str:
-    """Return bounded API diagnostics without serializing an exception payload."""
+    """Return safe API diagnostics without serializing response content."""
     api_status = getattr(exc, "status", None)
     if isinstance(api_status, str) and re.fullmatch(r"[A-Z_]{1,64}", api_status):
         detail = f"HTTP {status_code} {api_status}" if status_code else api_status
     else:
         detail = f"HTTP {status_code}" if status_code else exc.__class__.__name__
-    message = getattr(exc, "message", None)
-    if isinstance(message, str) and message.strip():
-        normalized_message = re.sub(r"\s+", " ", message).strip()
-        return f"{detail}: {normalized_message[:500]}"
     return detail
+
+
+def _is_sdk_timeout_exception(exc: Exception) -> bool:
+    """Recognize built-in and HTTP-client timeout classes used by Google Gen AI."""
+    if isinstance(exc, TimeoutError):
+        return True
+    pending = [exc]
+    seen: set[int] = set()
+    while pending:
+        candidate = pending.pop()
+        if id(candidate) in seen:
+            continue
+        seen.add(id(candidate))
+        name = candidate.__class__.__name__.lower()
+        module = candidate.__class__.__module__
+        if "timeout" in name and (
+            module.startswith(("httpx", "requests", "google")) or module == "builtins"
+        ):
+            return True
+        for nested in (getattr(candidate, "__cause__", None), getattr(candidate, "__context__", None)):
+            if isinstance(nested, Exception):
+                pending.append(nested)
+    return False
+
+
+def _safe_request_diagnostics(value: Any) -> dict[str, Any] | None:
+    """Return only bounded operational request facts suitable for durable reports."""
+    raw = getattr(value, "request_diagnostics", value if isinstance(value, dict) else None)
+    if not isinstance(raw, dict):
+        return None
+    attempts: list[dict[str, Any]] = []
+    for item in raw.get("attempts", [])[:32]:
+        if not isinstance(item, dict):
+            continue
+        diagnostic: dict[str, Any] = {}
+        attempt = item.get("attempt")
+        if isinstance(attempt, int) and attempt > 0:
+            diagnostic["attempt"] = attempt
+        status = item.get("http_status")
+        if isinstance(status, int) and 100 <= status <= 599:
+            diagnostic["http_status"] = status
+        elapsed = _valid_delay(item.get("elapsed_seconds"))
+        if elapsed is not None:
+            diagnostic["elapsed_seconds"] = round(elapsed, 3)
+        retry_delay = _valid_delay(item.get("retry_delay_seconds"))
+        if retry_delay is not None:
+            diagnostic["retry_delay_seconds"] = round(retry_delay, 3)
+        hint_used = item.get("server_retry_hint_used")
+        if isinstance(hint_used, bool):
+            diagnostic["server_retry_hint_used"] = hint_used
+        if diagnostic:
+            attempts.append(diagnostic)
+    terminal_reason = raw.get("terminal_retry_exhaustion_reason")
+    if not isinstance(terminal_reason, str) or not re.fullmatch(r"[a-z0-9_]{1,80}", terminal_reason):
+        terminal_reason = None
+    if not attempts and terminal_reason is None:
+        return None
+    return {"attempts": attempts, "terminal_retry_exhaustion_reason": terminal_reason}
+
+
+def safe_request_diagnostics(value: Any) -> dict[str, Any] | None:
+    """Expose safe request facts for lab and checkpoint failure reports."""
+    return _safe_request_diagnostics(value)
 
 
 class RequestRateLimiter:
@@ -273,6 +419,8 @@ class GeminiProofreader:
         self._types_module = types_module
         self._sleep = sleep
         self._random_value = random_value
+        self._clock = clock
+        self._last_request_elapsed_seconds = 0.0
         self._limiter = RequestRateLimiter(settings, clock=clock, sleep=sleep)
 
     @property
@@ -304,7 +452,60 @@ class GeminiProofreader:
             max_output_tokens=self.settings.max_output_tokens,
             response_mime_type="application/json",
             response_schema=EDIT_LIST_SCHEMA,
+            http_options={"timeout": int(self.settings.request_timeout_seconds * 1000)},
         )
+
+    def _generate_content_with_progress(
+        self,
+        text: str,
+        progress: Callable[[str], None] | None,
+    ) -> tuple[Any, float]:
+        """Run the synchronous SDK call while reporting bounded request status."""
+        started_at = self._clock()
+        completed = threading.Event()
+        result: dict[str, Any] = {}
+
+        def generate() -> None:
+            try:
+                result["response"] = self.client.models.generate_content(
+                    model=self.settings.model,
+                    contents=f"<source-text>\n{text}\n</source-text>",
+                    config=self._config(),
+                )
+            except BaseException as exc:  # Re-raise the original SDK error on the caller thread.
+                result["error"] = exc
+            finally:
+                completed.set()
+
+        thread = threading.Thread(target=generate, name="gurubodh-gemini-request", daemon=True)
+        thread.start()
+        while not completed.wait(self.settings.request_progress_interval_seconds):
+            # Do not race a just-completed response into a stale heartbeat.
+            if completed.is_set():
+                break
+            elapsed = max(0.0, self._clock() - started_at)
+            remaining = max(0.0, self.settings.request_timeout_seconds - elapsed)
+            if progress:
+                progress(
+                    "Gemini request is still in progress "
+                    f"({elapsed:.1f}s elapsed; {remaining:.1f}s remaining before the "
+                    f"{self.settings.request_timeout_seconds:.1f}s timeout)."
+                )
+        thread.join()
+        elapsed = max(0.0, self._clock() - started_at)
+        self._last_request_elapsed_seconds = elapsed
+        if "error" in result:
+            raise result["error"]
+        return result["response"], elapsed
+
+    def _unavailable_retry_delay(self, retry_number: int, retry_hint: float | None) -> tuple[float, bool]:
+        if retry_number == 1:
+            scheduled_delay = self.settings.unavailable_first_retry_delay_seconds
+        else:
+            scheduled_delay = self.settings.unavailable_second_retry_delay_seconds
+        hint_used = retry_hint is not None and retry_hint >= scheduled_delay
+        delay = max(scheduled_delay, retry_hint or 0.0)
+        return delay + delay * 0.25 * self._random_value(), hint_used
 
     def proofread(self, text: str, progress: Callable[[str], None] | None = None) -> dict[str, Any]:
         estimated_tokens = estimate_input_tokens(text)
@@ -320,6 +521,7 @@ class GeminiProofreader:
             )
         attempts = 0
         total_throttle_seconds = 0.0
+        request_attempt_diagnostics: list[dict[str, Any]] = []
 
         def announce_local_wait(wait_seconds: float) -> None:
             if progress:
@@ -335,13 +537,19 @@ class GeminiProofreader:
             )
             if progress:
                 progress(
-                    f"Sending Gemini request (attempt {attempts}; estimated input {estimated_tokens} tokens)."
+                    "Sending Gemini request "
+                    f"(attempt {attempts}; estimated input {estimated_tokens} tokens; "
+                    f"timeout {self.settings.request_timeout_seconds:.1f} seconds)."
                 )
             try:
-                response = self.client.models.generate_content(
-                    model=self.settings.model,
-                    contents=f"<source-text>\n{text}\n</source-text>",
-                    config=self._config(),
+                response, request_elapsed_seconds = self._generate_content_with_progress(text, progress)
+                request_attempt_diagnostics.append(
+                    {
+                        "attempt": attempts,
+                        "http_status": 200,
+                        "elapsed_seconds": round(request_elapsed_seconds, 3),
+                        "server_retry_hint_used": False,
+                    }
                 )
                 try:
                     corrected, edits = _validated_response(response.text, text)
@@ -350,6 +558,9 @@ class GeminiProofreader:
                     # the proofreading contract.
                     exc.request_attempts = attempts
                     exc.successful_request_attempts = 1
+                    exc.request_diagnostics = _safe_request_diagnostics(
+                        {"attempts": request_attempt_diagnostics, "terminal_retry_exhaustion_reason": None}
+                    )
                     raise
                 if progress:
                     progress("Gemini response received; validating and writing canonical artifacts.")
@@ -362,29 +573,69 @@ class GeminiProofreader:
                     "failed_request_attempts": attempts - 1,
                     "throttle_seconds": round(total_throttle_seconds, 3),
                     "usage": usage_summary(getattr(response, "usage_metadata", None)),
+                    "request_diagnostics": _safe_request_diagnostics(
+                        {"attempts": request_attempt_diagnostics, "terminal_retry_exhaustion_reason": None}
+                    ),
                 }
             except ProofreadingError:
                 raise
             except Exception as exc:
                 status_code = _status_code(exc)
-                retryable = status_code in {408, 429, 500, 502, 503, 504} or isinstance(exc, (TimeoutError, ConnectionError))
-                if not retryable or attempts > self.settings.max_retries:
-                    code = "rate_limited" if status_code == 429 else "api_error"
-                    detail = _api_error_detail(exc, status_code)
+                request_elapsed_seconds = self._last_request_elapsed_seconds
+                request_attempt_diagnostics.append(
+                    {
+                        "attempt": attempts,
+                        "http_status": status_code,
+                        "elapsed_seconds": round(request_elapsed_seconds, 3),
+                        "server_retry_hint_used": False,
+                    }
+                )
+                is_unavailable = status_code == 503
+                is_timeout = _is_sdk_timeout_exception(exc)
+                retryable = status_code in {408, 429, 500, 502, 504} or is_unavailable or is_timeout or isinstance(exc, ConnectionError)
+                retry_limit = self.settings.unavailable_max_retries if is_unavailable else self.settings.max_retries
+                if not retryable or attempts > retry_limit:
+                    if is_unavailable:
+                        code = "service_unavailable"
+                        terminal_reason = "service_unavailable_retry_exhausted"
+                        message = (
+                            "Gemini service capacity is temporarily unavailable "
+                            f"({_api_error_detail(exc, status_code)}); recovery retry budget exhausted after "
+                            f"{attempts} request attempt(s)."
+                        )
+                    else:
+                        code = "rate_limited" if status_code == 429 else ("request_timeout" if is_timeout else "api_error")
+                        terminal_reason = "max_retries_exhausted" if retryable else "non_retryable_api_failure"
+                        message = f"Gemini proofreading request failed ({_api_error_detail(exc, status_code)})."
+                    diagnostics = _safe_request_diagnostics(
+                        {
+                            "attempts": request_attempt_diagnostics,
+                            "terminal_retry_exhaustion_reason": terminal_reason,
+                        }
+                    )
                     raise ProofreadingError(
                         code,
-                        f"Gemini proofreading request failed ({detail}).",
+                        message,
                         retryable=retryable,
                         request_attempts=attempts,
+                        request_diagnostics=diagnostics,
+                        terminal_retry_exhaustion_reason=terminal_reason,
                     ) from exc
                 retry_after = _retry_after_seconds(exc)
-                delay = retry_after if retry_after is not None else min(
-                    self.settings.max_retry_delay_seconds,
-                    self.settings.initial_retry_delay_seconds * (2 ** (attempts - 1)),
-                )
-                delay += delay * 0.25 * self._random_value()
+                if is_unavailable:
+                    delay, hint_used = self._unavailable_retry_delay(attempts, retry_after)
+                    source = "Gemini's requested retry delay" if hint_used else "503 service-capacity recovery schedule"
+                else:
+                    delay = retry_after if retry_after is not None else min(
+                        self.settings.max_retry_delay_seconds,
+                        self.settings.initial_retry_delay_seconds * (2 ** (attempts - 1)),
+                    )
+                    delay += delay * 0.25 * self._random_value()
+                    hint_used = retry_after is not None
+                    source = "Gemini's requested retry delay" if hint_used else "exponential backoff"
+                request_attempt_diagnostics[-1]["retry_delay_seconds"] = round(delay, 3)
+                request_attempt_diagnostics[-1]["server_retry_hint_used"] = hint_used
                 if progress:
-                    source = "Gemini's requested retry delay" if retry_after is not None else "exponential backoff"
                     progress(
                         f"Gemini returned a transient {status_code or 'network'} error; "
                         f"retrying in {delay:.1f} seconds ({source})."
@@ -551,7 +802,10 @@ def proofread_single_chapter_artifacts(
         },
         "local_diff_summary": diff_summary,
         "gemini_edits": response["edits"],
-        "request": {key: response[key] for key in ("estimated_input_tokens", "attempts", "throttle_seconds", "usage")},
+        "request": {
+            **{key: response[key] for key in ("estimated_input_tokens", "attempts", "throttle_seconds", "usage")},
+            "diagnostics": response.get("request_diagnostics"),
+        },
     }
     write_json_artifact(artifact_paths["json"], payload, "chapter proofreading")
     artifact_files = [
@@ -569,6 +823,7 @@ def proofread_single_chapter_artifacts(
         # recording canonical chapter provenance.
         "gemini_request_attempts": response["attempts"],
         "gemini_successful_request_attempts": response.get("successful_request_attempts", response["attempts"]),
+        "request_diagnostics": response.get("request_diagnostics"),
         "local_diff_summary": diff_summary,
         "unmodified_source_content_key": source_identity["content_key"],
         "canonical_content_key": metadata["content_identity"]["content_key"],

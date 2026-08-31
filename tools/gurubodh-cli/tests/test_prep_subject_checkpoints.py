@@ -348,6 +348,49 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertTrue((subject / "chapters" / "chapter_content_manifest.json").is_file())
             self.assertFalse((subject / ".work" / "prep-subject" / state["job_id"]).exists())
 
+    def test_terminal_503_checkpoints_the_failed_chapter_then_cools_down_before_another_request(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job_config = config(root)
+            capacity_failure = ProofreadingError(
+                "service_unavailable",
+                "Gemini service capacity is temporarily unavailable (HTTP 503 UNAVAILABLE).",
+                retryable=True,
+                request_attempts=3,
+                request_diagnostics={
+                    "attempts": [
+                        {"attempt": 1, "http_status": 503, "elapsed_seconds": 1, "retry_delay_seconds": 30, "server_retry_hint_used": False},
+                        {"attempt": 2, "http_status": 503, "elapsed_seconds": 1, "retry_delay_seconds": 90, "server_retry_hint_used": False},
+                        {"attempt": 3, "http_status": 503, "elapsed_seconds": 1, "server_retry_hint_used": False},
+                    ],
+                    "terminal_retry_exhaustion_reason": "service_unavailable_retry_exhausted",
+                },
+            )
+            proofreader = FakeProofreader([capacity_failure, "CHAPTER 2\nदूसरा सही पाठ।"])
+            output = io.StringIO()
+            with (
+                patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=proofreader),
+                patch("gurubodh.prep_subject_checkpoints.time.sleep") as cooldown_sleep,
+                redirect_stdout(output),
+                self.assertRaisesRegex(SystemExit, "incomplete"),
+            ):
+                run_resumable_prep_job(
+                    None, job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode
+                )
+
+            cooldown_sleep.assert_called_once()
+            self.assertAlmostEqual(cooldown_sleep.call_args.args[0], 120, places=1)
+            self.assertIn("service-capacity cooldown is active", output.getvalue())
+            self.assertEqual(len(proofreader.calls), 2)
+            state_path = root / "subject" / "hi-IN" / JOB_STATE_RELATIVE_PATH
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["counts"], {"succeeded": 1, "failed": 1, "pending": 0})
+            diagnostics = state["chapters"][0]["latest_error"]["request_diagnostics"]
+            self.assertEqual(diagnostics["attempts"][0]["http_status"], 503)
+            self.assertEqual(diagnostics["terminal_retry_exhaustion_reason"], "service_unavailable_retry_exhausted")
+            self.assertNotIn("पहला गलत पाठ", state_path.read_text(encoding="utf-8"))
+
     def test_fake_r2_retains_checkpoint_workspace_then_publishes_canonical_manifest_last(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

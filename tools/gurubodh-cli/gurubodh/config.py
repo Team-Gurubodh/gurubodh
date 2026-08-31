@@ -131,7 +131,10 @@ def proofreading_config(config):
     value = config.get("proofreading")
     if not isinstance(value, dict):
         raise SystemExit("Config error: proofreading is required and must be an object")
-    settings = ProofreadingSettings.from_config(value)
+    try:
+        settings = ProofreadingSettings.from_config(value)
+    except ValueError as exc:
+        raise SystemExit(f"Config error: proofreading.{exc}") from exc
     if settings.max_retry_delay_seconds < settings.initial_retry_delay_seconds:
         raise SystemExit("Config error: proofreading.max_retry_delay_seconds must be at least initial_retry_delay_seconds")
     return settings

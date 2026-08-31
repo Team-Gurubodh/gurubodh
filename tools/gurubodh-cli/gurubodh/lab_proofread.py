@@ -22,7 +22,13 @@ from gurubodh.legacy.font_detection import (
     validate_supported_source_fonts,
 )
 from gurubodh.locales import locale_spec
-from gurubodh.proofreading import GeminiProofreader, ProofreadingError, ProofreadingSettings, word_level_diff
+from gurubodh.proofreading import (
+    GeminiProofreader,
+    ProofreadingError,
+    ProofreadingSettings,
+    safe_request_diagnostics,
+    word_level_diff,
+)
 from gurubodh.time_utils import utc_now
 
 
@@ -112,6 +118,24 @@ def _report_markdown(manifest: dict[str, Any]) -> str:
     ]
     if manifest.get("error"):
         lines.extend(("", f"- Error: {manifest['error']}"))
+    diagnostics = manifest.get("request_diagnostics")
+    if diagnostics:
+        terminal_reason = diagnostics.get("terminal_retry_exhaustion_reason")
+        attempts = diagnostics.get("attempts", [])
+        lines.extend(
+            (
+                "",
+                f"- Gemini request attempts recorded: `{len(attempts)}`",
+                f"- Terminal retry reason: `{terminal_reason or 'none'}`",
+            )
+        )
+        lines.extend(
+            f"- Attempt `{attempt.get('attempt', 'unknown')}`: HTTP `{attempt.get('http_status', 'unavailable')}`; "
+            f"elapsed `{attempt.get('elapsed_seconds', 'unavailable')}` seconds; "
+            f"retry delay `{attempt.get('retry_delay_seconds', 'none')}` seconds; "
+            f"server retry hint used `{attempt.get('server_retry_hint_used', False)}`."
+            for attempt in attempts
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -264,7 +288,7 @@ def run_lab_proofread(
                 "request": {
                     key: response[key]
                     for key in ("estimated_input_tokens", "attempts", "throttle_seconds", "usage")
-                },
+                } | {"diagnostics": response.get("request_diagnostics")},
             },
         )
         title = f"{source_path.stem}: proofread"
@@ -295,7 +319,10 @@ def run_lab_proofread(
         _write_text(run_dir / "README.md", _run_readme(manifest))
     except Exception as exc:
         manifest["outcome"] = "failed"
-        manifest["error"] = str(exc)
+        manifest["error"] = " ".join(str(exc).split())[:500] or type(exc).__name__
+        diagnostics = safe_request_diagnostics(exc)
+        if diagnostics is not None:
+            manifest["request_diagnostics"] = diagnostics
         final_dir = _finalize_run(run_dir, "failed")
         manifest["run_directory"] = str(final_dir)
         _write_final_reports(final_dir, manifest)
