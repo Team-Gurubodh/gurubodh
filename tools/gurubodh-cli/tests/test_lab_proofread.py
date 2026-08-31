@@ -178,6 +178,41 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(list((runs / "active").iterdir()), [])
         self.assertEqual(progress[-1], f"Lab proofread run failed: {failed_dir}")
 
+    def test_terminal_503_records_safe_capacity_diagnostics_in_the_failed_lab_report(self):
+        source = self.source_docx()
+        failure = ProofreadingError(
+            "service_unavailable",
+            "Gemini service capacity is temporarily unavailable (HTTP 503 UNAVAILABLE).",
+            retryable=True,
+            request_attempts=3,
+            request_diagnostics={
+                "attempts": [
+                    {"attempt": 1, "http_status": 503, "elapsed_seconds": 1.2, "retry_delay_seconds": 30, "server_retry_hint_used": False},
+                    {"attempt": 2, "http_status": 503, "elapsed_seconds": 1.3, "retry_delay_seconds": 90, "server_retry_hint_used": True},
+                    {"attempt": 3, "http_status": 503, "elapsed_seconds": 1.4, "server_retry_hint_used": False},
+                ],
+                "terminal_retry_exhaustion_reason": "service_unavailable_retry_exhausted",
+            },
+        )
+
+        class FailingProofreader:
+            def proofread(self, text, progress=None):
+                raise failure
+
+        with self.assertRaisesRegex(ProofreadingError, "service capacity"):
+            run_lab_proofread(self.context, source, "hi-IN", self.root / "lab", proofreader=FailingProofreader())
+
+        manifest_path = next((self.root / "lab" / "proofread" / "runs" / "failed").glob("*/run_manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["request_diagnostics"]["attempts"][0]["http_status"], 503)
+        self.assertEqual(
+            manifest["request_diagnostics"]["terminal_retry_exhaustion_reason"],
+            "service_unavailable_retry_exhausted",
+        )
+        report = (manifest_path.parent / "report" / "run_report.md").read_text(encoding="utf-8")
+        self.assertIn("Terminal retry reason: `service_unavailable_retry_exhausted`", report)
+        self.assertNotIn("यह गलत वाक्य है।", manifest_path.read_text(encoding="utf-8"))
+
     def test_rejects_canonical_lab_root_and_invalid_locale(self):
         source = self.source_docx()
         with self.assertRaisesRegex(ValueError, "cms_library"):

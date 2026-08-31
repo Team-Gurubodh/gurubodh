@@ -28,6 +28,7 @@ from gurubodh.proofreading import (
     GeminiProofreader,
     ProofreadingError,
     proofread_single_chapter_artifacts,
+    safe_request_diagnostics,
     write_proofreading_manifest,
 )
 from gurubodh.schema_validation import validated_artifact_json
@@ -105,10 +106,14 @@ def _read_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _safe_error(exc: BaseException) -> dict[str, str]:
+def _safe_error(exc: BaseException) -> dict[str, Any]:
     code = getattr(exc, "code", "unexpected_error")
     message = " ".join(str(exc).split())[:500] or type(exc).__name__
-    return {"code": str(code)[:80], "message": message}
+    error: dict[str, Any] = {"code": str(code)[:80], "message": message}
+    diagnostics = safe_request_diagnostics(exc)
+    if diagnostics is not None:
+        error["request_diagnostics"] = diagnostics
+    return error
 
 
 def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
@@ -677,6 +682,34 @@ class PrepCheckpointManager:
         chapter["updated_at"] = utc_now()
         chapter["latest_error"] = _safe_error(exc)
         self._record_gemini_failure(exc)
+        self.persist()
+
+    def impose_service_unavailable_cooldown(self, seconds: float) -> None:
+        """Persist the shared capacity cooldown before another chapter can call Gemini."""
+        self.state["proofreading_cooldown"] = {
+            "reason": "service_unavailable",
+            "duration_seconds": round(seconds, 3),
+            "not_before_epoch": time.time() + seconds,
+        }
+        self.persist()
+
+    def wait_for_proofreading_cooldown(self) -> None:
+        cooldown = self.state.get("proofreading_cooldown")
+        if not isinstance(cooldown, dict) or cooldown.get("reason") != "service_unavailable":
+            return
+        not_before = cooldown.get("not_before_epoch")
+        if not isinstance(not_before, (int, float)):
+            self.state["proofreading_cooldown"] = None
+            self.persist()
+            return
+        remaining = max(0.0, not_before - time.time())
+        if remaining:
+            print(
+                "[proofread] Gemini service-capacity cooldown is active; "
+                f"waiting {remaining:.1f} seconds before another chapter request."
+            )
+            time.sleep(remaining)
+        self.state["proofreading_cooldown"] = None
         self.persist()
 
     def _record_gemini_success(self, result: dict[str, Any]) -> None:
@@ -1273,6 +1306,7 @@ def run_resumable_prep_job(
         for chapter in manager.state["chapters"]:
             if chapter["state"] == "succeeded":
                 continue
+            manager.wait_for_proofreading_cooldown()
             manager.heartbeat()
             source_snapshot = manager.chapter_source_path(chapter)
             number = int(chapter["chapter_number"])
@@ -1297,7 +1331,11 @@ def run_resumable_prep_job(
                     manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
                     manager.print_metrics_summary()
                     raise SystemExit(str(exc)) from exc
-                if exc.code in {"api_error", "rate_limited"}:
+                if exc.code == "service_unavailable":
+                    manager.impose_service_unavailable_cooldown(
+                        config["_proofreading_config"].unavailable_cooldown_seconds
+                    )
+                if exc.code in {"api_error", "rate_limited", "request_timeout", "service_unavailable"}:
                     consecutive_infrastructure_failures += 1
                     if consecutive_infrastructure_failures >= INFRASTRUCTURE_FAILURE_CIRCUIT_BREAKER:
                         print("[proofread] Infrastructure failure circuit breaker opened; remaining chapters remain pending.")

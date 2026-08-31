@@ -31,6 +31,18 @@ cms_library/<subject-group>/<language>/
 
 Credentials are environment-only: preparation and lab proofreading use Gemini, while R2 jobs use the Cloudflare R2 variables. Their names, scopes, and secret-handling rules are defined in [Environment setup](../environment-setup.md). Do not put a credential in a job file.
 
+## Proofreading operational settings
+
+The `proofreading` object may set the positive request deadline and progress
+interval (`request_timeout_seconds`, default `120`; and
+`request_progress_interval_seconds`, default `15`). The interval cannot exceed
+the deadline. It may also set the 503-capacity recovery values
+`unavailable_max_retries` (one or two; default `2`),
+`unavailable_first_retry_delay_seconds` (default `30`),
+`unavailable_second_retry_delay_seconds` (default `90`), and
+`unavailable_cooldown_seconds` (default `120`). These are operational settings
+and do not affect canonical proofreading output or resume compatibility.
+
 ## Schema and artifact references
 
 Use the schemas in `config/jobs/` for required fields and validation. Generated artifact schemas are in `config/artifacts/`; their lifecycle and ownership are explained in [Artifact lifecycle](../concepts/artifact-lifecycle.md).

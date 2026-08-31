@@ -17,6 +17,15 @@ Only `hi-IN` and `mr-IN` are supported. The command handles approved Unicode or 
 
 The output includes a proofread DOCX and text; reports include extracted source, a readable diff, structured details, and provenance. None becomes CMS input or canonical subject text.
 
+Each Gemini attempt has a 120-second deadline by default and reports in-flight
+elapsed and remaining time every 15 seconds. HTTP 503 `UNAVAILABLE` is a
+temporary service-capacity condition, distinct from quota-related HTTP 429: it
+uses the same jittered 30-second then 90-second recovery schedule as
+`prep-subject`, subject to a longer valid `Retry-After` hint. If that recovery
+is exhausted, the failed lab report retains only safe request diagnostics; it
+does not include prompts, source or corrected text, credentials, or response
+bodies.
+
 ## Assemble or append controlled exports
 
 ```bash

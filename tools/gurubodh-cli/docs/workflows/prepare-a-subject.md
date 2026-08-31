@@ -30,6 +30,30 @@ The versioned text in `chapters/text_and_metadata/` is the canonical proofread t
 
 `prep-subject` requires a `proofreading` object and `GEMINI_API_KEY`. It fails before publication for missing credentials, invalid configuration, oversized input, invalid or blocked model responses, and exhausted retry attempts. It does not publish chapter DOCX files or a `full_subject/` artifact.
 
+## Gemini request resilience
+
+Each Gemini request attempt has a 120-second deadline by default. While an
+attempt is active, the CLI reports elapsed and remaining time every 15 seconds;
+these status lines contain no chapter text or credentials. Job settings may
+override `request_timeout_seconds` and `request_progress_interval_seconds`, but
+both must be positive and the interval cannot exceed the deadline. The request
+deadline, progress interval, retry delays, and cooldown are operational
+settings, so changing them does not invalidate a compatible resume checkpoint.
+
+HTTP 503 `UNAVAILABLE` means temporary Gemini service capacity. It is distinct
+from quota-related HTTP 429. A 503 receives at most two retries after the
+original request: a jittered wait of about 30 seconds, then about 90 seconds.
+A longer valid Gemini `Retry-After` hint takes precedence. Other retryable
+failures retain the configured generic retry behavior.
+
+When 503 recovery is exhausted, `prep-subject` checkpoints the failed chapter
+with safe request facts (HTTP status, elapsed time, retry delay, retry-hint
+use, and terminal reason), then applies a shared 120-second cooldown before it
+can send another chapter request. Two consecutive terminal infrastructure
+failures still open the circuit breaker, leaving remaining work pending for
+`--resume`. Lab proofreading instead records the terminal capacity diagnostics
+in its failed run report.
+
 ## Resume and replacement
 
 When an individual chapter fails, the command completes independently processable chapters, marks the release incomplete, and writes JSON and Markdown reports. Resume a compatible checkpoint without repeating successful proofreads:
