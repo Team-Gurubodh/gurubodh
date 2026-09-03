@@ -105,9 +105,21 @@ class SchemaValidationTests(unittest.TestCase):
         prep["naming"]["category_code"] = "category"
         cases.append((load_prep_subject_job, prep, "$.naming.category_code must match ^CAT[0-9]{3}$"))
 
+        prep = self.maintained_job("prep-subject")
+        prep["proofreading"].pop("request_timeout_seconds")
+        cases.append((load_prep_subject_job, prep, "$.proofreading.request_timeout_seconds is required"))
+
         chunks = self.maintained_job("generate-chunks")
         chunks["chunking"]["threshold_percentile"] = 101
         cases.append((load_generate_chunks_job, chunks, "$.chunking.threshold_percentile must be at most 100"))
+
+        chunks = self.maintained_job("generate-chunks")
+        chunks["chunking"].pop("strategy_version")
+        cases.append((load_generate_chunks_job, chunks, "$.chunking.strategy_version is required"))
+
+        chunks = self.maintained_job("generate-chunks")
+        chunks["chunking"]["strategy_version"] = "semantic-window-v2"
+        cases.append((load_generate_chunks_job, chunks, '$.chunking.strategy_version must equal "semantic-window-v1"'))
 
         docx = self.maintained_job("generate-docx")
         docx["source"].pop("root_dir")
@@ -134,7 +146,7 @@ class SchemaValidationTests(unittest.TestCase):
             load_prep_subject_job(self.write_job(prep, "bad-regex.json"))
 
         chunks = self.maintained_job("generate-chunks")
-        chunks["destination"]["subject_dir"] = "different-subject/hi-IN"
+        chunks["destination"]["subject_dir"] = f"different-subject/{chunks['naming']['language']}"
         with self.assertRaisesRegex(SystemExit, "same language-qualified root"):
             load_generate_chunks_job(self.write_job(chunks, "mismatched-root.json"))
 

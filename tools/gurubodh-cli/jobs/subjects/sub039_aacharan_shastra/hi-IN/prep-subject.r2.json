@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.4.0",
+  "schema_version": "1.5.0",
   "pipeline": "legacy-docx-to-unicode",
   "source": {
     "backend": "r2",
@@ -49,6 +49,14 @@
     "max_retry_delay_seconds": 30,
     "min_request_interval_seconds": 6,
     "max_requests_per_minute": 8,
-    "max_estimated_input_tokens_per_minute": 20000
+    "max_estimated_input_tokens_per_minute": 20000,
+    "enabled": true,
+    "request_timeout_seconds": 120,
+    "request_progress_interval_seconds": 15,
+    "unavailable_max_retries": 2,
+    "unavailable_first_retry_delay_seconds": 30,
+    "unavailable_second_retry_delay_seconds": 90,
+    "unavailable_cooldown_seconds": 120,
+    "continue_on_error": false
   }
 }

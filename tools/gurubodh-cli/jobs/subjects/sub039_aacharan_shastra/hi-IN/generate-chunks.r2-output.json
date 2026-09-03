@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "pipeline": "generate-chunks",
   "source": {
     "backend": "local",
@@ -31,6 +31,7 @@
     "batch_size": 16,
     "normalize_contextual_vectors": true,
     "device": null,
-    "local_files_only": true
+    "local_files_only": true,
+    "strategy_version": "semantic-window-v1"
   }
 }

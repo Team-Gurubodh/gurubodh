@@ -61,7 +61,7 @@ destination release roots, artifact/checksum identity, and runtime model/cache
 behavior.
 
 The prep-subject `metadata_defaults` object retains its existing explicit
-`additionalProperties: true` extension point in schema `1.4.0`; only declared
+`additionalProperties: true` extension point in schema `1.5.0`; only declared
 properties have schema-defined behavior today. All other strict job objects
 continue to reject unknown properties. The same schema now declares
 `source.file_format` as `const: "docx"`, aligning the executable contract with
@@ -73,14 +73,14 @@ the only format the maintained prep pipelines support. See
   `tools/gurubodh-cli/config/artifacts/`.
 - Prep-subject job configs support `local` and `r2` source/destination storage
   backends. R2 metadata references use bucket/key pairs and nullable URLs.
-- Prep-subject job schema `1.4.0` requires explicit `metadata_defaults.language`
+- Prep-subject job schema `1.5.0` requires explicit `metadata_defaults.language`
   and supports only `hi-IN` and `mr-IN`. Both require
   `source_script: "Devanagari"` and `output_text_encoding: "UTF-8"`.
   Its source encoding values are `unicode` and `aps`; `shreelipi` is rejected
   as an intentional safety-boundary change recorded in
   [Decision-0006](./decisions/0006-source-font-safety-boundary.md).
   `destination.subject_dir` must be a safe nested POSIX-relative path whose
-  final segment equals that language. Generate-chunks job schema `1.1.0`
+  final segment equals that language. Generate-chunks job schema `1.2.0`
   applies the same locale restriction to `naming.language` and requires source
   and destination to use the same language-qualified subject root.
   Generate-docx job schema `1.0.0` uses the same local/R2 subject-artifact

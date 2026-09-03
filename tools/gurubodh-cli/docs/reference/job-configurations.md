@@ -7,7 +7,7 @@ before it derives runtime settings or reads a source. Structural failures list
 the job path and exact JSON location, for example
 `$.chunking.model_revision`. Unknown properties are rejected wherever the
 schema declares `additionalProperties: false`; `metadata_defaults` retains its
-documented schema-1.4.0 extension point.
+documented schema-1.5.0 extension point.
 
 ## Select a backend
 
@@ -33,15 +33,16 @@ Credentials are environment-only: preparation and lab proofreading use Gemini, w
 
 ## Proofreading operational settings
 
-The `proofreading` object may set the positive request deadline and progress
-interval (`request_timeout_seconds`, default `120`; and
-`request_progress_interval_seconds`, default `15`). The interval cannot exceed
-the deadline. It may also set the 503-capacity recovery values
-`unavailable_max_retries` (one or two; default `2`),
-`unavailable_first_retry_delay_seconds` (default `30`),
-`unavailable_second_retry_delay_seconds` (default `90`), and
-`unavailable_cooldown_seconds` (default `120`). These are operational settings
-and do not affect canonical proofreading output or resume compatibility.
+The `proofreading` object is strict: every prep-subject job must provide all 18
+properties, including `enabled: true` and `continue_on_error: false`. In
+particular, it must explicitly provide the positive request deadline and
+progress interval (`request_timeout_seconds` and
+`request_progress_interval_seconds`) plus the 503-capacity recovery values
+`unavailable_max_retries`, `unavailable_first_retry_delay_seconds`,
+`unavailable_second_retry_delay_seconds`, and `unavailable_cooldown_seconds`.
+The maintained jobs use `120`, `15`, `2`, `30`, `90`, and `120` respectively.
+The interval cannot exceed the deadline. These are operational settings and do
+not affect canonical proofreading output or resume compatibility.
 
 ## Schema and artifact references
 

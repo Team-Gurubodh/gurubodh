@@ -28,17 +28,21 @@ run_reports/prep-subject/
 
 The versioned text in `chapters/text_and_metadata/` is the canonical proofread text. Metadata is calculated from that exact text. Extracted source snapshots, diffs, and proofreading provenance are supporting records—not chunking inputs. Details of ownership, derived outputs, and readiness are in [Artifact lifecycle](../concepts/artifact-lifecycle.md).
 
-`prep-subject` requires a `proofreading` object and `GEMINI_API_KEY`. It fails before publication for missing credentials, invalid configuration, oversized input, invalid or blocked model responses, and exhausted retry attempts. It does not publish chapter DOCX files or a `full_subject/` artifact.
+`prep-subject` requires a fully explicit 18-property `proofreading` object and
+`GEMINI_API_KEY`. It fails before publication for missing credentials, invalid
+configuration, oversized input, invalid or blocked model responses, and
+exhausted retry attempts. It does not publish chapter DOCX files or a
+`full_subject/` artifact.
 
 ## Gemini request resilience
 
-Each Gemini request attempt has a 120-second deadline by default. While an
-attempt is active, the CLI reports elapsed and remaining time every 15 seconds;
-these status lines contain no chapter text or credentials. Job settings may
-override `request_timeout_seconds` and `request_progress_interval_seconds`, but
-both must be positive and the interval cannot exceed the deadline. The request
-deadline, progress interval, retry delays, and cooldown are operational
-settings, so changing them does not invalidate a compatible resume checkpoint.
+Each Gemini request attempt uses the job's explicitly declared deadline. The
+maintained jobs declare 120 seconds and report elapsed and remaining time every
+15 seconds; these status lines contain no chapter text or credentials. Both
+`request_timeout_seconds` and `request_progress_interval_seconds` must be
+positive and the interval cannot exceed the deadline. The request deadline,
+progress interval, retry delays, and cooldown are operational settings, so
+changing them does not invalidate a compatible resume checkpoint.
 
 HTTP 503 `UNAVAILABLE` means temporary Gemini service capacity. It is distinct
 from quota-related HTTP 429. A 503 receives at most two retries after the
