@@ -4,7 +4,7 @@
   "source": {
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
-    "key": "source_library/123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya.docx",
+    "key": "source_library/123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
     "font_encoding": "unicode",
     "file_format": "docx"
   },

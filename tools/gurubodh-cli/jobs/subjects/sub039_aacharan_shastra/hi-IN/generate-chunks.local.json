@@ -4,12 +4,12 @@
   "source": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra/hi-IN"
+    "subject_dir": "39_aacharan_shastra/hi-IN"
   },
   "destination": {
     "backend": "local",
     "root_dir": "/Users/rajeev/Gurubodh_library/cms_library",
-    "subject_dir": "39_aacharan_shaastra/hi-IN"
+    "subject_dir": "39_aacharan_shastra/hi-IN"
   },
   "naming": {
     "category_code": "CAT004",
