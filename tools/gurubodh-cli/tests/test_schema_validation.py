@@ -146,7 +146,7 @@ class SchemaValidationTests(unittest.TestCase):
             load_prep_subject_job(self.write_job(prep, "bad-regex.json"))
 
         chunks = self.maintained_job("generate-chunks")
-        chunks["destination"]["subject_dir"] = "different-subject/hi-IN"
+        chunks["destination"]["subject_dir"] = f"different-subject/{chunks['naming']['language']}"
         with self.assertRaisesRegex(SystemExit, "same language-qualified root"):
             load_generate_chunks_job(self.write_job(chunks, "mismatched-root.json"))
 
