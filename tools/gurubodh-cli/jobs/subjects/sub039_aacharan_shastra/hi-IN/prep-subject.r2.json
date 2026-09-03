@@ -12,7 +12,7 @@
     "backend": "r2",
     "bucket": "gurubodh-library-dev",
     "prefix": "cms_library",
-    "subject_dir": "39_aacharan_shaastra/hi-IN",
+    "subject_dir": "39_aacharan_shastra/hi-IN",
     "url_base": null
   },
   "naming": {
