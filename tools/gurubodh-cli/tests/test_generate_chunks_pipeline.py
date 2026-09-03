@@ -17,7 +17,7 @@ from gurubodh.project import ProjectContext
 
 def base_config(root_dir):
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "pipeline": "generate-chunks",
         "source": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya/hi-IN"},
         "destination": {"backend": "local", "root_dir": str(root_dir), "subject_dir": "123_spand_rahasya/hi-IN"},
@@ -30,6 +30,7 @@ def base_config(root_dir):
             "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
             "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16,
             "normalize_contextual_vectors": True, "device": None, "local_files_only": False,
+            "strategy_version": "semantic-window-v1",
         },
     }
 
@@ -315,7 +316,10 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertEqual(payload["source_references"]["candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
         self.assertEqual(semantic_manifest["source_candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
         self.assertEqual(semantic_manifest["chapters"][0]["chunk_artifact_sha256"], hashlib.sha256(chunk_path.read_bytes()).hexdigest())
+        self.assertEqual(payload["chunking"]["strategy_version"], "semantic-window-v1")
+        self.assertEqual(semantic_manifest["chunking"]["strategy_version"], "semantic-window-v1")
         self.assertIn("chunking_config_key", semantic_manifest["chunking"])
+        self.assertEqual(payload["chunking"]["chunking_config_key"], semantic_manifest["chunking"]["chunking_config_key"])
         self.assertEqual(payload["chunks"][0]["estimated_token_count"], 2)
 
     def test_succeeded_old_contract_release_with_legacy_metadata_remains_consumable(self):

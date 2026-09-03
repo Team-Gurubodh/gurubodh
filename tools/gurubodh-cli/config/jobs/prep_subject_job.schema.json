@@ -7,7 +7,7 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.4.0"
+      "const": "1.5.0"
     },
     "pipeline": {
       "type": "string",
@@ -242,24 +242,44 @@
     "proofreading": {
       "type": "object",
       "additionalProperties": false,
+      "required": [
+        "enabled",
+        "provider",
+        "model",
+        "max_output_tokens",
+        "max_input_characters",
+        "max_retries",
+        "initial_retry_delay_seconds",
+        "max_retry_delay_seconds",
+        "min_request_interval_seconds",
+        "max_requests_per_minute",
+        "max_estimated_input_tokens_per_minute",
+        "request_timeout_seconds",
+        "request_progress_interval_seconds",
+        "unavailable_max_retries",
+        "unavailable_first_retry_delay_seconds",
+        "unavailable_second_retry_delay_seconds",
+        "unavailable_cooldown_seconds",
+        "continue_on_error"
+      ],
       "properties": {
         "enabled": { "const": true },
-        "provider": { "type": "string", "const": "google-ai-studio", "default": "google-ai-studio" },
-        "model": { "type": "string", "minLength": 1, "default": "gemini-3.7-flash" },
-        "max_output_tokens": { "type": "integer", "minimum": 1, "default": 8192 },
-        "max_input_characters": { "type": "integer", "minimum": 1, "default": 30000 },
-        "max_retries": { "type": "integer", "minimum": 1, "default": 3 },
-        "initial_retry_delay_seconds": { "type": "number", "minimum": 0, "default": 2 },
-        "max_retry_delay_seconds": { "type": "number", "minimum": 0, "default": 30 },
-        "min_request_interval_seconds": { "type": "number", "minimum": 0, "default": 6 },
-        "max_requests_per_minute": { "type": "integer", "minimum": 1, "default": 8 },
-        "max_estimated_input_tokens_per_minute": { "type": "integer", "minimum": 1, "default": 20000 },
-        "request_timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 120 },
-        "request_progress_interval_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 15 },
-        "unavailable_max_retries": { "type": "integer", "minimum": 1, "maximum": 2, "default": 2 },
-        "unavailable_first_retry_delay_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 30 },
-        "unavailable_second_retry_delay_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 90 },
-        "unavailable_cooldown_seconds": { "type": "number", "exclusiveMinimum": 0, "default": 120 },
+        "provider": { "type": "string", "const": "google-ai-studio" },
+        "model": { "type": "string", "minLength": 1 },
+        "max_output_tokens": { "type": "integer", "minimum": 1 },
+        "max_input_characters": { "type": "integer", "minimum": 1 },
+        "max_retries": { "type": "integer", "minimum": 1 },
+        "initial_retry_delay_seconds": { "type": "number", "minimum": 0 },
+        "max_retry_delay_seconds": { "type": "number", "minimum": 0 },
+        "min_request_interval_seconds": { "type": "number", "minimum": 0 },
+        "max_requests_per_minute": { "type": "integer", "minimum": 1 },
+        "max_estimated_input_tokens_per_minute": { "type": "integer", "minimum": 1 },
+        "request_timeout_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "request_progress_interval_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "unavailable_max_retries": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "unavailable_first_retry_delay_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "unavailable_second_retry_delay_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "unavailable_cooldown_seconds": { "type": "number", "exclusiveMinimum": 0 },
         "continue_on_error": { "const": false }
       }
     }

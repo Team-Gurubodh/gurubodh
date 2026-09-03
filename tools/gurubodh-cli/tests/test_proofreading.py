@@ -102,9 +102,13 @@ class ProofreadingTests(unittest.TestCase):
         self.assertIn("\n\nदूसरा", rendered)
         self.assertEqual(summary["changed_segments"], 1)
 
-    def test_proofreading_runtime_configuration_applies_defaults_and_cross_field_rule(self):
-        settings = proofreading_config({"proofreading": {}})
-        self.assertEqual(settings.model, "gemini-3.7-flash")
+    def test_proofreading_runtime_configuration_uses_explicit_job_values_and_cross_field_rule(self):
+        job_path = Path(__file__).parents[1] / "jobs" / "subjects" / "sub123_spand_rahasya" / "hi-IN" / "prep-subject.local.json"
+        job = json.loads(job_path.read_text(encoding="utf-8"))
+        settings = proofreading_config(job)
+
+        self.assertEqual(settings.model, "gemini-3.6-flash")
+        self.assertEqual(settings.max_output_tokens, 16384)
         self.assertEqual(settings.request_timeout_seconds, 120)
         self.assertEqual(settings.request_progress_interval_seconds, 15)
         self.assertEqual(settings.unavailable_max_retries, 2)
@@ -112,32 +116,36 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(settings.public_dict()["request_timeout_seconds"], 120)
         with self.assertRaisesRegex(SystemExit, "proofreading is required"):
             proofreading_config({})
+
+        invalid = json.loads(json.dumps(job))
+        invalid["proofreading"]["initial_retry_delay_seconds"] = 10
+        invalid["proofreading"]["max_retry_delay_seconds"] = 5
         with self.assertRaisesRegex(SystemExit, "max_retry_delay_seconds must be at least"):
-            proofreading_config({
-                "proofreading": {
-                    "initial_retry_delay_seconds": 10,
-                    "max_retry_delay_seconds": 5,
-                }
-            })
+            proofreading_config(invalid)
+
+        invalid = json.loads(json.dumps(job))
+        invalid["proofreading"]["request_timeout_seconds"] = 0
         with self.assertRaisesRegex(SystemExit, "request_timeout_seconds must be greater than zero"):
-            proofreading_config({"proofreading": {"request_timeout_seconds": 0}})
+            proofreading_config(invalid)
+
+        invalid = json.loads(json.dumps(job))
+        invalid["proofreading"]["request_timeout_seconds"] = 10
+        invalid["proofreading"]["request_progress_interval_seconds"] = 11
         with self.assertRaisesRegex(SystemExit, "must not exceed request_timeout_seconds"):
-            proofreading_config({
-                "proofreading": {"request_timeout_seconds": 10, "request_progress_interval_seconds": 11}
-            })
+            proofreading_config(invalid)
         with self.assertRaisesRegex(ValueError, "unavailable_cooldown_seconds must be greater than zero"):
             ProofreadingSettings(unavailable_cooldown_seconds=0)
 
     def test_prep_subject_schema_rejects_invalid_new_operational_settings(self):
         job_path = Path(__file__).parents[1] / "jobs" / "subjects" / "sub123_spand_rahasya" / "hi-IN" / "prep-subject.local.json"
         valid_job = json.loads(job_path.read_text(encoding="utf-8"))
-        valid_job["proofreading"]["request_timeout_seconds"] = 120
-        valid_job["proofreading"]["request_progress_interval_seconds"] = 15
-        valid_job["proofreading"]["unavailable_max_retries"] = 2
-        valid_job["proofreading"]["unavailable_first_retry_delay_seconds"] = 30
-        valid_job["proofreading"]["unavailable_second_retry_delay_seconds"] = 90
-        valid_job["proofreading"]["unavailable_cooldown_seconds"] = 120
         validate_job(valid_job, "prep-subject", job_path)
+
+        valid_job["proofreading"].pop("request_timeout_seconds")
+        with self.assertRaisesRegex(SystemExit, r"proofreading\.request_timeout_seconds.*is required"):
+            validate_job(valid_job, "prep-subject", job_path)
+
+        valid_job = json.loads(job_path.read_text(encoding="utf-8"))
         valid_job["proofreading"]["unavailable_cooldown_seconds"] = 0
         with self.assertRaisesRegex(SystemExit, r"proofreading\.unavailable_cooldown_seconds"):
             validate_job(valid_job, "prep-subject", job_path)

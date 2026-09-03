@@ -7,7 +7,7 @@
   "required": ["schema_version", "pipeline", "source", "destination", "naming", "chunking"],
   "properties": {
     "schema_version": {
-      "const": "1.1.0"
+      "const": "1.2.0"
     },
     "pipeline": {
       "const": "generate-chunks"
@@ -34,7 +34,8 @@
         "batch_size",
         "normalize_contextual_vectors",
         "device",
-        "local_files_only"
+        "local_files_only",
+        "strategy_version"
       ],
       "properties": {
         "provider": {
@@ -73,6 +74,9 @@
         },
         "local_files_only": {
           "type": "boolean"
+        },
+        "strategy_version": {
+          "const": "semantic-window-v1"
         }
       }
     },

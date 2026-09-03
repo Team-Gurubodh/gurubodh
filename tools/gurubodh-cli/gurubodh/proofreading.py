@@ -119,11 +119,6 @@ class ProofreadingSettings:
         if self.request_progress_interval_seconds > self.request_timeout_seconds:
             raise ValueError("request_progress_interval_seconds must not exceed request_timeout_seconds")
 
-    @classmethod
-    def from_config(cls, config: dict[str, Any]) -> "ProofreadingSettings":
-        values = {field: config.get(field, getattr(cls, field)) for field in cls.__dataclass_fields__}
-        return cls(**values)
-
     def public_dict(self) -> dict[str, Any]:
         return {
             "mandatory": True,

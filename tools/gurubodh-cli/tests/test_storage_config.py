@@ -22,7 +22,7 @@ from gurubodh.storage import (
 
 
 BASE_CONFIG = {
-    "schema_version": "1.4.0",
+    "schema_version": "1.5.0",
     "pipeline": "unicode-docx-ingest",
     "source": {
         "root_dir": "/tmp/source",
@@ -49,7 +49,26 @@ BASE_CONFIG = {
         "source_script": "Devanagari",
         "output_text_encoding": "UTF-8",
     },
-    "proofreading": {},
+    "proofreading": {
+        "enabled": True,
+        "provider": "google-ai-studio",
+        "model": "gemini-3.6-flash",
+        "max_output_tokens": 16384,
+        "max_input_characters": 30000,
+        "max_retries": 3,
+        "initial_retry_delay_seconds": 2,
+        "max_retry_delay_seconds": 30,
+        "min_request_interval_seconds": 6,
+        "max_requests_per_minute": 8,
+        "max_estimated_input_tokens_per_minute": 20000,
+        "request_timeout_seconds": 120,
+        "request_progress_interval_seconds": 15,
+        "unavailable_max_retries": 2,
+        "unavailable_first_retry_delay_seconds": 30,
+        "unavailable_second_retry_delay_seconds": 90,
+        "unavailable_cooldown_seconds": 120,
+        "continue_on_error": False,
+    },
 }
 
 
@@ -593,6 +612,7 @@ class StorageConfigTests(unittest.TestCase):
                     "5617a9f61b028005a4858fdac845db406aefb181",
                 )
                 self.assertTrue(config["_semantic_chunk_config"].local_files_only)
+                self.assertEqual(config["_semantic_chunk_config"].strategy_version, "semantic-window-v1")
                 self.assertEqual(config["naming"]["language"], "hi-IN")
                 self.assertTrue(config["source"]["subject_dir"].endswith("/hi-IN"))
                 self.assertEqual(config["source"]["subject_dir"], config["destination"]["subject_dir"])
@@ -623,12 +643,12 @@ class StorageConfigTests(unittest.TestCase):
 
     def test_generate_chunks_job_rejects_unpinned_model_revision(self):
         config = {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "pipeline": "generate-chunks",
             "source": {"backend": "r2", "bucket": "source", "prefix": "cms_library", "subject_dir": "123_spand_rahasya/hi-IN", "url_base": None},
             "destination": {"backend": "r2", "bucket": "destination", "prefix": "cms_library", "subject_dir": "123_spand_rahasya/hi-IN", "url_base": None},
             "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya", "version": "01", "subversion": "01", "language": "hi-IN"},
-            "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_contextual_vectors": True, "device": None, "local_files_only": False},
+            "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_contextual_vectors": True, "device": None, "local_files_only": False, "strategy_version": "semantic-window-v1"},
         }
 
         with self.assertRaisesRegex(SystemExit, r"\$\.chunking\.model_revision must be string; found null"):

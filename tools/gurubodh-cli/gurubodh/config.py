@@ -132,7 +132,12 @@ def proofreading_config(config):
     if not isinstance(value, dict):
         raise SystemExit("Config error: proofreading is required and must be an object")
     try:
-        settings = ProofreadingSettings.from_config(value)
+        settings = ProofreadingSettings(
+            **{
+                field: value[field]
+                for field in ProofreadingSettings.__dataclass_fields__
+            }
+        )
     except ValueError as exc:
         raise SystemExit(f"Config error: proofreading.{exc}") from exc
     if settings.max_retry_delay_seconds < settings.initial_retry_delay_seconds:
@@ -191,6 +196,7 @@ def load_generate_chunks_job(path):
             normalize_contextual_vectors=chunking["normalize_contextual_vectors"],
             device=chunking["device"],
             local_files_only=chunking["local_files_only"],
+            strategy_version=chunking["strategy_version"],
         )
     except SemanticChunkConfigError as exc:
         raise SystemExit(f"Config error: {exc}") from exc
