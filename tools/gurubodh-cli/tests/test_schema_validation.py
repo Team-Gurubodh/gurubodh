@@ -11,7 +11,11 @@ from gurubodh.config import (
     load_generate_chunks_job,
     load_generate_docx_job,
     load_prep_subject_job,
+    prepare_generate_chunks_job,
+    prepare_generate_docx_job,
+    prepare_prep_subject_job,
 )
+from gurubodh.prep_subject_checkpoints import compatibility_record
 from gurubodh.schema_validation import (
     ARTIFACT_SCHEMAS,
     JOB_SCHEMAS,
@@ -55,6 +59,40 @@ class SchemaValidationTests(unittest.TestCase):
             with self.subTest(path=path):
                 loaded = loaders[command](path)
                 self.assertEqual(loaded["pipeline"], json.loads(path.read_text())["pipeline"])
+
+    def test_mapping_preparation_is_non_mutating_and_equivalent_to_file_loading(self):
+        preparers = {
+            "prep-subject": (load_prep_subject_job, prepare_prep_subject_job),
+            "generate-chunks": (load_generate_chunks_job, prepare_generate_chunks_job),
+            "generate-docx": (load_generate_docx_job, prepare_generate_docx_job),
+        }
+
+        for command, (loader, preparer) in preparers.items():
+            path = next((CLI_ROOT / "jobs").rglob(f"{command}.local.json"))
+            mapping = json.loads(path.read_text(encoding="utf-8"))
+            original = copy.deepcopy(mapping)
+
+            with self.subTest(command=command):
+                file_loaded = loader(path)
+                mapping_prepared = preparer(mapping, origin=f"composed {command} job")
+
+                self.assertEqual(mapping, original)
+                self.assertEqual(mapping_prepared, file_loaded)
+                if command == "prep-subject":
+                    self.assertEqual(
+                        compatibility_record(mapping_prepared, "a" * 64),
+                        compatibility_record(file_loaded, "a" * 64),
+                    )
+
+    def test_mapping_preparation_uses_schema_validation_and_display_origin(self):
+        payload = self.maintained_job("generate-docx")
+        payload.pop("schema_version")
+
+        with self.assertRaisesRegex(
+            SystemExit,
+            r"Config validation failed \(generate-docx job, composed generate-docx job\): \$\.schema_version is required",
+        ):
+            prepare_generate_docx_job(payload, origin="composed generate-docx job")
 
     def test_job_validation_is_non_mutating_and_uses_explicit_draft_2020_12(self):
         payload = self.maintained_job("generate-chunks")

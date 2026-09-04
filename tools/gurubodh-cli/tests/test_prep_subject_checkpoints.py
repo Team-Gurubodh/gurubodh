@@ -1,5 +1,8 @@
+import copy
+from dataclasses import replace
 import io
 import json
+import re
 import tempfile
 import unittest
 import zipfile
@@ -8,7 +11,16 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
-from gurubodh.prep_subject_checkpoints import JOB_STATE_RELATIVE_PATH, run_resumable_prep_job
+from gurubodh.prep_subject_checkpoints import (
+    CHECKPOINT_CONTRACT_VERSION,
+    JOB_STATE_RELATIVE_PATH,
+    PrepCheckpointManager,
+    _compatibility_record_from_inputs,
+    _safe_config_inputs,
+    compatibility_record,
+    run_resumable_prep_job,
+)
+from gurubodh.locales import locale_spec
 from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
 
 
@@ -46,6 +58,23 @@ def config(root):
     }
     values["_proofreading_config"] = ProofreadingSettings(min_request_interval_seconds=0)
     return values
+
+
+def incomplete_checkpoint_state(compatibility):
+    return {
+        "schema_version": 1,
+        "job_id": "00000000-0000-4000-8000-000000000000",
+        "state": "incomplete",
+        "created_at": "2026-09-04T00:00:00Z",
+        "updated_at": "2026-09-04T00:00:00Z",
+        "run": {},
+        "lease": {},
+        "compatibility": compatibility,
+        "chapters": [],
+        "counts": {"succeeded": 0, "failed": 0, "pending": 0},
+        "publication": {},
+        "run_reports": [],
+    }
 
 
 class FakeR2Client:
@@ -105,6 +134,195 @@ def prepare_unicode(source_path, output_path, progress):
 
 
 class PrepSubjectCheckpointTests(unittest.TestCase):
+    def test_compatibility_record_has_a_deterministic_output_affecting_contract(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = config(root)
+            source_sha256 = "a" * 64
+            baseline = compatibility_record(base, source_sha256)
+
+            reordered = {
+                key: (
+                    {nested_key: nested_value for nested_key, nested_value in reversed(value.items())}
+                    if isinstance(value, dict)
+                    else value
+                )
+                for key, value in reversed(base.items())
+            }
+            self.assertEqual(compatibility_record(reordered, source_sha256), baseline)
+
+            runtime_enriched = copy.deepcopy(base)
+            runtime_enriched["chapter_split"]["_compiled_pattern"] = re.compile("CHAPTER")
+            self.assertEqual(compatibility_record(runtime_enriched, source_sha256), baseline)
+
+            operational_settings = {
+                "retry count": {"max_retries": 9},
+                "retry delay": {"initial_retry_delay_seconds": 3, "max_retry_delay_seconds": 31},
+                "request pacing": {"min_request_interval_seconds": 99},
+                "request rate limit": {"max_requests_per_minute": 99},
+                "token rate limit": {"max_estimated_input_tokens_per_minute": 99999},
+                "request timeout": {"request_timeout_seconds": 999},
+                "progress pacing": {"request_progress_interval_seconds": 16},
+                "unavailable retry count": {"unavailable_max_retries": 1},
+                "unavailable retry delays": {
+                    "unavailable_first_retry_delay_seconds": 31,
+                    "unavailable_second_retry_delay_seconds": 91,
+                },
+                "unavailable cooldown": {"unavailable_cooldown_seconds": 121},
+            }
+            for label, settings in operational_settings.items():
+                operational = copy.deepcopy(base)
+                operational["_proofreading_config"] = replace(base["_proofreading_config"], **settings)
+                with self.subTest(setting=label):
+                    self.assertEqual(compatibility_record(operational, source_sha256), baseline)
+
+            expected_inputs = _safe_config_inputs(base)
+            self.assertEqual(baseline["output_affecting_inputs"], expected_inputs)
+            self.assertEqual(
+                set(expected_inputs),
+                {
+                    "pipeline",
+                    "chapter_split",
+                    "naming",
+                    "metadata_defaults",
+                    "proofreading",
+                    "checkpoint_contract_version",
+                },
+            )
+            self.assertEqual(expected_inputs["checkpoint_contract_version"], CHECKPOINT_CONTRACT_VERSION)
+
+    def test_compatibility_record_changes_for_each_output_affecting_input(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = config(root)
+            source_sha256 = "a" * 64
+            baseline = compatibility_record(base, source_sha256)
+
+            mutations = {
+                "pipeline": lambda value: value.__setitem__("pipeline", "legacy-docx-to-unicode"),
+                "chapter splitting": lambda value: value["chapter_split"].__setitem__("pattern", "LECTURE"),
+                "naming": lambda value: value["naming"].__setitem__("title_slug", "other-title"),
+                "metadata defaults": lambda value: value["metadata_defaults"].__setitem__("output_text_encoding", "UTF-16"),
+                "proofreading locale provenance": lambda value: value.__setitem__("_locale", locale_spec("mr-IN")),
+                "proofreading provider": lambda value: value.__setitem__(
+                    "_proofreading_config", replace(value["_proofreading_config"], provider="other-provider")
+                ),
+                "proofreading model": lambda value: value.__setitem__(
+                    "_proofreading_config", replace(value["_proofreading_config"], model="other-model")
+                ),
+                "proofreading max output tokens": lambda value: value.__setitem__(
+                    "_proofreading_config", replace(value["_proofreading_config"], max_output_tokens=1)
+                ),
+                "proofreading max input characters": lambda value: value.__setitem__(
+                    "_proofreading_config", replace(value["_proofreading_config"], max_input_characters=1)
+                ),
+            }
+            for label, mutate in mutations.items():
+                changed = copy.deepcopy(base)
+                mutate(changed)
+                with self.subTest(input=label):
+                    self.assertNotEqual(compatibility_record(changed, source_sha256), baseline)
+
+            self.assertNotEqual(compatibility_record(base, "b" * 64), baseline)
+            with patch("gurubodh.prep_subject_checkpoints.CHECKPOINT_CONTRACT_VERSION", CHECKPOINT_CONTRACT_VERSION + 1):
+                self.assertNotEqual(compatibility_record(base, source_sha256), baseline)
+
+    def test_regex_flag_compatibility_canonicalizes_only_equivalent_sets(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            base = config(root)
+            base["chapter_split"] = {
+                "enabled": True,
+                "pattern_type": "regex",
+                "pattern": "CHAPTER",
+            }
+            source_sha256 = "a" * 64
+            omitted = compatibility_record(base, source_sha256)
+
+            explicit_empty = copy.deepcopy(base)
+            explicit_empty["chapter_split"]["flags"] = []
+            self.assertEqual(compatibility_record(explicit_empty, source_sha256), omitted)
+
+            ordered = copy.deepcopy(base)
+            ordered["chapter_split"]["flags"] = ["MULTILINE", "IGNORECASE"]
+            reordered = copy.deepcopy(base)
+            reordered["chapter_split"]["flags"] = ["IGNORECASE", "MULTILINE"]
+            self.assertEqual(compatibility_record(ordered, source_sha256), compatibility_record(reordered, source_sha256))
+
+            changed_set = copy.deepcopy(base)
+            changed_set["chapter_split"]["flags"] = ["DOTALL"]
+            self.assertNotEqual(compatibility_record(ordered, source_sha256), compatibility_record(changed_set, source_sha256))
+
+    def test_legacy_regex_flag_records_resume_when_the_flag_set_is_equivalent(self):
+        cases = (
+            ("omitted-to-explicit", None, []),
+            ("explicit-to-omitted", [], None),
+            ("reordered", ["MULTILINE", "IGNORECASE"], ["IGNORECASE", "MULTILINE"]),
+        )
+        source_sha256 = "a" * 64
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for label, stored_flags, current_flags in cases:
+                with self.subTest(transition=label):
+                    root = Path(temp_dir) / label
+                    stored_config = config(root)
+                    stored_config["chapter_split"] = {
+                        "enabled": True,
+                        "pattern_type": "regex",
+                        "pattern": "CHAPTER",
+                    }
+                    current_config = copy.deepcopy(stored_config)
+                    if stored_flags is not None:
+                        stored_config["chapter_split"]["flags"] = stored_flags
+                    if current_flags is not None:
+                        current_config["chapter_split"]["flags"] = current_flags
+
+                    legacy_inputs = _safe_config_inputs(stored_config)
+                    if stored_flags is None:
+                        legacy_inputs["chapter_split"].pop("flags")
+                    elif stored_flags == []:
+                        legacy_inputs["chapter_split"]["flags"] = []
+                    else:
+                        legacy_inputs["chapter_split"]["flags"] = stored_flags
+                    legacy_record = _compatibility_record_from_inputs(legacy_inputs, source_sha256)
+
+                    subject_dir = root / "subject" / "hi-IN"
+                    state_path = subject_dir / JOB_STATE_RELATIVE_PATH
+                    state_path.parent.mkdir(parents=True, exist_ok=True)
+                    state_path.write_text(
+                        json.dumps(incomplete_checkpoint_state(legacy_record)),
+                        encoding="utf-8",
+                    )
+
+                    manager = PrepCheckpointManager(current_config, resume=True, overwrite=False)
+                    try:
+                        manager.open()
+                        self.assertEqual(manager.begin(source_sha256), "started")
+                    finally:
+                        manager.close()
+
+    def test_resume_requires_overwrite_for_genuinely_incompatible_configuration(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_sha256 = "a" * 64
+            prior_config = config(root)
+            current_config = copy.deepcopy(prior_config)
+            current_config["naming"]["title_slug"] = "different-title"
+            state_path = root / "subject" / "hi-IN" / JOB_STATE_RELATIVE_PATH
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(incomplete_checkpoint_state(compatibility_record(prior_config, source_sha256))),
+                encoding="utf-8",
+            )
+
+            manager = PrepCheckpointManager(current_config, resume=True, overwrite=False)
+            try:
+                manager.open()
+                with self.assertRaisesRegex(SystemExit, r"incompatible.*--overwrite"):
+                    manager.begin(source_sha256)
+            finally:
+                manager.close()
+
     def test_unsupported_source_font_fails_before_preparation_or_canonical_artifacts(self):
         unsafe_xml = DOCUMENT_XML.replace(
             "<w:r><w:t>विषय परीक्षण</w:t></w:r>",
