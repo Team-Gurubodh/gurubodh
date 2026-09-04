@@ -34,13 +34,13 @@ from gurubodh.legacy.font_detection import validate_supported_source_fonts
 from gurubodh.naming import chapter_output_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
 from gurubodh.pipelines.common import validate_and_split
-from gurubodh.proofreading import (
-    GeminiProofreader,
-    ProofreadingError,
-    proofread_single_chapter_artifacts,
-    safe_request_diagnostics,
+from gurubodh.proofreading.artifacts import (
+    write_canonical_chapter_artifacts,
     write_proofreading_manifest,
 )
+from gurubodh.proofreading.errors import ProofreadingError
+from gurubodh.proofreading.gemini import GeminiProofreader
+from gurubodh.proofreading.policy import safe_request_diagnostics
 from gurubodh.schema_validation import validated_artifact_json
 from gurubodh.storage import (
     CANONICAL_ARTIFACT_FILES,
@@ -1398,14 +1398,14 @@ def run_resumable_prep_job(
             number = int(chapter["chapter_number"])
             attempted.append(chapter["chapter_number"])
             try:
-                chapter_result = proofread_single_chapter_artifacts(
+                chapter_result = write_canonical_chapter_artifacts(
                     config,
                     paths,
                     number,
                     source_snapshot,
+                    proofreader=proofreader,
                     converter_counts=manager.state.get("preparation", {}).get("converter_counts", {}),
                     entry_point=entry_point,
-                    proofreader=proofreader,
                     progress=lambda message, n=chapter["chapter_number"]: print(f"[proofread {n}] {message}"),
                 )
                 manager.mark_chapter_success(chapter, chapter_result)

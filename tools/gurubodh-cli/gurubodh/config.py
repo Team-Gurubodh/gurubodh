@@ -8,7 +8,7 @@ from gurubodh.contracts import GenerateChunksJob, GenerateDocxJob, PrepSubjectJo
 from gurubodh.errors import ConfigurationError
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
 from gurubodh.locales import locale_spec
-from gurubodh.proofreading import ProofreadingSettings
+from gurubodh.proofreading.settings import ProofreadingSettings
 from gurubodh.schema_validation import validate_job
 
 

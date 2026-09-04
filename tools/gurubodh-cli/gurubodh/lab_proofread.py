@@ -12,6 +12,7 @@ from typing import Any, Callable
 from gurubodh import __version__
 from gurubodh.audit import resolved_build_provenance
 from gurubodh.constants import ENTRY_POINT_LAB_PROOFREAD
+from gurubodh.contracts import Proofreader
 from gurubodh.docx.export import formatting_defaults, write_chapter_docx
 from gurubodh.docx.text import extract_docx_text
 from gurubodh.docx.validate import validate_docx
@@ -22,13 +23,11 @@ from gurubodh.legacy.font_detection import (
     validate_supported_source_fonts,
 )
 from gurubodh.locales import locale_spec
-from gurubodh.proofreading import (
-    GeminiProofreader,
-    ProofreadingError,
-    ProofreadingSettings,
-    safe_request_diagnostics,
-    word_level_diff,
-)
+from gurubodh.proofreading.errors import ProofreadingError
+from gurubodh.proofreading.gemini import GeminiProofreader
+from gurubodh.proofreading.policy import safe_request_diagnostics
+from gurubodh.proofreading.settings import ProofreadingSettings
+from gurubodh.proofreading.text_comparison import word_level_diff
 from gurubodh.time_utils import utc_now
 
 
@@ -191,7 +190,7 @@ def run_lab_proofread(
     source: str | Path,
     locale_name: str,
     lab_root: str | Path,
-    proofreader: Any | None = None,
+    proofreader: Proofreader | None = None,
     settings: ProofreadingSettings | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Callable, NotRequired, Protocol, TypedDic
 if TYPE_CHECKING:
     from gurubodh.locales import LocaleSpec
     from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
-    from gurubodh.proofreading import ProofreadingSettings
+    from gurubodh.proofreading.settings import ProofreadingSettings
 
 
 JsonObject = dict[str, Any]
@@ -55,18 +55,21 @@ class CleanupResource(Protocol):
 
 
 class ProofreadingProviderResponse(TypedDict):
+    """Validated provider-neutral proofreading result and bounded request facts."""
+
     corrected_text: str
     edits: list[dict[str, str]]
     estimated_input_tokens: int
     attempts: int
     successful_request_attempts: NotRequired[int]
+    failed_request_attempts: NotRequired[int]
     throttle_seconds: float
     usage: dict[str, int] | None
     request_diagnostics: NotRequired[JsonObject | None]
 
 
 class Proofreader(Protocol):
-    """Injectable proofreading seam shared by Gemini and lightweight fakes."""
+    """Provider-neutral seam shared by production providers and test fakes."""
 
     def proofread(
         self, text: str, progress: Callable[[str], None] | None = None
