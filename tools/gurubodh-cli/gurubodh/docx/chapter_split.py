@@ -9,10 +9,11 @@ from gurubodh.naming import chapter_unmodified_source_filename
 from gurubodh.text_utils import normalize_spaces, safe_filename
 
 
-def chapter_starts(text, chapter_split):
+def chapter_starts(text, chapter_split, compiled_pattern=None):
     pattern = chapter_split["pattern"]
     if chapter_split.get("pattern_type") == "regex":
-        return chapter_split["_compiled_pattern"].search(text) is not None
+        runtime_pattern = compiled_pattern or re.compile(pattern)
+        return runtime_pattern.search(text) is not None
     return pattern in text
 
 
@@ -54,7 +55,7 @@ def chapter_text(blocks):
     return "\n\n".join(parts)
 
 
-def split_body_into_chapters(body, chapter_split):
+def split_body_into_chapters(body, chapter_split, compiled_pattern=None):
     children = list(body)
     sect_pr = None
     content_blocks = []
@@ -69,7 +70,9 @@ def split_body_into_chapters(body, chapter_split):
     current = None
     for block in content_blocks:
         text = block_text(block)
-        starts_chapter = block.tag == W + "p" and chapter_starts(text, chapter_split)
+        starts_chapter = block.tag == W + "p" and chapter_starts(
+            text, chapter_split, compiled_pattern
+        )
         if starts_chapter:
             if current:
                 chapters.append(current)
@@ -91,6 +94,7 @@ def split_docx_into_chapters(
     unmodified_source_text_dir,
     config=None,
     progress=None,
+    compiled_pattern=None,
 ):
     with zipfile.ZipFile(docx_path) as docx:
         document_xml = docx.read("word/document.xml")
@@ -100,7 +104,9 @@ def split_docx_into_chapters(
     if body is None:
         raise RuntimeError("word/document.xml has no body")
 
-    preface, chapters, _ = split_body_into_chapters(body, chapter_split)
+    preface, chapters, _ = split_body_into_chapters(
+        body, chapter_split, compiled_pattern
+    )
     if not chapters:
         print(f"no chapters found using pattern: {chapter_split['pattern']}")
         return []

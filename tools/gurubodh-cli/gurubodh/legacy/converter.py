@@ -2,11 +2,13 @@ import json
 import shutil
 import subprocess
 
+from gurubodh.errors import ConfigurationError
+
 
 def required_command(name):
     if shutil.which(name):
         return
-    raise SystemExit(f"Missing required command: {name}")
+    raise ConfigurationError(f"Missing required command: {name}")
 
 
 def postprocess_unicode_text(text, converter="aps"):
@@ -21,7 +23,7 @@ def convert_texts(texts, converter, legacy_converter):
         return []
     required_command("node")
     if not legacy_converter.exists():
-        raise SystemExit(f"Missing legacy converter: {legacy_converter}")
+        raise ConfigurationError(f"Missing legacy converter: {legacy_converter}")
 
     proc = subprocess.run(
         ["node", str(legacy_converter)],
@@ -46,4 +48,3 @@ def convert_text_groups(groups, legacy_converter):
         for index, text in zip(indexes, convert_texts(texts, converter, legacy_converter)):
             converted[index] = text
     return converted
-

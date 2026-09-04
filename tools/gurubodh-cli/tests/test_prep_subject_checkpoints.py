@@ -10,6 +10,8 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from gurubodh.contracts import PrepSubjectJob
+from gurubodh.errors import GurubodhError
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
 from gurubodh.prep_subject_checkpoints import (
     CHECKPOINT_CONTRACT_VERSION,
@@ -56,8 +58,17 @@ def config(root):
         "chapter_split": {"enabled": True, "pattern_type": "literal", "pattern": "CHAPTER"},
         "metadata_defaults": {"language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
     }
-    values["_proofreading_config"] = ProofreadingSettings(min_request_interval_seconds=0)
-    return values
+    return PrepSubjectJob(
+        values,
+        locale_spec("hi-IN"),
+        ProofreadingSettings(min_request_interval_seconds=0),
+    )
+
+
+def with_payload(job, **changes):
+    payload = job.to_payload()
+    payload.update(changes)
+    return replace(job, _payload=payload)
 
 
 def incomplete_checkpoint_state(compatibility):
@@ -84,6 +95,9 @@ class FakeR2Client:
 
     def exists(self, bucket, key):
         return key in self.objects
+
+    def prefix_has_objects(self, bucket, prefix):
+        return any(key.startswith(prefix) for key in self.objects)
 
     def list_keys(self, bucket, prefix):
         return sorted(key for key in self.objects if key.startswith(prefix))
@@ -141,18 +155,20 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             source_sha256 = "a" * 64
             baseline = compatibility_record(base, source_sha256)
 
-            reordered = {
+            reordered_payload = {
                 key: (
                     {nested_key: nested_value for nested_key, nested_value in reversed(value.items())}
                     if isinstance(value, dict)
                     else value
                 )
-                for key, value in reversed(base.items())
+                for key, value in reversed(base.to_payload().items())
             }
+            reordered = replace(base, _payload=reordered_payload)
             self.assertEqual(compatibility_record(reordered, source_sha256), baseline)
 
-            runtime_enriched = copy.deepcopy(base)
-            runtime_enriched["chapter_split"]["_compiled_pattern"] = re.compile("CHAPTER")
+            runtime_enriched = replace(
+                base, compiled_chapter_pattern=re.compile("CHAPTER")
+            )
             self.assertEqual(compatibility_record(runtime_enriched, source_sha256), baseline)
 
             operational_settings = {
@@ -171,8 +187,12 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 "unavailable cooldown": {"unavailable_cooldown_seconds": 121},
             }
             for label, settings in operational_settings.items():
-                operational = copy.deepcopy(base)
-                operational["_proofreading_config"] = replace(base["_proofreading_config"], **settings)
+                operational = replace(
+                    base,
+                    proofreading_settings=replace(
+                        base.proofreading_settings, **settings
+                    ),
+                )
                 with self.subTest(setting=label):
                     self.assertEqual(compatibility_record(operational, source_sha256), baseline)
 
@@ -198,28 +218,27 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             source_sha256 = "a" * 64
             baseline = compatibility_record(base, source_sha256)
 
-            mutations = {
+            payload_mutations = {
                 "pipeline": lambda value: value.__setitem__("pipeline", "legacy-docx-to-unicode"),
                 "chapter splitting": lambda value: value["chapter_split"].__setitem__("pattern", "LECTURE"),
                 "naming": lambda value: value["naming"].__setitem__("title_slug", "other-title"),
                 "metadata defaults": lambda value: value["metadata_defaults"].__setitem__("output_text_encoding", "UTF-16"),
-                "proofreading locale provenance": lambda value: value.__setitem__("_locale", locale_spec("mr-IN")),
-                "proofreading provider": lambda value: value.__setitem__(
-                    "_proofreading_config", replace(value["_proofreading_config"], provider="other-provider")
-                ),
-                "proofreading model": lambda value: value.__setitem__(
-                    "_proofreading_config", replace(value["_proofreading_config"], model="other-model")
-                ),
-                "proofreading max output tokens": lambda value: value.__setitem__(
-                    "_proofreading_config", replace(value["_proofreading_config"], max_output_tokens=1)
-                ),
-                "proofreading max input characters": lambda value: value.__setitem__(
-                    "_proofreading_config", replace(value["_proofreading_config"], max_input_characters=1)
-                ),
             }
-            for label, mutate in mutations.items():
-                changed = copy.deepcopy(base)
-                mutate(changed)
+            for label, mutate in payload_mutations.items():
+                payload = base.to_payload()
+                mutate(payload)
+                changed = replace(base, _payload=payload)
+                with self.subTest(input=label):
+                    self.assertNotEqual(compatibility_record(changed, source_sha256), baseline)
+
+            runtime_changes = {
+                "proofreading locale provenance": replace(base, locale=locale_spec("mr-IN")),
+                "proofreading provider": replace(base, proofreading_settings=replace(base.proofreading_settings, provider="other-provider")),
+                "proofreading model": replace(base, proofreading_settings=replace(base.proofreading_settings, model="other-model")),
+                "proofreading max output tokens": replace(base, proofreading_settings=replace(base.proofreading_settings, max_output_tokens=1)),
+                "proofreading max input characters": replace(base, proofreading_settings=replace(base.proofreading_settings, max_input_characters=1)),
+            }
+            for label, changed in runtime_changes.items():
                 with self.subTest(input=label):
                     self.assertNotEqual(compatibility_record(changed, source_sha256), baseline)
 
@@ -231,11 +250,11 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             base = config(root)
-            base["chapter_split"] = {
+            base = replace(base, _payload=base.to_payload() | {"chapter_split": {
                 "enabled": True,
                 "pattern_type": "regex",
                 "pattern": "CHAPTER",
-            }
+            }})
             source_sha256 = "a" * 64
             omitted = compatibility_record(base, source_sha256)
 
@@ -266,11 +285,11 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 with self.subTest(transition=label):
                     root = Path(temp_dir) / label
                     stored_config = config(root)
-                    stored_config["chapter_split"] = {
+                    stored_config = replace(stored_config, _payload=stored_config.to_payload() | {"chapter_split": {
                         "enabled": True,
                         "pattern_type": "regex",
                         "pattern": "CHAPTER",
-                    }
+                    }})
                     current_config = copy.deepcopy(stored_config)
                     if stored_flags is not None:
                         stored_config["chapter_split"]["flags"] = stored_flags
@@ -318,7 +337,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             manager = PrepCheckpointManager(current_config, resume=True, overwrite=False)
             try:
                 manager.open()
-                with self.assertRaisesRegex(SystemExit, r"incompatible.*--overwrite"):
+                with self.assertRaisesRegex(GurubodhError, r"incompatible.*--overwrite"):
                     manager.begin(source_sha256)
             finally:
                 manager.close()
@@ -445,7 +464,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             root = Path(temp_dir)
             write_docx(root / "source.docx")
             job_config = config(root)
-            job_config["pipeline"] = "legacy-docx-to-unicode"
+            job_config = with_payload(
+                job_config, pipeline="legacy-docx-to-unicode"
+            )
             job_config["source"]["font_encoding"] = "aps"
             context = type("LegacyContext", (), {"legacy_converter": object()})()
             conversion_calls = []
@@ -530,7 +551,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 failed_request,
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
-                with self.assertRaisesRegex(SystemExit, "incomplete"):
+                with self.assertRaisesRegex(GurubodhError, "incomplete"):
                     run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode)
 
             subject = root / "subject" / "hi-IN"
@@ -589,7 +610,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=proofreader),
                 patch("gurubodh.prep_subject_checkpoints.time.sleep") as cooldown_sleep,
                 redirect_stdout(output),
-                self.assertRaisesRegex(SystemExit, "incomplete"),
+                self.assertRaisesRegex(GurubodhError, "incomplete"),
             ):
                 run_resumable_prep_job(
                     job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode
@@ -612,9 +633,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             root = Path(temp_dir)
             write_docx(root / "source.docx")
             job_config = config(root)
-            job_config["destination"] = {
+            job_config = with_payload(job_config, destination={
                 "backend": "r2", "bucket": "test-bucket", "prefix": "cms_library", "subject_dir": "subject/hi-IN", "url_base": None,
-            }
+            })
             client = FakeR2Client()
             failed_request = ProofreadingError(
                 "api_error",
@@ -627,7 +648,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 failed_request,
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
-                with self.assertRaisesRegex(SystemExit, "incomplete"):
+                with self.assertRaisesRegex(GurubodhError, "incomplete"):
                     run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode, r2_client=client)
 
             state_key = "cms_library/subject/hi-IN/run_state/prep-subject/job-state.json"
@@ -742,7 +763,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 ProofreadingError("invalid_response", "bad second chapter"),
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=proofreader):
-                with self.assertRaisesRegex(SystemExit, "incomplete"):
+                with self.assertRaisesRegex(GurubodhError, "incomplete"):
                     run_resumable_prep_job(
                         job_config,
                         "python3 -m gurubodh prep-subject",
@@ -811,14 +832,14 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 ProofreadingError("invalid_response", "bad second chapter"),
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=failed):
-                with self.assertRaisesRegex(SystemExit, "incomplete"):
+                with self.assertRaisesRegex(GurubodhError, "incomplete"):
                     run_resumable_prep_job(job_config, "prep-subject", False, False, None, prepare_unicode)
 
             state_path = root / "subject" / "hi-IN" / JOB_STATE_RELATIVE_PATH
             state = json.loads(state_path.read_text(encoding="utf-8"))
             state["compatibility"]["output_affecting_inputs"]["checkpoint_contract_version"] = 1
             state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            with self.assertRaisesRegex(SystemExit, "incompatible artifact contract.*--overwrite"):
+            with self.assertRaisesRegex(GurubodhError, "incompatible artifact contract.*--overwrite"):
                 run_resumable_prep_job(job_config, "prep-subject", False, True, None, prepare_unicode)
 
     def test_successful_r2_overwrite_cleans_only_same_locale_after_manifest_upload(self):
@@ -826,13 +847,13 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             root = Path(temp_dir)
             write_docx(root / "source.docx")
             job_config = config(root)
-            job_config["destination"] = {
+            job_config = with_payload(job_config, destination={
                 "backend": "r2",
                 "bucket": "test-bucket",
                 "prefix": "cms_library",
                 "subject_dir": "subject/hi-IN",
                 "url_base": None,
-            }
+            })
             client = FakeR2Client()
             same_root = "cms_library/subject/hi-IN/"
             retained_other_locale = "cms_library/subject/mr-IN/chapters/msword/keep.docx"
@@ -867,13 +888,13 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             root = Path(temp_dir)
             write_docx(root / "source.docx")
             job_config = config(root)
-            job_config["destination"] = {
+            job_config = with_payload(job_config, destination={
                 "backend": "r2",
                 "bucket": "test-bucket",
                 "prefix": "cms_library",
                 "subject_dir": "subject/hi-IN",
                 "url_base": None,
-            }
+            })
             client = FakeR2Client()
             protected = {
                 "cms_library/subject/hi-IN/chapters/text_and_metadata/previous.txt": b"canonical",
@@ -887,7 +908,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 ProofreadingError("invalid_response", "bad second chapter"),
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=failed):
-                with self.assertRaisesRegex(SystemExit, "incomplete"):
+                with self.assertRaisesRegex(GurubodhError, "incomplete"):
                     run_resumable_prep_job(
                         job_config,
                         "prep-subject",

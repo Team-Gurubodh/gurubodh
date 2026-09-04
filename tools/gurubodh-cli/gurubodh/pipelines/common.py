@@ -14,6 +14,7 @@ def validate_and_split(config, result, paths, progress=None):
             paths["unmodified_source_text"],
             config,
             progress=progress,
+            compiled_pattern=getattr(config, "compiled_chapter_pattern", None),
         )
         return outputs
     return []

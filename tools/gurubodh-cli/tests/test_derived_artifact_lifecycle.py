@@ -3,13 +3,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from gurubodh.contracts import CandidateManifestBinding, MaterializedSource
 from gurubodh.derived_artifact_lifecycle import (
     AuditResult,
     DerivedArtifactDefinition,
-    SourceRelease,
     destination_subject_dir,
     run_derived_artifact_lifecycle,
 )
+from gurubodh.errors import GurubodhError
 
 
 OUTPUT = Path("chapters") / "derived-test"
@@ -77,6 +78,10 @@ class FakeR2Client:
             self.objects.pop(key, None)
         return keys
 
+    def download_file(self, bucket, key, path):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_bytes(self.objects[key])
+
 
 class DummyWorkflow:
     def __init__(
@@ -99,9 +104,15 @@ class DummyWorkflow:
         self.audit_index = 0
 
     def materialize_and_validate_source(self, r2_client, progress):
-        return SourceRelease(
+        return MaterializedSource(
             subject_dir=self.destination_subject,
-            candidate_manifest={"sha256": "candidate", "chapters": []},
+            candidate_manifest=CandidateManifestBinding(
+                path=self.destination_subject / "candidate.json",
+                sha256="candidate",
+                reference={},
+                chapters=(),
+                selected_chapters=(),
+            ),
             sources=[],
         )
 
@@ -219,7 +230,7 @@ class DerivedArtifactLifecycleTests(unittest.TestCase):
                     else (lambda *args: None)
                 )
 
-                with self.assertRaises(RuntimeError):
+                with self.assertRaises(GurubodhError):
                     self.run_local(workflow, overwrite=True, revalidator=revalidator)
 
                 self.assertEqual(previous.read_text(encoding="utf-8"), "previous")
@@ -233,7 +244,7 @@ class DerivedArtifactLifecycleTests(unittest.TestCase):
         output = subject / OUTPUT
         workflow = DummyWorkflow(subject, output, appear_after_preflight=True)
 
-        with self.assertRaisesRegex(SystemExit, "appeared after preflight"):
+        with self.assertRaisesRegex(GurubodhError, "appeared after preflight"):
             self.run_local(workflow)
 
         self.assertEqual((output / "appeared.txt").read_text(), "appeared")
@@ -268,7 +279,7 @@ class DerivedArtifactLifecycleTests(unittest.TestCase):
                     source_revalidator=lambda *args: None,
                 )
                 if should_fail:
-                    with self.assertRaisesRegex(SystemExit, "simulated artifact"):
+                    with self.assertRaisesRegex(GurubodhError, "simulated artifact"):
                         run_derived_artifact_lifecycle(**arguments)
                     self.assertNotIn(manifest_key, client.objects)
                     self.assertTrue(
@@ -299,7 +310,7 @@ class DerivedArtifactLifecycleTests(unittest.TestCase):
             r2_appear_key=appeared_key,
         )
 
-        with self.assertRaisesRegex(SystemExit, "appeared after preflight"):
+        with self.assertRaisesRegex(GurubodhError, "appeared after preflight"):
             run_derived_artifact_lifecycle(
                 config,
                 DEFINITION,

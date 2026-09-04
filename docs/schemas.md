@@ -35,8 +35,10 @@ The Gurubodh CLI executes its Draft 2020-12 job and artifact schemas at runtime.
 They are not documentation-only contracts:
 
 - `prep-subject`, `generate-chunks`, and `generate-docx` validate the parsed raw
-  job JSON against the matching schema before adding runtime-only values or
-  using any configuration field.
+  job JSON against the matching schema before converting it to a typed prepared
+  job record or using any configuration field. Runtime-only locale, provider,
+  model, and compiled-pattern values are fields on that record rather than keys
+  in the schema-shaped job payload.
 - Schema-governed JSON payloads are built in memory and validated before JSON
   serialization, checksum calculation, staging, local publication, or R2
   upload. This covers chapter metadata, chapter content manifests, chapter

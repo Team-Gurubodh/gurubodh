@@ -6,6 +6,7 @@ from gurubodh.constants import (
     PIPELINE_LEGACY_DOCX_TO_UNICODE,
     PIPELINE_UNICODE_DOCX_INGEST,
 )
+from gurubodh.errors import ConfigurationError
 from gurubodh.pipelines.legacy_docx_to_unicode import run_legacy_docx_to_unicode
 from gurubodh.pipelines.unicode_docx_ingest import run_unicode_docx_ingest
 
@@ -17,7 +18,7 @@ def run_configured_job(context, config_path, entry_point=ENTRY_POINT_PREP_SUBJEC
         return run_unicode_docx_ingest(config, entry_point, overwrite, config_path, resume=resume)
     if pipeline == PIPELINE_LEGACY_DOCX_TO_UNICODE:
         return run_legacy_docx_to_unicode(context, config, entry_point, overwrite, config_path, resume=resume)
-    raise SystemExit(f"Config error: unsupported pipeline {pipeline!r}")
+    raise ConfigurationError(f"Config error: unsupported pipeline {pipeline!r}")
 
 
 def run_unicode_job(config_path, overwrite=False):

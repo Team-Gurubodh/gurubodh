@@ -15,7 +15,8 @@ That allowed the documented contract and runtime behavior to diverge.
 
 Treat the JSON Schemas under `tools/gurubodh-cli/config/jobs/` and
 `tools/gurubodh-cli/config/artifacts/` as executable structural authorities.
-Raw jobs validate before runtime enrichment. Every schema-governed artifact
+Raw jobs validate before conversion to typed prepared-job records; runtime-only
+values do not become job payload keys. Every schema-governed artifact
 payload validates before serialization, checksum calculation, staging, local
 publication, or R2 upload. One shared cached Draft 2020-12 validator owns schema
 discovery and safe diagnostics in local, installed-package, and container

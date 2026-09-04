@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from gurubodh.errors import GurubodhError
 from gurubodh.project import resolve_project_context
 
 
@@ -28,7 +29,7 @@ class ProjectContextTests(unittest.TestCase):
     def test_missing_project_root_message_mentions_cli_env_var(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.dict(os.environ, {}, clear=True), patch("pathlib.Path.cwd", return_value=Path(temp_dir)):
-                with self.assertRaises(SystemExit) as exc:
+                with self.assertRaises(GurubodhError) as exc:
                     resolve_project_context()
 
         message = str(exc.exception)

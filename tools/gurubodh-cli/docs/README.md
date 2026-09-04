@@ -15,6 +15,7 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 
 - [R2 production runs](operations/r2-production-runs.md) — immutable Docker images, R2 credentials, and the BGE-M3 cache volume.
 - [Artifact lifecycle](concepts/artifact-lifecycle.md) — ownership, invalidation, readiness markers, locales, and audit reports.
+- [Internal workflow contracts](concepts/internal-workflow-contracts.md) — typed runtime records, JSON conversion points, injectable seams, and domain errors.
 
 ## Reference
 

@@ -17,9 +17,19 @@ import time
 import uuid
 from typing import Any, Callable
 
+from gurubodh.contracts import (
+    ChapterStatus,
+    PrepCheckpointState,
+    PrepJobStatus,
+    PrepPublicationState,
+    PrepSubjectJob,
+    ProofreadingOutcome,
+    PublicationStatus,
+    R2Client,
+)
 from gurubodh.content_identity import build_content_identity
 from gurubodh.content_manifest import write_chapter_content_manifest
-from gurubodh.locales import locale_spec
+from gurubodh.errors import ProcessingError, PublicationError, SourceValidationError
 from gurubodh.legacy.font_detection import validate_supported_source_fonts
 from gurubodh.naming import chapter_output_filename
 from gurubodh.paths import destination_paths_for_subject, ensure_job_dirs
@@ -100,9 +110,9 @@ def _read_json(path: Path, label: str) -> dict[str, Any]:
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"{label} is missing or malformed: {path}: {exc}") from exc
+        raise SourceValidationError(f"{label} is missing or malformed: {path}: {exc}") from exc
     if not isinstance(value, dict):
-        raise SystemExit(f"{label} must be a JSON object: {path}")
+        raise SourceValidationError(f"{label} must be a JSON object: {path}")
     return value
 
 
@@ -116,10 +126,10 @@ def _safe_error(exc: BaseException) -> dict[str, Any]:
     return error
 
 
-def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
+def _safe_config_inputs(config: PrepSubjectJob) -> dict[str, Any]:
     """Return only output-affecting inputs; operational pacing is excluded."""
-    settings = config["_proofreading_config"]
-    locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])
+    settings = config.proofreading_settings
+    locale = config.locale
     chapter_split = {
         key: value
         for key, value in config["chapter_split"].items()
@@ -146,7 +156,7 @@ def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def compatibility_record(config: dict[str, Any], source_sha256: str) -> dict[str, Any]:
+def compatibility_record(config: PrepSubjectJob, source_sha256: str) -> dict[str, Any]:
     return _compatibility_record_from_inputs(_safe_config_inputs(config), source_sha256)
 
 
@@ -191,7 +201,11 @@ def _compatibility_matches(stored: dict[str, Any], current: dict[str, Any]) -> b
 def _counts(chapters: list[dict[str, Any]]) -> dict[str, int]:
     return {
         state: sum(1 for chapter in chapters if chapter.get("state") == state)
-        for state in ("succeeded", "failed", "pending")
+        for state in (
+            ChapterStatus.SUCCEEDED.value,
+            ChapterStatus.FAILED.value,
+            ChapterStatus.PENDING.value,
+        )
     }
 
 
@@ -202,13 +216,19 @@ def _workspace_relative_path(job_id: str) -> Path:
 class PrepCheckpointManager:
     """Persist job state and workspace to local storage or an R2-compatible API."""
 
-    def __init__(self, config: dict[str, Any], resume: bool, overwrite: bool, r2_client=None):
+    def __init__(
+        self,
+        config: PrepSubjectJob,
+        resume: bool,
+        overwrite: bool,
+        r2_client: R2Client | None = None,
+    ):
         self.config = config
         self.resume = resume
         self.overwrite = overwrite
         self.destination = config["destination"]
         self.r2_client = r2_client
-        self.state: dict[str, Any] | None = None
+        self._state: PrepCheckpointState | None = None
         self.metrics = {
             "gemini_generate_content_requests": {
                 **_attempt_counters(),
@@ -239,6 +259,22 @@ class PrepCheckpointManager:
             self.subject_dir = Path(self.workspace_temp_dir.name) / self.destination["subject_dir"]
             self.state_path = self.subject_dir / JOB_STATE_RELATIVE_PATH
             self.local_workspace_root = self.subject_dir
+
+    @property
+    def state(self) -> PrepCheckpointState | None:
+        return self._state
+
+    @state.setter
+    def state(self, value: PrepCheckpointState | dict[str, Any] | None) -> None:
+        if value is None or isinstance(value, PrepCheckpointState):
+            self._state = value
+            return
+        try:
+            self._state = PrepCheckpointState.from_payload(value)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise SourceValidationError(
+                f"Unsupported or malformed prep-subject checkpoint state: {exc}"
+            ) from exc
 
     @property
     def client(self):
@@ -290,7 +326,7 @@ class PrepCheckpointManager:
             if time.time() - self.local_lock_path.stat().st_mtime > LEASE_SECONDS:
                 self.local_lock_path.unlink(missing_ok=True)
                 return self._acquire_local_lock()
-            raise SystemExit(
+            raise ProcessingError(
                 f"Another prep-subject writer appears active for {self.subject_dir}; the local advisory lock is not "
                 "reliable mutual exclusion. Wait for it to finish, or use --resume after an interrupted writer's "
                 "advisory lock has expired."
@@ -306,7 +342,7 @@ class PrepCheckpointManager:
         for key in self.client.list_keys(self.destination["bucket"], prefix):
             relative = PurePosixPath(key.removeprefix(subject_artifact_prefix(self.destination)))
             if relative.is_absolute() or ".." in relative.parts:
-                raise SystemExit("Checkpoint workspace key escapes the destination subject prefix.")
+                raise SourceValidationError("Checkpoint workspace key escapes the destination subject prefix.")
             self.client.download_file(self.destination["bucket"], key, self.subject_dir / Path(*relative.parts))
 
     def _archive_prior_state(self) -> None:
@@ -317,13 +353,15 @@ class PrepCheckpointManager:
         if is_local(self.destination):
             # Archives preserve earlier checkpoint contracts verbatim; only the
             # live job-state path is governed by the current state schema.
-            _write_json_atomically(self.subject_dir / archive_relative, self.state)
+            _write_json_atomically(
+                self.subject_dir / archive_relative, self.state.to_payload()
+            )
             workspace = self.workspace_dir
             if workspace.exists():
                 shutil.rmtree(workspace)
             return
         archive_path = self.subject_dir / archive_relative
-        _write_json_atomically(archive_path, self.state)
+        _write_json_atomically(archive_path, self.state.to_payload())
         self._upload_r2_file(
             archive_path,
             destination_object_key(self.config, archive_relative),
@@ -358,41 +396,41 @@ class PrepCheckpointManager:
                 self.state = None
             elif not self.resume:
                 status = self.state.get("state")
-                if status == "succeeded":
-                    raise SystemExit(
+                if status == PrepJobStatus.SUCCEEDED.value:
+                    raise ProcessingError(
                         "A completed prep-subject checkpoint already exists. Use --resume to confirm it is complete "
                         "or --overwrite to start a fresh job."
                     )
-                raise SystemExit(
+                raise ProcessingError(
                     "An incomplete prep-subject checkpoint already exists. Re-run with --resume to continue it "
                     "or --overwrite to discard its staged workspace and start over."
                 )
             elif not _compatibility_matches(self.state["compatibility"], compatibility):
-                raise SystemExit(
+                raise ProcessingError(
                     "The existing prep-subject checkpoint is incompatible with this source or output-affecting "
                     "configuration. Re-run with --overwrite; checkpoints from different inputs are never mixed."
                 )
-            elif self.state.get("state") == "succeeded":
+            elif self.state.get("state") == PrepJobStatus.SUCCEEDED.value:
                 self.state["run"] = self.state.get("run", {}) | {
                     "run_id": str(uuid.uuid4()),
                     "last_started_at": utc_now(),
                 }
                 return "already_complete"
         elif self.resume:
-            raise SystemExit("No prep-subject checkpoint exists to resume. Run without --resume to start a new job.")
+            raise ProcessingError("No prep-subject checkpoint exists to resume. Run without --resume to start a new job.")
 
         if self.state is None:
             if self._canonical_artifacts_exist() and not self.overwrite:
-                raise SystemExit(
+                raise PublicationError(
                     "Canonical prepared artifacts exist without a compatible checkpoint. Re-run with --overwrite "
                     "to create a fresh staged prep-subject job."
                 )
             now = utc_now()
             job_id = str(uuid.uuid4())
-            self.state = {
+            self.state = PrepCheckpointState.from_payload({
                 "schema_version": CHECKPOINT_SCHEMA_VERSION,
                 "job_id": job_id,
-                "state": "running",
+                "state": PrepJobStatus.RUNNING.value,
                 "created_at": now,
                 "updated_at": now,
                 "run": {"run_id": str(uuid.uuid4()), "started_at": now, "last_started_at": now},
@@ -400,14 +438,17 @@ class PrepCheckpointManager:
                 "compatibility": compatibility,
                 "chapters": [],
                 "counts": {"succeeded": 0, "failed": 0, "pending": 0},
-                "publication": {"state": "not_ready", "canonical_manifest": None},
+                "publication": {
+                    "state": PublicationStatus.NOT_READY.value,
+                    "canonical_manifest": None,
+                },
                 "run_reports": [],
                 "workspace": {"relative_path": str(_workspace_relative_path(job_id)), "status": "active"},
                 "failure": None,
                 "preparation": None,
-            }
+            })
         else:
-            self.state["state"] = "running"
+            self.state.status = PrepJobStatus.RUNNING
             self.state["run"] = self.state.get("run", {}) | {
                 "run_id": str(uuid.uuid4()), "last_started_at": utc_now(),
             }
@@ -418,20 +459,20 @@ class PrepCheckpointManager:
 
     def _validate_loaded_state(self) -> None:
         if self.state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION or not isinstance(self.state.get("job_id"), str):
-            raise SystemExit("Unsupported or malformed prep-subject checkpoint. Re-run with --overwrite.")
+            raise SourceValidationError("Unsupported or malformed prep-subject checkpoint. Re-run with --overwrite.")
         stored_contract = (
             self.state.get("compatibility", {})
             .get("output_affecting_inputs", {})
             .get("checkpoint_contract_version")
         )
         if stored_contract != CHECKPOINT_CONTRACT_VERSION and not self.overwrite:
-            raise SystemExit(
+            raise SourceValidationError(
                 "The existing prep-subject checkpoint uses an incompatible artifact contract. "
                 "It cannot be resumed with the five-file text-only checkpoint; re-run with --overwrite."
             )
         lease = self.state.get("lease") or {}
         if lease.get("active") and lease.get("owner_id") != self.owner_id and lease.get("expires_at_epoch", 0) > time.time():
-            raise SystemExit(
+            raise ProcessingError(
                 "Another prep-subject process appears to hold an active destination advisory lease. This is not "
                 "reliable mutual exclusion; wait for it to finish or resume after its advisory lease expires."
             )
@@ -464,7 +505,7 @@ class PrepCheckpointManager:
         self.state["counts"] = _counts(self.state.get("chapters", []))
         _write_json_atomically(
             self.state_path,
-            self.state,
+            self.state.to_payload(),
             "prep-subject job state",
         )
         if self.is_r2:
@@ -519,7 +560,7 @@ class PrepCheckpointManager:
 
     def set_chapter_plan(self, source_paths: list[Path], preparation: dict[str, Any]) -> None:
         if not source_paths:
-            raise SystemExit("No chapters were detected, so prep-subject cannot create a resumable canonical chapter set.")
+            raise ProcessingError("No chapters were detected, so prep-subject cannot create a resumable canonical chapter set.")
         chapters = []
         for index, source_path in enumerate(sorted(source_paths), start=1):
             chapters.append(
@@ -527,7 +568,7 @@ class PrepCheckpointManager:
                     "chapter_number": f"{index:03d}",
                     "source_filename": source_path.name,
                     "source_sha256": _sha256(source_path),
-                    "state": "pending",
+                    "state": ChapterStatus.PENDING.value,
                     "attempt_count": 0,
                     "created_at": utc_now(),
                     "updated_at": utc_now(),
@@ -558,7 +599,7 @@ class PrepCheckpointManager:
     def chapter_source_path(self, chapter: dict[str, Any]) -> Path:
         path = self.paths["unmodified_source_text"] / chapter["source_filename"]
         if not path.is_file() or _sha256(path) != chapter["source_sha256"]:
-            raise SystemExit(
+            raise SourceValidationError(
                 f"Checkpointed source snapshot for chapter {chapter['chapter_number']} is missing or changed. "
                 "Re-run with --overwrite to build a compatible workspace."
             )
@@ -570,12 +611,12 @@ class PrepCheckpointManager:
         changed = False
         for chapter in self.state.get("chapters", []):
             valid = self._validate_success_artifacts(chapter)
-            if chapter.get("state") == "succeeded":
+            if chapter.get("state") == ChapterStatus.SUCCEEDED.value:
                 if valid:
                     reused.append(chapter["chapter_number"])
                 else:
                     changed = True
-                    chapter["state"] = "pending"
+                    chapter["state"] = ChapterStatus.PENDING.value
                     chapter["successful_artifacts"] = []
                     chapter["proofreading"] = None
                     chapter["latest_error"] = {
@@ -585,7 +626,7 @@ class PrepCheckpointManager:
                     chapter["updated_at"] = utc_now()
             elif valid:
                 changed = True
-                chapter["state"] = "succeeded"
+                chapter["state"] = ChapterStatus.SUCCEEDED.value
                 chapter["successful_artifacts"] = self._expected_artifact_records(chapter)
                 chapter["proofreading"] = self._reconciled_proofreading_summary(chapter)
                 chapter["latest_error"] = None
@@ -632,7 +673,7 @@ class PrepCheckpointManager:
             text_sha = _sha256(paths[1])
             metadata = _read_json(paths[2], "Checkpointed chapter metadata")
             details = _read_json(paths[4], "Checkpointed proofreading details")
-            locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
+            locale = self.config.locale
             source_identity = build_content_identity(
                 self.config["naming"]["category_code"],
                 self.config["naming"]["subject_code"],
@@ -659,7 +700,7 @@ class PrepCheckpointManager:
                 and details.get("integrity", {}).get("canonical_corrected", {}).get("value") == text_sha
                 and details.get("status") == "succeeded"
             )
-        except (KeyError, OSError, SystemExit, TypeError, UnicodeDecodeError):
+        except (KeyError, OSError, SourceValidationError, TypeError, UnicodeDecodeError):
             return False
 
     def _reconciled_proofreading_summary(self, chapter: dict[str, Any]) -> dict[str, Any]:
@@ -689,18 +730,22 @@ class PrepCheckpointManager:
             },
         }
 
-    def mark_chapter_success(self, chapter: dict[str, Any], result: dict[str, Any]) -> None:
-        chapter["state"] = "succeeded"
+    def mark_chapter_success(
+        self, chapter: dict[str, Any], result: ProofreadingOutcome
+    ) -> None:
+        chapter["state"] = ChapterStatus.SUCCEEDED.value
         chapter["attempt_count"] += 1
         chapter["updated_at"] = utc_now()
         chapter["succeeded_at"] = utc_now()
         chapter["latest_error"] = None
-        chapter["successful_artifacts"] = result.pop("checkpoint_artifacts")
+        chapter["successful_artifacts"] = [
+            artifact.to_payload() for artifact in result.checkpoint_artifacts
+        ]
         request_metrics = {
-            "attempts": result.pop("gemini_request_attempts", 0),
-            "successful_request_attempts": result.pop("gemini_successful_request_attempts", 0),
+            "attempts": result.request_attempts,
+            "successful_request_attempts": result.successful_request_attempts,
         }
-        chapter["proofreading"] = result
+        chapter["proofreading"] = result.proofreading_payload()
         self._record_gemini_success(request_metrics)
         self.persist(
             checkpoint_artifacts=[
@@ -714,7 +759,7 @@ class PrepCheckpointManager:
         )
 
     def mark_chapter_failure(self, chapter: dict[str, Any], exc: BaseException) -> None:
-        chapter["state"] = "failed"
+        chapter["state"] = ChapterStatus.FAILED.value
         chapter["attempt_count"] += 1
         chapter["updated_at"] = utc_now()
         chapter["latest_error"] = _safe_error(exc)
@@ -768,51 +813,57 @@ class PrepCheckpointManager:
         counters["attempts_failed"] += attempts - succeeded
 
     def mark_global_failure(self, exc: BaseException) -> None:
-        self.state["state"] = "failed"
+        self.state.status = PrepJobStatus.FAILED
         self.state["failure"] = _safe_error(exc)
         self.persist()
 
     def mark_incomplete(self) -> None:
-        self.state["state"] = "incomplete"
+        self.state.status = PrepJobStatus.INCOMPLETE
         self.state["failure"] = None
         self.persist()
 
     def prepare_for_publication(self) -> Path:
         chapters = self.state.get("chapters", [])
-        if not chapters or any(chapter.get("state") != "succeeded" for chapter in chapters):
-            raise SystemExit("Cannot publish until every expected chapter has a validated successful checkpoint.")
+        if not chapters or any(
+            chapter.get("state") != ChapterStatus.SUCCEEDED.value
+            for chapter in chapters
+        ):
+            raise PublicationError("Cannot publish until every expected chapter has a validated successful checkpoint.")
         for chapter in chapters:
             if not self._validate_success_artifacts(chapter):
-                raise SystemExit(
+                raise PublicationError(
                     f"Checkpoint artifacts for chapter {chapter['chapter_number']} are not valid; re-run with --resume "
                     "to reprocess it before publication."
                 )
         proofread = [chapter["proofreading"] for chapter in chapters]
-        locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
-        write_proofreading_manifest(self.paths, self.config["_proofreading_config"], proofread, locale)
+        locale = self.config.locale
+        write_proofreading_manifest(
+            self.paths, self.config.proofreading_settings, proofread, locale
+        )
         manifest = write_chapter_content_manifest(self.config, self.paths)
-        self.state["state"] = "ready_to_publish"
-        self.state["publication"] = {
-            "state": "ready_to_publish",
+        self.state.status = PrepJobStatus.READY_TO_PUBLISH
+        self.state.publication = PrepPublicationState.from_payload({
+            "state": PublicationStatus.READY_TO_PUBLISH.value,
             "canonical_manifest": {
                 "reference": destination_artifact_reference(self.config, Path("chapters") / manifest.name),
                 "sha256": _sha256(manifest),
                 "chapter_numbers": [chapter["chapter_number"] for chapter in chapters],
             },
-        }
+        })
         self.persist()
         return manifest
 
     def publish(self) -> None:
-        self.state["state"] = "publishing"
-        self.state["publication"]["state"] = "publishing"
+        self.state.status = PrepJobStatus.PUBLISHING
+        self.state.publication_status = PublicationStatus.PUBLISHING
         self.persist()
         if is_local(self.destination):
             self._publish_local()
         else:
             self._publish_r2()
         if self.overwrite:
-            cleanup = self.state["publication"].setdefault("obsolete_artifact_cleanup", {})
+            publication = self.state.publication
+            cleanup = publication.payload.setdefault("obsolete_artifact_cleanup", {})
             if is_local(self.destination):
                 cleanup["chapter_docx_invalidation"] = invalidate_local_chapter_docx_artifacts(
                     self.subject_dir
@@ -820,7 +871,7 @@ class PrepCheckpointManager:
                 self.persist()
                 cleanup["legacy_full_subject_cleanup"] = cleanup_local_legacy_full_subject(self.subject_dir)
                 self.persist()
-                self.state["publication"]["semantic_invalidation"] = invalidate_local_semantic_artifacts(self.subject_dir)
+                publication.payload["semantic_invalidation"] = invalidate_local_semantic_artifacts(self.subject_dir)
             else:
                 cleanup["chapter_docx_invalidation"] = invalidate_r2_chapter_docx_artifacts(
                     self.config,
@@ -832,11 +883,11 @@ class PrepCheckpointManager:
                     self.client,
                 )
                 self.persist()
-                self.state["publication"]["semantic_invalidation"] = invalidate_r2_semantic_artifacts(self.config, self.client)
+                publication.payload["semantic_invalidation"] = invalidate_r2_semantic_artifacts(self.config, self.client)
             self.persist()
             docx_cleanup = cleanup["chapter_docx_invalidation"]
             full_cleanup = cleanup["legacy_full_subject_cleanup"]
-            semantic_cleanup = self.state["publication"]["semantic_invalidation"]
+            semantic_cleanup = publication.payload["semantic_invalidation"]
             print(
                 "[overwrite] Derived chapter DOCX invalidation: "
                 f"{'removed' if docx_cleanup['invalidated'] else 'not needed'}."
@@ -849,8 +900,8 @@ class PrepCheckpointManager:
                 "[overwrite] Semantic chunk invalidation: "
                 f"{'removed' if semantic_cleanup['invalidated'] else 'not needed'}."
             )
-        self.state["state"] = "succeeded"
-        self.state["publication"]["state"] = "succeeded"
+        self.state.status = PrepJobStatus.SUCCEEDED
+        self.state.publication_status = PublicationStatus.SUCCEEDED
         self.persist()
         self._remove_completed_workspace()
 
@@ -917,7 +968,7 @@ class PrepCheckpointManager:
                     if key not in uploaded_keys
                 )
             self.client.delete_keys(self.destination["bucket"], stale_keys)
-            self.state["publication"]["stale_prep_artifact_cleanup"] = {
+            self.state.publication.payload["stale_prep_artifact_cleanup"] = {
                 "deleted_keys": stale_keys,
                 "deleted_count": len(stale_keys),
             }
@@ -945,7 +996,7 @@ class PrepCheckpointManager:
             # invocation.
             self.state["lease"] = self.state["lease"] | {"active": False, "released_at": utc_now()}
             self.persist()
-        locale = self.config.get("_locale") or locale_spec(self.config["metadata_defaults"]["language"])
+        locale = self.config.locale
         artifact_root = (
             subject_artifact_prefix(self.destination)
             if self.is_r2
@@ -1203,33 +1254,46 @@ def validate_canonical_release_gate(
         client = r2_client or R2StorageClient.from_env()
         key = subject_artifact_object_key(source, JOB_STATE_RELATIVE_PATH)
         if not client.exists(source["bucket"], key):
-            raise SystemExit(f"{command_name} requires a completed prep-subject job state; no checkpoint was found.")
+            raise SourceValidationError(f"{command_name} requires a completed prep-subject job state; no checkpoint was found.")
         client.download_file(source["bucket"], key, state_path)
     elif not state_path.is_file():
-        raise SystemExit(f"{command_name} requires a completed prep-subject job state; no checkpoint was found.")
-    state = _read_json(state_path, "Prep-subject job state")
-    if state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION or state.get("state") != "succeeded":
-        raise SystemExit(
+        raise SourceValidationError(f"{command_name} requires a completed prep-subject job state; no checkpoint was found.")
+    try:
+        state = PrepCheckpointState.from_payload(
+            _read_json(state_path, "Prep-subject job state")
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SourceValidationError(
+            f"Prep-subject job state is malformed: {state_path}: {exc}"
+        ) from exc
+    if (
+        state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION
+        or state.status is not PrepJobStatus.SUCCEEDED
+    ):
+        raise SourceValidationError(
             f"{command_name} refuses prepared content while the latest prep-subject job is not succeeded. "
             "Use gurubodh prep-subject --resume to complete or recover the preparation job first."
         )
     publication = state.get("publication") or {}
-    if publication.get("state") != "succeeded":
-        raise SystemExit(
+    if state.publication_status is not PublicationStatus.SUCCEEDED:
+        raise SourceValidationError(
             f"{command_name} refuses prepared content while the latest prep-subject publication is not succeeded."
         )
     canonical = publication.get("canonical_manifest") or {}
     if canonical.get("sha256") != candidate_manifest.get("sha256"):
-        raise SystemExit(
+        raise SourceValidationError(
             f"{command_name} refuses the candidate manifest because it does not match the completed prep-subject checkpoint."
         )
     checkpoint_chapters = state.get("chapters")
-    if not isinstance(checkpoint_chapters, list) or any(chapter.get("state") != "succeeded" for chapter in checkpoint_chapters):
-        raise SystemExit(f"{command_name} requires every completed checkpoint chapter to be succeeded.")
+    if not isinstance(checkpoint_chapters, list) or any(
+        chapter.get("state") != ChapterStatus.SUCCEEDED.value
+        for chapter in checkpoint_chapters
+    ):
+        raise SourceValidationError(f"{command_name} requires every completed checkpoint chapter to be succeeded.")
     expected_numbers = [chapter.get("chapter_number") for chapter in checkpoint_chapters]
     manifest_numbers = [chapter.get("generated_chapter_number") for chapter in candidate_manifest.get("chapters", [])]
     if expected_numbers != manifest_numbers or canonical.get("chapter_numbers") != expected_numbers:
-        raise SystemExit(
+        raise SourceValidationError(
             f"{command_name} refuses the candidate manifest because its chapters do not match the completed checkpoint set."
         )
     checkpoint_keys = {
@@ -1237,13 +1301,13 @@ def validate_canonical_release_gate(
         for chapter in checkpoint_chapters
     }
     if any(checkpoint_keys.get(chapter["generated_chapter_number"]) != chapter.get("content_key") for chapter in candidate_manifest["chapters"]):
-        raise SystemExit(
+        raise SourceValidationError(
             f"{command_name} refuses the candidate manifest because its chapter identities do not match the completed checkpoint."
         )
 
 
 def run_resumable_prep_job(
-    config: dict[str, Any],
+    config: PrepSubjectJob,
     entry_point: str,
     overwrite: bool,
     resume: bool,
@@ -1323,10 +1387,10 @@ def run_resumable_prep_job(
         manager.discard_transient_preparation()
         reused = manager.reconcile_successes()
         consecutive_infrastructure_failures = 0
-        locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])
-        proofreader = GeminiProofreader(config["_proofreading_config"], locale=locale)
+        locale = config.locale
+        proofreader = GeminiProofreader(config.proofreading_settings, locale=locale)
         for chapter in manager.state["chapters"]:
-            if chapter["state"] == "succeeded":
+            if chapter["state"] == ChapterStatus.SUCCEEDED.value:
                 continue
             manager.wait_for_proofreading_cooldown()
             manager.heartbeat()
@@ -1352,10 +1416,10 @@ def run_resumable_prep_job(
                     manager.mark_global_failure(exc)
                     manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
                     manager.print_metrics_summary()
-                    raise SystemExit(str(exc)) from exc
+                    raise
                 if exc.code == "service_unavailable":
                     manager.impose_service_unavailable_cooldown(
-                        config["_proofreading_config"].unavailable_cooldown_seconds
+                        config.proofreading_settings.unavailable_cooldown_seconds
                     )
                 if exc.code in {"api_error", "rate_limited", "request_timeout", "service_unavailable"}:
                     consecutive_infrastructure_failures += 1
@@ -1364,11 +1428,14 @@ def run_resumable_prep_job(
                         break
                 continue
 
-        if any(chapter["state"] != "succeeded" for chapter in manager.state["chapters"]):
+        if any(
+            chapter["state"] != ChapterStatus.SUCCEEDED.value
+            for chapter in manager.state["chapters"]
+        ):
             manager.mark_incomplete()
             manager.write_report(config_path, entry_point, "incomplete", None, reused, attempted)
             manager.print_metrics_summary()
-            raise SystemExit(
+            raise ProcessingError(
                 "prep-subject is incomplete; successful chapter checkpoints were retained. "
                 "Re-run with --resume to retry failed or pending chapters."
             )
@@ -1377,8 +1444,8 @@ def run_resumable_prep_job(
         try:
             manager.publish()
         except BaseException as exc:
-            manager.state["state"] = "publishing"
-            manager.state["publication"]["state"] = "publishing"
+            manager.state.status = PrepJobStatus.PUBLISHING
+            manager.state.publication_status = PublicationStatus.PUBLISHING
             manager.state["failure"] = _safe_error(exc)
             manager.persist()
             manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)

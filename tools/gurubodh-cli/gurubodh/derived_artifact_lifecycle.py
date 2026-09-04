@@ -7,12 +7,15 @@ import os
 import shutil
 import tempfile
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Generic, Protocol, TypeVar
 
 from gurubodh.canonical_source import revalidate_source_release
+from gurubodh.contracts import CleanupResource, MaterializedSource, R2Client
+from gurubodh.errors import GurubodhError, ProcessingError, PublicationError
 from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import (
     R2StorageClient,
@@ -35,6 +38,13 @@ class LifecycleState(str, Enum):
     SUCCESS_AUDIT = "success_audit"
 
 
+class DerivedPublicationStatus(str, Enum):
+    NOT_STARTED = "not_started"
+    PUBLISHING = "publishing"
+    FAILED = "failed"
+    SUCCEEDED = "succeeded"
+
+
 @dataclass(frozen=True)
 class DerivedArtifactDefinition:
     command_name: str
@@ -43,18 +53,6 @@ class DerivedArtifactDefinition:
     report_relative_dir: Path
     readiness_manifest_artifact_name: str | None = None
     legacy_output_relative_dirs: tuple[Path, ...] = ()
-
-
-@dataclass
-class SourceRelease:
-    subject_dir: Path
-    candidate_manifest: dict[str, Any]
-    sources: list[dict[str, Any]]
-    temporary_resource: Any = None
-
-    def cleanup(self) -> None:
-        if self.temporary_resource is not None:
-            self.temporary_resource.cleanup()
 
 
 @dataclass
@@ -84,7 +82,7 @@ class PublicationResult:
     backend: str
     ownership_scope: str
     overwrite_requested: bool
-    status: str = "not_started"
+    status: DerivedPublicationStatus = DerivedPublicationStatus.NOT_STARTED
     preflight_status: str = "not_started"
     existed_before_run: bool | None = None
     prior_publication_state: str = "unknown"
@@ -108,7 +106,7 @@ class PublicationResult:
     def as_dict(self) -> dict[str, Any]:
         return {
             "backend": self.backend,
-            "status": self.status,
+            "status": self.status.value,
             "preflight_status": self.preflight_status,
             "ownership_scope": self.ownership_scope,
             "overwrite_requested": self.overwrite_requested,
@@ -127,34 +125,37 @@ class PublicationResult:
         }
 
 
+GenerationT = TypeVar("GenerationT")
+
+
 @dataclass
-class LifecycleResult:
-    source: SourceRelease
-    generation: Any
+class LifecycleResult(Generic[GenerationT]):
+    source: MaterializedSource
+    generation: GenerationT
     publication: dict[str, Any]
     audit_report: dict[str, Any]
     lifecycle: dict[str, Any]
 
 
-class DerivedArtifactWorkflow(Protocol):
+class DerivedArtifactWorkflow(Protocol[GenerationT]):
     """Narrow command-specific surface used by the shared lifecycle."""
 
     def materialize_and_validate_source(
-        self, r2_client: Any, progress: Any
-    ) -> SourceRelease: ...
+        self, r2_client: R2Client | None, progress: Callable[[str], None]
+    ) -> MaterializedSource: ...
 
     def generate_staged_artifacts(
-        self, source: SourceRelease, staged_output: Path, progress: Any
-    ) -> Any: ...
+        self, source: MaterializedSource, staged_output: Path, progress: Callable[[str], None]
+    ) -> GenerationT: ...
 
     def build_readiness_manifest(
-        self, source: SourceRelease, generation: Any
+        self, source: MaterializedSource, generation: GenerationT
     ) -> dict[str, Any]: ...
 
     def validate_staged_package(
         self,
-        source: SourceRelease,
-        generation: Any,
+        source: MaterializedSource,
+        generation: GenerationT,
         staged_output: Path,
         readiness_manifest: Path,
     ) -> None: ...
@@ -163,15 +164,15 @@ class DerivedArtifactWorkflow(Protocol):
         self,
         status: str,
         lifecycle: LifecycleTrace,
-        source: SourceRelease | None,
-        generation: Any,
+        source: MaterializedSource | None,
+        generation: GenerationT | None,
         publication: dict[str, Any],
         failure: dict[str, Any] | None,
         announce: bool,
     ) -> AuditResult: ...
 
 
-def destination_subject_dir(config: dict[str, Any], command_name: str):
+def destination_subject_dir(config: Mapping[str, Any], command_name: str):
     destination = config["destination"]
     if is_local(destination):
         return Path(destination["root_dir"]).expanduser() / destination["subject_dir"], None
@@ -179,12 +180,12 @@ def destination_subject_dir(config: dict[str, Any], command_name: str):
     return Path(temporary.name) / destination["subject_dir"], temporary
 
 
-def _output_prefix(config: dict[str, Any], definition: DerivedArtifactDefinition) -> str:
+def _output_prefix(config: Mapping[str, Any], definition: DerivedArtifactDefinition) -> str:
     return subject_artifact_object_key(config["destination"], definition.output_relative_dir) + "/"
 
 
 def _legacy_prefixes(
-    config: dict[str, Any], definition: DerivedArtifactDefinition
+    config: Mapping[str, Any], definition: DerivedArtifactDefinition
 ) -> list[str]:
     return [
         subject_artifact_object_key(config["destination"], path) + "/"
@@ -193,12 +194,12 @@ def _legacy_prefixes(
 
 
 def preflight_destination(
-    config: dict[str, Any],
+    config: Mapping[str, Any],
     definition: DerivedArtifactDefinition,
     destination_subject: Path,
     overwrite: bool,
     publication: PublicationResult,
-    r2_client: Any = None,
+    r2_client: R2Client | None = None,
 ) -> None:
     """Inspect command-owned destinations without modifying them."""
     destination = config["destination"]
@@ -217,12 +218,12 @@ def preflight_destination(
             publication.prior_publication_state = "absent"
         if existing and not overwrite:
             if any(path in existing for path in legacy):
-                raise SystemExit(
+                raise PublicationError(
                     f"Legacy combined {definition.command_name} output exists and is unsupported: "
                     f"{', '.join(str(path) for path in legacy if path.exists())}. "
                     "Re-run with --overwrite only after inspecting it."
                 )
-            raise SystemExit(
+            raise PublicationError(
                 f"{definition.command_name} output already exists. Re-run with --overwrite "
                 f"to replace only: {output}"
             )
@@ -251,7 +252,7 @@ def preflight_destination(
     else:
         publication.prior_publication_state = "absent"
     if existing and not overwrite:
-        raise SystemExit(
+        raise PublicationError(
             r2_existing_artifacts_error(
                 definition.command_name,
                 destination["bucket"],
@@ -283,14 +284,14 @@ def publish_local(
     destination_output = destination_subject / definition.output_relative_dir
     destination_output.parent.mkdir(parents=True, exist_ok=True)
     if destination_output.exists() and not overwrite:
-        raise SystemExit(
+        raise PublicationError(
             f"{definition.command_name} output appeared after preflight. Re-run with "
             f"--overwrite only after inspecting: {destination_output}"
         )
     legacy_paths = [destination_subject / path for path in definition.legacy_output_relative_dirs]
     appeared_legacy = [path for path in legacy_paths if path.exists()]
     if appeared_legacy and not overwrite:
-        raise SystemExit(
+        raise PublicationError(
             f"Legacy {definition.command_name} output appeared after preflight. "
             f"Inspect before retrying: {', '.join(str(path) for path in appeared_legacy)}"
         )
@@ -302,7 +303,7 @@ def publish_local(
         f".{destination_output.name}.backup-{uuid.uuid4().hex}"
     )
     replaced = False
-    publication.status = "publishing"
+    publication.status = DerivedPublicationStatus.PUBLISHING
     try:
         shutil.copytree(staged_output, incoming)
         if destination_output.exists():
@@ -319,7 +320,7 @@ def publish_local(
 
     publication.output_path = str(destination_output)
     publication.replaced_existing_output = replaced
-    publication.status = "succeeded"
+    publication.status = DerivedPublicationStatus.SUCCEEDED
     if legacy_paths:
         deleted = []
         for path in legacy_paths:
@@ -335,7 +336,7 @@ def publish_local(
 
 
 def _ensure_r2_not_ready(
-    publication: PublicationResult, r2_client: Any
+    publication: PublicationResult, r2_client: R2Client
 ) -> None:
     if not publication.readiness_manifest_key or not publication.bucket:
         return
@@ -355,13 +356,13 @@ def _ensure_r2_not_ready(
 
 
 def publish_r2(
-    config: dict[str, Any],
+    config: Mapping[str, Any],
     definition: DerivedArtifactDefinition,
     staged_output: Path,
     overwrite: bool,
     publication: PublicationResult,
-    r2_client: Any,
-    progress: Any,
+    r2_client: R2Client,
+    progress: Callable[[str], None],
 ) -> None:
     destination = config["destination"]
     bucket = destination["bucket"]
@@ -383,7 +384,7 @@ def publish_r2(
             if r2_client.prefix_has_objects(bucket, candidate)
         ]
         if appeared:
-            raise SystemExit(
+            raise PublicationError(
                 r2_existing_artifacts_error(
                     definition.command_name,
                     bucket,
@@ -392,7 +393,7 @@ def publish_r2(
                 )
             )
 
-    publication.status = "publishing"
+    publication.status = DerivedPublicationStatus.PUBLISHING
     try:
         if overwrite:
             if r2_client.exists(bucket, manifest_key):
@@ -428,7 +429,7 @@ def publish_r2(
         publication.replaced_existing_output = bool(
             overwrite and publication.existed_before_run
         )
-        publication.status = "succeeded"
+        publication.status = DerivedPublicationStatus.SUCCEEDED
         progress(
             f"Published {definition.readiness_manifest_filename} last; "
             f"the {definition.command_name} output is ready."
@@ -445,7 +446,7 @@ def publish_r2(
             }
     except BaseException:
         _ensure_r2_not_ready(publication, r2_client)
-        publication.status = "failed"
+        publication.status = DerivedPublicationStatus.FAILED
         raise
 
 
@@ -453,23 +454,23 @@ def _validate_stage_layout(staged_output: Path, readiness_manifest: Path) -> Non
     staged_root = staged_output.resolve()
     manifest = readiness_manifest.resolve()
     if not staged_output.is_dir():
-        raise ValueError("Derived-artifact staged output directory was not created.")
+        raise ProcessingError("Derived-artifact staged output directory was not created.")
     if manifest.parent != staged_root:
-        raise ValueError("Readiness manifest must be located at the staged output root.")
+        raise ProcessingError("Readiness manifest must be located at the staged output root.")
     if not readiness_manifest.is_file():
-        raise ValueError(f"Readiness manifest was not written: {readiness_manifest}")
+        raise ProcessingError(f"Readiness manifest was not written: {readiness_manifest}")
     for path in staged_output.rglob("*"):
         if path.is_symlink():
-            raise ValueError(f"Staged derived artifacts must not contain symlinks: {path}")
+            raise ProcessingError(f"Staged derived artifacts must not contain symlinks: {path}")
         if not path.resolve().is_relative_to(staged_root):
-            raise ValueError(f"Staged derived artifact escapes its workspace: {path}")
+            raise ProcessingError(f"Staged derived artifact escapes its workspace: {path}")
 
 
 def _upload_audit_reports(
-    config: dict[str, Any],
+    config: Mapping[str, Any],
     definition: DerivedArtifactDefinition,
     audit: AuditResult,
-    r2_client: Any,
+    r2_client: R2Client,
 ) -> None:
     destination = config["destination"]
     for kind in ("json", "markdown"):
@@ -490,16 +491,16 @@ def _failure_details(state: LifecycleState, error: BaseException) -> dict[str, A
 
 
 def run_derived_artifact_lifecycle(
-    config: dict[str, Any],
+    config: Mapping[str, Any],
     definition: DerivedArtifactDefinition,
-    workflow: DerivedArtifactWorkflow,
+    workflow: DerivedArtifactWorkflow[GenerationT],
     overwrite: bool = False,
-    r2_client: Any = None,
-    progress: Any = print,
+    r2_client: R2Client | None = None,
+    progress: Callable[[str], None] = print,
     destination_subject: Path | None = None,
-    destination_temporary: Any = None,
-    source_revalidator: Any = revalidate_source_release,
-) -> LifecycleResult:
+    destination_temporary: CleanupResource | None = None,
+    source_revalidator: Callable[..., None] = revalidate_source_release,
+) -> LifecycleResult[GenerationT]:
     """Execute the ordered lifecycle and preserve the original failure."""
     needs_r2 = is_r2(config["source"]) or is_r2(config["destination"])
     client = r2_client if needs_r2 else None
@@ -616,8 +617,8 @@ def run_derived_artifact_lifecycle(
             )
     except BaseException as error:
         if is_r2(config["destination"]) and publication.status in {
-            "publishing",
-            "failed",
+            DerivedPublicationStatus.PUBLISHING,
+            DerivedPublicationStatus.FAILED,
         }:
             _ensure_r2_not_ready(publication, client)
         failure = _failure_details(trace.current_state, error)
@@ -635,7 +636,17 @@ def run_derived_artifact_lifecycle(
                 _upload_audit_reports(config, definition, audit, client)
         except BaseException:
             pass
-        raise
+        if not isinstance(error, Exception):
+            raise
+        if isinstance(error, GurubodhError):
+            raise
+        error_type = (
+            PublicationError
+            if trace.current_state
+            in {LifecycleState.PREFLIGHT, LifecycleState.PUBLICATION}
+            else ProcessingError
+        )
+        raise error_type(str(error) or error.__class__.__name__) from error
     finally:
         if source is not None:
             source.cleanup()

@@ -168,6 +168,7 @@ class AuditReportBuilder:
         }
 
     def safe_config_snapshot(self):
+        proofreading_settings = getattr(self.config, "proofreading_settings", None)
         snapshot = {
             "schema_version": self.config.get("schema_version"),
             "pipeline": self.config.get("pipeline"),
@@ -182,6 +183,10 @@ class AuditReportBuilder:
                 if not key.startswith("_")
             },
             "metadata_defaults": copy.deepcopy(self.config.get("metadata_defaults", {})),
-            "proofreading": copy.deepcopy(self.config.get("_proofreading_config").public_dict()) if self.config.get("_proofreading_config") else {},
+            "proofreading": (
+                copy.deepcopy(proofreading_settings.public_dict())
+                if proofreading_settings
+                else {}
+            ),
         }
         return redact_mapping(snapshot)
