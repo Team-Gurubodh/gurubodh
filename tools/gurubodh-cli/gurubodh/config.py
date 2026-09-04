@@ -43,19 +43,7 @@ def prepare_chapter_split(chapter_split):
         raise SystemExit(f"Config error: chapter_split.pattern is not a valid regex: {exc}") from exc
 
 
-def normalized_source_font_encoding(config):
-    return config["source"]["font_encoding"].strip().lower()
-
-
-def source_is_unicode(config):
-    return normalized_source_font_encoding(config) == "unicode"
-
-
-def source_is_legacy(config):
-    return normalized_source_font_encoding(config) == "aps"
-
-
-def storage_backend(section, context):
+def storage_backend(section):
     return section.get("backend", "local")
 
 
@@ -168,10 +156,6 @@ def load_prep_subject_job(path):
     return prepare_prep_subject_job(read_json(path), str(path))
 
 
-def load_conversion_job(path):
-    return load_prep_subject_job(path)
-
-
 def prepare_generate_chunks_job(job: dict[str, Any], origin: str | None = "in-memory job") -> dict[str, Any]:
     """Validate and prepare an isolated generate-chunks job mapping."""
     config = deepcopy(job)
@@ -229,7 +213,7 @@ def prepare_generate_docx_job(job: dict[str, Any], origin: str | None = "in-memo
         raise SystemExit(f"Config error: naming.language is invalid: {exc}") from exc
 
     for section, context in ((source, "source"), (destination, "destination")):
-        backend = storage_backend(section, context)
+        backend = storage_backend(section)
         validate_subject_artifact_storage(section, context, language)
         if backend == "r2":
             validate_safe_posix_prefix(section["prefix"], f"{context}.prefix")

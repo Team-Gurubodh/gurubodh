@@ -28,19 +28,8 @@ DERIVED_CHAPTER_DOCX_ARTIFACT_DIR = Path("chapters") / "msword"
 LEGACY_FULL_SUBJECT_ARTIFACT_DIR = Path("full_subject")
 SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks"
 LEGACY_SEMANTIC_ARTIFACT_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
-PREP_REPORT_DIR = Path("run_reports") / "prep-subject"
 CHUNKS_REPORT_DIR = Path("run_reports") / "generate-chunks"
 DOCX_REPORT_DIR = Path("run_reports") / "generate-docx"
-
-
-def owned_relative_paths(command):
-    if command == "prep-subject":
-        return (*PREP_ARTIFACT_DIRS, *CANONICAL_ARTIFACT_FILES, PREP_REPORT_DIR)
-    if command == "generate-chunks":
-        return (SEMANTIC_ARTIFACT_DIR, CHUNKS_REPORT_DIR)
-    if command == "generate-docx":
-        return (DERIVED_CHAPTER_DOCX_ARTIFACT_DIR, DOCX_REPORT_DIR)
-    raise ValueError(f"Unknown artifact owner: {command}")
 
 
 def replaceable_relative_paths(command):
@@ -65,10 +54,6 @@ def preflight_relative_paths(command):
     if command == "prep-subject":
         return (*paths, LEGACY_FULL_SUBJECT_ARTIFACT_DIR)
     return paths
-
-
-def owned_prefixes(config, command):
-    return [destination_object_key(config, path) + ("/" if path.suffix == "" else "") for path in replaceable_relative_paths(command)]
 
 
 def r2_existing_artifacts_error(command, bucket, keys, artifact_label):
@@ -99,23 +84,6 @@ def r2_existing_artifacts_error(command, bucket, keys, artifact_label):
     )
 
 
-def remove_local_owned_paths(subject_dir, command):
-    removed = []
-    for relative_path in replaceable_relative_paths(command):
-        target = Path(subject_dir) / relative_path
-        if target.is_dir():
-            shutil.rmtree(target)
-            removed.append(str(relative_path))
-        elif target.exists():
-            target.unlink()
-            removed.append(str(relative_path))
-    return removed
-
-
-def local_owned_paths_exist(subject_dir, command):
-    return [str(path) for path in preflight_relative_paths(command) if (Path(subject_dir) / path).exists()]
-
-
 def _remove_local_artifact_path(subject_dir, relative_path, reason):
     target = Path(subject_dir) / relative_path
     deleted_paths = []
@@ -130,14 +98,6 @@ def _remove_local_artifact_path(subject_dir, relative_path, reason):
         "deleted_paths": deleted_paths,
         "path": str(relative_path),
         "reason": reason if deleted_paths else "no artifacts existed",
-    }
-
-
-def cleanup_local_obsolete_prep_artifacts(subject_dir):
-    """Invalidate derived DOCX and remove the retired full-subject output."""
-    return {
-        "chapter_docx_invalidation": invalidate_local_chapter_docx_artifacts(subject_dir),
-        "legacy_full_subject_cleanup": cleanup_local_legacy_full_subject(subject_dir),
     }
 
 
@@ -182,16 +142,6 @@ def invalidate_r2_semantic_artifacts(config, r2_client=None):
     deleted = [key for prefix in prefixes for key in client.delete_prefix(destination["bucket"], prefix)]
     return {"invalidated": bool(deleted), "deleted_keys": deleted, "prefixes": prefixes,
             "reason": "canonical content was overwritten" if deleted else "no semantic artifacts existed"}
-
-
-def cleanup_r2_obsolete_prep_artifacts(config, r2_client=None):
-    """Invalidate same-release DOCX and remove retired full-subject objects."""
-    client = r2_client or R2StorageClient.from_env()
-
-    return {
-        "chapter_docx_invalidation": invalidate_r2_chapter_docx_artifacts(config, client),
-        "legacy_full_subject_cleanup": cleanup_r2_legacy_full_subject(config, client),
-    }
 
 
 def _cleanup_r2_artifact_prefix(config, relative_path, reason, r2_client=None):
@@ -396,19 +346,6 @@ def subject_artifact_object_key(section, relative_path):
     return join_key(section["prefix"], section["subject_dir"], relative_path.as_posix())
 
 
-def destination_subject_prefix(config):
-    destination = config["destination"]
-    return join_key(destination["prefix"], destination["subject_dir"]) + "/"
-
-
-def subject_output_root(config):
-    destination = config["destination"]
-    if is_local(destination):
-        return Path(destination["root_dir"]).expanduser() / destination["subject_dir"]
-    temp_dir = tempfile.TemporaryDirectory(prefix="gurubodh-content-")
-    return Path(temp_dir.name) / destination["subject_dir"], temp_dir
-
-
 def local_source_path(config):
     source = config["source"]
     root_dir = Path(source["root_dir"]).expanduser()
@@ -433,152 +370,6 @@ def materialize_source(config, r2_client=None):
     return path, temp_dir
 
 
-def ensure_local_destination(subject_dir, overwrite, command="prep-subject"):
-    existed = subject_dir.exists()
-    if subject_dir.exists() and not subject_dir.is_dir():
-        raise SystemExit(f"Destination subject path exists but is not a directory: {subject_dir}")
-    existing = local_owned_paths_exist(subject_dir, command)
-    if existing and not overwrite:
-        raise SystemExit(
-            f"Destination already has {command} artifacts or required legacy cleanup paths. "
-            f"Re-run with --overwrite to replace or clean them: {subject_dir}"
-        )
-    subject_dir.mkdir(parents=True, exist_ok=True)
-    return {
-        "path": str(subject_dir),
-        "existed_before_run": existed,
-        "removed_for_overwrite": False,
-        "removed_paths": [],
-    }
-
-
-def ensure_r2_destination_available(config, overwrite, r2_client=None, command="prep-subject"):
-    if not is_r2(config["destination"]):
-        return {
-            "status": "not_applicable",
-            "skipped": True,
-        }
-    destination = config["destination"]
-    prefixes = [
-        destination_object_key(config, path) + ("/" if path.suffix == "" else "")
-        for path in preflight_relative_paths(command)
-    ]
-    if overwrite:
-        return {
-            "status": "destructive_replacement_pending",
-            "skipped": True,
-            "reason": (
-                "overwrite enabled; prep-owned paths will be replaced and approved derived/legacy cleanup "
-                "will run only after candidate publication"
-                if command == "prep-subject"
-                else f"overwrite enabled; only {command}-owned paths will be replaced before upload"
-            ),
-            "bucket": destination["bucket"],
-            "prefixes": prefixes,
-        }
-    client = r2_client or R2StorageClient.from_env()
-    existing = [prefix for prefix in prefixes if client.prefix_has_objects(destination["bucket"], prefix)]
-    if existing:
-        raise SystemExit(
-            r2_existing_artifacts_error(
-                command, destination["bucket"], existing, f"{command} artifact locations"
-            )
-        )
-    return {
-        "status": "passed",
-        "skipped": False,
-        "bucket": destination["bucket"],
-        "prefixes": prefixes,
-    }
-
-
-def iter_subject_files(subject_dir):
-    return sorted(path for path in subject_dir.rglob("*") if path.is_file())
-
-
-def prep_upload_groups(uploads, subject_dir):
-    """Return prep artifacts in operator-facing publication order."""
-    groups = {
-        "chapters": {},
-        "manifest": [],
-        "proofreading_manifest": [],
-        "reports": [],
-        "other": [],
-    }
-
-    def chapter_stem(relative_path):
-        filename = relative_path.name
-        if relative_path.parts[:2] == ("chapters", "text_and_metadata"):
-            return Path(filename).stem
-        if relative_path.parts[:2] == ("chapters", "unmodified_source_text") and filename.endswith("_unmodified_source.txt"):
-            return filename.removesuffix("_unmodified_source.txt")
-        if relative_path.parts[:2] == ("chapters", "proofreading") and filename.endswith(".proofread.diff.txt"):
-            return filename.removesuffix(".proofread.diff.txt")
-        if relative_path.parts[:2] == ("chapters", "proofreading") and filename.endswith(".proofread.json"):
-            return filename.removesuffix(".proofread.json")
-        return None
-
-    for upload in uploads:
-        relative_path = upload[0].relative_to(subject_dir)
-        if stem := chapter_stem(relative_path):
-            groups["chapters"].setdefault(stem, []).append(upload)
-        elif relative_path == Path("chapters") / "chapter_content_manifest.json":
-            groups["manifest"].append(upload)
-        elif relative_path == PROOFREADING_ARTIFACT_DIR / "proofreading_manifest.json":
-            groups["proofreading_manifest"].append(upload)
-        elif relative_path.parts[:2] == ("run_reports", "prep-subject"):
-            groups["reports"].append(upload)
-        else:
-            groups["other"].append(upload)
-
-    ordered = []
-    if groups["chapters"]:
-        def chapter_file_order(upload):
-            path, _ = upload
-            if "text_and_metadata" in path.parts:
-                return 0 if path.suffix == ".txt" else 1
-            if "unmodified_source_text" in path.parts:
-                return 2
-            if path.name.endswith(".proofread.diff.txt"):
-                return 3
-            if path.name.endswith(".proofread.json"):
-                return 4
-            return 99
-
-        chapters = [
-            (stem, sorted(files, key=chapter_file_order))
-            for stem, files in sorted(groups["chapters"].items())
-        ]
-        ordered.append(("chapters", chapters))
-    if groups["manifest"]:
-        ordered.append(("manifest", sorted(groups["manifest"])))
-    if groups["proofreading_manifest"]:
-        ordered.append(("proofreading_manifest", sorted(groups["proofreading_manifest"])))
-    if groups["reports"]:
-        ordered.append(("reports", sorted(groups["reports"])))
-    if groups["other"]:
-        ordered.append(("other", sorted(groups["other"])))
-    return ordered
-
-
-def artifact_types(files):
-    labels = []
-    for path, _ in files:
-        if "unmodified_source_text" in path.parts:
-            label = "unmodified source"
-        elif "proofreading" in path.parts and path.name.endswith(".proofread.diff.txt"):
-            label = "diff"
-        elif "proofreading" in path.parts and path.name.endswith(".proofread.json"):
-            label = "proofreading details"
-        else:
-            label = {".txt": "canonical text", ".json": "canonical metadata"}.get(
-                path.suffix,
-                path.suffix.lstrip("."),
-            )
-        labels.append(label)
-    return ", ".join(labels)
-
-
 def upload_r2_file(client, destination, path, key):
     try:
         client.upload_file(path, destination["bucket"], key)
@@ -586,82 +377,3 @@ def upload_r2_file(client, destination, path, key):
         raise SystemExit(
             f"R2 upload failed for {path.name} to r2://{destination['bucket']}/{key}: {exc}"
         ) from exc
-
-
-def publish_r2_destination(config, subject_dir, overwrite, r2_client=None, before_upload=None, command="prep-subject"):
-    destination = config["destination"]
-    client = r2_client or R2StorageClient.from_env()
-    uploads = []
-    for path in iter_subject_files(subject_dir):
-        relative_path = path.relative_to(subject_dir)
-        if not any(relative_path == owned or owned in relative_path.parents for owned in owned_relative_paths(command)):
-            continue
-        key = destination_object_key(config, relative_path)
-        uploads.append((path, key))
-
-    groups = prep_upload_groups(uploads, subject_dir) if command == "prep-subject" else None
-    if groups:
-        ordered_uploads = []
-        for kind, items in groups:
-            if kind == "chapters":
-                for _, files in items:
-                    ordered_uploads.extend(files)
-            else:
-                ordered_uploads.extend(items)
-        uploads = ordered_uploads
-
-    total = len(uploads)
-    print(f"prepared {total} artifact file(s) for R2 upload")
-    deleted_keys = []
-    prefixes = owned_prefixes(config, command)
-    if overwrite:
-        for prefix in prefixes:
-            deleted_keys.extend(client.delete_prefix(destination["bucket"], prefix))
-        print(f"deleted {len(deleted_keys)} object(s) from {command}-owned R2 paths")
-    else:
-        print(f"checking {total} target object key(s) in r2://{destination['bucket']}/{destination['prefix']}")
-        existing = []
-        for _, key in uploads:
-            if client.exists(destination["bucket"], key):
-                existing.append(key)
-        if existing:
-            raise SystemExit(
-                r2_existing_artifacts_error(
-                    command, destination["bucket"], existing[:10], f"{command} target objects"
-                )
-            )
-
-    if before_upload:
-        before_upload(uploads, deleted_keys)
-
-    if command == "prep-subject" and groups:
-        print(f"Publishing {total} artifact(s) to:")
-        print(f"  r2://{destination['bucket']}/{destination['prefix']}/{destination['subject_dir']}/")
-        for index, (kind, items) in enumerate(groups, start=1):
-            if kind == "chapters":
-                file_count = sum(len(files) for _, files in items)
-                print(f"[{index}/{len(groups)}] chapter artifacts: {len(items)} chapters / {file_count} files")
-                for chapter_index, (stem, files) in enumerate(items, start=1):
-                    for path, key in files:
-                        upload_r2_file(client, destination, path, key)
-                    print(f"  [{chapter_index:02d}/{len(items):02d}] {stem} ({artifact_types(files)})")
-            else:
-                for path, key in items:
-                    upload_r2_file(client, destination, path, key)
-                if kind == "manifest":
-                    print(f"[{index}/{len(groups)}] content manifest: chapters/chapter_content_manifest.json")
-                elif kind == "proofreading_manifest":
-                    print(f"[{index}/{len(groups)}] proofreading manifest: chapters/proofreading/proofreading_manifest.json")
-                elif kind == "reports":
-                    print(f"[{index}/{len(groups)}] prep-subject audit: {', '.join(path.name for path, _ in items)}")
-                else:
-                    print(f"[{index}/{len(groups)}] other artifacts: {len(items)} files")
-    else:
-        print(f"uploading {total} artifact file(s) to r2://{destination['bucket']}/{destination['prefix']}")
-        for index, (path, key) in enumerate(uploads, start=1):
-            print(f"[{index}/{total}] uploading {key}")
-            upload_r2_file(client, destination, path, key)
-    if command == "prep-subject" and overwrite:
-        cleanup_r2_obsolete_prep_artifacts(config, client)
-    print(f"uploaded {len(uploads)} artifact files to r2://{destination['bucket']}/{destination['prefix']}")
-    return uploads

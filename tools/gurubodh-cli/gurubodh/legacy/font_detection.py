@@ -105,15 +105,6 @@ def rfonts_values(rfonts):
     ]
 
 
-def run_converter(run):
-    rfonts = run.find("w:rPr/w:rFonts", NS)
-    for value in rfonts_values(rfonts):
-        converter = detect_converter_for_font(value)
-        if converter:
-            return converter
-    return None
-
-
 def _font_attributes(rfonts) -> dict[str, str]:
     if rfonts is None:
         return {}
