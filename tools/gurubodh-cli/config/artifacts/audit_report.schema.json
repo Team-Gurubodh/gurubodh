@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.org/schemas/audit_report.schema.json",
+  "title": "Gurubodh audit report envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_name",
+    "schema_version",
+    "run_identity",
+    "job_identity",
+    "configuration_snapshot",
+    "processing_summary",
+    "lifecycle",
+    "publication",
+    "failure",
+    "report_artifacts",
+    "command_details"
+  ],
+  "properties": {
+    "schema_name": {
+      "const": "gurubodh.audit-report"
+    },
+    "schema_version": {
+      "const": "2.0.0"
+    },
+    "run_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "status",
+        "started_at",
+        "completed_at",
+        "command",
+        "entry_point",
+        "package_version",
+        "config_path",
+        "job_schema_version",
+        "pipeline",
+        "source_backend",
+        "destination_backend",
+        "overwrite",
+        "build_provenance"
+      ],
+      "properties": {
+        "run_id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["succeeded", "failed", "incomplete"] },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "command": { "type": "string", "minLength": 1 },
+        "entry_point": { "type": "string", "minLength": 1 },
+        "package_version": { "type": "string", "minLength": 1 },
+        "config_path": { "type": ["string", "null"] },
+        "job_schema_version": { "type": ["string", "integer", "null"] },
+        "pipeline": { "type": ["string", "null"] },
+        "source_backend": { "type": ["string", "null"] },
+        "destination_backend": { "type": "string", "minLength": 1 },
+        "overwrite": { "type": "boolean" },
+        "build_provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "source_revision",
+            "image_revision",
+            "image_version",
+            "image_created"
+          ],
+          "properties": {
+            "source": { "enum": ["embedded-container-manifest", "native-git-checkout", "unavailable"] },
+            "source_revision": { "type": ["string", "null"] },
+            "image_revision": { "type": ["string", "null"] },
+            "image_version": { "type": ["string", "null"] },
+            "image_created": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "job_identity": {
+      "type": ["object", "null"]
+    },
+    "configuration_snapshot": {
+      "type": "object"
+    },
+    "processing_summary": {
+      "type": "object"
+    },
+    "lifecycle": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["current_state", "transitions"],
+          "properties": {
+            "current_state": { "type": "string", "minLength": 1 },
+            "transitions": { "type": "array" }
+          }
+        }
+      ]
+    },
+    "publication": {
+      "type": "object",
+      "required": ["backend", "status"],
+      "properties": {
+        "backend": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 }
+      }
+    },
+    "failure": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "stage",
+            "code",
+            "error_type",
+            "message",
+            "request_diagnostics"
+          ],
+          "properties": {
+            "stage": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "code": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "error_type": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "request_diagnostics": { "type": ["object", "null"] }
+          }
+        }
+      ]
+    },
+    "report_artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["json", "markdown"],
+      "properties": {
+        "json": { "type": "object" },
+        "markdown": { "type": "object" }
+      }
+    },
+    "command_details": {
+      "type": "object"
+    }
+  }
+}

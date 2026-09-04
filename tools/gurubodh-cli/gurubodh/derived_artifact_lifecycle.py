@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Generic, Protocol, TypeVar
 
+from gurubodh.audit import AuditWriteResult, bounded_failure, warn_audit_failure
 from gurubodh.canonical_source import revalidate_source_release
 from gurubodh.contracts import CleanupResource, MaterializedSource, R2Client
 from gurubodh.errors import GurubodhError, ProcessingError, PublicationError
@@ -53,12 +54,6 @@ class DerivedArtifactDefinition:
     report_relative_dir: Path
     readiness_manifest_artifact_name: str | None = None
     legacy_output_relative_dirs: tuple[Path, ...] = ()
-
-
-@dataclass
-class AuditResult:
-    report: dict[str, Any]
-    paths: dict[str, Path]
 
 
 @dataclass
@@ -169,7 +164,7 @@ class DerivedArtifactWorkflow(Protocol[GenerationT]):
         publication: dict[str, Any],
         failure: dict[str, Any] | None,
         announce: bool,
-    ) -> AuditResult: ...
+    ) -> AuditWriteResult: ...
 
 
 def destination_subject_dir(config: Mapping[str, Any], command_name: str):
@@ -469,7 +464,7 @@ def _validate_stage_layout(staged_output: Path, readiness_manifest: Path) -> Non
 def _upload_audit_reports(
     config: Mapping[str, Any],
     definition: DerivedArtifactDefinition,
-    audit: AuditResult,
+    audit: AuditWriteResult,
     r2_client: R2Client,
 ) -> None:
     destination = config["destination"]
@@ -482,12 +477,7 @@ def _upload_audit_reports(
 
 
 def _failure_details(state: LifecycleState, error: BaseException) -> dict[str, Any]:
-    return {
-        "state": state.value,
-        "stage": state.value,
-        "error_type": error.__class__.__name__,
-        "message": str(error)[:1000] or error.__class__.__name__,
-    }
+    return bounded_failure(error, state.value)
 
 
 def run_derived_artifact_lifecycle(
@@ -634,8 +624,8 @@ def run_derived_artifact_lifecycle(
             )
             if is_r2(config["destination"]):
                 _upload_audit_reports(config, definition, audit, client)
-        except BaseException:
-            pass
+        except BaseException as audit_error:
+            warn_audit_failure(definition.command_name, audit_error, error)
         if not isinstance(error, Exception):
             raise
         if isinstance(error, GurubodhError):

@@ -23,6 +23,7 @@ JOB_SCHEMAS = {
 }
 
 ARTIFACT_SCHEMAS = {
+    "audit report": "audit_report.schema.json",
     "chapter metadata": "chapter_metadata.schema.json",
     "chapter content manifest": "chapter_content_manifest.schema.json",
     "chapter proofreading": "chapter_proofreading.schema.json",

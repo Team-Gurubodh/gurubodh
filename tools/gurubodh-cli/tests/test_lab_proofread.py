@@ -3,6 +3,8 @@ import json
 import shutil
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -71,13 +73,19 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(source.read_bytes(), source_before)
         self.assertEqual(len(proofreader.calls), 1)
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
-        self.assertEqual(manifest["outcome"], "succeeded")
-        self.assertEqual(manifest["run_directory"], str(run_dir))
-        self.assertTrue(manifest["non_canonical"])
-        self.assertEqual(manifest["source"]["sha256"], hashlib.sha256(source_before).hexdigest())
-        self.assertEqual(manifest["source"]["font_encoding"], "unicode")
-        self.assertEqual(manifest["locale"]["language"], "hi-IN")
-        self.assertEqual(manifest["command"]["name"], "lab proofread")
+        details = manifest["command_details"]
+        self.assertEqual(manifest["schema_name"], "gurubodh.audit-report")
+        self.assertEqual(manifest["schema_version"], "2.0.0")
+        self.assertEqual(manifest["run_identity"]["status"], "succeeded")
+        self.assertEqual(details["run_directory"], str(run_dir))
+        self.assertTrue(details["non_canonical"])
+        self.assertFalse(manifest["publication"]["canonical"])
+        self.assertEqual(
+            details["source"]["sha256"], hashlib.sha256(source_before).hexdigest()
+        )
+        self.assertEqual(details["source"]["font_encoding"], "unicode")
+        self.assertEqual(details["locale"]["language"], "hi-IN")
+        self.assertEqual(manifest["run_identity"]["command"], "lab proofread")
         self.assertTrue((run_dir / "report" / "extracted_source.txt").is_file())
         self.assertTrue((run_dir / "output" / "source_proofread.txt").is_file())
         self.assertTrue((run_dir / "output" / "source_proofread.docx").is_file())
@@ -88,16 +96,20 @@ class LabProofreadTests(unittest.TestCase):
         validate_chapter_docx(run_dir / "output" / "source_proofread.docx", corrected, "source: proofread")
         self.assertEqual(Document(run_dir / "output" / "source_proofread.docx").paragraphs[1].text, "यह सही वाक्य है।")
         self.assertIn("non-canonical", (run_dir / "README.md").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["operator_readme"], "README.md")
-        for relative, expected_sha256 in manifest["artifact_sha256"].items():
+        self.assertEqual(details["operator_readme"], "README.md")
+        for relative, expected_sha256 in details["artifact_sha256"].items():
             self.assertEqual(hashlib.sha256((run_dir / relative).read_bytes()).hexdigest(), expected_sha256)
 
     def test_marathi_selects_the_marathi_locale(self):
         source = self.source_docx(text="हे गलत वाक्य आहे.")
         result = run_lab_proofread(self.context, source, "mr-IN", self.root / "lab", proofreader=FakeProofreader("चुकीचे"))
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
-        self.assertEqual(manifest["locale"]["language"], "mr-IN")
-        self.assertEqual(manifest["locale"]["instruction_template"]["id"], "mr-IN-proofreading")
+        details = manifest["command_details"]
+        self.assertEqual(details["locale"]["language"], "mr-IN")
+        self.assertEqual(
+            details["locale"]["instruction_template"]["id"],
+            "mr-IN-proofreading",
+        )
 
     def test_exact_configured_marathi_paragraphs_render_as_heading_2(self):
         source = self.root / "source.docx"
@@ -132,8 +144,12 @@ class LabProofreadTests(unittest.TestCase):
 
         convert.assert_called_once()
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
-        self.assertEqual(manifest["source"]["font_encoding"], "aps")
-        self.assertEqual(manifest["source"]["legacy_conversion"]["converter_counts"], {"aps": 1})
+        details = manifest["command_details"]
+        self.assertEqual(details["source"]["font_encoding"], "aps")
+        self.assertEqual(
+            details["source"]["legacy_conversion"]["converter_counts"],
+            {"aps": 1},
+        )
 
     def test_unsupported_font_fails_before_conversion_or_proofreading(self):
         source = self.source_docx(text="fdn")
@@ -173,8 +189,10 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(len(manifests), 1)
         failed_dir = manifests[0].parent.resolve()
         manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
-        self.assertEqual(manifest["outcome"], "failed")
-        self.assertEqual(manifest["run_directory"], str(failed_dir))
+        self.assertEqual(manifest["run_identity"]["status"], "failed")
+        self.assertEqual(
+            manifest["command_details"]["run_directory"], str(failed_dir)
+        )
         self.assertEqual(list((runs / "active").iterdir()), [])
         self.assertEqual(progress[-1], f"Lab proofread run failed: {failed_dir}")
 
@@ -204,14 +222,49 @@ class LabProofreadTests(unittest.TestCase):
 
         manifest_path = next((self.root / "lab" / "proofread" / "runs" / "failed").glob("*/run_manifest.json"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["request_diagnostics"]["attempts"][0]["http_status"], 503)
         self.assertEqual(
-            manifest["request_diagnostics"]["terminal_retry_exhaustion_reason"],
+            manifest["failure"]["request_diagnostics"]["attempts"][0][
+                "http_status"
+            ],
+            503,
+        )
+        self.assertEqual(
+            manifest["failure"]["request_diagnostics"][
+                "terminal_retry_exhaustion_reason"
+            ],
             "service_unavailable_retry_exhausted",
         )
         report = (manifest_path.parent / "report" / "run_report.md").read_text(encoding="utf-8")
         self.assertIn("Terminal retry reason: `service_unavailable_retry_exhausted`", report)
         self.assertNotIn("यह गलत वाक्य है।", manifest_path.read_text(encoding="utf-8"))
+
+    def test_primary_proofreading_error_survives_audit_write_failure(self):
+        source = self.source_docx()
+        primary = ProofreadingError("api_error", "primary proofreading failure")
+
+        class FailingProofreader:
+            def proofread(self, text, progress=None):
+                raise primary
+
+        stderr = StringIO()
+        with (
+            patch(
+                "gurubodh.lab_proofread._write_final_reports",
+                side_effect=OSError("audit disk failure"),
+            ),
+            redirect_stderr(stderr),
+            self.assertRaisesRegex(ProofreadingError, "primary proofreading failure"),
+        ):
+            run_lab_proofread(
+                self.context,
+                source,
+                "hi-IN",
+                self.root / "lab",
+                proofreader=FailingProofreader(),
+            )
+
+        self.assertIn("preserving the primary ProofreadingError", stderr.getvalue())
+        self.assertIn("audit disk failure", stderr.getvalue())
 
     def test_rejects_canonical_lab_root_and_invalid_locale(self):
         source = self.source_docx()

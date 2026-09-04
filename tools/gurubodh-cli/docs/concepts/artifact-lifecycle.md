@@ -43,6 +43,31 @@ R2 publication is readiness-based and is not atomic. On overwrite, the command r
 
 Each maintained command writes JSON and Markdown audit reports below `run_reports/<command>/`. JSON is the tooling source of truth; Markdown is the operator summary. Reports capture run identity, lifecycle transitions, safe configuration/provenance, artifact summaries, publication deletes/uploads/readiness status, and outcomes, but exclude credentials, environment values, request bodies, and full content.
 
+`prep-subject`, `generate-chunks`, `generate-docx`, and lab proofreading all
+use the executable `gurubodh.audit-report` envelope at schema version `2.0.0`.
+Its common fields are `run_identity`, `job_identity`,
+`configuration_snapshot`, `processing_summary`, `lifecycle`, `publication`,
+`failure`, `report_artifacts`, and `command_details`. JSON serialization and
+local JSON/Markdown writes are deterministic and centralized; command modules
+provide only their identities, summaries, details, and Markdown renderers. R2
+upload remains a workflow-boundary action after the local write result exists.
+
+The v2 envelope is a deliberate major-version replacement for the earlier
+command-specific v1 layouts. Historical v1 reports are retained unchanged.
+Report consumers must inspect `schema_name` and the major `schema_version` and
+must not parse v1 and v2 as the same shape. Within v2, command-only fields live
+under `command_details`; adding such detail does not change the common
+envelope. A future incompatible envelope change requires another major
+version.
+
+Configuration snapshots copy only schema-shaped JSON settings, redact
+credential-like keys, and omit private keys and runtime-only objects such as
+compiled patterns or provider clients. Failures use one bounded shape and may
+include only provider-neutral request diagnostics. If failure-audit writing or
+upload also fails, the CLI emits a warning and preserves the original
+processing/publication exception; an audit failure after otherwise successful
+processing remains an explicit command failure.
+
 Preparation checkpoint state lives at `run_state/prep-subject/job-state.json`. Use `prep-subject --resume` only for a compatible incomplete checkpoint. See [Prepare a subject](../workflows/prepare-a-subject.md) for the compatibility and replacement rules.
 
 Derived commands retain carriage-return rejection as a defense-in-depth check.

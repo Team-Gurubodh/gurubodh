@@ -5,6 +5,7 @@
 
 ## Current Schema Locations
 
+- `tools/gurubodh-cli/config/artifacts/audit_report.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_metadata.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_content_manifest.schema.json`
 - `tools/gurubodh-cli/config/artifacts/chapter_proofreading.schema.json`
@@ -43,7 +44,16 @@ They are not documentation-only contracts:
   serialization, checksum calculation, staging, local publication, or R2
   upload. This covers chapter metadata, chapter content manifests, chapter
   proofreading details, proofreading manifests, prep-subject job state,
-  semantic chunks, semantic chunk manifests, and DOCX manifests.
+  semantic chunks, semantic chunk manifests, DOCX manifests, and the common
+  audit-report envelope.
+- Audit report schema `2.0.0` is shared by `prep-subject`, `generate-chunks`,
+  `generate-docx`, and lab proofreading. It fixes the common top-level
+  identity, safe configuration, summary, lifecycle, publication, bounded
+  failure, report-reference, and `command_details` fields while allowing each
+  command to own the contents of its summary and details. The v2 major version
+  is intentionally incompatible with the earlier command-specific v1 report
+  layouts; retained v1 reports stay immutable, and consumers must select a
+  parser by `schema_name` and the major `schema_version`.
 - The validator explicitly uses JSON Schema Draft 2020-12, validates schema
   definitions before use, checks declared formats, and caches compiled
   validators. The `jsonschema` dependency and schema files are included in the

@@ -307,6 +307,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         rendered = json.dumps(payload, ensure_ascii=False)
 
         self.assertEqual(segmenter.calls, 1)
+        self.assertEqual(audit["schema_name"], "gurubodh.audit-report")
+        self.assertEqual(audit["schema_version"], "2.0.0")
         self.assertEqual(result["source_chapter_count"], 1)
         self.assertNotIn("dense_embedding", rendered)
         self.assertNotIn('"embedding"', rendered)
@@ -491,8 +493,10 @@ class GenerateChunksPipelineTests(unittest.TestCase):
             )
         )
         self.assertEqual(report["run_identity"]["status"], "failed")
-        self.assertEqual(report["failure"]["state"], "generation")
-        self.assertEqual(report["chapters"][0]["status"], "failed")
+        self.assertEqual(report["failure"]["stage"], "generation")
+        self.assertEqual(
+            report["command_details"]["chapters"][0]["status"], "failed"
+        )
 
     def test_staged_validation_and_source_revalidation_preserve_existing_chunks(self):
         for failing_state in ("staged_validation", "source_revalidation"):
@@ -528,7 +532,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
                         encoding="utf-8"
                     )
                 )
-                self.assertEqual(report["failure"]["state"], failing_state)
+                self.assertEqual(report["failure"]["stage"], failing_state)
 
     def test_r2_overwrite_publishes_chunk_manifest_last_and_preserves_other_commands(self):
         config, objects = r2_release(["पहला।\n"])
@@ -597,7 +601,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         ]
         self.assertEqual(len(failure_reports), 1)
         report = json.loads(failure_reports[0])
-        self.assertEqual(report["failure"]["state"], "publication")
+        self.assertEqual(report["failure"]["stage"], "publication")
         self.assertEqual(report["publication"]["status"], "failed")
 
     def test_r2_materializes_only_selected_manifest_artifacts(self):

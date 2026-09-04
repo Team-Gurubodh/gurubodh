@@ -1,11 +1,13 @@
 import json
+from contextlib import redirect_stderr
+from io import StringIO
 import tempfile
 import unittest
 from pathlib import Path
 
+from gurubodh.audit import AuditWriteResult, LocalAuditWrite
 from gurubodh.contracts import CandidateManifestBinding, MaterializedSource
 from gurubodh.derived_artifact_lifecycle import (
-    AuditResult,
     DerivedArtifactDefinition,
     destination_subject_dir,
     run_derived_artifact_lifecycle,
@@ -93,6 +95,7 @@ class DummyWorkflow:
         appear_after_preflight=False,
         r2_client=None,
         r2_appear_key=None,
+        audit_error=None,
     ):
         self.destination_subject = Path(destination_subject)
         self.final_output = Path(final_output)
@@ -101,6 +104,7 @@ class DummyWorkflow:
         self.appear_after_preflight = appear_after_preflight
         self.r2_client = r2_client
         self.r2_appear_key = r2_appear_key
+        self.audit_error = audit_error
         self.audit_index = 0
 
     def materialize_and_validate_source(self, r2_client, progress):
@@ -150,6 +154,8 @@ class DummyWorkflow:
         failure,
         announce,
     ):
+        if self.audit_error:
+            raise self.audit_error
         self.audit_index += 1
         report = {
             "status": status,
@@ -165,7 +171,15 @@ class DummyWorkflow:
         }
         paths["json"].write_text(json.dumps(report) + "\n", encoding="utf-8")
         paths["markdown"].write_text(f"status: {status}\n", encoding="utf-8")
-        return AuditResult(report, paths)
+        return AuditWriteResult(
+            report,
+            paths,
+            {kind: {"backend": "local", "path": str(path)} for kind, path in paths.items()},
+            {
+                kind: LocalAuditWrite(path, path.stat().st_size)
+                for kind, path in paths.items()
+            },
+        )
 
 
 class DerivedArtifactLifecycleTests(unittest.TestCase):
@@ -237,7 +251,7 @@ class DerivedArtifactLifecycleTests(unittest.TestCase):
                 report = json.loads(
                     next((subject / REPORTS).glob("*.json")).read_text(encoding="utf-8")
                 )
-                self.assertEqual(report["failure"]["state"], failing_state)
+                self.assertEqual(report["failure"]["stage"], failing_state)
 
     def test_destination_appearing_after_preflight_is_not_modified(self):
         subject = self.root / "appeared/123_subject/hi-IN"
@@ -248,6 +262,26 @@ class DerivedArtifactLifecycleTests(unittest.TestCase):
             self.run_local(workflow)
 
         self.assertEqual((output / "appeared.txt").read_text(), "appeared")
+
+    def test_failure_audit_error_is_visible_without_replacing_primary_error(self):
+        subject = self.root / "audit-failure/123_subject/hi-IN"
+        workflow = DummyWorkflow(
+            subject,
+            subject / OUTPUT,
+            generation_error=RuntimeError("primary generation failure"),
+            audit_error=OSError("audit disk failure"),
+        )
+        stderr = StringIO()
+
+        with redirect_stderr(stderr), self.assertRaisesRegex(
+            GurubodhError, "primary generation failure"
+        ):
+            self.run_local(workflow)
+
+        warning = stderr.getvalue()
+        self.assertIn("audit reporting failed", warning)
+        self.assertIn("audit disk failure", warning)
+        self.assertIn("preserving the primary RuntimeError", warning)
 
     def test_r2_manifest_is_last_and_failure_audit_is_uploaded(self):
         config = r2_config(self.root)
