@@ -42,6 +42,32 @@ the injectable storage and provider seams. Production clients and test fakes
 satisfy those protocols without inheriting a framework base class or being cast
 to `Any`.
 
+## Proofreading boundaries
+
+Proofreading is a package of independently testable components rather than a
+single provider-specific workflow module:
+
+- `proofreading/settings.py` owns the explicit provider and request-policy
+  configuration record.
+- `proofreading/gemini.py` is the only Gemini SDK adapter. It owns client
+  initialization, request construction, and bounded in-flight progress.
+- `proofreading/service.py` applies provider-neutral orchestration around a raw
+  transport and returns the shared `ProofreadingProviderResponse` contract.
+- `proofreading/policy.py` owns pacing, retry classification and delay,
+  service-unavailable recovery, and safe bounded diagnostics. It has no SDK
+  dependency.
+- `proofreading/validation.py` converts a plain structured-response string into
+  typed, validated edits before the provider result crosses the protocol.
+- `proofreading/text_comparison.py` owns local word-level comparison.
+- `proofreading/artifacts.py` owns canonical chapter output and proofreading
+  manifest construction and accepts the narrow `Proofreader` protocol.
+
+Locale selection is an explicit input to the Gemini composition, and the
+locale's instruction-template provenance remains an explicit input to canonical
+and lab artifact construction. `gurubodh.proofreading` re-exports only the
+previously consumed compatibility names; new internal callers should import the
+narrow component they use.
+
 ## Compatibility rule
 
 Do not add runtime-only keys to schema-shaped job dictionaries. Add a typed
