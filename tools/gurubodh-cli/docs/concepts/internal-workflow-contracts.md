@@ -42,6 +42,38 @@ the injectable storage and provider seams. Production clients and test fakes
 satisfy those protocols without inheriting a framework base class or being cast
 to `Any`.
 
+## Prep-subject boundaries
+
+The resumable prep workflow is composed from explicit collaborators while its
+persisted job, chapter, proofreading, publication, and manifest schemas remain
+unchanged:
+
+- `canonical_release.py` owns the persisted release-state constants and the
+  release readiness gate used by derived commands. It is foundational and does
+  not import prep orchestration.
+- `prep_checkpoint_store.py` defines the checkpoint persistence protocol and
+  its local and R2 implementations. Both stores load typed state, commit state
+  atomically, commit checkpoint artifacts before state, restore and remove a
+  workspace, and archive prior state.
+- `prep_coordination.py` owns the local advisory lock and R2 advisory lease
+  transitions. It does not process chapters or publish artifacts, and the R2
+  lease remains only a guardrail.
+- `prep_publication.py` owns local and R2 canonical promotion plus the
+  separately invoked overwrite cleanup operations. The canonical content
+  manifest remains the last promoted or uploaded artifact.
+- `prep_checkpoint.py` owns backend-neutral checkpoint and chapter state
+  transitions and presents a session facade over those ports.
+- `prep_subject_checkpoints.py` is the application orchestrator and retained
+  compatibility entry point for the two prep pipelines. It coordinates source
+  preparation, proofreading, checkpoint transitions, publication, and audit
+  outcomes without implementing a storage backend.
+
+The collaborators accept the existing `R2Client` and `Proofreader` protocols,
+along with injected clock, sleeper, progress, and filesystem-backed roots used
+by focused tests. Prep resumability remains distinct from the non-resumable
+derived-artifact lifecycle; both reuse the lower-level storage client and
+upload primitive where their semantics match.
+
 ## Proofreading boundaries
 
 Proofreading is a package of independently testable components rather than a

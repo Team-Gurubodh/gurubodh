@@ -19,7 +19,7 @@ from gurubodh.errors import (
     SourceValidationError,
     StorageError,
 )
-from gurubodh.prep_subject_checkpoints import validate_canonical_release_gate
+from gurubodh.canonical_release import validate_canonical_release_gate
 from gurubodh.schema_validation import validate_artifact
 from gurubodh.storage import (
     R2StorageClient,
