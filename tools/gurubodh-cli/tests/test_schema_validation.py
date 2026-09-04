@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
+from gurubodh.errors import GurubodhError
 from gurubodh.config import (
     load_generate_chunks_job,
     load_generate_docx_job,
@@ -89,7 +90,7 @@ class SchemaValidationTests(unittest.TestCase):
         payload.pop("schema_version")
 
         with self.assertRaisesRegex(
-            SystemExit,
+            GurubodhError,
             r"Config validation failed \(generate-docx job, composed generate-docx job\): \$\.schema_version is required",
         ):
             prepare_generate_docx_job(payload, origin="composed generate-docx job")
@@ -120,7 +121,7 @@ class SchemaValidationTests(unittest.TestCase):
         cases.append((load_generate_docx_job, docx, "$.naming.unexpected_name is not allowed"))
 
         for index, (loader, payload, expected) in enumerate(cases):
-            with self.subTest(expected=expected), self.assertRaises(SystemExit) as raised:
+            with self.subTest(expected=expected), self.assertRaises(GurubodhError) as raised:
                 loader(self.write_job(payload, f"unknown-{index}.json"))
             self.assertIn(expected, str(raised.exception))
 
@@ -168,7 +169,7 @@ class SchemaValidationTests(unittest.TestCase):
         cases.append((load_generate_chunks_job, chunks, "$.chapters must not contain duplicate items"))
 
         for index, (loader, payload, expected) in enumerate(cases):
-            with self.subTest(expected=expected), self.assertRaises(SystemExit) as raised:
+            with self.subTest(expected=expected), self.assertRaises(GurubodhError) as raised:
                 loader(self.write_job(payload, f"constraint-{index}.json"))
             self.assertIn(expected, str(raised.exception))
 
@@ -180,12 +181,12 @@ class SchemaValidationTests(unittest.TestCase):
             "pattern": "[",
             "flags": [],
         }
-        with self.assertRaisesRegex(SystemExit, "not a valid regex"):
+        with self.assertRaisesRegex(GurubodhError, "not a valid regex"):
             load_prep_subject_job(self.write_job(prep, "bad-regex.json"))
 
         chunks = self.maintained_job("generate-chunks")
         chunks["destination"]["subject_dir"] = f"different-subject/{chunks['naming']['language']}"
-        with self.assertRaisesRegex(SystemExit, "same language-qualified root"):
+        with self.assertRaisesRegex(GurubodhError, "same language-qualified root"):
             load_generate_chunks_job(self.write_job(chunks, "mismatched-root.json"))
 
     def test_diagnostics_are_deterministic_and_do_not_echo_values(self):
@@ -195,7 +196,7 @@ class SchemaValidationTests(unittest.TestCase):
 
         messages = []
         for name in ("first.json", "second.json"):
-            with self.assertRaises(SystemExit) as raised:
+            with self.assertRaises(GurubodhError) as raised:
                 load_generate_docx_job(self.write_job(payload, name))
             messages.append(str(raised.exception).split(f", {self.temp_dir / name}", 1)[1])
 
@@ -271,7 +272,7 @@ class SchemaValidationTests(unittest.TestCase):
             payload = copy.deepcopy(valid)
             mutate(payload)
             output = self.temp_dir / filename
-            with self.subTest(filename=filename), self.assertRaises(SystemExit) as raised:
+            with self.subTest(filename=filename), self.assertRaises(GurubodhError) as raised:
                 write_json_artifact(output, payload, "chapter content manifest")
             self.assertFalse(output.exists())
             message = str(raised.exception)

@@ -19,10 +19,17 @@ from gurubodh.constants import (
     DOCX_TITLE_TEMPLATE_VERSION,
     ENTRY_POINT_GENERATE_DOCX,
 )
+from gurubodh.contracts import (
+    DocxChapterSummary,
+    DocxGenerationSummary,
+    GenerateDocxJob,
+    GenerationStatus,
+    MaterializedChapterSource,
+    MaterializedSource,
+)
 from gurubodh.derived_artifact_lifecycle import (
     AuditResult,
     DerivedArtifactDefinition,
-    SourceRelease,
     destination_subject_dir,
     run_derived_artifact_lifecycle,
 )
@@ -32,6 +39,7 @@ from gurubodh.docx.export import (
     validate_chapter_docx,
     write_chapter_docx,
 )
+from gurubodh.errors import ProcessingError
 from gurubodh.generate_docx_audit import GenerateDocxAuditWriter
 from gurubodh.storage import (
     DOCX_REPORT_DIR,
@@ -45,53 +53,57 @@ DOCX_MANIFEST_FILENAME = "docx_manifest.json"
 
 
 def _docx_filename(source):
-    filename = source["text_path"].name
+    filename = source.text_path.name
     if Path(filename).suffix != ".txt":
-        raise SystemExit(f"Canonical source text filename must end in .txt: {filename}")
+        raise ProcessingError(f"Canonical source text filename must end in .txt: {filename}")
     return str(Path(filename).with_suffix(".docx"))
 
 
-def generate_docx_artifacts(config, sources, output_dir, progress=print, chapters=None):
+def generate_docx_artifacts(
+    config: GenerateDocxJob,
+    sources: list[MaterializedChapterSource],
+    output_dir,
+    progress=print,
+    summary: DocxGenerationSummary | None = None,
+) -> DocxGenerationSummary:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    chapters = chapters if chapters is not None else []
+    result = summary or DocxGenerationSummary()
     for index, source in enumerate(sources, start=1):
-        chapter_number = source["chapter_number"]
+        chapter_number = source.chapter_number
         filename = _docx_filename(source)
         title = generated_title(config["naming"]["title_slug"], chapter_number)
         path = output_dir / filename
-        metadata = source["metadata"]
-        summary = {
-            "chapter_number": chapter_number,
-            "content_key": metadata["content_identity"]["content_key"],
-            "normalized_content_sha256": metadata["content_identity"]["normalized_content_sha256"],
-            "source_text": {
-                "reference": source["text_artifact"],
-                "sha256": source["text_artifact_sha256"],
+        metadata = source.metadata
+        chapter = DocxChapterSummary(
+            chapter_number=chapter_number,
+            content_key=metadata["content_identity"]["content_key"],
+            normalized_content_sha256=metadata["content_identity"]["normalized_content_sha256"],
+            source_text={
+                "reference": source.text_artifact,
+                "sha256": source.text_artifact_sha256,
             },
-            "generated_title": title,
-            "docx_filename": filename,
-            "docx_artifact": destination_artifact_reference(config, DOCX_RELATIVE_DIR / filename),
-            "docx_sha256": None,
-            "status": "running",
-            "error": None,
-        }
-        chapters.append(summary)
+            generated_title=title,
+            docx_filename=filename,
+            docx_artifact=destination_artifact_reference(config, DOCX_RELATIVE_DIR / filename),
+        )
+        result.chapters.append(chapter)
         progress(f"[{index:02d}/{len(sources):02d}] chapter {chapter_number}: generating {filename}")
         try:
-            text = source["text_path"].read_text(encoding="utf-8")
+            text = source.text_path.read_text(encoding="utf-8")
             write_chapter_docx(path, text, title, config["naming"]["language"])
-            summary["docx_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
-            summary["status"] = "succeeded"
+            chapter.docx_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+            chapter.status = GenerationStatus.SUCCEEDED
         except Exception as exc:
-            summary["status"] = "failed"
-            summary["error"] = str(exc)[:500] or exc.__class__.__name__
+            chapter.status = GenerationStatus.FAILED
+            chapter.error = str(exc)[:500] or exc.__class__.__name__
             raise
         progress(f"[{index:02d}/{len(sources):02d}] chapter {chapter_number}: validated")
-    return chapters
+    return result
 
 
-def build_docx_manifest(context, config, candidate_manifest, chapters):
+def build_docx_manifest(context, config, candidate_manifest, summary):
+    chapters = summary.chapters
     return {
         "schema_version": DOCX_MANIFEST_SCHEMA_VERSION,
         "formatting_contract_version": DOCX_FORMATTING_CONTRACT_VERSION,
@@ -103,8 +115,8 @@ def build_docx_manifest(context, config, candidate_manifest, chapters):
         },
         "subject": {key: config["naming"][key] for key in ("category_code", "subject_code", "title_slug", "language")},
         "source_candidate_manifest": {
-            "reference": candidate_manifest["reference"],
-            "sha256": candidate_manifest["sha256"],
+            "reference": candidate_manifest.reference,
+            "sha256": candidate_manifest.sha256,
         },
         "formatting": formatting_defaults(),
         "title_template": {
@@ -113,61 +125,34 @@ def build_docx_manifest(context, config, candidate_manifest, chapters):
             "template": "<title_slug>: prabodhan <chapter_number>",
         },
         "counts": {"chapter_count": len(chapters), "docx_file_count": len(chapters)},
-        "chapters": [
-            {
-                key: chapter[key]
-                for key in (
-                    "chapter_number",
-                    "content_key",
-                    "normalized_content_sha256",
-                    "source_text",
-                    "generated_title",
-                    "docx_artifact",
-                    "docx_sha256",
-                )
-            }
-            for chapter in chapters
-        ],
+        "chapters": [chapter.manifest_payload() for chapter in chapters],
     }
 
 
-def validate_docx_staged_package(config, sources, chapters, staged_output, readiness_manifest):
+def validate_docx_staged_package(config, sources, summary, staged_output, readiness_manifest):
+    chapters = summary.chapters
     manifest = json.loads(Path(readiness_manifest).read_text(encoding="utf-8"))
-    expected_names = {chapter["docx_filename"] for chapter in chapters}
+    expected_names = {chapter.docx_filename for chapter in chapters}
     actual_names = {path.name for path in Path(staged_output).glob("*.docx")}
     if actual_names != expected_names:
-        raise ValueError("Staged DOCX files do not exactly match the readiness manifest chapters.")
+        raise ProcessingError("Staged DOCX files do not exactly match the readiness manifest chapters.")
     if manifest.get("counts") != {
         "chapter_count": len(chapters),
         "docx_file_count": len(chapters),
     }:
-        raise ValueError("DOCX readiness manifest counts do not match staged artifacts.")
-    if manifest.get("chapters") != [
-        {
-            key: chapter[key]
-            for key in (
-                "chapter_number",
-                "content_key",
-                "normalized_content_sha256",
-                "source_text",
-                "generated_title",
-                "docx_artifact",
-                "docx_sha256",
-            )
-        }
-        for chapter in chapters
-    ]:
-        raise ValueError("DOCX readiness manifest chapter entries do not match generation results.")
-    source_by_number = {source["chapter_number"]: source for source in sources}
+        raise ProcessingError("DOCX readiness manifest counts do not match staged artifacts.")
+    if manifest.get("chapters") != [chapter.manifest_payload() for chapter in chapters]:
+        raise ProcessingError("DOCX readiness manifest chapter entries do not match generation results.")
+    source_by_number = {source.chapter_number: source for source in sources}
     for chapter in chapters:
-        path = Path(staged_output) / chapter["docx_filename"]
-        if hashlib.sha256(path.read_bytes()).hexdigest() != chapter["docx_sha256"]:
-            raise ValueError(f"Staged DOCX checksum changed for chapter {chapter['chapter_number']}.")
-        source = source_by_number[chapter["chapter_number"]]
+        path = Path(staged_output) / chapter.docx_filename
+        if hashlib.sha256(path.read_bytes()).hexdigest() != chapter.docx_sha256:
+            raise ProcessingError(f"Staged DOCX checksum changed for chapter {chapter.chapter_number}.")
+        source = source_by_number[chapter.chapter_number]
         validate_chapter_docx(
             path,
-            source["text_path"].read_text(encoding="utf-8"),
-            chapter["generated_title"],
+            source.text_path.read_text(encoding="utf-8"),
+            chapter.generated_title,
         )
 
 
@@ -183,7 +168,7 @@ class GenerateDocxWorkflow:
     ):
         self.context = context
         self.config = config
-        self.chapters = []
+        self.summary = DocxGenerationSummary()
         self.audit = GenerateDocxAuditWriter(
             context,
             config_path,
@@ -209,17 +194,17 @@ class GenerateDocxWorkflow:
             if temporary:
                 temporary.cleanup()
             raise
-        return SourceRelease(subject, manifest, sources, temporary)
+        return MaterializedSource(subject, manifest, sources, temporary)
 
     def generate_staged_artifacts(self, source, staged_output, progress):
         generate_docx_artifacts(
             self.config,
-            source.sources,
+            source.chapters,
             staged_output,
             progress,
-            chapters=self.chapters,
+            summary=self.summary,
         )
-        return self.chapters
+        return self.summary
 
     def build_readiness_manifest(self, source, generation):
         return build_docx_manifest(
@@ -234,7 +219,7 @@ class GenerateDocxWorkflow:
     ):
         validate_docx_staged_package(
             self.config,
-            source.sources,
+            source.chapters,
             generation,
             staged_output,
             readiness_manifest,
@@ -252,8 +237,14 @@ class GenerateDocxWorkflow:
     ):
         report = self.audit.write(
             status,
-            source.candidate_manifest if source else None,
-            generation if generation is not None else self.chapters,
+            (
+                source.candidate_manifest.to_internal_payload() if source else None
+            ),
+            (
+                generation.to_payload()["chapters"]
+                if generation is not None
+                else self.summary.to_payload()["chapters"]
+            ),
             publication,
             failure=failure,
             lifecycle=lifecycle.as_dict(),
@@ -264,13 +255,13 @@ class GenerateDocxWorkflow:
 
 def run_generate_docx_job(
     context,
-    config,
+    config: GenerateDocxJob,
     entry_point=ENTRY_POINT_GENERATE_DOCX,
     overwrite=False,
     config_path=None,
     r2_client=None,
     progress=print,
-):
+) -> DocxGenerationSummary:
     definition = DerivedArtifactDefinition(
         command_name="generate-docx",
         output_relative_dir=DOCX_RELATIVE_DIR,
@@ -300,13 +291,11 @@ def run_generate_docx_job(
         destination_temporary=destination_temporary,
         source_revalidator=revalidate_source_release,
     )
-    return {
-        "processed_chapter_count": len(workflow.chapters),
-        "docx_manifest": destination_artifact_reference(
-            config, DOCX_RELATIVE_DIR / DOCX_MANIFEST_FILENAME
-        ),
-        "chapters": workflow.chapters,
-        "publication": lifecycle.publication,
-        "audit_report": lifecycle.audit_report,
-        "lifecycle": lifecycle.lifecycle,
-    }
+    result = lifecycle.generation
+    result.docx_manifest = destination_artifact_reference(
+        config, DOCX_RELATIVE_DIR / DOCX_MANIFEST_FILENAME
+    )
+    result.publication = lifecycle.publication
+    result.audit_report = lifecycle.audit_report
+    result.lifecycle = lifecycle.lifecycle
+    return result

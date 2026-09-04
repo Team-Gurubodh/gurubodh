@@ -3,6 +3,9 @@ import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
 
+from gurubodh.contracts import R2Downloader, R2Uploader
+from gurubodh.errors import ConfigurationError, SourceValidationError, StorageError
+
 
 LOCAL_BACKEND = "local"
 R2_BACKEND = "r2"
@@ -207,7 +210,7 @@ def require_r2_env():
     missing = [name for name, value in values.items() if not value]
     if missing:
         names = ", ".join(missing)
-        raise SystemExit(f"Missing Cloudflare R2 environment variables: {names}")
+        raise ConfigurationError(f"Missing Cloudflare R2 environment variables: {names}")
     return values
 
 
@@ -217,7 +220,7 @@ class R2StorageClient:
             import boto3
             from botocore.exceptions import ClientError
         except ImportError as exc:
-            raise SystemExit(
+            raise ConfigurationError(
                 "R2 storage requires boto3. Install Gurubodh CLI dependencies with pip install -e ."
             ) from exc
 
@@ -290,7 +293,7 @@ class R2StorageClient:
         except self._client_error as exc:
             code = exc.response.get("Error", {}).get("Code")
             if code in {"404", "NoSuchKey", "NotFound"}:
-                raise SystemExit(
+                raise SourceValidationError(
                     "R2 source object does not exist. Check the job source key or upload the source DOCX:\n"
                     f"r2://{bucket}/{key}"
                 ) from exc
@@ -351,11 +354,11 @@ def local_source_path(config):
     root_dir = Path(source["root_dir"]).expanduser()
     relative_path = Path(source["relative_path"])
     if relative_path.is_absolute():
-        raise SystemExit("Config error: source.relative_path must be relative to source.root_dir")
+        raise ConfigurationError("Config error: source.relative_path must be relative to source.root_dir")
     return root_dir / relative_path
 
 
-def materialize_source(config, r2_client=None):
+def materialize_source(config, r2_client: R2Downloader | None = None):
     source = config["source"]
     if is_local(source):
         path = local_source_path(config)
@@ -370,10 +373,10 @@ def materialize_source(config, r2_client=None):
     return path, temp_dir
 
 
-def upload_r2_file(client, destination, path, key):
+def upload_r2_file(client: R2Uploader, destination, path: Path, key: str) -> None:
     try:
         client.upload_file(path, destination["bucket"], key)
     except Exception as exc:
-        raise SystemExit(
+        raise StorageError(
             f"R2 upload failed for {path.name} to r2://{destination['bucket']}/{key}: {exc}"
         ) from exc

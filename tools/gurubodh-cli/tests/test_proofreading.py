@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from gurubodh.config import proofreading_config, validate_pipeline_matches_source
+from gurubodh.errors import GurubodhError
 from gurubodh.locales import locale_spec
 from gurubodh.proofreading import (
     EDIT_LIST_SCHEMA,
@@ -88,24 +89,24 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(settings.unavailable_max_retries, 2)
         self.assertEqual(settings.unavailable_cooldown_seconds, 120)
         self.assertEqual(settings.public_dict()["request_timeout_seconds"], 120)
-        with self.assertRaisesRegex(SystemExit, "proofreading is required"):
+        with self.assertRaisesRegex(GurubodhError, "proofreading is required"):
             proofreading_config({})
 
         invalid = json.loads(json.dumps(job))
         invalid["proofreading"]["initial_retry_delay_seconds"] = 10
         invalid["proofreading"]["max_retry_delay_seconds"] = 5
-        with self.assertRaisesRegex(SystemExit, "max_retry_delay_seconds must be at least"):
+        with self.assertRaisesRegex(GurubodhError, "max_retry_delay_seconds must be at least"):
             proofreading_config(invalid)
 
         invalid = json.loads(json.dumps(job))
         invalid["proofreading"]["request_timeout_seconds"] = 0
-        with self.assertRaisesRegex(SystemExit, "request_timeout_seconds must be greater than zero"):
+        with self.assertRaisesRegex(GurubodhError, "request_timeout_seconds must be greater than zero"):
             proofreading_config(invalid)
 
         invalid = json.loads(json.dumps(job))
         invalid["proofreading"]["request_timeout_seconds"] = 10
         invalid["proofreading"]["request_progress_interval_seconds"] = 11
-        with self.assertRaisesRegex(SystemExit, "must not exceed request_timeout_seconds"):
+        with self.assertRaisesRegex(GurubodhError, "must not exceed request_timeout_seconds"):
             proofreading_config(invalid)
         with self.assertRaisesRegex(ValueError, "unavailable_cooldown_seconds must be greater than zero"):
             ProofreadingSettings(unavailable_cooldown_seconds=0)
@@ -116,16 +117,16 @@ class ProofreadingTests(unittest.TestCase):
         validate_job(valid_job, "prep-subject", job_path)
 
         valid_job["proofreading"].pop("request_timeout_seconds")
-        with self.assertRaisesRegex(SystemExit, r"proofreading\.request_timeout_seconds.*is required"):
+        with self.assertRaisesRegex(GurubodhError, r"proofreading\.request_timeout_seconds.*is required"):
             validate_job(valid_job, "prep-subject", job_path)
 
         valid_job = json.loads(job_path.read_text(encoding="utf-8"))
         valid_job["proofreading"]["unavailable_cooldown_seconds"] = 0
-        with self.assertRaisesRegex(SystemExit, r"proofreading\.unavailable_cooldown_seconds"):
+        with self.assertRaisesRegex(GurubodhError, r"proofreading\.unavailable_cooldown_seconds"):
             validate_job(valid_job, "prep-subject", job_path)
 
     def test_pipeline_runtime_validation_rejects_the_wrong_entry_point(self):
-        with self.assertRaisesRegex(SystemExit, "cannot be processed"):
+        with self.assertRaisesRegex(GurubodhError, "cannot be processed"):
             validate_pipeline_matches_source(
                 {"pipeline": "unicode-docx-ingest"},
                 "legacy-docx-to-unicode",

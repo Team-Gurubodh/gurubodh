@@ -17,13 +17,23 @@ from gurubodh.constants import (
     SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
     SEMANTIC_CHUNKS_OUTPUT_DIR,
 )
+from gurubodh.contracts import (
+    ChunkChapterSummary,
+    ChunkGenerationJob,
+    ChunkGenerationPaths,
+    ChunkGenerationSummary,
+    GenerateChunksJob,
+    GenerationStatus,
+    MaterializedChapterSource,
+    MaterializedSource,
+)
 from gurubodh.derived_artifact_lifecycle import (
     AuditResult,
     DerivedArtifactDefinition,
-    SourceRelease,
     destination_subject_dir,
     run_derived_artifact_lifecycle,
 )
+from gurubodh.errors import ProcessingError
 from gurubodh.generate_chunks_audit import GenerateChunksAuditWriter
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
@@ -43,7 +53,7 @@ SEMANTIC_CHUNKS_RELATIVE_DIR = Path("chapters") / SEMANTIC_CHUNKS_OUTPUT_DIR
 LEGACY_SEMANTIC_CHUNKS_RELATIVE_DIR = Path("chapters") / "semantic_chunks_and_embeddings"
 
 
-def destination_output_prefix(config):
+def destination_output_prefix(config: GenerateChunksJob) -> str | None:
     return subject_artifact_object_key(config["destination"], SEMANTIC_CHUNKS_RELATIVE_DIR) + "/" if is_r2(config["destination"]) else None
 
 
@@ -58,9 +68,8 @@ def chunking_metadata(semantic_config: SemanticChunkConfig):
     return metadata | {"chunking_config_key": hashlib.sha256(canonical.encode("utf-8")).hexdigest()}
 
 
-def candidate_manifest_binding(job):
-    manifest = job["candidate_manifest"]
-    return {"reference": manifest["reference"], "sha256": manifest["sha256"]}
+def candidate_manifest_binding(job: ChunkGenerationJob):
+    return job.candidate_manifest.serialized_binding()
 
 
 def chunk_payload(chunk):
@@ -73,12 +82,19 @@ def chunk_payload(chunk):
     }
 
 
-def chunk_artifact_payload(config, job, source, document, semantic_config, chunk_filename):
-    metadata = source["metadata"]
+def chunk_artifact_payload(
+    config: GenerateChunksJob,
+    job: ChunkGenerationJob,
+    source: MaterializedChapterSource,
+    document,
+    semantic_config: SemanticChunkConfig,
+    chunk_filename: str,
+):
+    metadata = source.metadata
     return {
         "schema_version": SEMANTIC_CHUNKS_ARTIFACT_SCHEMA_VERSION,
-        "document": {"category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"], "title_slug": config["naming"]["title_slug"], "chapter_number": source["chapter_number"], "version": metadata["document"]["version"], "language": config["naming"]["language"]},
-        "files": {"chunk_filename": chunk_filename, "source_text_filename": source["text_path"].name, "source_metadata_filename": source["metadata_path"].name},
+        "document": {"category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"], "title_slug": config["naming"]["title_slug"], "chapter_number": source.chapter_number, "version": metadata["document"]["version"], "language": config["naming"]["language"]},
+        "files": {"chunk_filename": chunk_filename, "source_text_filename": source.text_path.name, "source_metadata_filename": source.metadata_path.name},
         "source_references": {
             "candidate_manifest": candidate_manifest_binding(job),
             "content_identity": {key: metadata["content_identity"][key] for key in ("content_key", "normalized_content_sha256", "identity_contract_version")},
@@ -90,63 +106,69 @@ def chunk_artifact_payload(config, job, source, document, semantic_config, chunk
     }
 
 
-def chapter_summary(config, source, document, chunk_filename, artifact_sha256):
-    metadata = source["metadata"]
-    return {
-        "chapter_number": source["chapter_number"], "status": "succeeded", "source_text_filename": source["text_path"].name,
-        "source_metadata_filename": source["metadata_path"].name, "chunk_filename": chunk_filename,
-        "source_text_artifact": metadata["storage"]["artifacts"]["text"], "source_metadata_artifact": metadata["storage"]["artifacts"]["metadata"],
-        "chunk_artifact": destination_artifact_reference(config, SEMANTIC_CHUNKS_RELATIVE_DIR / chunk_filename),
-        "chunk_artifact_sha256": artifact_sha256, "source_text_checksum": metadata["integrity"]["artifacts"]["text"],
-        "content_key": metadata["content_identity"]["content_key"], "normalized_content_sha256": metadata["content_identity"]["normalized_content_sha256"],
-        "chunk_count": document.chunk_count, "estimated_token_count": document.estimated_token_count,
-        "breakpoint_threshold": document.breakpoint_threshold, "error": None,
-    }
+def chapter_summary(
+    config: GenerateChunksJob,
+    source: MaterializedChapterSource,
+    document,
+    chunk_filename: str,
+    artifact_sha256: str,
+) -> ChunkChapterSummary:
+    metadata = source.metadata
+    return ChunkChapterSummary(
+        chapter_number=source.chapter_number,
+        status=GenerationStatus.SUCCEEDED,
+        source_text_filename=source.text_path.name,
+        source_metadata_filename=source.metadata_path.name,
+        chunk_filename=chunk_filename,
+        source_text_artifact=metadata["storage"]["artifacts"]["text"],
+        source_metadata_artifact=metadata["storage"]["artifacts"]["metadata"],
+        chunk_artifact=destination_artifact_reference(config, SEMANTIC_CHUNKS_RELATIVE_DIR / chunk_filename),
+        chunk_artifact_sha256=artifact_sha256,
+        source_text_checksum=metadata["integrity"]["artifacts"]["text"],
+        content_key=metadata["content_identity"]["content_key"],
+        normalized_content_sha256=metadata["content_identity"]["normalized_content_sha256"],
+        chunk_count=document.chunk_count,
+        estimated_token_count=document.estimated_token_count,
+        breakpoint_threshold=document.breakpoint_threshold,
+    )
 
 
 def write_chunk_artifacts(
-    config, job, semantic_config, segmenter, progress=print, result=None
-):
-    chapters = job["candidate_sources"]
-    initial = {
-        "source_chapter_count": len(job["candidate_manifest"]["chapters"]), "processed_chapter_count": 0,
-        "skipped_chapter_count": len(job["candidate_manifest"]["chapters"]) - len(chapters), "failed_chapter_count": 0,
-        "chunk_artifacts_written": 0, "chunk_manifest_written": False, "total_chunk_count": 0,
-        "total_estimated_token_count": 0, "chapters": [], "audit_report_references": None,
-    }
-    if result is None:
-        result = initial
-    else:
-        audit_references = result.get("audit_report_references")
-        result.clear()
-        result.update(initial)
-        result["audit_report_references"] = audit_references
+    config: GenerateChunksJob,
+    job: ChunkGenerationJob,
+    semantic_config: SemanticChunkConfig,
+    segmenter: ParagraphSegmenter,
+    progress=print,
+    summary: ChunkGenerationSummary | None = None,
+) -> ChunkGenerationSummary:
+    chapters = job.candidate_sources
+    result = summary or ChunkGenerationSummary(source_chapter_count=0)
+    result.source_chapter_count = len(job.candidate_manifest.chapters)
+    result.skipped_chapter_count = len(job.candidate_manifest.chapters) - len(chapters)
     for position, source in enumerate(chapters, 1):
-        prefix = f"[{position}/{len(chapters)}] {source['text_path'].name}:"
-        filename = chapter_chunks_output_filename(config, int(source["chapter_number"]))
-        in_progress = {
-            "chapter_number": source["chapter_number"],
-            "status": "running",
-            "source_text_filename": source["text_path"].name,
-            "source_metadata_filename": source["metadata_path"].name,
-            "chunk_filename": filename,
-            "source_text_artifact": source["metadata"]["storage"]["artifacts"]["text"],
-            "source_metadata_artifact": source["metadata"]["storage"]["artifacts"]["metadata"],
-            "content_key": source["metadata"]["content_identity"]["content_key"],
-            "normalized_content_sha256": source["metadata"]["content_identity"]["normalized_content_sha256"],
-            "chunk_count": 0,
-            "estimated_token_count": 0,
-            "error": None,
-        }
-        result["chapters"].append(in_progress)
+        prefix = f"[{position}/{len(chapters)}] {source.text_path.name}:"
+        filename = chapter_chunks_output_filename(config, int(source.chapter_number))
+        metadata = source.metadata
+        in_progress = ChunkChapterSummary(
+            chapter_number=source.chapter_number,
+            status=GenerationStatus.RUNNING,
+            source_text_filename=source.text_path.name,
+            source_metadata_filename=source.metadata_path.name,
+            chunk_filename=filename,
+            source_text_artifact=metadata["storage"]["artifacts"]["text"],
+            source_metadata_artifact=metadata["storage"]["artifacts"]["metadata"],
+            content_key=metadata["content_identity"]["content_key"],
+            normalized_content_sha256=metadata["content_identity"]["normalized_content_sha256"],
+        )
+        result.chapters.append(in_progress)
         try:
             progress(f"{prefix} reading source text")
-            text = source["text_path"].read_text(encoding="utf-8")
+            text = source.text_path.read_text(encoding="utf-8")
             progress(f"{prefix} segmenting {len(text)} characters")
-            document = segmenter.segment(text, source_name=source["text_path"].name)
+            document = segmenter.segment(text, source_name=source.text_path.name)
             progress(f"{prefix} validating chunks")
             validate_document_for_source(text, document)
-            path = job["paths"]["semantic_chunks"] / filename
+            path = job.paths.semantic_chunks / filename
             write_json_artifact(
                 path,
                 chunk_artifact_payload(
@@ -155,71 +177,92 @@ def write_chunk_artifacts(
                 "semantic chunks",
             )
             artifact_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
-            summary = chapter_summary(config, source, document, filename, artifact_sha256)
-            result["chapters"][-1] = summary
-            result["processed_chapter_count"] += 1
-            result["chunk_artifacts_written"] += 1
-            result["total_chunk_count"] += document.chunk_count
-            result["total_estimated_token_count"] += document.estimated_token_count
+            completed = chapter_summary(
+                config, source, document, filename, artifact_sha256
+            )
+            result.chapters[-1] = completed
+            result.processed_chapter_count += 1
+            result.chunk_artifacts_written += 1
+            result.total_chunk_count += document.chunk_count
+            result.total_estimated_token_count += document.estimated_token_count
             progress(f"{prefix} wrote {document.chunk_count} chunk(s)")
         except BaseException as error:
-            in_progress["status"] = "failed"
-            in_progress["error"] = str(error)[:500] or error.__class__.__name__
-            result["failed_chapter_count"] += 1
+            in_progress.status = GenerationStatus.FAILED
+            in_progress.error = str(error)[:500] or error.__class__.__name__
+            result.failed_chapter_count += 1
             raise
     return result
 
 
-def destination_output_location(config, job):
+def destination_output_location(
+    config: GenerateChunksJob, job: ChunkGenerationJob
+):
     destination = config["destination"]
     if is_r2(destination):
-        prefix = job["destination_output_prefix"]
+        prefix = job.destination_output_prefix
         return {"backend": "r2", "bucket": destination["bucket"], "prefix": prefix, "url": optional_url(destination.get("url_base"), prefix.rstrip("/"))}
-    return {"backend": "local", "path": str(job["paths"]["final_semantic_chunks"]), "url": None}
+    return {
+        "backend": "local",
+        "path": str(job.paths.final_semantic_chunks),
+        "url": None,
+    }
 
 
 def audit_report_references(config, paths):
     return {"json": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["json"].name), "markdown": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["markdown"].name)}
 
 
-def build_chunk_manifest(config, job, semantic_config, result):
+def build_chunk_manifest(
+    config,
+    job: ChunkGenerationJob,
+    semantic_config,
+    result: ChunkGenerationSummary,
+):
+    result_payload = result.to_payload()
     return {
         "schema_version": SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
         "run": {"pipeline": config["pipeline"], "source_backend": config["source"].get("backend", "local"), "destination_backend": config["destination"].get("backend", "local"), "output_directory": destination_output_location(config, job)},
         "document": {"category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"], "title_slug": config["naming"]["title_slug"], "language": config["naming"]["language"], "version": f"v{config['naming']['version']}.{config['naming']['subversion']}"},
         "source_candidate_manifest": candidate_manifest_binding(job), "chunking": chunking_metadata(semantic_config),
-        "counts": {"total_chapter_count": result["source_chapter_count"], "processed_chapter_count": result["processed_chapter_count"], "skipped_chapter_count": result["skipped_chapter_count"], "failed_chapter_count": result["failed_chapter_count"], "total_chunk_count": result["total_chunk_count"], "total_estimated_token_count": result["total_estimated_token_count"]},
-        "chapters": result["chapters"], "audit_reports": result["audit_report_references"],
+        "counts": {"total_chapter_count": result.source_chapter_count, "processed_chapter_count": result.processed_chapter_count, "skipped_chapter_count": result.skipped_chapter_count, "failed_chapter_count": result.failed_chapter_count, "total_chunk_count": result.total_chunk_count, "total_estimated_token_count": result.total_estimated_token_count},
+        "chapters": result_payload["chapters"], "audit_reports": result.audit_report_references,
     }
 
 
-def validate_chunk_staged_package(config, job, result, staged_output, readiness_manifest):
+def validate_chunk_staged_package(
+    config,
+    job: ChunkGenerationJob,
+    result: ChunkGenerationSummary,
+    staged_output,
+    readiness_manifest,
+):
     manifest = json.loads(Path(readiness_manifest).read_text(encoding="utf-8"))
-    expected_names = {chapter["chunk_filename"] for chapter in result["chapters"]}
+    chapter_payloads = [chapter.to_payload() for chapter in result.chapters]
+    expected_names = {chapter.chunk_filename for chapter in result.chapters}
     actual_names = {path.name for path in Path(staged_output).glob("*.chunks.json")}
     if expected_names != actual_names:
-        raise ValueError("Staged chunk files do not exactly match generated chapter results.")
-    if manifest.get("chapters") != result["chapters"]:
-        raise ValueError("Semantic chunk readiness manifest chapters do not match staged artifacts.")
+        raise ProcessingError("Staged chunk files do not exactly match generated chapter results.")
+    if manifest.get("chapters") != chapter_payloads:
+        raise ProcessingError("Semantic chunk readiness manifest chapters do not match staged artifacts.")
     counts = manifest.get("counts", {})
     expected_counts = {
-        "total_chapter_count": result["source_chapter_count"],
-        "processed_chapter_count": result["processed_chapter_count"],
-        "skipped_chapter_count": result["skipped_chapter_count"],
-        "failed_chapter_count": result["failed_chapter_count"],
-        "total_chunk_count": result["total_chunk_count"],
-        "total_estimated_token_count": result["total_estimated_token_count"],
+        "total_chapter_count": result.source_chapter_count,
+        "processed_chapter_count": result.processed_chapter_count,
+        "skipped_chapter_count": result.skipped_chapter_count,
+        "failed_chapter_count": result.failed_chapter_count,
+        "total_chunk_count": result.total_chunk_count,
+        "total_estimated_token_count": result.total_estimated_token_count,
     }
     if counts != expected_counts:
-        raise ValueError("Semantic chunk readiness manifest counts do not match generation results.")
-    for chapter in result["chapters"]:
-        path = Path(staged_output) / chapter["chunk_filename"]
-        if hashlib.sha256(path.read_bytes()).hexdigest() != chapter["chunk_artifact_sha256"]:
-            raise ValueError(f"Staged chunk checksum changed for chapter {chapter['chapter_number']}.")
+        raise ProcessingError("Semantic chunk readiness manifest counts do not match generation results.")
+    for chapter in result.chapters:
+        path = Path(staged_output) / chapter.chunk_filename
+        if hashlib.sha256(path.read_bytes()).hexdigest() != chapter.chunk_artifact_sha256:
+            raise ProcessingError(f"Staged chunk checksum changed for chapter {chapter.chapter_number}.")
         payload = json.loads(path.read_text(encoding="utf-8"))
         if payload.get("source_references", {}).get("candidate_manifest") != candidate_manifest_binding(job):
-            raise ValueError(f"Staged chunk source binding is invalid for chapter {chapter['chapter_number']}.")
-    result["chunk_manifest_written"] = True
+            raise ProcessingError(f"Staged chunk source binding is invalid for chapter {chapter.chapter_number}.")
+    result.chunk_manifest_written = True
 
 
 class GenerateChunksWorkflow:
@@ -234,22 +277,11 @@ class GenerateChunksWorkflow:
         segmenter,
     ):
         self.config = config
-        self.semantic_config = config["_semantic_chunk_config"]
+        self.semantic_config = config.semantic_chunk_config
         self.destination_subject = Path(destination_subject)
         self.segmenter = segmenter
         self.job = None
-        self.result = {
-            "source_chapter_count": 0,
-            "processed_chapter_count": 0,
-            "skipped_chapter_count": 0,
-            "failed_chapter_count": 0,
-            "chunk_artifacts_written": 0,
-            "chunk_manifest_written": False,
-            "total_chunk_count": 0,
-            "total_estimated_token_count": 0,
-            "chapters": [],
-            "audit_report_references": None,
-        }
+        self.result = ChunkGenerationSummary(source_chapter_count=0)
         self.audit = GenerateChunksAuditWriter(
             context,
             config_path,
@@ -258,7 +290,7 @@ class GenerateChunksWorkflow:
             overwrite,
             destination_subject,
         )
-        self.result["audit_report_references"] = audit_report_references(
+        self.result.audit_report_references = audit_report_references(
             config, self.audit.paths
         )
 
@@ -278,25 +310,25 @@ class GenerateChunksWorkflow:
             if temporary:
                 temporary.cleanup()
             raise
-        self.result["source_chapter_count"] = len(manifest["chapters"])
-        self.result["skipped_chapter_count"] = len(manifest["chapters"]) - len(sources)
-        return SourceRelease(subject, manifest, sources, temporary)
+        self.result.source_chapter_count = len(manifest.chapters)
+        self.result.skipped_chapter_count = len(manifest.chapters) - len(sources)
+        return MaterializedSource(subject, manifest, sources, temporary)
 
     def generate_staged_artifacts(self, source, staged_output, progress):
-        self.job = {
-            "paths": {
-                "source_subject": source.subject_dir,
-                "source_text_and_metadata": source.subject_dir / TEXT_AND_METADATA_RELATIVE_DIR,
-                "candidate_manifest": source.subject_dir / CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH,
-                "destination_subject": self.destination_subject,
-                "semantic_chunks": staged_output,
-                "final_semantic_chunks": self.destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR,
-                "chunk_manifest": staged_output / "semantic_chunks_manifest.json",
-            },
-            "candidate_sources": source.sources,
-            "candidate_manifest": source.candidate_manifest,
-            "destination_output_prefix": destination_output_prefix(self.config),
-        }
+        self.job = ChunkGenerationJob(
+            paths=ChunkGenerationPaths(
+                source_subject=source.subject_dir,
+                source_text_and_metadata=source.subject_dir / TEXT_AND_METADATA_RELATIVE_DIR,
+                candidate_manifest=source.subject_dir / CHAPTER_CONTENT_MANIFEST_RELATIVE_PATH,
+                destination_subject=self.destination_subject,
+                semantic_chunks=staged_output,
+                final_semantic_chunks=self.destination_subject / SEMANTIC_CHUNKS_RELATIVE_DIR,
+                chunk_manifest=staged_output / "semantic_chunks_manifest.json",
+            ),
+            candidate_sources=tuple(source.chapters),
+            candidate_manifest=source.candidate_manifest,
+            destination_output_prefix=destination_output_prefix(self.config),
+        )
         # Every source check completed before the lazy segmenter can load a model.
         segmenter = self.segmenter or SemanticChunkingParagraphSegmenter(
             self.semantic_config, progress=progress
@@ -307,9 +339,9 @@ class GenerateChunksWorkflow:
             self.semantic_config,
             segmenter,
             progress=progress,
-            result=self.result,
+            summary=self.result,
         )
-        self.result["audit_report_references"] = audit_report_references(
+        self.result.audit_report_references = audit_report_references(
             self.config, self.audit.paths
         )
         return self.result
@@ -342,8 +374,14 @@ class GenerateChunksWorkflow:
     ):
         report = self.audit.write(
             status=status,
-            candidate_manifest=source.candidate_manifest if source else None,
-            result=generation if generation is not None else self.result,
+            candidate_manifest=(
+                source.candidate_manifest.to_internal_payload() if source else None
+            ),
+            result=(
+                generation.to_payload()
+                if generation is not None
+                else self.result.to_payload()
+            ),
             publication=publication,
             failure=failure,
             lifecycle=lifecycle.as_dict(),
@@ -355,14 +393,14 @@ class GenerateChunksWorkflow:
 
 def run_generate_chunks_job(
     context,
-    config,
+    config: GenerateChunksJob,
     entry_point=ENTRY_POINT_GENERATE_CHUNKS,
     overwrite=False,
     config_path=None,
     segmenter: ParagraphSegmenter | None = None,
     r2_client=None,
     progress=print,
-):
+) -> ChunkGenerationSummary:
     definition = DerivedArtifactDefinition(
         command_name="generate-chunks",
         output_relative_dir=SEMANTIC_CHUNKS_RELATIVE_DIR,
@@ -395,7 +433,7 @@ def run_generate_chunks_job(
         source_revalidator=revalidate_source_release,
     )
     result = lifecycle.generation
-    result["publication"] = lifecycle.publication
-    result["audit_report"] = lifecycle.audit_report
-    result["lifecycle"] = lifecycle.lifecycle
+    result.publication = lifecycle.publication
+    result.audit_report = lifecycle.audit_report
+    result.lifecycle = lifecycle.lifecycle
     return result

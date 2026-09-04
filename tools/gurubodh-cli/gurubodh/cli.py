@@ -3,6 +3,7 @@ import sys
 
 from gurubodh.docx.namespaces import register_namespaces
 from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
+from gurubodh.errors import GurubodhError
 from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
@@ -154,6 +155,13 @@ def build_parser():
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
+    try:
+        return _run_command(parser, args)
+    except GurubodhError as exc:
+        parser.error(str(exc))
+
+
+def _run_command(parser, args):
 
     if args.command in PLANNED_COMMANDS:
         parser.error(f"{args.command} is planned but not implemented yet.")

@@ -10,6 +10,7 @@ from docx import Document
 from gurubodh.config import load_generate_docx_job
 from gurubodh.content_identity import build_content_identity
 from gurubodh.docx.export import generated_title, write_chapter_docx
+from gurubodh.errors import GurubodhError, SourceValidationError
 from gurubodh.naming import chapter_output_filename
 from gurubodh.pipelines.generate_docx import run_generate_docx_job
 from gurubodh.project import ProjectContext
@@ -304,7 +305,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         previous.write_bytes(b"previous")
         loaded, config_path = self.load(config)
 
-        with self.assertRaisesRegex(SystemExit, "already exists"):
+        with self.assertRaisesRegex(GurubodhError, "already exists"):
             run_generate_docx_job(self.context, loaded, config_path=config_path, progress=lambda _: None)
 
         self.assertEqual(previous.read_bytes(), b"previous")
@@ -324,7 +325,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         loaded, config_path = self.load(config)
 
         with patch("gurubodh.pipelines.generate_docx.write_chapter_docx", side_effect=ValueError("bad docx")):
-            with self.assertRaisesRegex(ValueError, "bad docx"):
+            with self.assertRaisesRegex(GurubodhError, "bad docx"):
                 run_generate_docx_job(
                     self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
                 )
@@ -372,7 +373,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         previous.write_bytes(b"previous")
         loaded, config_path = self.load(config)
 
-        with self.assertRaisesRegex(SystemExit, "metadata subject identity does not match"):
+        with self.assertRaisesRegex(GurubodhError, "metadata subject identity does not match"):
             run_generate_docx_job(
                 self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
             )
@@ -392,7 +393,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         state["publication"]["state"] = "publishing"
         state_path.write_text(json.dumps(state), encoding="utf-8")
         loaded, config_path = self.load(config)
-        with self.assertRaisesRegex(SystemExit, "latest prep-subject job is not succeeded"):
+        with self.assertRaisesRegex(GurubodhError, "latest prep-subject job is not succeeded"):
             run_generate_docx_job(
                 self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
             )
@@ -403,9 +404,9 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         state_path.write_text(json.dumps(state), encoding="utf-8")
         with patch(
             "gurubodh.pipelines.generate_docx.revalidate_source_release",
-            side_effect=SystemExit("canonical changed"),
+            side_effect=SourceValidationError("canonical changed"),
         ):
-            with self.assertRaisesRegex(SystemExit, "canonical changed"):
+            with self.assertRaisesRegex(GurubodhError, "canonical changed"):
                 run_generate_docx_job(
                     self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
                 )
@@ -460,7 +461,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         client = FakeR2Client(objects, fail_docx_upload=True)
         loaded, config_path = self.load(config)
 
-        with self.assertRaisesRegex(SystemExit, "simulated DOCX upload failure"):
+        with self.assertRaisesRegex(GurubodhError, "simulated DOCX upload failure"):
             run_generate_docx_job(
                 self.context,
                 loaded,
@@ -476,19 +477,19 @@ class GenerateDocxPipelineTests(unittest.TestCase):
     def test_invalid_dedicated_job_fails_before_pipeline(self):
         config = base_config(self.temp_dir.name)
         config["schema_version"] = "9.9.9"
-        with self.assertRaisesRegex(SystemExit, r"\$\.schema_version must equal \"1\.0\.0\""):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.schema_version must equal \"1\.0\.0\""):
             self.load(config)
         config = base_config(self.temp_dir.name)
         config["source"]["subject_dir"] = "../hi-IN"
-        with self.assertRaisesRegex(SystemExit, "must not contain"):
+        with self.assertRaisesRegex(GurubodhError, "must not contain"):
             self.load(config)
         config = base_config(self.temp_dir.name)
         config["naming"]["title_slug"] = "unsafe slug"
-        with self.assertRaisesRegex(SystemExit, r"\$\.naming\.title_slug must match"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.naming\.title_slug must match"):
             self.load(config)
         config = base_config(self.temp_dir.name)
         config["destination"]["backend"] = "unsupported"
-        with self.assertRaisesRegex(SystemExit, r"\$\.destination\.backend must equal"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.destination\.backend must equal"):
             self.load(config)
 
 

@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from gurubodh.errors import ConfigurationError
+
 
 @dataclass(frozen=True)
 class ProjectContext:
@@ -28,17 +30,17 @@ def resolve_project_context(project_root=None):
     if project_root:
         root = Path(project_root).expanduser().resolve()
         if not _looks_like_project_root(root):
-            raise SystemExit(f"Project root does not contain config/jobs/ and jobs/subjects/: {root}")
+            raise ConfigurationError(f"Project root does not contain config/jobs/ and jobs/subjects/: {root}")
     else:
         env_root = os.environ.get("GURUBODH_CLI_ROOT")
         if env_root:
             root = Path(env_root).expanduser().resolve()
             if not _looks_like_project_root(root):
-                raise SystemExit(f"GURUBODH_CLI_ROOT is not a Gurubodh CLI project root: {root}")
+                raise ConfigurationError(f"GURUBODH_CLI_ROOT is not a Gurubodh CLI project root: {root}")
         else:
             root = _find_project_root(Path.cwd())
             if root is None:
-                raise SystemExit(
+                raise ConfigurationError(
                     "Could not find project root. Run from the project tree, set "
                     "GURUBODH_CLI_ROOT, or pass --project-root."
                 )

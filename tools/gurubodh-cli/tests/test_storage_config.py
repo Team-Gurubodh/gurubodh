@@ -9,6 +9,7 @@ from pathlib import Path
 from botocore.exceptions import ClientError
 
 from gurubodh.config import load_generate_chunks_job, load_prep_subject_job
+from gurubodh.errors import GurubodhError
 from gurubodh.metadata import build_chapter_metadata, text_artifact_integrity
 from gurubodh.storage import (
     R2StorageClient,
@@ -112,46 +113,46 @@ class StorageConfigTests(unittest.TestCase):
         config["pipeline"] = "legacy-docx-to-unicode"
         config["source"]["font_encoding"] = "shreelipi"
 
-        with self.assertRaisesRegex(SystemExit, r"\$\.source\.font_encoding must equal \"aps\""):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.source\.font_encoding must equal \"aps\""):
             load_prep_subject_job(self.write_config(config))
 
     def test_prep_subject_requires_strict_proofreading_configuration(self):
         missing = json.loads(json.dumps(BASE_CONFIG))
         missing.pop("proofreading")
-        with self.assertRaisesRegex(SystemExit, r"\$\.proofreading is required"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.proofreading is required"):
             load_prep_subject_job(self.write_config(missing))
 
         disabled = json.loads(json.dumps(BASE_CONFIG))
         disabled["proofreading"] = {"enabled": False}
-        with self.assertRaisesRegex(SystemExit, r"\$\.proofreading\.enabled must equal true"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.proofreading\.enabled must equal true"):
             load_prep_subject_job(self.write_config(disabled))
 
         permissive = json.loads(json.dumps(BASE_CONFIG))
         permissive["proofreading"] = {"continue_on_error": True}
-        with self.assertRaisesRegex(SystemExit, r"\$\.proofreading\.continue_on_error must equal false"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.proofreading\.continue_on_error must equal false"):
             load_prep_subject_job(self.write_config(permissive))
 
     def test_prep_subject_requires_an_explicit_supported_locale(self):
         missing = json.loads(json.dumps(BASE_CONFIG))
         missing["metadata_defaults"].pop("language")
-        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.language is required"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.metadata_defaults\.language is required"):
             load_prep_subject_job(self.write_config(missing))
 
         unsupported = json.loads(json.dumps(BASE_CONFIG))
         unsupported["metadata_defaults"]["language"] = "sa-IN"
         unsupported["destination"]["subject_dir"] = "129_spand_rahasya/sa-IN"
-        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.language must be one of"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.metadata_defaults\.language must be one of"):
             load_prep_subject_job(self.write_config(unsupported))
 
     def test_prep_subject_rejects_invalid_locale_metadata_defaults(self):
         source_script = json.loads(json.dumps(BASE_CONFIG))
         source_script["metadata_defaults"]["source_script"] = "Latin"
-        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.source_script must equal \"Devanagari\""):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.metadata_defaults\.source_script must equal \"Devanagari\""):
             load_prep_subject_job(self.write_config(source_script))
 
         output_encoding = json.loads(json.dumps(BASE_CONFIG))
         output_encoding["metadata_defaults"]["output_text_encoding"] = "UTF-16"
-        with self.assertRaisesRegex(SystemExit, r"\$\.metadata_defaults\.output_text_encoding must equal \"UTF-8\""):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.metadata_defaults\.output_text_encoding must equal \"UTF-8\""):
             load_prep_subject_job(self.write_config(output_encoding))
 
     def test_prep_subject_validates_safe_language_qualified_subject_roots(self):
@@ -166,12 +167,12 @@ class StorageConfigTests(unittest.TestCase):
             with self.subTest(subject_dir=subject_dir):
                 config = json.loads(json.dumps(BASE_CONFIG))
                 config["destination"]["subject_dir"] = subject_dir
-                with self.assertRaises(SystemExit):
+                with self.assertRaises(GurubodhError):
                     load_prep_subject_job(self.write_config(config))
 
         mismatch = json.loads(json.dumps(BASE_CONFIG))
         mismatch["destination"]["subject_dir"] = "129_spand_rahasya/mr-IN"
-        with self.assertRaisesRegex(SystemExit, "final language partition"):
+        with self.assertRaisesRegex(GurubodhError, "final language partition"):
             load_prep_subject_job(self.write_config(mismatch))
 
     def test_prep_subject_accepts_marathi_language_qualified_root(self):
@@ -181,7 +182,7 @@ class StorageConfigTests(unittest.TestCase):
 
         loaded = load_prep_subject_job(self.write_config(config))
 
-        self.assertEqual(loaded["_locale"].language, "mr-IN")
+        self.assertEqual(loaded.locale.language, "mr-IN")
 
     def test_prep_overwrite_invalidation_removes_v2_and_legacy_semantic_outputs(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -565,19 +566,19 @@ class StorageConfigTests(unittest.TestCase):
                 config = load_generate_chunks_job(job_path)
 
                 self.assertEqual(config["pipeline"], "generate-chunks")
-                self.assertEqual(config["_semantic_chunk_config"].model_name, "BAAI/bge-m3")
+                self.assertEqual(config.semantic_chunk_config.model_name, "BAAI/bge-m3")
                 self.assertEqual(
-                    config["_semantic_chunk_config"].model_revision,
+                    config.semantic_chunk_config.model_revision,
                     "5617a9f61b028005a4858fdac845db406aefb181",
                 )
-                self.assertTrue(config["_semantic_chunk_config"].local_files_only)
-                self.assertEqual(config["_semantic_chunk_config"].strategy_version, "semantic-window-v1")
+                self.assertTrue(config.semantic_chunk_config.local_files_only)
+                self.assertEqual(config.semantic_chunk_config.strategy_version, "semantic-window-v1")
                 self.assertEqual(config["naming"]["language"], "hi-IN")
                 self.assertTrue(config["source"]["subject_dir"].endswith("/hi-IN"))
                 self.assertEqual(config["source"]["subject_dir"], config["destination"]["subject_dir"])
-                self.assertGreaterEqual(config["_semantic_chunk_config"].threshold_percentile, 0.0)
-                self.assertLessEqual(config["_semantic_chunk_config"].threshold_percentile, 100.0)
-                self.assertGreaterEqual(config["_semantic_chunk_config"].min_chars, 0)
+                self.assertGreaterEqual(config.semantic_chunk_config.threshold_percentile, 0.0)
+                self.assertLessEqual(config.semantic_chunk_config.threshold_percentile, 100.0)
+                self.assertGreaterEqual(config.semantic_chunk_config.min_chars, 0)
 
     def test_generate_chunks_requires_matching_marathi_language_root(self):
         job_path = (
@@ -597,7 +598,7 @@ class StorageConfigTests(unittest.TestCase):
 
         self.assertEqual(loaded["naming"]["language"], "mr-IN")
         config["destination"]["subject_dir"] = "different_subject/mr-IN"
-        with self.assertRaisesRegex(SystemExit, "same language-qualified root"):
+        with self.assertRaisesRegex(GurubodhError, "same language-qualified root"):
             load_generate_chunks_job(self.write_config(config))
 
     def test_generate_chunks_job_rejects_unpinned_model_revision(self):
@@ -610,14 +611,14 @@ class StorageConfigTests(unittest.TestCase):
             "chunking": {"provider": "semantic-chunking", "model": "BAAI/bge-m3", "model_revision": None, "threshold_percentile": 80.0, "min_chars": 600, "window_size": 3, "batch_size": 16, "normalize_contextual_vectors": True, "device": None, "local_files_only": False, "strategy_version": "semantic-window-v1"},
         }
 
-        with self.assertRaisesRegex(SystemExit, r"\$\.chunking\.model_revision must be string; found null"):
+        with self.assertRaisesRegex(GurubodhError, r"\$\.chunking\.model_revision must be string; found null"):
             load_generate_chunks_job(self.write_config(config))
 
     def test_load_prep_subject_job_rejects_invalid_summary_chapter_markers(self):
         config = json.loads(json.dumps(BASE_CONFIG))
         config["metadata_defaults"]["summary_chapter_markers"] = "उपसंहार"
 
-        with self.assertRaises(SystemExit) as exc:
+        with self.assertRaises(GurubodhError) as exc:
             load_prep_subject_job(self.write_config(config))
 
         self.assertIn(
@@ -731,7 +732,7 @@ class StorageConfigTests(unittest.TestCase):
         client.client = FakeMissingR2ObjectClient()
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with self.assertRaises(SystemExit) as exc:
+            with self.assertRaises(GurubodhError) as exc:
                 client.download_file(
                     "gurubodh-library-dev",
                     "source_library/123_spand_rahasya/source.docx",

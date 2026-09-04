@@ -13,6 +13,8 @@ from typing import Any, Iterable
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError, ValidationError
 
+from gurubodh.errors import ConfigurationError, ProcessingError
+
 
 JOB_SCHEMAS = {
     "prep-subject": "prep_subject_job.schema.json",
@@ -32,7 +34,7 @@ ARTIFACT_SCHEMAS = {
 }
 
 
-class SchemaDefinitionError(RuntimeError):
+class SchemaDefinitionError(ConfigurationError):
     """A required bundled schema is missing, malformed, or invalid."""
 
 
@@ -259,26 +261,31 @@ def _messages_for(error: ValidationError) -> list[tuple[tuple[Any, ...], str]]:
     return [(parts, f"violates JSON Schema rule {rule!r}.")]
 
 
-def _validation_failure(prefix: str, errors: list[ValidationError]) -> SystemExit:
+def _validation_failure(
+    prefix: str,
+    errors: list[ValidationError],
+    error_type: type[ConfigurationError] | type[ProcessingError],
+) -> ConfigurationError | ProcessingError:
     messages: list[tuple[tuple[Any, ...], str]] = []
     for error in errors:
         messages.extend(_messages_for(error))
     messages = sorted(set(messages), key=lambda item: (_path_key(item[0]), item[1]))
     rendered = [f"{_json_path(path)} {message}" for path, message in messages]
     if len(rendered) == 1:
-        return SystemExit(f"{prefix}: {rendered[0]}")
-    return SystemExit(f"{prefix}:\n" + "\n".join(f"- {message}" for message in rendered))
+        return error_type(f"{prefix}: {rendered[0]}")
+    return error_type(f"{prefix}:\n" + "\n".join(f"- {message}" for message in rendered))
 
 
 def _validate(instance: Any, kind: str, filename: str, prefix: str) -> None:
+    error_type = ConfigurationError if kind == "jobs" else ProcessingError
     try:
         _ensure_json_compatible(instance)
         validator = _validator(kind, filename)
     except (SchemaDefinitionError, ValueError) as exc:
-        raise SystemExit(f"{prefix}: {str(exc).rstrip('.')}.") from exc
+        raise error_type(f"{prefix}: {str(exc).rstrip('.')}.") from exc
     errors = _actionable_errors(validator, instance)
     if errors:
-        raise _validation_failure(prefix, errors)
+        raise _validation_failure(prefix, errors, error_type)
 
 
 def validate_job(instance: Any, job_name: str, path: str | Path | None = None) -> None:

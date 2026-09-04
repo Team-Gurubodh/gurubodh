@@ -17,9 +17,18 @@ import threading
 import time
 from typing import Any, Callable
 
+from gurubodh.contracts import (
+    CheckpointArtifactRecord,
+    PrepSubjectJob,
+    Proofreader,
+    ProofreadingOutcome,
+    ProofreadingProviderResponse,
+    ProofreadingStatus,
+)
 from gurubodh.constants import ENTRY_POINT_PREP_SUBJECT
 from gurubodh.content_identity import build_content_identity
-from gurubodh.locales import LocaleSpec, locale_spec
+from gurubodh.errors import ProcessingError
+from gurubodh.locales import LocaleSpec
 from gurubodh.metadata import build_chapter_metadata
 from gurubodh.naming import chapter_output_filename
 from gurubodh.schema_validation import write_json_artifact
@@ -55,7 +64,7 @@ EDIT_LIST_SCHEMA = {
 }
 
 
-class ProofreadingError(RuntimeError):
+class ProofreadingError(ProcessingError):
     def __init__(
         self,
         code: str,
@@ -502,7 +511,9 @@ class GeminiProofreader:
         delay = max(scheduled_delay, retry_hint or 0.0)
         return delay + delay * 0.25 * self._random_value(), hint_used
 
-    def proofread(self, text: str, progress: Callable[[str], None] | None = None) -> dict[str, Any]:
+    def proofread(
+        self, text: str, progress: Callable[[str], None] | None = None
+    ) -> ProofreadingProviderResponse:
         estimated_tokens = estimate_input_tokens(text)
         if len(text) > self.settings.max_input_characters:
             raise ProofreadingError(
@@ -693,7 +704,7 @@ def _canonical_text_value(corrected_text: str) -> str:
     return corrected_text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
 
 
-def _validate_proofreader_locale(proofreader: Any, locale: LocaleSpec) -> None:
+def _validate_proofreader_locale(proofreader: Proofreader, locale: LocaleSpec) -> None:
     """Reject a caller-supplied Gemini client whose prompt locale disagrees.
 
     This guard runs before the request. It protects the canonical metadata
@@ -711,25 +722,25 @@ def _validate_proofreader_locale(proofreader: Any, locale: LocaleSpec) -> None:
 
 
 def proofread_single_chapter_artifacts(
-    config: dict[str, Any],
+    config: PrepSubjectJob,
     paths: dict[str, Path],
     chapter_number: int,
     unmodified_source_path: Path,
     converter_counts: dict[str, int] | None = None,
     entry_point: str = ENTRY_POINT_PREP_SUBJECT,
-    proofreader: GeminiProofreader | None = None,
+    proofreader: Proofreader | None = None,
     progress: Callable[[str], None] | None = None,
-) -> dict[str, Any]:
+) -> ProofreadingOutcome:
     """Proofread one staged chapter and write its complete artifact set.
 
     The caller owns checkpointing.  This deliberately returns only bounded
     provenance and artifact checksums; neither the source nor corrected text is
     returned for inclusion in a job checkpoint or audit record.
     """
-    settings = config["_proofreading_config"]
+    settings = config.proofreading_settings
     source_bytes = unmodified_source_path.read_bytes()
     source_text = source_bytes.decode("utf-8")
-    locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])
+    locale = config.locale
     source_identity = build_content_identity(
         config["naming"]["category_code"],
         config["naming"]["subject_code"],
@@ -810,19 +821,19 @@ def proofread_single_chapter_artifacts(
         artifact_paths["diff"],
         artifact_paths["json"],
     ]
-    chapter = {
-        "chapter_number": f"{chapter_number:03d}",
-        "status": "succeeded",
-        "correction_count": len(response["edits"]),
-        # Internal checkpoint bookkeeping. The caller removes this before
-        # recording canonical chapter provenance.
-        "gemini_request_attempts": response["attempts"],
-        "gemini_successful_request_attempts": response.get("successful_request_attempts", response["attempts"]),
-        "request_diagnostics": response.get("request_diagnostics"),
-        "local_diff_summary": diff_summary,
-        "unmodified_source_content_key": source_identity["content_key"],
-        "canonical_content_key": metadata["content_identity"]["content_key"],
-        "artifacts": {
+    return ProofreadingOutcome(
+        chapter_number=f"{chapter_number:03d}",
+        status=ProofreadingStatus.SUCCEEDED,
+        correction_count=len(response["edits"]),
+        request_attempts=response["attempts"],
+        successful_request_attempts=response.get(
+            "successful_request_attempts", response["attempts"]
+        ),
+        request_diagnostics=response.get("request_diagnostics"),
+        local_diff_summary=diff_summary,
+        unmodified_source_content_key=source_identity["content_key"],
+        canonical_content_key=metadata["content_identity"]["content_key"],
+        artifacts={
             "unmodified_source": destination_artifact_reference(
                 config,
                 Path("chapters") / "unmodified_source_text" / unmodified_source_path.name,
@@ -831,16 +842,15 @@ def proofread_single_chapter_artifacts(
             "canonical_metadata": metadata["storage"]["artifacts"]["metadata"],
             **{key: destination_artifact_reference(config, relative_dir / path.name) for key, path in artifact_paths.items()},
         },
-        "checkpoint_artifacts": [
-            {
-                "path": str(path.relative_to(paths["subject"])),
-                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-            }
+        checkpoint_artifacts=tuple(
+            CheckpointArtifactRecord(
+                path=str(path.relative_to(paths["subject"])),
+                sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+            )
             for path in artifact_files
             if path.is_file()
-        ],
-    }
-    return chapter
+        ),
+    )
 
 
 def write_proofreading_manifest(

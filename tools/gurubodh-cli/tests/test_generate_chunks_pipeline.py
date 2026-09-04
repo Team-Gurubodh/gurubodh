@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from gurubodh.config import load_generate_chunks_job
 from gurubodh.content_identity import build_content_identity
+from gurubodh.errors import GurubodhError
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
@@ -316,6 +317,10 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertEqual(payload["source_references"]["candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
         self.assertEqual(semantic_manifest["source_candidate_manifest"]["sha256"], hashlib.sha256(source_manifest_bytes).hexdigest())
         self.assertEqual(semantic_manifest["chapters"][0]["chunk_artifact_sha256"], hashlib.sha256(chunk_path.read_bytes()).hexdigest())
+        self.assertEqual(
+            semantic_manifest["run"]["output_directory"],
+            {"backend": "local", "path": str(output_dir), "url": None},
+        )
         self.assertEqual(payload["chunking"]["strategy_version"], "semantic-window-v1")
         self.assertEqual(semantic_manifest["chunking"]["strategy_version"], "semantic-window-v1")
         self.assertIn("chunking_config_key", semantic_manifest["chunking"])
@@ -363,7 +368,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         loaded, config_path = self.load(config)
         segmenter = FakeSegmenter()
 
-        with self.assertRaisesRegex(SystemExit, "must not escape"):
+        with self.assertRaisesRegex(GurubodhError, "must not escape"):
             run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
         self.assertEqual(segmenter.calls, 0)
 
@@ -376,7 +381,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         loaded, config_path = self.load(config)
         segmenter = FakeSegmenter()
 
-        with self.assertRaisesRegex(SystemExit, "content identity disagree"):
+        with self.assertRaisesRegex(GurubodhError, "content identity disagree"):
             run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
         self.assertEqual(segmenter.calls, 0)
 
@@ -394,7 +399,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         loaded, config_path = self.load(config)
         segmenter = FakeSegmenter()
 
-        with self.assertRaisesRegex(SystemExit, "source text checksum does not match metadata"):
+        with self.assertRaisesRegex(GurubodhError, "source text checksum does not match metadata"):
             run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=segmenter, progress=lambda _: None)
         self.assertEqual(segmenter.calls, 0)
 
@@ -413,7 +418,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
 
         config["chapters"] = ["003"]
         loaded, config_path = self.load(config)
-        with self.assertRaisesRegex(SystemExit, "absent from the candidate manifest"):
+        with self.assertRaisesRegex(GurubodhError, "absent from the candidate manifest"):
             run_generate_chunks_job(
                 self.context,
                 loaded,
@@ -432,7 +437,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         legacy.mkdir()
         (legacy / "old.chunks.json").write_text("{}", encoding="utf-8")
         loaded, config_path = self.load(config)
-        with self.assertRaisesRegex(SystemExit, "Legacy combined"):
+        with self.assertRaisesRegex(GurubodhError, "Legacy combined"):
             run_generate_chunks_job(self.context, loaded, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
         with redirect_stdout(StringIO()):
             run_generate_chunks_job(self.context, loaded, overwrite=True, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
@@ -452,7 +457,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         previous.write_text("previous", encoding="utf-8")
         loaded, config_path = self.load(config)
 
-        with self.assertRaisesRegex(SystemExit, "latest prep-subject job is not succeeded"):
+        with self.assertRaisesRegex(GurubodhError, "latest prep-subject job is not succeeded"):
             run_generate_chunks_job(self.context, loaded, overwrite=True, config_path=config_path, segmenter=FakeSegmenter(), progress=lambda _: None)
         self.assertTrue(previous.is_file())
 
@@ -469,7 +474,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         segmenter = FakeSegmenter()
 
         with patch.object(segmenter, "segment", side_effect=RuntimeError("model failed")):
-            with self.assertRaisesRegex(RuntimeError, "model failed"):
+            with self.assertRaisesRegex(GurubodhError, "model failed"):
                 run_generate_chunks_job(
                     self.context,
                     loaded,
@@ -508,7 +513,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
                     else "gurubodh.pipelines.generate_chunks.revalidate_source_release"
                 )
                 with patch(target, side_effect=RuntimeError(f"{failing_state} failed")):
-                    with self.assertRaisesRegex(RuntimeError, f"{failing_state} failed"):
+                    with self.assertRaisesRegex(GurubodhError, f"{failing_state} failed"):
                         run_generate_chunks_job(
                             self.context,
                             loaded,
@@ -573,7 +578,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         client = FakeR2Client(objects, fail_chunk_upload=True)
         loaded, config_path = self.load(config)
 
-        with self.assertRaisesRegex(SystemExit, "simulated chunk upload failure"):
+        with self.assertRaisesRegex(GurubodhError, "simulated chunk upload failure"):
             run_generate_chunks_job(
                 self.context,
                 loaded,
