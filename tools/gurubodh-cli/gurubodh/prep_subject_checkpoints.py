@@ -120,13 +120,18 @@ def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
     """Return only output-affecting inputs; operational pacing is excluded."""
     settings = config["_proofreading_config"]
     locale = config.get("_locale") or locale_spec(config["metadata_defaults"]["language"])
+    chapter_split = {
+        key: value
+        for key, value in config["chapter_split"].items()
+        if not key.startswith("_")
+    }
+    if chapter_split.get("pattern_type") == "regex":
+        # Runtime combines flags bitwise, so an omitted collection, an empty
+        # collection, and any order of the same flag set have identical output.
+        chapter_split["flags"] = sorted(chapter_split.get("flags", []))
     return {
         "pipeline": config["pipeline"],
-        "chapter_split": {
-            key: value
-            for key, value in config["chapter_split"].items()
-            if not key.startswith("_")
-        },
+        "chapter_split": chapter_split,
         "naming": dict(config["naming"]),
         "metadata_defaults": dict(config.get("metadata_defaults", {})),
         "proofreading": {
@@ -142,13 +147,45 @@ def _safe_config_inputs(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def compatibility_record(config: dict[str, Any], source_sha256: str) -> dict[str, Any]:
-    inputs = _safe_config_inputs(config)
+    return _compatibility_record_from_inputs(_safe_config_inputs(config), source_sha256)
+
+
+def _compatibility_record_from_inputs(
+    output_affecting_inputs: dict[str, Any], source_sha256: str
+) -> dict[str, Any]:
     payload = {
         "source_docx_sha256": source_sha256,
-        "output_affecting_inputs": inputs,
+        "output_affecting_inputs": output_affecting_inputs,
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return payload | {"fingerprint": hashlib.sha256(encoded).hexdigest()}
+
+
+def _canonicalize_legacy_compatibility(record: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a canonical legacy record only when its stored fingerprint is intact."""
+    source_sha256 = record.get("source_docx_sha256")
+    inputs = record.get("output_affecting_inputs")
+    fingerprint = record.get("fingerprint")
+    if not isinstance(source_sha256, str) or not isinstance(inputs, dict) or not isinstance(fingerprint, str):
+        return None
+    if _compatibility_record_from_inputs(inputs, source_sha256)["fingerprint"] != fingerprint:
+        return None
+
+    canonical_inputs = dict(inputs)
+    chapter_split = canonical_inputs.get("chapter_split")
+    if isinstance(chapter_split, dict) and chapter_split.get("pattern_type") == "regex":
+        canonical_chapter_split = dict(chapter_split)
+        flags = canonical_chapter_split.get("flags", [])
+        if not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags):
+            return None
+        canonical_chapter_split["flags"] = sorted(flags)
+        canonical_inputs["chapter_split"] = canonical_chapter_split
+    return _compatibility_record_from_inputs(canonical_inputs, source_sha256)
+
+
+def _compatibility_matches(stored: dict[str, Any], current: dict[str, Any]) -> bool:
+    canonical_stored = _canonicalize_legacy_compatibility(stored)
+    return canonical_stored is not None and canonical_stored["fingerprint"] == current["fingerprint"]
 
 
 def _counts(chapters: list[dict[str, Any]]) -> dict[str, int]:
@@ -330,7 +367,7 @@ class PrepCheckpointManager:
                     "An incomplete prep-subject checkpoint already exists. Re-run with --resume to continue it "
                     "or --overwrite to discard its staged workspace and start over."
                 )
-            elif self.state["compatibility"].get("fingerprint") != compatibility["fingerprint"]:
+            elif not _compatibility_matches(self.state["compatibility"], compatibility):
                 raise SystemExit(
                     "The existing prep-subject checkpoint is incompatible with this source or output-affecting "
                     "configuration. Re-run with --overwrite; checkpoints from different inputs are never mixed."

@@ -1,6 +1,8 @@
+from copy import deepcopy
 import json
 import re
 from pathlib import PurePosixPath
+from typing import Any
 
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
 from gurubodh.locales import locale_spec
@@ -145,9 +147,10 @@ def proofreading_config(config):
     return settings
 
 
-def load_prep_subject_job(path):
-    config = read_json(path)
-    validate_job(config, "prep-subject", path)
+def prepare_prep_subject_job(job: dict[str, Any], origin: str | None = "in-memory job") -> dict[str, Any]:
+    """Validate and prepare an isolated prep-subject job mapping."""
+    config = deepcopy(job)
+    validate_job(config, "prep-subject", origin)
     destination = config["destination"]
     chapter_split = config["chapter_split"]
     locale = validate_metadata_defaults(config)
@@ -161,13 +164,18 @@ def load_prep_subject_job(path):
     return config
 
 
+def load_prep_subject_job(path):
+    return prepare_prep_subject_job(read_json(path), str(path))
+
+
 def load_conversion_job(path):
     return load_prep_subject_job(path)
 
 
-def load_generate_chunks_job(path):
-    config = read_json(path)
-    validate_job(config, "generate-chunks", path)
+def prepare_generate_chunks_job(job: dict[str, Any], origin: str | None = "in-memory job") -> dict[str, Any]:
+    """Validate and prepare an isolated generate-chunks job mapping."""
+    config = deepcopy(job)
+    validate_job(config, "generate-chunks", origin)
     source = config["source"]
     destination = config["destination"]
     naming = config["naming"]
@@ -203,9 +211,14 @@ def load_generate_chunks_job(path):
     return config
 
 
-def load_generate_docx_job(path):
-    config = read_json(path)
-    validate_job(config, "generate-docx", path)
+def load_generate_chunks_job(path):
+    return prepare_generate_chunks_job(read_json(path), str(path))
+
+
+def prepare_generate_docx_job(job: dict[str, Any], origin: str | None = "in-memory job") -> dict[str, Any]:
+    """Validate and prepare an isolated generate-docx job mapping."""
+    config = deepcopy(job)
+    validate_job(config, "generate-docx", origin)
     source = config["source"]
     destination = config["destination"]
     naming = config["naming"]
@@ -226,3 +239,7 @@ def load_generate_docx_job(path):
             "language-qualified root"
         )
     return config
+
+
+def load_generate_docx_job(path):
+    return prepare_generate_docx_job(read_json(path), str(path))
