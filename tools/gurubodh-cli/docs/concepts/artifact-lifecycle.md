@@ -70,6 +70,14 @@ processing remains an explicit command failure.
 
 Preparation checkpoint state lives at `run_state/prep-subject/job-state.json`. Use `prep-subject --resume` only for a compatible incomplete checkpoint. See [Prepare a subject](../workflows/prepare-a-subject.md) for the compatibility and replacement rules.
 
+Prep checkpoint persistence, advisory coordination, and canonical publication
+are separate internal components. Local and R2 stores implement one checkpoint
+contract, while local locks and R2 leases do not participate in chapter domain
+transitions. Publication consumes only a fully validated prep workspace and
+promotes the canonical content manifest last. Overwrite invalidation remains a
+post-publication operation, so an incomplete replacement cannot touch the
+existing canonical or derived release.
+
 Derived commands retain carriage-return rejection as a defense-in-depth check.
 They do not repair malformed existing releases: regenerate a canonical artifact
 containing CR with an intentional `prep-subject --overwrite` before deriving
