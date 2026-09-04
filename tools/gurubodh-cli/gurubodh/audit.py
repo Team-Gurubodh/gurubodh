@@ -103,20 +103,6 @@ def resolved_build_provenance(path):
     }
 
 
-def report_basename(config, command_name, timestamp=None):
-    naming = config["naming"]
-    run_timestamp = timestamp or timestamp_for_filename()
-    return "_".join(
-        [
-            naming["category_code"],
-            naming["subject_code"],
-            naming["title_slug"],
-            command_name,
-            run_timestamp,
-        ]
-    )
-
-
 def report_paths(subject_dir, basename, command_name=None):
     report_dir = Path(subject_dir) / "run_reports" / command_name if command_name else Path(subject_dir) / "run_reports"
     return {

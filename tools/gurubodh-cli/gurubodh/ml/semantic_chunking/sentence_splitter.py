@@ -60,8 +60,3 @@ def split_sentence_spans(text: str) -> list[SentenceSpan]:
             spans.append(SentenceSpan(sentence_text, start, end, len(spans)))
 
     return spans
-
-
-def split_sentences(text: str) -> list[str]:
-    """Split text into sentence-like units while preserving paragraph meaning."""
-    return [span.text for span in split_sentence_spans(text)]

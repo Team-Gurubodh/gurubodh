@@ -4,7 +4,7 @@ from gurubodh.docx.text import extract_docx_text
 from gurubodh.prep_subject_checkpoints import run_resumable_prep_job
 
 
-def prepare_unicode_docx(path, transient_docx_path=None, progress=None):
+def prepare_unicode_docx(path, _transient_docx_path=None, progress=None):
     print("[prepare] Reading the Unicode source DOCX directly for chapter detection and text extraction.")
     text = extract_docx_text(path)
 
@@ -19,10 +19,9 @@ def prepare_unicode_docx(path, transient_docx_path=None, progress=None):
     }
 
 
-def run_unicode_docx_ingest(context, config, entry_point, overwrite=False, config_path=None, audit_enabled=True, resume=False, r2_client=None):
+def run_unicode_docx_ingest(config, entry_point, overwrite=False, config_path=None, resume=False, r2_client=None):
     validate_pipeline_matches_source(config, PIPELINE_UNICODE_DOCX_INGEST)
     return run_resumable_prep_job(
-        context,
         config,
         entry_point,
         overwrite,

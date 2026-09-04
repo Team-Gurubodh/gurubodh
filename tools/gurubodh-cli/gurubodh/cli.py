@@ -3,7 +3,6 @@ import sys
 
 from gurubodh.docx.namespaces import register_namespaces
 from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
-from gurubodh.constants import ENTRY_POINT_LAB_PROOFREAD
 from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
@@ -237,7 +236,7 @@ def main(argv=None):
             parser.error("--resume and --overwrite are mutually exclusive for prep-subject.")
         run_configured_job(context, config_path, overwrite=args.overwrite, resume=args.resume)
     elif args.command == "unicode-ingest":
-        run_unicode_job(context, config_path, overwrite=args.overwrite)
+        run_unicode_job(config_path, overwrite=args.overwrite)
     elif args.command == "legacy-convert":
         run_legacy_job(context, config_path, overwrite=args.overwrite)
     else:

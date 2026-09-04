@@ -1242,21 +1242,7 @@ def validate_canonical_release_gate(
         )
 
 
-def validate_generate_chunks_gate(
-    config: dict[str, Any], source_subject: Path, candidate_manifest: dict[str, Any], r2_client=None
-) -> None:
-    """Backward-compatible command-specific wrapper for existing callers."""
-    validate_canonical_release_gate(
-        config,
-        source_subject,
-        candidate_manifest,
-        command_name="generate-chunks",
-        r2_client=r2_client,
-    )
-
-
 def run_resumable_prep_job(
-    context,
     config: dict[str, Any],
     entry_point: str,
     overwrite: bool,
@@ -1316,7 +1302,6 @@ def run_resumable_prep_job(
                     config,
                     result,
                     paths,
-                    entry_point,
                     progress=lambda *_: manager.heartbeat(),
                 )
                 manager.set_chapter_plan(

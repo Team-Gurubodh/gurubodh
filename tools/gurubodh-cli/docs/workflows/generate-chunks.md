@@ -28,7 +28,7 @@ The command validates the candidate manifest and its selected metadata/text pair
 
 Chunk artifacts bind back to canonical content through checksums and content identity. The model may be used to find boundaries, but finalized embedding vectors are not persisted.
 
-## Replacement and standalone experiments
+## Replacement behavior
 
 Without `--overwrite`, an existing chunk output fails preflight without modifying it. With `--overwrite`, the prior local chunk set remains in place through generation, staged validation, and source revalidation; publication then swaps only the complete `chapters/semantic_chunks/` directory. A failed pre-publication rerun therefore leaves the prior ready set intact. The unsupported legacy `chapters/semantic_chunks_and_embeddings/` location is not removed during preflight. On a successful overwrite it is removed after the v2 output publishes, and that cleanup is recorded in the audit.
 
@@ -36,4 +36,4 @@ For R2 overwrite, the old readiness manifest is removed before replacement objec
 
 Every success or failure writes JSON and Markdown audit reports. Failure reports include the active lifecycle state, bounded error information, the known prior/publication state, upload and deletion progress, and per-chapter progress. R2 failure reports are uploaded when the reporting path remains available.
 
-For the lower-level experimental boundary, see [Semantic chunking](../reference/semantic-chunking.md). Those results are non-canonical and are not preparation artifacts.
+There is no supported standalone folder writer or module CLI. See [Semantic chunking](../reference/semantic-chunking.md) for the maintained model boundary.

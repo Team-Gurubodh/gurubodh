@@ -2,7 +2,7 @@ from gurubodh.docx.chapter_split import split_docx_into_chapters
 from gurubodh.docx.validate import validate_docx
 
 
-def validate_and_split(config, result, paths, entry_point, progress=None):
+def validate_and_split(config, result, paths, progress=None):
     print("[validate] Validating the prepared source DOCX before chapter detection.")
     validate_docx(result["output_path"])
 

@@ -17,7 +17,7 @@ from gurubodh.ml.semantic_chunking.config import (
     SemanticChunkConfig,
     SemanticChunkConfigError,
 )
-from gurubodh.ml.semantic_chunking.file_io import chunk_folder, validate_document_for_source
+from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 
 
@@ -108,22 +108,6 @@ class SemanticChunkingTests(unittest.TestCase):
         self.assertEqual(document.chunks[0].estimated_token_count, 2)
         self.assertFalse(hasattr(document.chunks[0], "dense_embedding"))
         self.assertEqual(document.source_text_sha256, document.concatenated_chunks_sha256)
-
-    def test_chunk_folder_uses_generic_token_names(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            source_dir, output_dir = Path(temp_dir) / "source", Path(temp_dir) / "out"
-            source_dir.mkdir()
-            (source_dir / "001.txt").write_text("एक।\n\nदो।", encoding="utf-8")
-            documents = chunk_folder(
-                source_dir, output_dir, SemanticChunkConfig(min_chars=0, threshold_percentile=50.0),
-                segmenter=type("Segmenter", (), {"segment": lambda self, text, source_name: SemanticChunker(SemanticChunkConfig(min_chars=0, threshold_percentile=50.0), model=FakeEmbeddingModel()).chunk_text(text, source_name)})(),
-            )
-            payload = json.loads((output_dir / "semantic_chunks_bge_m3" / "001.chunks.json").read_text(encoding="utf-8"))
-            summary = json.loads((output_dir / "semantic_chunks_bge_m3" / "summary.json").read_text(encoding="utf-8"))
-        self.assertEqual(len(documents), 1)
-        self.assertIn("estimated_token_count", payload)
-        self.assertNotIn("embedding", json.dumps(payload))
-        self.assertIn("estimated_token_count", summary["files"][0])
 
     def test_coverage_validation_rejects_non_whitespace_gap(self):
         source = "पहला। छूटा।"
