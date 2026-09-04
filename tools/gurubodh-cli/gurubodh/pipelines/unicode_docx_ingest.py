@@ -19,7 +19,15 @@ def prepare_unicode_docx(path, _transient_docx_path=None, progress=None):
     }
 
 
-def run_unicode_docx_ingest(config, entry_point, overwrite=False, config_path=None, resume=False, r2_client=None):
+def run_unicode_docx_ingest(
+    config,
+    entry_point,
+    overwrite=False,
+    config_path=None,
+    resume=False,
+    r2_client=None,
+    context=None,
+):
     validate_pipeline_matches_source(config, PIPELINE_UNICODE_DOCX_INGEST)
     return run_resumable_prep_job(
         config,
@@ -29,4 +37,5 @@ def run_unicode_docx_ingest(config, entry_point, overwrite=False, config_path=No
         config_path,
         prepare_unicode_docx,
         r2_client=r2_client,
+        context=context,
     )

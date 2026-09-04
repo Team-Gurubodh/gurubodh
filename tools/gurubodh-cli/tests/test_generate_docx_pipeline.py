@@ -310,7 +310,10 @@ class GenerateDocxPipelineTests(unittest.TestCase):
 
         self.assertEqual(previous.read_bytes(), b"previous")
         report = next((subject / "run_reports" / "generate-docx").glob("*.json"))
-        self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["run_identity"]["status"], "failed")
+        report_payload = json.loads(report.read_text(encoding="utf-8"))
+        self.assertEqual(report_payload["schema_name"], "gurubodh.audit-report")
+        self.assertEqual(report_payload["schema_version"], "2.0.0")
+        self.assertEqual(report_payload["run_identity"]["status"], "failed")
 
     def test_generation_failure_preserves_existing_set_and_unrelated_artifacts(self):
         config = base_config(self.temp_dir.name)

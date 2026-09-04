@@ -17,6 +17,7 @@ import time
 import uuid
 from typing import Any, Callable
 
+from gurubodh.audit import bounded_failure, warn_audit_failure
 from gurubodh.contracts import (
     ChapterStatus,
     PrepCheckpointState,
@@ -40,7 +41,10 @@ from gurubodh.proofreading.artifacts import (
 )
 from gurubodh.proofreading.errors import ProofreadingError
 from gurubodh.proofreading.gemini import GeminiProofreader
-from gurubodh.proofreading.policy import safe_request_diagnostics
+from gurubodh.prep_subject_audit import (
+    PREP_REPORT_RELATIVE_DIR,
+    PrepSubjectAuditWriter,
+)
 from gurubodh.schema_validation import validated_artifact_json
 from gurubodh.storage import (
     CANONICAL_ARTIFACT_FILES,
@@ -70,7 +74,6 @@ CHECKPOINT_CONTRACT_VERSION = 2
 RUN_STATE_RELATIVE_DIR = Path("run_state") / "prep-subject"
 JOB_STATE_RELATIVE_PATH = RUN_STATE_RELATIVE_DIR / "job-state.json"
 WORK_RELATIVE_DIR = Path(".work") / "prep-subject"
-PREP_REPORT_RELATIVE_DIR = Path("run_reports") / "prep-subject"
 LEASE_SECONDS = 120
 INFRASTRUCTURE_FAILURE_CIRCUIT_BREAKER = 2
 R2_UPLOAD_BREAKDOWN_DEFINITIONS = {
@@ -117,12 +120,10 @@ def _read_json(path: Path, label: str) -> dict[str, Any]:
 
 
 def _safe_error(exc: BaseException) -> dict[str, Any]:
-    code = getattr(exc, "code", "unexpected_error")
-    message = " ".join(str(exc).split())[:500] or type(exc).__name__
-    error: dict[str, Any] = {"code": str(code)[:80], "message": message}
-    diagnostics = safe_request_diagnostics(exc)
-    if diagnostics is not None:
-        error["request_diagnostics"] = diagnostics
+    failure = bounded_failure(exc, "checkpoint")
+    error = {key: failure[key] for key in ("code", "message")}
+    if failure["request_diagnostics"] is not None:
+        error["request_diagnostics"] = failure["request_diagnostics"]
     return error
 
 
@@ -987,103 +988,6 @@ class PrepCheckpointManager:
         self.state["workspace"]["status"] = "removed_after_success"
         self.persist()
 
-    def write_report(self, config_path, entry_point: str, status: str, failure: dict[str, str] | None, reused: list[str], attempted: list[str]) -> dict[str, Any]:
-        """Write immutable, text-free invocation reports at the destination."""
-        if self.is_r2 and self.state.get("lease", {}).get("owner_id") == self.owner_id:
-            # Release the advisory lease before snapshotting metrics into the
-            # immutable report. This is an actual state transition, not a
-            # heartbeat, and permits an immediate --resume after an incomplete
-            # invocation.
-            self.state["lease"] = self.state["lease"] | {"active": False, "released_at": utc_now()}
-            self.persist()
-        locale = self.config.locale
-        artifact_root = (
-            subject_artifact_prefix(self.destination)
-            if self.is_r2
-            else str(self.subject_dir)
-        )
-        timestamp = f"{timestamp_for_filename()}-{self.state['run']['run_id'][:8]}"
-        base = f"prep-subject-{timestamp}"
-        reports_dir = self.subject_dir / PREP_REPORT_RELATIVE_DIR
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        json_path, markdown_path = reports_dir / f"{base}.json", reports_dir / f"{base}.md"
-        report = {
-            "schema_version": 1,
-            "command": "prep-subject",
-            "status": status,
-            "created_at": utc_now(),
-            "job_id": self.state["job_id"],
-            "run_id": self.state["run"]["run_id"],
-            "entry_point": entry_point,
-            "overwrite": self.overwrite,
-            "config_path": str(config_path) if config_path else None,
-            "destination_backend": self.destination.get("backend", "local"),
-            "subject": {
-                "category_code": self.config["naming"]["category_code"],
-                "subject_code": self.config["naming"]["subject_code"],
-                "language": locale.language,
-                "artifact_root": artifact_root,
-            },
-            "proofreading_locale": locale.proofreading_provenance(),
-            "failure_stage": "proofreading" if status == "incomplete" else ("global" if failure else None),
-            "failure": failure,
-            "counts": self.state["counts"],
-            "run_metrics": self._report_metrics(),
-            "processing_summary": {
-                "source_materialization_status": "succeeded",
-                "source_docx_validation_status": (
-                    "succeeded" if self.state.get("preparation") else "failed_or_not_completed"
-                ),
-                "legacy_converter_counts": (self.state.get("preparation") or {}).get("converter_counts", {}),
-                "converted_text_nodes": (self.state.get("preparation") or {}).get("total_nodes", 0),
-                "converted_or_extracted_character_count": (self.state.get("preparation") or {}).get("total_chars", 0),
-                "chapters_detected": (self.state.get("preparation") or {}).get("chapters_detected", 0),
-                "unmodified_source_snapshots": len(self.state.get("chapters", [])),
-                "canonical_chapters_succeeded": self.state["counts"]["succeeded"],
-                "proofreading_manifest_status": (
-                    "published" if status == "succeeded" else "not_published"
-                ),
-                "chapter_content_manifest_status": (
-                    "published_last" if status == "succeeded" else "not_published"
-                ),
-            },
-            "chapters": [
-                {
-                    "chapter_number": chapter["chapter_number"],
-                    "state": chapter["state"],
-                    "attempt_count": chapter["attempt_count"],
-                    "latest_error": chapter.get("latest_error"),
-                    "outcome": "reused_checkpoint" if chapter["chapter_number"] in reused else ("attempted" if chapter["chapter_number"] in attempted else "pending"),
-                }
-                for chapter in self.state.get("chapters", [])
-            ],
-            "publication": self.state.get("publication"),
-            "preparation": self.state.get("preparation"),
-            "checkpoint_contract_version": CHECKPOINT_CONTRACT_VERSION,
-        }
-        _write_json_atomically(json_path, report)
-        markdown_path.write_text(_render_report_markdown(report), encoding="utf-8")
-        references = {
-            "json": destination_artifact_reference(self.config, PREP_REPORT_RELATIVE_DIR / json_path.name),
-            "markdown": destination_artifact_reference(self.config, PREP_REPORT_RELATIVE_DIR / markdown_path.name),
-        }
-        self.state["run_reports"].append(references)
-        if self.is_r2:
-            for path in (json_path, markdown_path):
-                # Audit-report writes do not count as R2 publication or
-                # checkpoint upload attempts, so the report is immutable.
-                self._upload_r2_file(
-                    path,
-                    destination_object_key(self.config, PREP_REPORT_RELATIVE_DIR / path.name),
-                    count_r2_uploads=False,
-                )
-        # R2 reports are immutable standalone records. Avoid a follow-up state
-        # write solely to index those reports, so audit creation cannot add an
-        # uncounted checkpoint upload after the report has captured its metrics.
-        if not self.is_r2:
-            self.persist()
-        return references
-
     def _report_metrics(self) -> dict[str, Any]:
         return {
             "gemini_generate_content_requests": {
@@ -1145,92 +1049,78 @@ class PrepCheckpointManager:
             self.workspace_temp_dir.cleanup()
 
 
-def _render_report_markdown(report: dict[str, Any]) -> str:
-    lines = [
-        "# Gurubodh prep-subject Run Report",
-        "",
-        f"- Status: `{report['status']}`",
-        f"- Job: `{report['job_id']}`",
-        f"- Run: `{report['run_id']}`",
-        f"- Category: `{report['subject']['category_code']}`",
-        f"- Subject: `{report['subject']['subject_code']}`",
-        f"- Language: `{report['subject']['language']}`",
-        f"- Language-specific artifact root: `{report['subject']['artifact_root']}`",
-        f"- Proofreading template: `{report['proofreading_locale']['instruction_template']['id']}` v{report['proofreading_locale']['instruction_template']['version']} (`{report['proofreading_locale']['instruction_template']['sha256']}`)",
-        f"- Overwrite: `{report['overwrite']}`",
-        f"- Checkpoint artifact contract: `{report['checkpoint_contract_version']}` (five files per chapter)",
-        f"- Counts: succeeded `{report['counts']['succeeded']}`, failed `{report['counts']['failed']}`, pending `{report['counts']['pending']}`",
-        "",
-        "## Processing",
-        "",
-        f"- Source materialization: `{report['processing_summary']['source_materialization_status']}`",
-        f"- Source DOCX validation: `{report['processing_summary']['source_docx_validation_status']}`",
-        f"- Legacy converter counts: `{json.dumps(report['processing_summary']['legacy_converter_counts'], ensure_ascii=False, sort_keys=True)}`",
-        f"- Converted text nodes: `{report['processing_summary']['converted_text_nodes']}`",
-        f"- Converted or extracted characters: `{report['processing_summary']['converted_or_extracted_character_count']}`",
-        f"- Chapters detected: `{report['processing_summary']['chapters_detected']}`",
-        f"- Unmodified-source snapshots: `{report['processing_summary']['unmodified_source_snapshots']}`",
-        f"- Canonical chapters succeeded: `{report['processing_summary']['canonical_chapters_succeeded']}`",
-        f"- Proofreading manifest: `{report['processing_summary']['proofreading_manifest_status']}`",
-        f"- Chapter content manifest: `{report['processing_summary']['chapter_content_manifest_status']}`",
-        "",
-        "## Run metrics",
-        "",
-    ]
-    gemini = report["run_metrics"]["gemini_generate_content_requests"]
-    lines.append(
-        "- Gemini `generate_content` request attempts: "
-        f"`{gemini['attempts_total']}` total, `{gemini['attempts_succeeded']}` succeeded, "
-        f"`{gemini['attempts_failed']}` failed. {gemini['definition']}"
-    )
-    r2 = report["run_metrics"]["r2_object_upload_requests"]
-    if r2 is not None:
-        lines.append(
-            "- R2 object-upload request attempts: "
-            f"`{r2['attempts_total']}` total, `{r2['attempts_succeeded']}` succeeded, "
-            f"`{r2['attempts_failed']}` failed. {r2['definition']}"
-        )
-        lines.extend(
-            [
-                "",
-                "### R2 upload breakdown",
-                "",
-                "| Category | Total | Succeeded | Failed |",
-                "| --- | ---: | ---: | ---: |",
-            ]
-        )
-        lines.extend(
-            f"| {category} — {counters['definition']} | {counters['attempts_total']} | "
-            f"{counters['attempts_succeeded']} | {counters['attempts_failed']} |"
-            for category, counters in r2["breakdown"].items()
-        )
-    if report["failure"]:
-        lines.extend(["", "## Failure", "", f"- {report['failure']['code']}: {report['failure']['message']}"])
-    lines.extend(["", "## Chapters", "", "| Chapter | State | Attempts | Outcome |", "| --- | --- | ---: | --- |"])
-    lines.extend(
-        f"| {chapter['chapter_number']} | {chapter['state']} | {chapter['attempt_count']} | {chapter['outcome']} |"
-        for chapter in report["chapters"]
-    )
-    publication = report.get("publication") or {}
-    lines.extend(["", "## Publication", "", f"- State: `{publication.get('state', 'not_ready')}`"])
-    cleanup = publication.get("obsolete_artifact_cleanup") or {}
-    if cleanup:
-        docx = cleanup.get("chapter_docx_invalidation") or {}
-        full_subject = cleanup.get("legacy_full_subject_cleanup") or {}
-        lines.extend(
-            [
-                f"- Derived chapter DOCX invalidated: `{docx.get('invalidated', False)}`",
-                f"- Legacy full_subject removed: `{full_subject.get('invalidated', False)}`",
-            ]
-        )
-    semantic = publication.get("semantic_invalidation")
-    if semantic:
-        lines.append(f"- Semantic chunks invalidated: `{semantic.get('invalidated', False)}`")
-    return "\n".join(lines) + "\n"
-
-
 def _is_global_proofreading_failure(exc: ProofreadingError) -> bool:
     return exc.code in {"missing_credentials", "missing_dependency"}
+
+
+def _write_prep_audit(
+    manager: PrepCheckpointManager,
+    project_root: Path,
+    config_path: Path | None,
+    entry_point: str,
+    status: str,
+    reused: list[str],
+    attempted: list[str],
+    *,
+    failure_error: BaseException | None = None,
+    failure_stage: str | None = None,
+):
+    """Write and optionally upload one prep audit without owning report content."""
+    try:
+        if (
+            manager.is_r2
+            and manager.state.get("lease", {}).get("owner_id") == manager.owner_id
+        ):
+            # This real checkpoint transition precedes the immutable metric
+            # snapshot and permits an immediate resume after an incomplete run.
+            manager.state["lease"] = manager.state["lease"] | {
+                "active": False,
+                "released_at": utc_now(),
+            }
+            manager.persist()
+        writer = PrepSubjectAuditWriter(
+            project_root,
+            manager.config,
+            config_path,
+            entry_point,
+            manager.overwrite,
+            manager.state.to_payload(),
+            manager.subject_dir,
+        )
+        failure = (
+            bounded_failure(failure_error, failure_stage or "unknown")
+            if failure_error is not None
+            else None
+        )
+        result = writer.write(
+            status,
+            failure,
+            reused,
+            attempted,
+            manager._report_metrics(),
+            CHECKPOINT_CONTRACT_VERSION,
+        )
+        manager.state["run_reports"].append(result.references)
+        if manager.is_r2:
+            for kind in ("json", "markdown"):
+                path = result.paths[kind]
+                # Report uploads remain at the workflow/application boundary
+                # and are excluded from canonical/checkpoint upload metrics.
+                manager._upload_r2_file(
+                    path,
+                    destination_object_key(
+                        manager.config, PREP_REPORT_RELATIVE_DIR / path.name
+                    ),
+                    count_r2_uploads=False,
+                )
+        else:
+            manager.persist()
+        return result
+    except BaseException as audit_error:
+        if failure_error is None:
+            raise
+        warn_audit_failure("prep-subject", audit_error, failure_error)
+        return None
 
 
 def validate_canonical_release_gate(
@@ -1314,9 +1204,11 @@ def run_resumable_prep_job(
     config_path: Path | None,
     prepare_source_docx: Callable[[Path, Path, Callable[..., None]], dict[str, Any]],
     r2_client=None,
+    context=None,
 ) -> dict[str, Any]:
     """Run either preparation pipeline with checkpointed proof-reading."""
     manager = PrepCheckpointManager(config, resume, overwrite, r2_client=r2_client)
+    project_root = Path(getattr(context, "root", Path.cwd()))
     reused: list[str] = []
     attempted: list[str] = []
     try:
@@ -1340,7 +1232,15 @@ def run_resumable_prep_job(
         outcome = manager.begin(_sha256(source_path))
         if outcome == "already_complete":
             print("prep-subject already complete; the compatible checkpoint is succeeded. No Gemini requests were made.")
-            manager.write_report(config_path, entry_point, "succeeded", None, reused, attempted)
+            _write_prep_audit(
+                manager,
+                project_root,
+                config_path,
+                entry_point,
+                "succeeded",
+                reused,
+                attempted,
+            )
             manager.print_metrics_summary()
             return {
                 "status": "succeeded",
@@ -1380,7 +1280,17 @@ def run_resumable_prep_job(
                 manager.discard_transient_preparation()
             except BaseException as exc:
                 manager.mark_global_failure(exc)
-                manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
+                _write_prep_audit(
+                    manager,
+                    project_root,
+                    config_path,
+                    entry_point,
+                    "failed",
+                    reused,
+                    attempted,
+                    failure_error=exc,
+                    failure_stage="preparation",
+                )
                 manager.print_metrics_summary()
                 raise
 
@@ -1414,7 +1324,17 @@ def run_resumable_prep_job(
                 manager.mark_chapter_failure(chapter, exc)
                 if _is_global_proofreading_failure(exc):
                     manager.mark_global_failure(exc)
-                    manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
+                    _write_prep_audit(
+                        manager,
+                        project_root,
+                        config_path,
+                        entry_point,
+                        "failed",
+                        reused,
+                        attempted,
+                        failure_error=exc,
+                        failure_stage="proofreading",
+                    )
                     manager.print_metrics_summary()
                     raise
                 if exc.code == "service_unavailable":
@@ -1433,12 +1353,23 @@ def run_resumable_prep_job(
             for chapter in manager.state["chapters"]
         ):
             manager.mark_incomplete()
-            manager.write_report(config_path, entry_point, "incomplete", None, reused, attempted)
-            manager.print_metrics_summary()
-            raise ProcessingError(
+            incomplete_error = ProcessingError(
                 "prep-subject is incomplete; successful chapter checkpoints were retained. "
                 "Re-run with --resume to retry failed or pending chapters."
             )
+            _write_prep_audit(
+                manager,
+                project_root,
+                config_path,
+                entry_point,
+                "incomplete",
+                reused,
+                attempted,
+                failure_error=incomplete_error,
+                failure_stage="proofreading",
+            )
+            manager.print_metrics_summary()
+            raise incomplete_error
 
         manager.prepare_for_publication()
         try:
@@ -1448,10 +1379,28 @@ def run_resumable_prep_job(
             manager.state.publication_status = PublicationStatus.PUBLISHING
             manager.state["failure"] = _safe_error(exc)
             manager.persist()
-            manager.write_report(config_path, entry_point, "failed", _safe_error(exc), reused, attempted)
+            _write_prep_audit(
+                manager,
+                project_root,
+                config_path,
+                entry_point,
+                "failed",
+                reused,
+                attempted,
+                failure_error=exc,
+                failure_stage="publication",
+            )
             manager.print_metrics_summary()
             raise
-        manager.write_report(config_path, entry_point, "succeeded", None, reused, attempted)
+        _write_prep_audit(
+            manager,
+            project_root,
+            config_path,
+            entry_point,
+            "succeeded",
+            reused,
+            attempted,
+        )
         counts = manager.state["counts"]
         artifact_root = subject_artifact_prefix(manager.destination) if manager.is_r2 else str(manager.subject_dir)
         print(

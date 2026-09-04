@@ -28,7 +28,6 @@ from gurubodh.contracts import (
     MaterializedSource,
 )
 from gurubodh.derived_artifact_lifecycle import (
-    AuditResult,
     DerivedArtifactDefinition,
     destination_subject_dir,
     run_derived_artifact_lifecycle,
@@ -250,7 +249,7 @@ class GenerateDocxWorkflow:
             lifecycle=lifecycle.as_dict(),
             announce=announce,
         )
-        return AuditResult(report, self.audit.paths)
+        return report
 
 
 def run_generate_docx_job(

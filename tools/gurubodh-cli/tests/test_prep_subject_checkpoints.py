@@ -6,7 +6,7 @@ import re
 import tempfile
 import unittest
 import zipfile
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -567,9 +567,21 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             report = next((subject / "run_reports" / "prep-subject").glob("*.json"))
             report_payload = json.loads(report.read_text(encoding="utf-8"))
             self.assertNotIn("पहला गलत पाठ", report.read_text(encoding="utf-8"))
-            self.assertEqual(report_payload["subject"]["language"], "hi-IN")
-            self.assertEqual(report_payload["subject"]["artifact_root"], str(subject))
-            self.assertEqual(report_payload["proofreading_locale"]["instruction_template"]["id"], "hi-IN-proofreading")
+            self.assertEqual(report_payload["schema_name"], "gurubodh.audit-report")
+            self.assertEqual(report_payload["schema_version"], "2.0.0")
+            self.assertEqual(
+                report_payload["job_identity"]["subject"]["language"], "hi-IN"
+            )
+            self.assertEqual(
+                report_payload["job_identity"]["subject"]["artifact_root"],
+                str(subject),
+            )
+            self.assertEqual(
+                report_payload["command_details"]["proofreading_locale"][
+                    "instruction_template"
+                ]["id"],
+                "hi-IN-proofreading",
+            )
             self.assertFalse((subject / "chapters" / "chapter_content_manifest.json").exists())
             self.assertEqual(len(first.calls), 2)
 
@@ -628,6 +640,42 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertEqual(diagnostics["terminal_retry_exhaustion_reason"], "service_unavailable_retry_exhausted")
             self.assertNotIn("पहला गलत पाठ", state_path.read_text(encoding="utf-8"))
 
+    def test_incomplete_error_survives_a_secondary_audit_write_failure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            proofreader = FakeProofreader(
+                [
+                    ProofreadingError("invalid_response", "first failure"),
+                    ProofreadingError("invalid_response", "second failure"),
+                ]
+            )
+            stderr = io.StringIO()
+
+            with (
+                patch(
+                    "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                    return_value=proofreader,
+                ),
+                patch(
+                    "gurubodh.prep_subject_checkpoints.PrepSubjectAuditWriter.write",
+                    side_effect=OSError("audit disk failure"),
+                ),
+                redirect_stderr(stderr),
+                self.assertRaisesRegex(GurubodhError, "prep-subject is incomplete"),
+            ):
+                run_resumable_prep_job(
+                    config(root),
+                    "prep-subject",
+                    False,
+                    False,
+                    None,
+                    prepare_unicode,
+                )
+
+            self.assertIn("preserving the primary ProcessingError", stderr.getvalue())
+            self.assertIn("audit disk failure", stderr.getvalue())
+
     def test_fake_r2_retains_checkpoint_workspace_then_publishes_canonical_manifest_last(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -674,7 +722,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             report_key = next(key for key in client.objects if "/run_reports/prep-subject/" in key and key.endswith(".json"))
             report = json.loads(client.objects[report_key].decode("utf-8"))
             self.assertEqual(
-                report["run_metrics"]["gemini_generate_content_requests"],
+                report["command_details"]["run_metrics"][
+                    "gemini_generate_content_requests"
+                ],
                 {
                     "attempts_total": 3,
                     "attempts_succeeded": 1,
@@ -682,9 +732,16 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "definition": "Actual Gemini generate_content request attempts in this invocation, including retries and terminal failures; excludes reused checkpoints and local pacing waits.",
                 },
             )
-            self.assertEqual(report["run_metrics"]["r2_object_upload_requests"]["attempts_total"], 12)
             self.assertEqual(
-                report["run_metrics"]["r2_object_upload_requests"]["breakdown"],
+                report["command_details"]["run_metrics"][
+                    "r2_object_upload_requests"
+                ]["attempts_total"],
+                12,
+            )
+            self.assertEqual(
+                report["command_details"]["run_metrics"][
+                    "r2_object_upload_requests"
+                ]["breakdown"],
                 {
                     "checkpoint_source_snapshots": {
                         "attempts_total": 2,
@@ -814,7 +871,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertTrue(state["publication"]["semantic_invalidation"]["invalidated"])
             report_path = next((subject / "run_reports" / "prep-subject").glob("*.json"))
             report = json.loads(report_path.read_text(encoding="utf-8"))
-            self.assertEqual(report["checkpoint_contract_version"], 2)
+            self.assertEqual(
+                report["command_details"]["checkpoint_contract_version"], 2
+            )
             self.assertEqual(report["processing_summary"]["source_docx_validation_status"], "succeeded")
             self.assertEqual(report["processing_summary"]["unmodified_source_snapshots"], 2)
             markdown = report_path.with_suffix(".md").read_text(encoding="utf-8")

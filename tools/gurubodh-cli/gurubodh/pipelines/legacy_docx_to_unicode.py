@@ -27,4 +27,5 @@ def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, co
         config_path,
         prepare,
         r2_client=r2_client,
+        context=context,
     )

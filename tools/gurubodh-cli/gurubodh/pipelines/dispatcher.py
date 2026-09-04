@@ -15,19 +15,27 @@ def run_configured_job(context, config_path, entry_point=ENTRY_POINT_PREP_SUBJEC
     config = load_prep_subject_job(config_path)
     pipeline = config["pipeline"]
     if pipeline == PIPELINE_UNICODE_DOCX_INGEST:
-        return run_unicode_docx_ingest(config, entry_point, overwrite, config_path, resume=resume)
+        return run_unicode_docx_ingest(
+            config,
+            entry_point,
+            overwrite,
+            config_path,
+            resume=resume,
+            context=context,
+        )
     if pipeline == PIPELINE_LEGACY_DOCX_TO_UNICODE:
         return run_legacy_docx_to_unicode(context, config, entry_point, overwrite, config_path, resume=resume)
     raise ConfigurationError(f"Config error: unsupported pipeline {pipeline!r}")
 
 
-def run_unicode_job(config_path, overwrite=False):
+def run_unicode_job(config_path, overwrite=False, context=None):
     config = load_prep_subject_job(config_path)
     return run_unicode_docx_ingest(
         config,
         ENTRY_POINT_UNICODE_DOCX_INGEST,
         overwrite,
         config_path=config_path,
+        context=context,
     )
 
 

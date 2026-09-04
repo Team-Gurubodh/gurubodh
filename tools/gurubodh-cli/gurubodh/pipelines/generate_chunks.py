@@ -28,7 +28,6 @@ from gurubodh.contracts import (
     MaterializedSource,
 )
 from gurubodh.derived_artifact_lifecycle import (
-    AuditResult,
     DerivedArtifactDefinition,
     destination_subject_dir,
     run_derived_artifact_lifecycle,
@@ -208,10 +207,6 @@ def destination_output_location(
     }
 
 
-def audit_report_references(config, paths):
-    return {"json": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["json"].name), "markdown": destination_artifact_reference(config, CHUNKS_REPORT_DIR / paths["markdown"].name)}
-
-
 def build_chunk_manifest(
     config,
     job: ChunkGenerationJob,
@@ -290,9 +285,7 @@ class GenerateChunksWorkflow:
             overwrite,
             destination_subject,
         )
-        self.result.audit_report_references = audit_report_references(
-            config, self.audit.paths
-        )
+        self.result.audit_report_references = self.audit.references
 
     def materialize_and_validate_source(self, r2_client, progress):
         subject, temporary, manifest = materialize_source_subject(
@@ -341,9 +334,7 @@ class GenerateChunksWorkflow:
             progress=progress,
             summary=self.result,
         )
-        self.result.audit_report_references = audit_report_references(
-            self.config, self.audit.paths
-        )
+        self.result.audit_report_references = self.audit.references
         return self.result
 
     def build_readiness_manifest(self, source, generation):
@@ -388,7 +379,7 @@ class GenerateChunksWorkflow:
             destination_subject=self.destination_subject,
             announce=announce,
         )
-        return AuditResult(report, self.audit.paths)
+        return report
 
 
 def run_generate_chunks_job(

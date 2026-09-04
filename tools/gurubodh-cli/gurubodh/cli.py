@@ -244,7 +244,7 @@ def _run_command(parser, args):
             parser.error("--resume and --overwrite are mutually exclusive for prep-subject.")
         run_configured_job(context, config_path, overwrite=args.overwrite, resume=args.resume)
     elif args.command == "unicode-ingest":
-        run_unicode_job(config_path, overwrite=args.overwrite)
+        run_unicode_job(config_path, overwrite=args.overwrite, context=context)
     elif args.command == "legacy-convert":
         run_legacy_job(context, config_path, overwrite=args.overwrite)
     else:

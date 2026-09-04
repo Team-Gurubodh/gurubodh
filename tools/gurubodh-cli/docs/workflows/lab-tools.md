@@ -15,7 +15,12 @@ gurubodh lab proofread \
 
 Only `hi-IN` and `mr-IN` are supported. The command handles approved Unicode or APS fonts in a temporary workspace and sends one structured Gemini request. It rejects ShreeLipi/Sri-Lipi/Shree Dev and every unapproved source font before conversion or proofreading. Each invocation gets a unique run under `<lab-root>/proofread/runs/active/`, which is moved atomically to `succeeded/` or `failed/` when an outcome is recorded. The run-root `README.md` links to output, report, and manifest.
 
-The output includes a proofread DOCX and text; reports include extracted source, a readable diff, structured details, and provenance. None becomes CMS input or canonical subject text.
+The output includes a proofread DOCX and text; reports include extracted
+source, a readable diff, structured details, and provenance. The
+`run_manifest.json` uses the same versioned audit envelope as maintained
+subject workflows, while its `command_details.non_canonical` and publication
+record explicitly mark the output as non-canonical. None becomes CMS input or
+canonical subject text.
 
 Each Gemini attempt has a 120-second deadline by default and reports in-flight
 elapsed and remaining time every 15 seconds. HTTP 503 `UNAVAILABLE` is a
