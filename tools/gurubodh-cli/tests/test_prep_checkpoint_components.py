@@ -2,7 +2,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gurubodh.canonical_release import JOB_STATE_RELATIVE_PATH
+from gurubodh.canonical_release import (
+    CHECKPOINT_SCHEMA_VERSION,
+    JOB_STATE_RELATIVE_PATH,
+)
 from gurubodh.contracts import PrepCheckpointState, PrepSubjectJob
 from gurubodh.errors import ProcessingError
 from gurubodh.locales import locale_spec
@@ -96,8 +99,9 @@ def prep_job(root: Path, destination: dict | None = None) -> PrepSubjectJob:
 def checkpoint_state() -> PrepCheckpointState:
     return PrepCheckpointState.from_payload(
         {
-            "schema_version": 1,
+            "schema_version": CHECKPOINT_SCHEMA_VERSION,
             "job_id": "00000000-0000-4000-8000-000000000001",
+            "replacement_authorized": True,
             "state": "running",
             "created_at": "2026-09-04T00:00:00Z",
             "updated_at": "2026-09-04T00:00:00Z",
@@ -146,6 +150,7 @@ class CheckpointStoreContractTests(unittest.TestCase):
         restored_store = recreate()
         loaded = restored_store.load()
         self.assertEqual(loaded.to_payload(), state.to_payload())
+        self.assertTrue(loaded.replacement_authorized)
         restored_store.restore_workspace(workspace)
         restored = restored_store.subject_dir / workspace / "chapter.txt"
         self.assertEqual(restored.read_text(encoding="utf-8"), "checkpoint")
@@ -355,6 +360,7 @@ class CheckpointStateTransitionTests(unittest.TestCase):
             manager.open()
             self.assertEqual(manager.begin("a" * 64), "started")
             self.assertEqual(store.saved["state"], "running")
+            self.assertFalse(store.saved.replacement_authorized)
             manager.mark_incomplete()
             self.assertEqual(store.saved["state"], "incomplete")
             manager.close()

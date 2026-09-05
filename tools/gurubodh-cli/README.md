@@ -36,7 +36,10 @@ source DOCX → prep-subject → canonical chapter artifacts
                               └─ generate-docx   → reviewable DOCX exports
 ```
 
-`prep-subject` is the source of canonical content. A successful `prep-subject --overwrite` invalidates derived chunks and DOCX exports, so regenerate the outputs you need afterward.
+`prep-subject` is the source of canonical content. A successful overwrite-authorized
+job invalidates derived chunks and DOCX exports, including when an interrupted
+`--overwrite` job completes through `--resume`; regenerate the outputs you need
+afterward.
 
 ## Choose the right guide
 

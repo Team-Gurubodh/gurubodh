@@ -117,6 +117,7 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_checkpoint_conversion_constrains_states_and_returns_copies(self):
         payload = {
+            "replacement_authorized": True,
             "state": "succeeded",
             "publication": {"state": "succeeded", "canonical_manifest": None},
             "chapters": [{"state": "succeeded"}],
@@ -125,6 +126,7 @@ class WorkflowContractTests(unittest.TestCase):
         state = PrepCheckpointState.from_payload(payload)
 
         self.assertIs(state.status, PrepJobStatus.SUCCEEDED)
+        self.assertTrue(state.replacement_authorized)
         self.assertIs(state.publication_status, PublicationStatus.SUCCEEDED)
         self.assertIs(ChapterStatus(state["chapters"][0]["state"]), ChapterStatus.SUCCEEDED)
         serialized = state.to_payload()
@@ -134,6 +136,10 @@ class WorkflowContractTests(unittest.TestCase):
         invalid = payload | {"state": "unknown"}
         with self.assertRaises(ValueError):
             PrepCheckpointState.from_payload(invalid)
+
+        invalid_authorization = payload | {"replacement_authorized": "yes"}
+        with self.assertRaises(TypeError):
+            PrepCheckpointState.from_payload(invalid_authorization)
 
     def test_proofreading_conversion_does_not_consume_the_outcome(self):
         outcome = ProofreadingOutcome(

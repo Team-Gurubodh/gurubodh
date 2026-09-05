@@ -22,7 +22,8 @@ from gurubodh.errors import SourceValidationError
 from gurubodh.storage import R2StorageClient, is_r2, subject_artifact_object_key
 
 
-CHECKPOINT_SCHEMA_VERSION = 1
+LEGACY_CHECKPOINT_SCHEMA_VERSION = 1
+CHECKPOINT_SCHEMA_VERSION = 2
 CHECKPOINT_CONTRACT_VERSION = 2
 RUN_STATE_RELATIVE_DIR = Path("run_state") / "prep-subject"
 JOB_STATE_RELATIVE_PATH = RUN_STATE_RELATIVE_DIR / "job-state.json"
@@ -76,7 +77,8 @@ def validate_canonical_release_gate(
 
     state = read_checkpoint_state(state_path)
     if (
-        state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION
+        state.get("schema_version")
+        not in {LEGACY_CHECKPOINT_SCHEMA_VERSION, CHECKPOINT_SCHEMA_VERSION}
         or state.status is not PrepJobStatus.SUCCEEDED
     ):
         raise SourceValidationError(
