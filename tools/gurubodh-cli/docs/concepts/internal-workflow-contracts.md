@@ -19,8 +19,9 @@ typed records in `gurubodh/contracts.py`; they are not new serialized formats.
   existing checkpoint/manifest representation without consuming the outcome.
 - Prep job-state JSON enters and leaves the runtime through
   `PrepCheckpointState.from_payload()` and `to_payload()`. Prep, chapter, and
-  publication state strings are constrained by enums while their serialized
-  values remain unchanged.
+  publication state strings are constrained by enums, and the typed
+  `replacement_authorized` property exposes the required schema-version-2 job
+  intent without consulting invocation flags.
 - Chunk and DOCX workflows use typed generation summaries internally. Their
   `to_payload()` methods provide the existing dictionaries used by artifact and
   audit writers.
@@ -73,6 +74,13 @@ along with injected clock, sleeper, progress, and filesystem-backed roots used
 by focused tests. Prep resumability remains distinct from the non-resumable
 derived-artifact lifecycle; both reuse the lower-level storage client and
 upload primitive where their semantics match.
+
+Checkpoint schema version 2 persists replacement authorization when a new job
+starts. Compatible resume restores that job-level value for canonical
+replacement and post-publication invalidation. Legacy incomplete version-1
+states are ambiguous and require restart with `--overwrite`; succeeded
+version-1 states migrate with authorization set to false and remain usable by
+derived-release gates.
 
 ## Proofreading boundaries
 

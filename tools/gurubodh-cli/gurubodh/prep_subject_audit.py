@@ -44,6 +44,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"v{details['proofreading_locale']['instruction_template']['version']} "
         f"(`{details['proofreading_locale']['instruction_template']['sha256']}`)",
         f"- Overwrite: `{run['overwrite']}`",
+        f"- Replacement authorized for this job: `{details['replacement_authorized']}`",
         f"- Checkpoint artifact contract: `{details['checkpoint_contract_version']}` (five files per chapter)",
         f"- Counts: succeeded `{details['counts']['succeeded']}`, failed `{details['counts']['failed']}`, "
         f"pending `{details['counts']['pending']}`",
@@ -257,6 +258,7 @@ class PrepSubjectAuditWriter:
             ],
             "preparation": deepcopy(self.state.get("preparation")),
             "checkpoint_contract_version": checkpoint_contract_version,
+            "replacement_authorized": self.state["replacement_authorized"],
             "non_canonical": False,
         }
         return self.writer.write(

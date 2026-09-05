@@ -15,6 +15,7 @@ from gurubodh.errors import GurubodhError
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
 from gurubodh.prep_subject_checkpoints import (
     CHECKPOINT_CONTRACT_VERSION,
+    CHECKPOINT_SCHEMA_VERSION,
     JOB_STATE_RELATIVE_PATH,
     PrepCheckpointManager,
     _compatibility_record_from_inputs,
@@ -24,6 +25,8 @@ from gurubodh.prep_subject_checkpoints import (
 )
 from gurubodh.locales import locale_spec
 from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
+from gurubodh.prep_publication import LocalPrepPublisher
+from gurubodh.storage import CANONICAL_ARTIFACT_FILES
 
 
 DOCUMENT_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -73,8 +76,9 @@ def with_payload(job, **changes):
 
 def incomplete_checkpoint_state(compatibility):
     return {
-        "schema_version": 1,
+        "schema_version": CHECKPOINT_SCHEMA_VERSION,
         "job_id": "00000000-0000-4000-8000-000000000000",
+        "replacement_authorized": False,
         "state": "incomplete",
         "created_at": "2026-09-04T00:00:00Z",
         "updated_at": "2026-09-04T00:00:00Z",
@@ -320,6 +324,33 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     finally:
                         manager.close()
 
+    def test_legacy_incomplete_checkpoint_without_authorization_requires_restart(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source_sha256 = "a" * 64
+            job_config = config(root)
+            state = incomplete_checkpoint_state(
+                compatibility_record(job_config, source_sha256)
+            )
+            state["schema_version"] = 1
+            state.pop("replacement_authorized")
+            state_path = root / "subject" / "hi-IN" / JOB_STATE_RELATIVE_PATH
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            manager = PrepCheckpointManager(
+                job_config, resume=True, overwrite=False
+            )
+            try:
+                manager.open()
+                with self.assertRaisesRegex(
+                    GurubodhError,
+                    r"predates persisted replacement authorization.*--overwrite",
+                ):
+                    manager.begin(source_sha256)
+            finally:
+                manager.close()
+
     def test_resume_requires_overwrite_for_genuinely_incompatible_configuration(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -443,6 +474,20 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 self.assertIn("IMPORTANT: prep-subject is single-writer per destination.", output.getvalue())
                 self.assertIn("checkpoint/workspace artifacts.\n", output.getvalue())
                 self.assertIn("prep-subject metrics: Gemini generate_content attempts 2 (2 succeeded, 0 failed).", output.getvalue())
+                state = json.loads(
+                    (
+                        root
+                        / "subject"
+                        / "hi-IN"
+                        / JOB_STATE_RELATIVE_PATH
+                    ).read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    state["schema_version"], CHECKPOINT_SCHEMA_VERSION
+                )
+                self.assertIs(
+                    state["replacement_authorized"], overwrite
+                )
 
             subject = root / "subject" / "hi-IN"
             self.assertFalse((subject / "full_subject").exists())
@@ -535,6 +580,63 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             )
             self.assertIn("prep-subject metrics: Gemini generate_content attempts 0 (0 succeeded, 0 failed).", output.getvalue())
 
+    def test_legacy_succeeded_resume_migrates_without_authorizing_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job_config = config(root)
+            first = FakeProofreader(
+                [
+                    "CHAPTER 1\nपहला सही पाठ।",
+                    "CHAPTER 2\nदूसरा सही पाठ।",
+                ]
+            )
+            with patch(
+                "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                return_value=first,
+            ):
+                run_resumable_prep_job(
+                    job_config,
+                    "prep-subject",
+                    False,
+                    False,
+                    None,
+                    prepare_unicode,
+                )
+
+            subject = root / "subject" / "hi-IN"
+            state_path = subject / JOB_STATE_RELATIVE_PATH
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["schema_version"] = 1
+            state.pop("replacement_authorized")
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            derived = subject / "chapters" / "msword" / "keep.docx"
+            derived.parent.mkdir(parents=True, exist_ok=True)
+            derived.write_text("keep", encoding="utf-8")
+
+            resumed = FakeProofreader([])
+            with patch(
+                "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                return_value=resumed,
+            ):
+                result = run_resumable_prep_job(
+                    job_config,
+                    "prep-subject",
+                    False,
+                    True,
+                    None,
+                    prepare_unicode,
+                )
+
+            migrated = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertTrue(result["already_complete"])
+            self.assertEqual(
+                migrated["schema_version"], CHECKPOINT_SCHEMA_VERSION
+            )
+            self.assertFalse(migrated["replacement_authorized"])
+            self.assertTrue(derived.is_file())
+            self.assertEqual(resumed.calls, [])
+
     def test_resume_reuses_valid_success_and_publishes_only_after_all_chapters_succeed(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -584,6 +686,14 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             )
             self.assertFalse((subject / "chapters" / "chapter_content_manifest.json").exists())
             self.assertEqual(len(first.calls), 2)
+            self.assertFalse(state["replacement_authorized"])
+            retained_docx = subject / "chapters" / "msword" / "keep.docx"
+            retained_chunks = (
+                subject / "chapters" / "semantic_chunks" / "keep.json"
+            )
+            for path in (retained_docx, retained_chunks):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("keep", encoding="utf-8")
 
             second = FakeProofreader(["CHAPTER 2\nदूसरा सही पाठ।"])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=second):
@@ -596,6 +706,8 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertEqual(len(second.calls), 1)
             self.assertTrue((subject / "chapters" / "chapter_content_manifest.json").is_file())
             self.assertFalse((subject / ".work" / "prep-subject" / state["job_id"]).exists())
+            self.assertTrue(retained_docx.is_file())
+            self.assertTrue(retained_chunks.is_file())
 
     def test_terminal_503_checkpoints_the_failed_chapter_then_cools_down_before_another_request(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -833,6 +945,140 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             for path, value in protected.items():
                 self.assertEqual(path.read_text(encoding="utf-8"), value)
 
+    def test_local_overwrite_authorization_survives_resume_and_invalidates_derived_outputs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job_config = config(root)
+            subject = root / "subject" / "hi-IN"
+            previous_canonical = (
+                subject / "chapters" / "text_and_metadata" / "previous.txt"
+            )
+            docx = subject / "chapters" / "msword" / "previous.docx"
+            chunks = (
+                subject / "chapters" / "semantic_chunks" / "previous.json"
+            )
+            legacy_chunks = (
+                subject
+                / "chapters"
+                / "semantic_chunks_and_embeddings"
+                / "previous.json"
+            )
+            full_subject = subject / "full_subject" / "previous.docx"
+            unrelated = subject / "unrelated" / "keep.txt"
+            other_locale = (
+                root
+                / "subject"
+                / "mr-IN"
+                / "chapters"
+                / "msword"
+                / "keep.docx"
+            )
+            protected = (
+                previous_canonical,
+                docx,
+                chunks,
+                legacy_chunks,
+                full_subject,
+                unrelated,
+                other_locale,
+            )
+            for path in protected:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("previous", encoding="utf-8")
+
+            first = FakeProofreader(
+                [
+                    "CHAPTER 1\nपहला सही पाठ।",
+                    ProofreadingError("invalid_response", "bad second chapter"),
+                ]
+            )
+            with (
+                patch(
+                    "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                    return_value=first,
+                ),
+                self.assertRaisesRegex(GurubodhError, "incomplete"),
+            ):
+                run_resumable_prep_job(
+                    job_config,
+                    "prep-subject",
+                    True,
+                    False,
+                    None,
+                    prepare_unicode,
+                )
+
+            state_path = subject / JOB_STATE_RELATIVE_PATH
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertTrue(state["replacement_authorized"])
+            for path in protected:
+                self.assertEqual(path.read_text(encoding="utf-8"), "previous")
+
+            promoted = []
+            original_replace = LocalPrepPublisher._replace_path
+
+            def recording_replace(publisher, source, target, relative, *args):
+                del publisher
+                promoted.append(relative)
+                return original_replace(source, target, relative, *args)
+
+            second = FakeProofreader(["CHAPTER 2\nदूसरा सही पाठ।"])
+            with (
+                patch(
+                    "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                    return_value=second,
+                ),
+                patch.object(
+                    LocalPrepPublisher, "_replace_path", recording_replace
+                ),
+            ):
+                run_resumable_prep_job(
+                    job_config,
+                    "prep-subject",
+                    False,
+                    True,
+                    None,
+                    prepare_unicode,
+                )
+
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(state["state"], "succeeded")
+            self.assertTrue(state["replacement_authorized"])
+            self.assertEqual(promoted[-1], CANONICAL_ARTIFACT_FILES[0])
+            self.assertFalse(previous_canonical.exists())
+            self.assertFalse(docx.parent.exists())
+            self.assertFalse(chunks.parent.exists())
+            self.assertFalse(legacy_chunks.parent.exists())
+            self.assertFalse(full_subject.parent.exists())
+            self.assertTrue(unrelated.is_file())
+            self.assertTrue(other_locale.is_file())
+            cleanup = state["publication"]["obsolete_artifact_cleanup"]
+            self.assertTrue(cleanup["chapter_docx_invalidation"]["invalidated"])
+            self.assertTrue(cleanup["legacy_full_subject_cleanup"]["invalidated"])
+            self.assertTrue(
+                state["publication"]["semantic_invalidation"]["invalidated"]
+            )
+            succeeded_report = next(
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in (subject / "run_reports" / "prep-subject").glob(
+                    "*.json"
+                )
+                if json.loads(path.read_text(encoding="utf-8"))["run_identity"][
+                    "status"
+                ]
+                == "succeeded"
+            )
+            self.assertFalse(succeeded_report["run_identity"]["overwrite"])
+            self.assertTrue(
+                succeeded_report["command_details"]["replacement_authorized"]
+            )
+            self.assertTrue(
+                succeeded_report["publication"]["semantic_invalidation"][
+                    "invalidated"
+                ]
+            )
+
     def test_successful_local_overwrite_invalidates_docx_chunks_and_legacy_full_subject(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -941,6 +1187,119 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 if key.startswith(same_root + "chapters/") and "/.work/" not in key
             ]
             self.assertEqual(canonical_uploads[-1], manifest_key)
+
+    def test_r2_overwrite_authorization_survives_resume_and_invalidates_derived_outputs(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job_config = with_payload(
+                config(root),
+                destination={
+                    "backend": "r2",
+                    "bucket": "test-bucket",
+                    "prefix": "cms_library",
+                    "subject_dir": "subject/hi-IN",
+                    "url_base": None,
+                },
+            )
+            client = FakeR2Client()
+            same_root = "cms_library/subject/hi-IN/"
+            previous_canonical = (
+                same_root + "chapters/text_and_metadata/previous.txt"
+            )
+            docx = same_root + "chapters/msword/previous.docx"
+            chunks = same_root + "chapters/semantic_chunks/previous.json"
+            legacy_chunks = (
+                same_root
+                + "chapters/semantic_chunks_and_embeddings/previous.json"
+            )
+            full_subject = same_root + "full_subject/previous.docx"
+            unrelated = same_root + "unrelated/keep.txt"
+            other_locale = (
+                "cms_library/subject/mr-IN/chapters/msword/keep.docx"
+            )
+            protected = {
+                previous_canonical: b"canonical",
+                docx: b"docx",
+                chunks: b"chunks",
+                legacy_chunks: b"legacy chunks",
+                full_subject: b"legacy full subject",
+                unrelated: b"unrelated",
+                other_locale: b"other locale",
+            }
+            client.objects.update(protected)
+
+            first = FakeProofreader(
+                [
+                    "CHAPTER 1\nपहला सही पाठ।",
+                    ProofreadingError("invalid_response", "bad second chapter"),
+                ]
+            )
+            with (
+                patch(
+                    "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                    return_value=first,
+                ),
+                self.assertRaisesRegex(GurubodhError, "incomplete"),
+            ):
+                run_resumable_prep_job(
+                    job_config,
+                    "prep-subject",
+                    True,
+                    False,
+                    None,
+                    prepare_unicode,
+                    r2_client=client,
+                )
+
+            state_key = same_root + JOB_STATE_RELATIVE_PATH.as_posix()
+            state = json.loads(client.objects[state_key].decode("utf-8"))
+            self.assertTrue(state["replacement_authorized"])
+            for key, value in protected.items():
+                self.assertEqual(client.objects[key], value)
+
+            uploads_before_resume = len(client.uploads)
+            second = FakeProofreader(["CHAPTER 2\nदूसरा सही पाठ।"])
+            with patch(
+                "gurubodh.prep_subject_checkpoints.GeminiProofreader",
+                return_value=second,
+            ):
+                run_resumable_prep_job(
+                    job_config,
+                    "prep-subject",
+                    False,
+                    True,
+                    None,
+                    prepare_unicode,
+                    r2_client=client,
+                )
+
+            state = json.loads(client.objects[state_key].decode("utf-8"))
+            self.assertEqual(state["state"], "succeeded")
+            self.assertTrue(state["replacement_authorized"])
+            self.assertNotIn(previous_canonical, client.objects)
+            self.assertNotIn(docx, client.objects)
+            self.assertNotIn(chunks, client.objects)
+            self.assertNotIn(legacy_chunks, client.objects)
+            self.assertNotIn(full_subject, client.objects)
+            self.assertIn(unrelated, client.objects)
+            self.assertIn(other_locale, client.objects)
+            resume_canonical_uploads = [
+                key
+                for key in client.uploads[uploads_before_resume:]
+                if key.startswith(same_root + "chapters/")
+                and "/.work/" not in key
+            ]
+            self.assertEqual(
+                resume_canonical_uploads[-1],
+                same_root + CANONICAL_ARTIFACT_FILES[0].as_posix(),
+            )
+            cleanup = state["publication"]["obsolete_artifact_cleanup"]
+            self.assertTrue(cleanup["chapter_docx_invalidation"]["invalidated"])
+            self.assertTrue(cleanup["legacy_full_subject_cleanup"]["invalidated"])
+            self.assertTrue(
+                state["publication"]["semantic_invalidation"]["invalidated"]
+            )
 
     def test_incomplete_r2_overwrite_preserves_published_and_derived_objects(self):
         with tempfile.TemporaryDirectory() as temp_dir:

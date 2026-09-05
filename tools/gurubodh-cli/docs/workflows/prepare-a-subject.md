@@ -76,7 +76,25 @@ gurubodh prep-subject \
   --overwrite
 ```
 
-An overwrite replaces only preparation-owned paths after a complete candidate is staged. It invalidates same-locale semantic chunks and DOCX exports because they can no longer be bound to the new canonical manifest. `prep-subject` is a single-writer operation per destination: run one writer per subject and locale. Its local advisory lock and R2 advisory lease are guardrails, not reliable mutual exclusion; concurrent runs can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
+Replacement authorization is stored in the checkpoint when an `--overwrite`
+job is created. If that job is incomplete, the required `--resume` invocation
+restores the authorization and performs the normal replacement cleanup only
+after canonical publication succeeds. Resuming a job that started without
+`--overwrite` never adds replacement authorization.
+
+Checkpoint schema version 2 records this authorization explicitly. An older
+incomplete checkpoint without the field cannot prove that cleanup was
+authorized and must be restarted with `--overwrite`. An older succeeded
+checkpoint remains already complete and is migrated with replacement cleanup
+disabled, so cleanup is never applied retroactively.
+
+An overwrite-authorized job replaces only preparation-owned paths after a
+complete candidate is staged. It invalidates same-locale semantic chunks and
+DOCX exports because they can no longer be bound to the new canonical manifest.
+`prep-subject` is a single-writer operation per destination: run one writer per
+subject and locale. Its local advisory lock and R2 advisory lease are
+guardrails, not reliable mutual exclusion; concurrent runs can duplicate
+Gemini calls and overwrite checkpoint/workspace artifacts.
 
 For R2, checkpoints are append-only commits. Initial source snapshots upload once with the chapter plan state commit; each successful chapter uploads only its newly generated text, metadata, diff, and provenance artifacts before the state that marks that chapter successful. Failure state changes upload state only, and advisory heartbeats upload neither workspace artifacts nor state. The job-state JSON is uploaded last for each checkpoint event.
 

@@ -13,7 +13,14 @@ prep-subject
 
 Each prepared release is rooted at `<subject-group>/<language>/`; `hi-IN` and `mr-IN` are independent releases. No command owns the complete subject root. `--overwrite` replaces only the invoking command's owned paths.
 
-A successful `prep-subject --overwrite` invalidates same-locale chunks and DOCX exports because they may no longer match canonical content. Chunks and DOCX do not invalidate one another. `prep-subject` is single-writer per destination; its local advisory lock and R2 advisory lease are guardrails rather than reliable mutual exclusion, so concurrent writers can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
+A successful overwrite-authorized `prep-subject` job invalidates same-locale
+chunks and DOCX exports because they may no longer match canonical content.
+That authorization is persisted when `--overwrite` creates the job and survives
+a compatible `--resume`; resume never grants it to an ordinary job. Chunks and
+DOCX do not invalidate one another. `prep-subject` is single-writer per
+destination; its local advisory lock and R2 advisory lease are guardrails rather
+than reliable mutual exclusion, so concurrent writers can duplicate Gemini
+calls and overwrite checkpoint/workspace artifacts.
 
 ## Canonical content and integrity
 

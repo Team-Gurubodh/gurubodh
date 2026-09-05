@@ -146,15 +146,20 @@ the only format the maintained prep pipelines support. See
   artifacts.
 - `prep_subject_job_state.schema.json` defines the durable operational
   checkpoint at `run_state/prep-subject/job-state.json`. It records safe
-  compatibility, lease, per-chapter state, artifact checksums, publication, and
-  report references; it must never contain credentials, raw requests/responses,
-  or full chapter text. `generate-chunks` and `generate-docx` require this state
-  to be `succeeded` and to bind the published chapter content manifest before
-  either command can mutate its derived output.
+  compatibility, job-level replacement authorization, lease, per-chapter state,
+  artifact checksums, publication, and report references; it must never contain
+  credentials, raw requests/responses, or full chapter text. Schema version `2`
+  requires the boolean `replacement_authorized` field so an overwrite-authorized
+  job retains that intent across `--resume`. `generate-chunks` and
+  `generate-docx` require this state to be `succeeded` and to bind the published
+  chapter content manifest before either command can mutate its derived output.
   Checkpoint compatibility contract version `2` validates exactly the five
   per-chapter canonical/provenance files. Old incomplete six-file checkpoints
   require a fresh `prep-subject --overwrite`; old succeeded releases remain
-  downstream-consumable.
+  downstream-consumable. Incomplete schema-version-1 checkpoints lack reliable
+  replacement authorization and also require a fresh `--overwrite`; succeeded
+  schema-version-1 checkpoints migrate conservatively with replacement cleanup
+  disabled.
 - Seed-data JSON schemas belong under `tools/seed-data-cli/config/` once the
   config-driven source discovery task is implemented.
 - Glossary seed-data artifacts are validated by

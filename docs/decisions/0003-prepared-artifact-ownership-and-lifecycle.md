@@ -59,6 +59,15 @@ staged generation, staged validation, and source revalidation, then records its
 cleanup after successful v2 publication. Local and R2 replacement are not a fully atomic multi-prefix
 release; versioned releases and a current pointer are deferred.
 
+For `prep-subject`, replacement authorization belongs to the persisted job,
+not to one CLI invocation. A job created by `--overwrite` retains that
+authorization when its compatible incomplete checkpoint is continued with
+`--resume`; cleanup still occurs only after canonical publication succeeds. A
+resume cannot add authorization to a non-overwrite job. Legacy incomplete
+checkpoints without explicit authorization must be restarted with
+`--overwrite`, while already-succeeded legacy checkpoints never receive
+retroactive cleanup authorization.
+
 ## Rationale
 
 Proofreading is a required staging step. All chapter responses must validate

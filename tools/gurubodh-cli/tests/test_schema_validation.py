@@ -280,6 +280,55 @@ class SchemaValidationTests(unittest.TestCase):
             self.assertIn(str(output), message)
             self.assertIn(expected, message)
 
+    def test_prep_checkpoint_schema_requires_typed_replacement_authorization(self):
+        valid = {
+            "schema_version": 2,
+            "job_id": "00000000-0000-4000-8000-000000000000",
+            "replacement_authorized": False,
+            "state": "running",
+            "created_at": "2026-09-05T00:00:00Z",
+            "updated_at": "2026-09-05T00:00:00Z",
+            "compatibility": {
+                "fingerprint": "a" * 64,
+                "source_docx_sha256": "b" * 64,
+                "output_affecting_inputs": {},
+            },
+            "chapters": [],
+            "counts": {"succeeded": 0, "failed": 0, "pending": 0},
+            "publication": {},
+            "run_reports": [],
+        }
+        valid_path = self.temp_dir / "valid-prep-state.json"
+        write_json_artifact(valid_path, valid, "prep-subject job state")
+        self.assertTrue(valid_path.is_file())
+
+        for filename, value, expected in (
+            (
+                "missing-authorization.json",
+                None,
+                "$.replacement_authorized is required",
+            ),
+            (
+                "invalid-authorization.json",
+                "yes",
+                "$.replacement_authorized must be boolean; found string",
+            ),
+        ):
+            payload = copy.deepcopy(valid)
+            if value is None:
+                payload.pop("replacement_authorized")
+            else:
+                payload["replacement_authorized"] = value
+            output = self.temp_dir / filename
+            with self.subTest(filename=filename), self.assertRaises(
+                GurubodhError
+            ) as raised:
+                write_json_artifact(
+                    output, payload, "prep-subject job state"
+                )
+            self.assertFalse(output.exists())
+            self.assertIn(expected, str(raised.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

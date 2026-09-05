@@ -338,6 +338,11 @@ class PrepCheckpointState:
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> PrepCheckpointState:
         isolated = deepcopy(dict(payload))
+        if (
+            "replacement_authorized" in isolated
+            and not isinstance(isolated["replacement_authorized"], bool)
+        ):
+            raise TypeError("replacement_authorized must be a boolean")
         state = isolated.get("state")
         if state is not None:
             PrepJobStatus(state)
@@ -358,6 +363,13 @@ class PrepCheckpointState:
     @status.setter
     def status(self, value: PrepJobStatus) -> None:
         self.payload["state"] = value.value
+
+    @property
+    def replacement_authorized(self) -> bool:
+        value = self.payload["replacement_authorized"]
+        if not isinstance(value, bool):
+            raise TypeError("replacement_authorized must be a boolean")
+        return value
 
     @property
     def publication_status(self) -> PublicationStatus:

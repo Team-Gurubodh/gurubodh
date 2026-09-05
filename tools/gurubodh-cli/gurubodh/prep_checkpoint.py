@@ -14,6 +14,7 @@ from gurubodh.audit import bounded_failure
 from gurubodh.canonical_release import (
     CHECKPOINT_CONTRACT_VERSION,
     CHECKPOINT_SCHEMA_VERSION,
+    LEGACY_CHECKPOINT_SCHEMA_VERSION,
 )
 from gurubodh.contracts import (
     ChapterStatus,
@@ -254,6 +255,12 @@ class PrepCheckpointManager:
         return self.state["job_id"]
 
     @property
+    def replacement_authorized(self) -> bool:
+        if not self.state:
+            raise RuntimeError("Checkpoint state is not initialized")
+        return self.state.replacement_authorized
+
+    @property
     def workspace_relative(self) -> Path:
         return workspace_relative_path(self.job_id)
 
@@ -299,6 +306,11 @@ class PrepCheckpointManager:
                     "--overwrite; checkpoints from different inputs are never mixed."
                 )
             elif self.state.status is PrepJobStatus.SUCCEEDED:
+                if (
+                    self.state.get("schema_version")
+                    == LEGACY_CHECKPOINT_SCHEMA_VERSION
+                ):
+                    self._migrate_legacy_succeeded_state()
                 self.state["run"] = self.state.get("run", {}) | {
                     "run_id": str(uuid.uuid4()),
                     "last_started_at": utc_now(),
@@ -323,6 +335,7 @@ class PrepCheckpointManager:
                 {
                     "schema_version": CHECKPOINT_SCHEMA_VERSION,
                     "job_id": job_id,
+                    "replacement_authorized": self.overwrite,
                     "state": PrepJobStatus.RUNNING.value,
                     "created_at": now,
                     "updated_at": now,
@@ -360,10 +373,32 @@ class PrepCheckpointManager:
         return "started"
 
     def _validate_loaded_state(self) -> None:
-        if (
-            self.state.get("schema_version") != CHECKPOINT_SCHEMA_VERSION
-            or not isinstance(self.state.get("job_id"), str)
-        ):
+        schema_version = self.state.get("schema_version")
+        if not isinstance(self.state.get("job_id"), str):
+            raise SourceValidationError(
+                "Unsupported or malformed prep-subject checkpoint. Re-run "
+                "with --overwrite."
+            )
+        if schema_version == CHECKPOINT_SCHEMA_VERSION:
+            try:
+                self.state.replacement_authorized
+            except (KeyError, TypeError) as exc:
+                raise SourceValidationError(
+                    "The prep-subject checkpoint is missing valid persisted "
+                    "replacement authorization. Re-run with --overwrite to "
+                    "restart the staged job safely."
+                ) from exc
+        elif schema_version == LEGACY_CHECKPOINT_SCHEMA_VERSION:
+            if (
+                self.state.status is not PrepJobStatus.SUCCEEDED
+                and not self.overwrite
+            ):
+                raise SourceValidationError(
+                    "The existing incomplete prep-subject checkpoint predates "
+                    "persisted replacement authorization, so it cannot be "
+                    "resumed safely. Restart the job with --overwrite."
+                )
+        else:
             raise SourceValidationError(
                 "Unsupported or malformed prep-subject checkpoint. Re-run "
                 "with --overwrite."
@@ -380,6 +415,11 @@ class PrepCheckpointManager:
                 "text-only checkpoint; re-run with --overwrite."
             )
         self.coordinator.validate_loaded_state(self.state)
+
+    def _migrate_legacy_succeeded_state(self) -> None:
+        """Upgrade an already-published state without authorizing cleanup."""
+        self.state["schema_version"] = CHECKPOINT_SCHEMA_VERSION
+        self.state["replacement_authorized"] = False
 
     def heartbeat(self) -> None:
         self.coordinator.heartbeat(self.state)
@@ -757,13 +797,13 @@ class PrepCheckpointManager:
         self.state.publication_status = PublicationStatus.PUBLISHING
         self.persist()
         publication_updates = self.publisher.publish_canonical(
-            self.workspace_dir, self.overwrite
+            self.workspace_dir, self.replacement_authorized
         )
         if publication_updates:
             publication = self.state.publication
             publication.payload.update(publication_updates)
             self.state.publication = publication
-        if self.overwrite:
+        if self.replacement_authorized:
             self._perform_overwrite_cleanup()
         self.state.status = PrepJobStatus.SUCCEEDED
         self.state.publication_status = PublicationStatus.SUCCEEDED
