@@ -108,6 +108,54 @@ and lab artifact construction. `gurubodh.proofreading` re-exports only the
 previously consumed compatibility names; new internal callers should import the
 narrow component they use.
 
+## Import ownership and verification
+
+`gurubodh.ml.errors` owns the shared `ModelCacheConfigError` leaf exception.
+Embedding infrastructure and semantic-chunking configuration consume that same
+class; `gurubodh.ml.semantic_chunking.config.ModelCacheConfigError` remains a
+compatible import and catch target. Embedding infrastructure must not depend on
+semantic-chunking modules.
+
+`gurubodh.ml.semantic_chunking` eagerly exports only `SemanticChunkConfig`,
+`Chunk`, and `ChunkedDocument`. The supported `SemanticChunker`,
+`ParagraphSegmenter`, and `SemanticChunkingParagraphSegmenter` package imports
+resolve lazily to their original classes. Importing the package, configuration,
+or models alone must not load chunker, segmenter, or embedding implementation.
+New internal callers should import the narrow component they consume.
+
+Dependency direction runs from CLI and command orchestration to reusable
+components. Only `gurubodh.__main__`, the module entry point, imports the main
+`gurubodh.cli` module; the installed console script also targets `cli:main`.
+Reusable modules must not import lab commands, `pipelines`,
+`prep_subject_checkpoints`, or the tokenization command adapter. In particular,
+canonical source/release validation stays independent of prep orchestration.
+Importing `contracts` alone must not load other Gurubodh components, including
+proofreading services or provider adapters.
+
+`tests/test_import_boundaries.py` replaces the former canonical/prep string
+guard with focused declared-import checks and a fresh interpreter for **each**
+discovered package module. Imports may not load provider/model SDKs, perform
+network or process operations, or invoke CLI/workflow entry functions. The
+checks distinguish eager imports, `TYPE_CHECKING` references, deferred function
+imports, and deliberate `__getattr__` compatibility exports. Fresh-process
+guards additionally cover implicit parent-package initialization and transitive
+runtime dependencies, which a direct-import scan cannot establish. A static
+graph cycle involving type references or lazy exports is not by itself a
+runtime defect; raw pydeps cycle counts are not a pass/fail criterion.
+
+From `tools/gurubodh-cli`, run the focused checks or normal verification:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p test_import_boundaries.py -v
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p test_semantic_chunking.py -v
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -v
+```
+
+The existing `gurubodh-cli container` pull-request workflow runs full unittest
+discovery, including these import guards and deterministic fake-model chunking
+checks. Container runtime smoke checks are described in the
+[R2 runbook](../operations/r2-production-runs.md#build-and-inspect-locally).
+
 ## Compatibility rule
 
 Do not add runtime-only keys to schema-shaped job dictionaries. Add a typed

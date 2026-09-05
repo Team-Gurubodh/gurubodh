@@ -469,13 +469,5 @@ class PrepPublicationTests(unittest.TestCase):
             self.assertNotIn(prefix + "chapters/msword/old.docx", client.objects)
 
 
-class ImportBoundaryTests(unittest.TestCase):
-    def test_foundational_canonical_modules_do_not_import_prep_orchestration(self):
-        package = Path(__file__).parents[1] / "gurubodh"
-        for filename in ("canonical_release.py", "canonical_source.py"):
-            source = (package / filename).read_text(encoding="utf-8")
-            self.assertNotIn("prep_subject_checkpoints", source)
-
-
 if __name__ == "__main__":
     unittest.main()
