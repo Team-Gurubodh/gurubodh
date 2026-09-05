@@ -94,13 +94,19 @@ single provider-specific workflow module:
 - `proofreading/service.py` applies provider-neutral orchestration around a raw
   transport and returns the shared `ProofreadingProviderResponse` contract.
 - `proofreading/policy.py` owns pacing, retry classification and delay,
-  service-unavailable recovery, and safe bounded diagnostics. It has no SDK
-  dependency.
+  and service-unavailable recovery. It has no SDK dependency.
 - `proofreading/validation.py` converts a plain structured-response string into
   typed, validated edits before the provider result crosses the protocol.
 - `proofreading/text_comparison.py` owns local word-level comparison.
 - `proofreading/artifacts.py` owns canonical chapter output and proofreading
   manifest construction and accepts the narrow `Proofreader` protocol.
+
+`gurubodh/diagnostics.py` is the shared leaf owner for bounded request-diagnostic
+sanitization used by auditing and proofreading. It depends on no proofreading,
+retry-policy, provider, audit, or orchestration component. The former
+`proofreading.policy.safe_request_diagnostics` import remains a compatibility
+alias to the same implementation; production consumers import the shared owner
+directly.
 
 Locale selection is an explicit input to the Gemini composition, and the
 locale's instruction-template provenance remains an explicit input to canonical

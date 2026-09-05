@@ -39,6 +39,12 @@ def matches(name, prefixes):
 
 def forbidden_dependencies(module):
     forbidden = []
+    if module == "gurubodh.diagnostics":
+        forbidden.extend(
+            name for name in MODULES if name not in {"gurubodh", module}
+        )
+    if module == "gurubodh.audit":
+        forbidden.append("gurubodh.proofreading")
     if module not in {"gurubodh.__main__", "gurubodh.cli"}:
         forbidden.append("gurubodh.cli")
     if not matches(module, COMMANDS):
@@ -168,6 +174,19 @@ class ImportBoundaryTests(unittest.TestCase):
                     forbidden = forbidden_dependencies(module)
                 with self.subTest(module=module, line=line, kind=kind, target=target):
                     self.assertFalse(matches(target, forbidden))
+
+    def test_audit_import_does_not_load_proofreading(self):
+        self.probe("gurubodh.audit", forbidden=("gurubodh.proofreading",))
+
+    def test_diagnostics_declares_only_minimal_standard_library_dependencies(self):
+        imports = declared_imports(
+            MODULES["gurubodh.diagnostics"].read_text(encoding="utf-8"),
+            "gurubodh.diagnostics",
+        )
+        self.assertEqual(
+            {target for target, _, _ in imports},
+            {"__future__", "math", "re", "typing"},
+        )
 
     def test_import_scan_distinguishes_relative_type_and_compatibility_imports(self):
         source = """
