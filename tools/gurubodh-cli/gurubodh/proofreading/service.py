@@ -8,13 +8,13 @@ import time
 from typing import Callable, Protocol
 
 from gurubodh.contracts import ProofreadingProviderResponse
+from gurubodh.diagnostics import safe_request_diagnostics
 from gurubodh.locales import LocaleSpec
 from gurubodh.proofreading.errors import ProofreadingError
 from gurubodh.proofreading.policy import (
     RequestPolicy,
     RequestRateLimiter,
     estimate_input_tokens,
-    safe_request_diagnostics,
 )
 from gurubodh.proofreading.settings import ProofreadingSettings
 from gurubodh.proofreading.validation import parse_structured_response

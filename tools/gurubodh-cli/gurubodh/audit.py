@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from gurubodh import __version__
+from gurubodh.diagnostics import safe_request_diagnostics
 from gurubodh.errors import ProcessingError
-from gurubodh.proofreading.policy import safe_request_diagnostics
 from gurubodh.schema_validation import validate_artifact
 from gurubodh.time_utils import utc_now
 
