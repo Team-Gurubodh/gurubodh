@@ -109,6 +109,51 @@ class SemanticChunkingTests(unittest.TestCase):
         self.assertFalse(hasattr(document.chunks[0], "dense_embedding"))
         self.assertEqual(document.source_text_sha256, document.concatenated_chunks_sha256)
 
+        # Fixed pre-repair output: catch changes to text, codepoint spans,
+        # checksums and token accounting without loading a real model.
+        self.assertEqual([chunk.to_dict() for chunk in document.chunks], [
+            {
+                "index": 1, "text": "पहला वाक्य।", "sentence_count": 1,
+                "char_count": 11, "estimated_token_count": 2,
+                "start_sentence": 0, "end_sentence": 0, "start_char": 0, "end_char": 11,
+                "chunk_text_sha256": "fcac1a80ea6e68669ef4942137d2dc17f45a14e84649d2a2dae04bbe51af5833",
+            },
+            {
+                "index": 2, "text": "दूसरा वाक्य।", "sentence_count": 1,
+                "char_count": 12, "estimated_token_count": 2,
+                "start_sentence": 1, "end_sentence": 1, "start_char": 13, "end_char": 25,
+                "chunk_text_sha256": "9a6153560c03229b235ec02bf409d22ef5c868d9b641332dee2810f061cd09cf",
+            },
+        ])
+        self.assertEqual(document.estimated_token_count, 4)
+        self.assertEqual(
+            document.source_text_sha256,
+            "df2047898e9ee03e96504738037caf7d1523fec64a50ab620516805c8894a11f",
+        )
+        self.assertEqual(model.calls, [{
+            "texts": ["पहला वाक्य। दूसरा वाक्य।", "पहला वाक्य। दूसरा वाक्य।"],
+            "batch_size": 16, "normalize_embeddings": True, "show_progress_bar": False,
+        }])
+        validate_document_for_source("पहला वाक्य।\n\nदूसरा वाक्य।", document)
+
+    def test_cached_model_failure_is_caught_through_legacy_config_error(self):
+        def unavailable_model(*args, **kwargs):
+            raise OSError("missing pinned snapshot")
+
+        helper = SentenceTransformerEmbeddingHelper(
+            provider="sentence-transformers", model_name="BAAI/bge-m3",
+            model_revision="5617a9f61b028005a4858fdac845db406aefb181",
+            cache_dir_resolver=lambda: Path("/unused-model-cache"),
+            local_files_only=True, device="cpu",
+        )
+        with patch.dict(sys.modules, {"sentence_transformers": SimpleNamespace(SentenceTransformer=unavailable_model)}):
+            with self.assertRaisesRegex(ModelCacheConfigError, "unavailable or incomplete") as exc:
+                helper.encode_texts(["text"], batch_size=1, normalize=True)
+        from gurubodh.ml.errors import ModelCacheConfigError as SharedModelCacheConfigError
+
+        self.assertIs(type(exc.exception), SharedModelCacheConfigError)
+        self.assertIsInstance(exc.exception.__cause__, OSError)
+
     def test_coverage_validation_rejects_non_whitespace_gap(self):
         source = "पहला। छूटा।"
         chunk = Chunk(

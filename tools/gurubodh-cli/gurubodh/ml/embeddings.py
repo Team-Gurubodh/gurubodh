@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from gurubodh.ml.semantic_chunking.config import ModelCacheConfigError
+from gurubodh.ml.errors import ModelCacheConfigError
 
 class TextEmbeddingHelper(Protocol):
     """A reusable batch text-encoding boundary."""

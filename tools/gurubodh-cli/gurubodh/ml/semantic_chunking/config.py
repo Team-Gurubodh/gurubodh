@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
+from gurubodh.ml.errors import ModelCacheConfigError
 
 MODEL_CACHE_ENV_VAR = "GURUBODH_MODEL_CACHE_DIR"
 DEFAULT_PROVIDER = "semantic-chunking"
@@ -15,10 +16,6 @@ DEFAULT_STRATEGY_VERSION = "semantic-window-v1"
 
 class SemanticChunkConfigError(ValueError):
     """Raised when semantic chunking configuration is invalid."""
-
-
-class ModelCacheConfigError(RuntimeError):
-    """Raised when semantic chunking cannot resolve the local model cache."""
 
 
 @dataclass(frozen=True)
