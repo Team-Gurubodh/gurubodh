@@ -20,6 +20,7 @@ Use numbered filenames:
 | [0005](./0005-language-scoped-prepared-content-release-roots.md) | Language-Scoped Prepared Content Release Roots | Accepted |
 | [0006](./0006-source-font-safety-boundary.md) | Source Font Safety Boundary | Accepted |
 | [0007](./0007-executable-cli-json-schema-boundaries.md) | Executable Gurubodh CLI JSON Schema Boundaries | Accepted |
+| [0008](./0008-slice-development-pilot.md) | Slice Development Pilot | Accepted for pilot only |
 
 Keep `0000-template.md` as the local starter template.
 
