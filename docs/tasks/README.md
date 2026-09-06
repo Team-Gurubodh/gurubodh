@@ -12,3 +12,7 @@ Task history lives here so it is discoverable through the main documentation tre
 - Use `docs/templates/task-template.md` for new structured task records.
 - Link important completed tasks from durable docs when they explain architecture, decisions, or setup.
 - Promote durable lessons into `docs/adr/`, `docs/decisions/`, or other docs rather than relying only on task history.
+
+## Active Process Pilot
+
+- [018: Slice development pilot](./018-slice-development-pilot.md) - #289 process setup and the current planning handoff for the selected #283 slice.

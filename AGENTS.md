@@ -63,6 +63,17 @@ Before making any change to tracked files:
 This workflow is mandatory unless the user explicitly instructs otherwise.
 </github_workflow>
 
+<development_pilot>
+For the proofreading/chunking profile-contract pilot in GitHub Issue #283,
+follow `docs/development/slice-workflow.md` before planning or implementation.
+Its requirement coverage, reconciliation, and whole-issue completion rules
+apply to all of #283; #284 implementation waits for #283's completion review.
+The full phase workflow is mandatory only for the selected pilot until the
+maintainer approves wider adoption under #289. Read the current handoff linked
+from the workflow. Existing issue, branch, verification, and merge rules remain
+applicable; explicit user exceptions are handled as documented there.
+</development_pilot>
+
 
 <verification>
 - For CMS changes, prefer the commands documented in `README.md` and `apps/gurubodh-cms/README.md`.
