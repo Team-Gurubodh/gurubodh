@@ -216,9 +216,14 @@ boundaries, but retrieval vectors are not preparation artifacts and are not
 stored in local artifact trees or R2.
 
 `chapters/semantic_chunks_and_embeddings/` is a legacy combined-output path.
-It is unsupported for new ingestion. `generate-chunks` fails when it exists
-unless `--overwrite` is supplied, which removes that legacy command-owned
-output before producing v2 chunks.
+It is unsupported for new ingestion, and its vectors are not migrated into v2
+chunk-only artifacts. `generate-chunks` fails when the legacy output exists
+unless `--overwrite` is supplied. With overwrite, the command preserves that
+output through preflight, staged generation, staged validation, and source
+revalidation. It removes the legacy output only after successful v2 publication
+and records the cleanup in the audit. For R2, the new
+`semantic_chunks_manifest.json` is the readiness marker and is published last;
+the multi-object replacement is readiness-based rather than atomic.
 
 ## Derived DOCX Exports
 
