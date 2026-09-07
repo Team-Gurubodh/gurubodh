@@ -62,10 +62,14 @@ maps all 29 fields to the assembled job configuration and defines identity and
 whole-profile precedence. Used IDs are immutable; policy changes require a new
 ID and explicit selection.
 
-Profile and subject/locale component validation are implemented. The future catalog uses
+All seven component validators are implemented; S3's contract remains in
+[#296](https://github.com/Team-Gurubodh/gurubodh/issues/296). The
+[S4 field mapping](../../../../docs/interfaces/assembled-job-field-mapping.md)
+accounts for every assembled field, omission rule, and legacy allowance.
+The future catalog uses
 `config/job-components/profiles/proofreading/` and
 `config/job-components/profiles/chunking/`. Production declarations, lookup,
-command/manifest/edition/invocation selection, and canonical/lab binding remain
+command/manifest/edition/invocation selection, and runtime canonical/lab binding remain
 pending. Complete jobs and `--config` remain supported until the maintainer
 accepts comparison results under #288.
 

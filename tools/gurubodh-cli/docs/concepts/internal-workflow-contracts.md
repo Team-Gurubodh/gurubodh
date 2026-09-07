@@ -33,8 +33,10 @@ it.
 ## Error boundary
 
 `validate_component(instance, component_name, path=None, *, expected_id=None)`
-validates `proofreading-profile`, `chunking-profile`, `subject-manifest`, and
-`locale-definition` in memory. It returns
+validates all seven registered component kinds in memory. The additional S3
+contracts are recorded in [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296).
+The [S4 field mapping](../../../../docs/interfaces/assembled-job-field-mapping.md)
+reconciles component ownership with the existing preparation APIs. Validation returns
 `None` without mutation, component lookup, or policy construction. `path` supplies
 diagnostic context; `expected_id` checks resource identity. Unknown kinds and
 malformed components raise `ConfigurationError`. Each job/component/artifact
@@ -47,7 +49,7 @@ schema or remote retrieval. After structural validation, it rejects proofreading
 progress intervals above the timeout and compiles manifest regex patterns with
 explicit flags to reject invalid Python syntax. Compiler errors are sanitized;
 compiled values are discarded. Expected identity uses `profile_id`, `manifest_id`,
-or `locale` for the corresponding kind. See
+or `locale` for S1/S2 kinds; S3 identity fields are specified in #296. See
 [Decision-0009](../../../../docs/decisions/0009-cli-execution-profile-contracts.md)
 for the profile contract and
 [Decision-0010](../../../../docs/decisions/0010-cli-manifest-locale-contracts.md)

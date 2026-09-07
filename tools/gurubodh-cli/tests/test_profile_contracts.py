@@ -33,8 +33,12 @@ def profile(kind):
 
 
 class ProfileContractTests(unittest.TestCase):
-    def assert_invalid(self, payload, kind, location):
+    def assert_invalid(self, payload, kind, location, *, structural=True):
         original = copy.deepcopy(payload)
+        if structural:
+            filename = COMPONENT_SCHEMAS[f"{kind}-profile"]
+            schema = _validator("job-components/schemas", filename).schema
+            self.assertFalse(Draft202012Validator(schema).is_valid(payload))
         with self.assertRaises(ConfigurationError) as raised:
             validate_component(payload, f"{kind}-profile", "profiles/example.json")
         self.assertEqual(payload, original)
@@ -163,7 +167,8 @@ class ProfileContractTests(unittest.TestCase):
         payload = profile("proofreading")
         payload["proofreading"]["request_progress_interval_seconds"] = 121
         self.assert_invalid(payload, "proofreading",
-                            "$.proofreading.request_progress_interval_seconds must not exceed request_timeout_seconds")
+                            "$.proofreading.request_progress_interval_seconds must not exceed request_timeout_seconds",
+                            structural=False)
 
     def test_non_json_values_and_non_object_roots_fail_in_configuration_domain(self):
         for value in (None, [], True, "text", 123):

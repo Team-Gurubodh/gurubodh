@@ -1,4 +1,4 @@
-"""S3 fixture mappings at existing job boundaries, without a production resolver."""
+"""S3/S4 fixture mappings at existing job boundaries, without a production resolver."""
 
 import copy
 import tempfile
@@ -121,6 +121,51 @@ class CommandStorageMappingTests(unittest.TestCase):
                                     self.assertEqual(job["source"]["prefix"], "cms_library")
                             if command_id == "generate-chunks":
                                 job["chunking"] = fixture("chunking/bge-m3-semantic-window-v1.json")["chunking"]
+                            # S4: exact location and metadata expectations are independent
+                            # of the component field construction above, including omissions.
+                            expected_destination = (
+                                {"backend": "local", "root_dir": str(Path(directory) / "artifacts"),
+                                 "subject_dir": subject_dir}
+                                if route_id == "local" else
+                                {"backend": "r2", "bucket": "gurubodh-library-dev", "prefix": "cms_library",
+                                 "subject_dir": subject_dir, "url_base": None}
+                            )
+                            if command_id == "prep-subject":
+                                expected_source = (
+                                    {"backend": "r2", "bucket": "gurubodh-library-dev", "key": source_key,
+                                     "url_base": None} if route_id == "r2" else
+                                    {"backend": "local", "root_dir": str(Path(directory) / "source"),
+                                     "relative_path": source_key.removeprefix("source_library/")}
+                                )
+                                expected_source.update(file_format="docx", font_encoding=(
+                                    "aps" if manifest_file == "subjects/aps-hindi.json" else "unicode"))
+                                expected_split = (
+                                    {"enabled": True, "pattern_type": "literal", "pattern": "प्रबोधन"}
+                                    if manifest_file == "subjects/aps-hindi.json" else
+                                    {"enabled": True, "pattern_type": "regex", "pattern": "^प्रबोधन",
+                                     "flags": ["MULTILINE"]} if locale_id == "hi-IN" else {"enabled": False}
+                                )
+                                self.assertEqual(job["chapter_split"], expected_split)
+                                self.assertEqual(job["metadata_defaults"], {
+                                    "language": locale_id, "source_script": "Devanagari",
+                                    "output_text_encoding": "UTF-8", "summary_chapter_markers": [
+                                        "उपसंहार", "उपसंहारात्मक", "उपसंभारात्मक", "उपसंभारात्त्मक", "उपसंभार",
+                                    ],
+                                })
+                            else:
+                                expected_source = (
+                                    {"backend": "r2", "bucket": "gurubodh-library-dev", "prefix": "cms_library",
+                                     "subject_dir": subject_dir, "url_base": None} if route_id == "r2" else
+                                    {"backend": "local", "root_dir": str(Path(directory) / "artifacts"),
+                                     "subject_dir": subject_dir}
+                                )
+                            self.assertEqual(job["source"], expected_source)
+                            self.assertEqual(job["destination"], expected_destination)
+                            self.assertEqual(set(job), {
+                                "schema_version", "pipeline", "source", "destination", "naming",
+                            } | ({"chapter_split", "metadata_defaults", "proofreading"}
+                                 if command_id == "prep-subject" else {"chunking"}
+                                 if command_id == "generate-chunks" else set()))
                             self.assertEqual(prepare_job(job, "s3-contract.json").to_payload(), job)
                             if command_id == "generate-chunks":
                                 job["chapters"] = ["001", "012"]
