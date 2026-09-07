@@ -1,8 +1,7 @@
-"""S4 cross-kind ownership and exhaustive documented job-field reconciliation."""
+"""S4 cross-kind ownership and exhaustive job-field ownership reconciliation."""
 
 import json
 from pathlib import Path
-import re
 import unittest
 
 from jsonschema import Draft202012Validator
@@ -12,7 +11,7 @@ import component_contract_cases as cases
 
 
 CLI_ROOT = Path(__file__).parents[1]
-MAPPING = CLI_ROOT.parents[1] / "docs/interfaces/assembled-job-field-mapping.md"
+MAPPING = CLI_ROOT / "tests/fixtures/job-components/assembled-job-field-mapping.json"
 # Independent expected registration, not computed from production registration.
 SCHEMAS = {
     "subject-manifest": "subject_manifest.schema.json",
@@ -101,19 +100,14 @@ class AllComponentContractTests(unittest.TestCase):
             detail for _, detail in result.errors + result.failures))
 
 
-class DocumentedFieldMappingTests(unittest.TestCase):
-    def test_every_job_field_has_exactly_one_documented_owner(self):
+class FieldMappingTests(unittest.TestCase):
+    def test_every_job_field_has_exactly_one_owner(self):
         inventories = {command: {} for command in ("prep", "chunks", "docx")}
-        for line in MAPPING.read_text().splitlines():
-            if not line.startswith("| "):
-                continue
-            columns = [column.strip() for column in line.strip("|").split("|")]
-            if len(columns) != 4 or columns[0].split(",")[0] not in inventories:
-                continue
-            commands, fields, owner, presence = columns
-            self.assertTrue(owner and presence, line)
-            for command in commands.split(","):
-                for field in re.findall(r"`(\$[^`]*)`", fields):
+        for row in json.loads(MAPPING.read_text(encoding="utf-8"))["fields"]:
+            owner, presence = row["owner"], row["presence"]
+            self.assertTrue(owner and presence, row)
+            for command in row["commands"]:
+                for field in row["paths"]:
                     self.assertNotIn(field, inventories[command], (command, field))
                     inventories[command][field] = (owner, presence)
         for short, command in (("prep", "prep-subject"), ("chunks", "generate-chunks"),

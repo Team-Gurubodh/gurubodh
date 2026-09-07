@@ -1,4 +1,4 @@
-"""Run with an isolated installed interpreter; see the fixture README."""
+"""Run with an isolated interpreter; see docs/concepts/internal-workflow-contracts.md."""
 
 import copy
 from importlib.metadata import distribution

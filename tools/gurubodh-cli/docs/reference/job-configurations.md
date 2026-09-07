@@ -55,16 +55,16 @@ such as `gemini-3.6-flash-v1` or `bge-m3-v1`, and complete `proofreading` or
 references to other schemas. Unknown or missing fields fail without defaults;
 a supplied `expected_id` must match `profile_id`.
 
-The [fixtures](../../tests/fixtures/job-components/README.md) include examples
-and verification commands. The
-[profile decision](../../../../docs/decisions/0009-cli-execution-profile-contracts.md)
+The [component verification guide](../concepts/internal-workflow-contracts.md#component-contract-verification)
+describes fixtures and verification commands. The
+[profile decision](https://github.com/Team-Gurubodh/gurubodh/issues/292#issuecomment-5571635810)
 maps all 29 fields to the assembled job configuration and defines identity and
 whole-profile precedence. Used IDs are immutable; policy changes require a new
 ID and explicit selection.
 
 All seven component validators are implemented; S3's contract remains in
 [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296). The
-[S4 field mapping](../../../../docs/interfaces/assembled-job-field-mapping.md)
+[S4 field mapping](https://github.com/Team-Gurubodh/gurubodh/issues/298#issuecomment-5571636607)
 accounts for every assembled field, omission rule, and legacy allowance.
 The future catalog uses
 `config/job-components/profiles/proofreading/` and
@@ -79,7 +79,7 @@ accepts comparison results under #288.
 Both require `component_schema_version: "1.0.0"` and reject unknown or missing
 properties. Optional `expected_id` matches `manifest_id` or `locale`; the display
 filename never supplies identity. Representative declarations live in the
-[component fixtures](../../tests/fixtures/job-components/README.md).
+[component fixtures](../../tests/fixtures/job-components/).
 
 A manifest declares its identity, explicit artifact root, and one or both
 `hi-IN`/`mr-IN` editions. Each edition owns its two-digit string release,
@@ -94,7 +94,7 @@ selected locale supplies assembled metadata language; instruction templates
 remain in `locales.py`. Artifact `subject_dir` is the declared root plus `/` and
 locale. No value is inferred from a manifest ID or directory.
 
-[Decision-0010](../../../../docs/decisions/0010-cli-manifest-locale-contracts.md)
+[Decision-0010](https://github.com/Team-Gurubodh/gurubodh/issues/294#issuecomment-5571636132)
 defines the exact identity/path grammar, conditional shapes, and complete field
 mapping. These contracts do not activate composition or replace maintained jobs.
 

@@ -1,0 +1,448 @@
+{
+  "source": "https://github.com/Team-Gurubodh/gurubodh/issues/298#issuecomment-5571636607",
+  "fields": [
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$"
+      ],
+      "owner": "Resolver constructs the command-specific object from validated components",
+      "presence": "Required; only the fields below enter the job"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.schema_version"
+      ],
+      "owner": "Command `job_schema_version`",
+      "presence": "Required; prep 1.5.0, chunks 1.2.0, DOCX 1.0.0"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.pipeline"
+      ],
+      "owner": "Command fixed pipeline; prep indexes `pipeline_by_encoding` with edition encoding",
+      "presence": "Required; APS selects legacy-docx-to-unicode, Unicode selects unicode-docx-ingest"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source",
+        "$.destination"
+      ],
+      "owner": "Resolver constructs the selected store's applicable location shape using S3 roles",
+      "presence": "Required; local and R2 shapes use only their applicable fields"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source.backend",
+        "$.destination.backend"
+      ],
+      "owner": "Selected environment store `backend`",
+      "presence": "Required; legacy prep may omit it and interpret local"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source.root_dir",
+        "$.destination.root_dir"
+      ],
+      "owner": "Selected local store's named `$env` binding, resolved by #284",
+      "presence": "Required for local; omitted for R2; used value must be a nonempty absolute path"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source.bucket",
+        "$.destination.bucket"
+      ],
+      "owner": "Selected R2 store `bucket`",
+      "presence": "Required for R2; omitted for local"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source.url_base",
+        "$.destination.url_base"
+      ],
+      "owner": "Selected R2 store `url_base`, including explicit null",
+      "presence": "Required for R2; omitted for local; legacy prep may omit it"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.source.relative_path"
+      ],
+      "owner": "Edition `source_document.relative_path`",
+      "presence": "Required for local DOCX source; omitted for R2"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.source.key"
+      ],
+      "owner": "Selected R2 source-store prefix + slash + edition source-relative path",
+      "presence": "Required for R2 DOCX source; omitted for local; prefix is consumed into key"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.source.font_encoding",
+        "$.source.file_format"
+      ],
+      "owner": "Same-named edition `source_document` fields",
+      "presence": "Required for either backend; aps/unicode and docx; actual font inspection remains execution work"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.destination.prefix"
+      ],
+      "owner": "Selected R2 destination-store `prefix`",
+      "presence": "Required for R2; omitted for local"
+    },
+    {
+      "commands": [
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source.prefix"
+      ],
+      "owner": "Selected R2 source-store `prefix`",
+      "presence": "Required for R2; omitted for local"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.destination.subject_dir"
+      ],
+      "owner": "Manifest `artifact_root` + slash + selected locale",
+      "presence": "Required; never inferred from manifest ID, directory, subject code, or slug"
+    },
+    {
+      "commands": [
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.source.subject_dir"
+      ],
+      "owner": "Manifest `artifact_root` + slash + selected locale",
+      "presence": "Required; must equal destination subject_dir"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.naming"
+      ],
+      "owner": "Resolver constructs only command `naming_fields` from identity/release/locale owners",
+      "presence": "Required; field order does not change filename formatting"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.naming.category_code",
+        "$.naming.subject_code",
+        "$.naming.title_slug"
+      ],
+      "owner": "Same-named manifest `identity` fields",
+      "presence": "Required for all canonical commands"
+    },
+    {
+      "commands": [
+        "prep",
+        "chunks"
+      ],
+      "paths": [
+        "$.naming.version",
+        "$.naming.subversion"
+      ],
+      "owner": "Same-named selected edition `release` fields",
+      "presence": "Required strings retaining leading zeroes; independent per locale; absent from DOCX naming"
+    },
+    {
+      "commands": [
+        "chunks",
+        "docx"
+      ],
+      "paths": [
+        "$.naming.language"
+      ],
+      "owner": "Selected locale, matching the manifest edition and locale definition",
+      "presence": "Required; prep puts language in metadata instead"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.chapter_split"
+      ],
+      "owner": "Selected edition `chapter_split` shape",
+      "presence": "Required; only active shape fields are copied"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.chapter_split.enabled"
+      ],
+      "owner": "Edition split `enabled`",
+      "presence": "Required boolean; false produces only this field"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.chapter_split.pattern_type",
+        "$.chapter_split.pattern"
+      ],
+      "owner": "Same-named edition split fields",
+      "presence": "Required when enabled; omitted when disabled"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.chapter_split.flags",
+        "$.chapter_split.flags[]"
+      ],
+      "owner": "Edition regex split's explicit flags array and each declared flag",
+      "presence": "Required for regex, including empty array; omitted for literal/disabled; legacy regex jobs may omit flags"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.metadata_defaults"
+      ],
+      "owner": "Resolver constructs declared locale metadata plus selected language",
+      "presence": "Required; no arbitrary metadata extension in composition"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.metadata_defaults.language"
+      ],
+      "owner": "Selected locale, matching edition and locale definition",
+      "presence": "Required; hi-IN or mr-IN; no independent language override"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.metadata_defaults.source_script",
+        "$.metadata_defaults.output_text_encoding"
+      ],
+      "owner": "Same-named locale metadata fields",
+      "presence": "Required explicit Devanagari and UTF-8 declarations"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.metadata_defaults.summary_chapter_markers",
+        "$.metadata_defaults.summary_chapter_markers[]"
+      ],
+      "owner": "Locale metadata marker array and each declared string",
+      "presence": "Required array, including empty; legacy complete jobs may omit the array"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.proofreading"
+      ],
+      "owner": "Complete selected proofreading profile's settings object",
+      "presence": "Required; profile identity/envelope does not enter job JSON"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.proofreading.enabled",
+        "$.proofreading.provider",
+        "$.proofreading.model",
+        "$.proofreading.max_output_tokens"
+      ],
+      "owner": "Same-named settings in selected proofreading profile (S1)",
+      "presence": "Every field required; no defaults or scalar merge"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.proofreading.max_input_characters",
+        "$.proofreading.max_retries",
+        "$.proofreading.initial_retry_delay_seconds",
+        "$.proofreading.max_retry_delay_seconds"
+      ],
+      "owner": "Same-named settings in selected proofreading profile (S1)",
+      "presence": "Every field required; no defaults or scalar merge"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.proofreading.min_request_interval_seconds",
+        "$.proofreading.max_requests_per_minute",
+        "$.proofreading.max_estimated_input_tokens_per_minute"
+      ],
+      "owner": "Same-named settings in selected proofreading profile (S1)",
+      "presence": "Every field required; no defaults or scalar merge"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.proofreading.request_timeout_seconds",
+        "$.proofreading.request_progress_interval_seconds"
+      ],
+      "owner": "Same-named settings in selected proofreading profile (S1)",
+      "presence": "Every field required; component semantics additionally require progress interval not above timeout"
+    },
+    {
+      "commands": [
+        "prep"
+      ],
+      "paths": [
+        "$.proofreading.unavailable_max_retries",
+        "$.proofreading.unavailable_first_retry_delay_seconds",
+        "$.proofreading.unavailable_second_retry_delay_seconds",
+        "$.proofreading.unavailable_cooldown_seconds",
+        "$.proofreading.continue_on_error"
+      ],
+      "owner": "Same-named settings in selected proofreading profile (S1)",
+      "presence": "Every field required, including explicit false; no defaults or scalar merge"
+    },
+    {
+      "commands": [
+        "chunks"
+      ],
+      "paths": [
+        "$.chunking"
+      ],
+      "owner": "Complete selected chunking profile's settings object",
+      "presence": "Required; profile identity/envelope does not enter job JSON"
+    },
+    {
+      "commands": [
+        "chunks"
+      ],
+      "paths": [
+        "$.chunking.provider",
+        "$.chunking.model",
+        "$.chunking.model_revision"
+      ],
+      "owner": "Same-named settings in selected chunking profile (S1)",
+      "presence": "Every field required; preserve maintained BGE-M3 model and pinned revision"
+    },
+    {
+      "commands": [
+        "chunks"
+      ],
+      "paths": [
+        "$.chunking.threshold_percentile",
+        "$.chunking.min_chars",
+        "$.chunking.window_size",
+        "$.chunking.batch_size"
+      ],
+      "owner": "Same-named settings in selected chunking profile (S1)",
+      "presence": "Every field required; preserve maintained values 78, 550, 3, and 16"
+    },
+    {
+      "commands": [
+        "chunks"
+      ],
+      "paths": [
+        "$.chunking.normalize_contextual_vectors",
+        "$.chunking.device",
+        "$.chunking.local_files_only",
+        "$.chunking.strategy_version"
+      ],
+      "owner": "Same-named settings in selected chunking profile (S1)",
+      "presence": "Every field required, including nullable device and booleans; maintained true, null, true, semantic-window-v1"
+    },
+    {
+      "commands": [
+        "chunks"
+      ],
+      "paths": [
+        "$.chapters",
+        "$.chapters[]"
+      ],
+      "owner": "Explicit invocation chapter list and its entries",
+      "presence": "Optional; absent means unspecified, not an injected list; supplied list is nonempty/unique with exactly three ASCII digits per string"
+    }
+  ]
+}

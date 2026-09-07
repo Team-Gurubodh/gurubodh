@@ -15,4 +15,4 @@ Task history lives here so it is discoverable through the main documentation tre
 
 ## Active Process Pilot
 
-- [018: Slice development pilot](./018-slice-development-pilot.md) - #289 process setup and the current planning handoff for the selected #283 slice.
+- [018: Slice development pilot](https://github.com/Team-Gurubodh/gurubodh/issues/289#issuecomment-5571636976) - historical process setup and execution handoffs, migrated to GitHub under #300; current status lives in the relevant slice issue.
