@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/job-components/chunking_profile.schema.json",
+  "title": "Gurubodh complete chunking profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "component_schema_version",
+    "profile_id",
+    "chunking"
+  ],
+  "properties": {
+    "component_schema_version": {
+      "const": "1.0.0"
+    },
+    "profile_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*-v[1-9][0-9]*(?![\\s\\S])"
+    },
+    "chunking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "model_revision",
+        "threshold_percentile",
+        "min_chars",
+        "window_size",
+        "batch_size",
+        "normalize_contextual_vectors",
+        "device",
+        "local_files_only",
+        "strategy_version"
+      ],
+      "properties": {
+        "provider": {
+          "const": "semantic-chunking"
+        },
+        "model": {
+          "const": "BAAI/bge-m3"
+        },
+        "model_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "threshold_percentile": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "min_chars": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "window_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "normalize_contextual_vectors": {
+          "type": "boolean"
+        },
+        "device": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "cpu",
+            "mps",
+            "cuda",
+            null
+          ]
+        },
+        "local_files_only": {
+          "type": "boolean"
+        },
+        "strategy_version": {
+          "const": "semantic-window-v1"
+        }
+      }
+    }
+  }
+}

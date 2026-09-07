@@ -16,8 +16,9 @@ proofreading/chunking profile-contract pilot under
 
 The six-issue implementation series is #283–#288. Completed #263 supplied
 in-memory job preparation and checkpoint equivalence foundations. The parent
-issue's requirement-coverage checklist and pilot brief live in #283; this
-handoff links to them rather than maintaining a competing scope checklist.
+issue's requirement-coverage checklist lives in #283; the S1 brief and execution
+evidence live in [#292](https://github.com/Team-Gurubodh/gurubodh/issues/292).
+This handoff links to them rather than maintaining a competing scope checklist.
 
 ## Decisions
 
@@ -45,7 +46,7 @@ through outstanding #283 requirements before #284 implementation.
 - Added the provisional workflow, agent/documentation routing, process decision,
   and this handoff. The initial planning draft was local and uncommitted.
 - Reviewed the full #283/#289 descriptions and empty discussions, existing
-  schema machinery, resolved policy schemas, package metadata, and validator
+  schema machinery, job definition schemas, package metadata, and validator
   tests. Existing policies require 18 proofreading settings and 11 chunking
   settings. Existing tests validate all maintained complete jobs.
 - Identified an implementation boundary for interface design: `_validate()`
@@ -56,69 +57,189 @@ through outstanding #283 requirements before #284 implementation.
   acceptance criteria and verification proposals. Later slice groupings remain
   planning proposals, not additional maintainer-approved technical contracts.
 
-## Follow-Up
+## Process Setup Handoff — Historical
 
-Current phase: planning draft prepared; interface design has not been completed.
-No #283 runtime/schema implementation or test fixtures have been added. #283
-and #289 remain open; pilot execution, reconciliation, retrospective, and the
-adoption decision remain pending.
+At setup completion, planning was drafted; interface design, tests, and runtime
+implementation had not begun. Both issues remained open for pilot execution,
+reconciliation, retrospective, and adoption. The next session was to review
+#283's checklist and brief, then settle profile envelopes, ID checks, constraint
+reuse, and validation examples before test preparation. #284's resolver and
+runtime-default changes remained outside scope.
 
-Next session: read #283's coverage checklist and pilot brief, review the planning
-draft with the maintainer, and work through concrete profile examples and the
-validation interface. Resolve profile-envelope naming, component ID checks,
-and reuse of resolved-schema constraints before test preparation. Technical
-choices should preserve the accepted #283 design and avoid broadening into
-#284's resolver or runtime-default changes.
-
-Verification: `git diff --check` passed. A local link/whitespace check covered
-all eight changed/new documents; all 15 relative Markdown links resolved and
-the documents had clean trailing whitespace and final newlines. Reviewed the
-workflow against #289, including exceptions, partial PR references, the
-#283-to-#284 gate, and the separate pilot/adoption/issue-completion milestones.
-Application tests were not run because this increment changes only process
-documentation and issue planning. #283's focused/full tests and package checks
-remain pending for technical implementation.
-
-## Publication Handoff
+`git diff --check` passed. All 15 relative Markdown links in eight changed/new
+documents resolved; whitespace and final newlines passed. The workflow review
+covered #289's exceptions, partial PR references, the #283-to-#284 gate, and
+separate pilot, adoption, and issue-completion milestones. Application tests
+were not run for this documentation-only increment; technical checks remained
+pending.
 
 The maintainer authorized committing, pushing, and merging the process PR after
-checks, explicitly retaining #289 as open. Use `Refs #289` in the PR. The live
-PR linked from #289 records commit, publication, checks, and merge status.
-Pilot completion and repository-wide adoption remain pending. The parent-table
-approach to slices was accepted; promote slices to sub-issues only when
-independent tracking helps.
+checks, with `Refs #289` and #289 left open. Its linked live PR records publication
+and merge status. Pilot completion and wider adoption were still pending.
+Slices stay in the parent table unless independent tracking warrants sub-issues.
 
-## Prepared PR Description
+### Prepared process PR description
 
 Title: `docs: establish the slice development pilot (#289)`
 
-### Summary
+Refs #289. Adds the provisional workflow, agent/documentation routing, process
+decision, and handoff. The phase workflow applies only to S1; requirement
+coverage and whole-issue completion apply throughout #283. The coverage map and
+planning brief are recorded in #283. Technical delivery, the retrospective, and
+adoption remain pending at this stage.
 
-Document the provisional workflow for #283's profile-contract pilot, with
-agent routing, session handoffs, user exceptions, requirement coverage, and a
-whole-issue completion gate. The phase workflow applies only to the selected
-pilot; issue-level coverage applies to all of #283.
+Documentation checks passed as recorded above; application tests were not run.
+Review scope, session handoffs, exceptions, and the parent-issue completion gate.
+The maintainer authorized merging this process PR after checks, leaving #289 open.
 
-### Linked Issue
+## S1 Results — 2026-09-06 (historical delivery status)
 
-Refs #289. This is partial process setup; pilot execution, retrospective, and
-adoption remain pending. Merging this PR must leave #289 open.
+S1 is implemented and verified locally on `issue-283-s1-profile-contracts`, based
+on fetched `origin/main` at `c97f89f`. Changes remain **uncommitted and unpublished**.
+The working tree contains the implementation. #283 holds the authoritative
+requirement map and S1-A1–A8 evidence; S2–S4 and whole-issue review remain pending.
 
-### Scope
+### Planning, design, and implementation
 
-Adds the workflow guide, process decision, task handoff, and documentation
-routing. The coverage map and planning brief were recorded in #283. Technical
-schema and runtime implementation remain pending.
+- The maintainer authorized implementation after the effort assessment. The
+  working tree was clean. The full #283/#289 descriptions and empty discussions
+  were read, R01–R38 were assigned, and S1-A1–A8 were adopted with the brief's
+  exclusions. No maintainer-reserved product question remained open.
+- [Decision-0009](../decisions/0009-cli-execution-profile-contracts.md) records
+  kind-specific envelopes, versioned safe IDs, explicit expected-ID matching,
+  configuration errors, non-mutation, and downstream obligations. The initial
+  design referenced job definition schemas; the ownership correction below
+  supersedes that choice. The timing invariant is checked after schema
+  validation without constructing runtime policy records.
+- Independent Gemini/BGE-M3 fixtures and invalid cases preceded implementation.
+  Initial discovery failed on the missing component API. Tests covered every
+  envelope and policy field, unknown fields, kinds/IDs/versions, types/bounds,
+  non-JSON values, booleans/nulls, non-mutation, safe deterministic diagnostics,
+  resource matching, cache reuse, and job/artifact compatibility. They used real
+  validators. The plan included temporary sdist/wheel builds, non-editable
+  package checks, focused/full tests, Markdown links, and whitespace checks.
+- Implementation registered and packaged both schemas, added
+  `validate_component()`, and declared the direct `referencing` dependency.
+  Job definition schemas, all 26 complete jobs, `--config`, runtime policy
+  constructors, and checkpoint code remained unchanged.
+- The first installed probe exposed the incorrect `site-packages/config`
+  assumption: wheel data files install under the environment prefix. Returning
+  to design/test preparation produced a failing real `PathDistribution`
+  regression. Discovery now follows distribution records and preserves
+  source-tree precedence. Rebuilding and reinstalling passed S1-A5; broader
+  catalog discovery remains outside S1.
+
+### Property ownership correction
+
+The maintainer required both job component schemas to own their complete
+specifications without references to other schemas. The correction kept the
+envelopes, constraints, API, and timing check, declared all 18 proofreading and
+11 chunking properties locally, and removed job-definition registration from
+component validation. It refined S1-A1/A3/A5 and R02/R03/R18/R21 without deciding
+broader series changes or retirement.
+
+Before implementation, two new tests required complete standalone definitions
+and forbade reads of job definition schemas. Both failed, then passed after the
+correction. Plain Draft 2020-12 validation and installed checks with job definition
+schemas temporarily absent now verify independence. Decision-0009 and current
+schema/CLI references document this ownership.
 
 ### Verification
 
-- `git diff --check` passed.
-- All 15 relative Markdown links in eight changed/new documents resolved;
-  whitespace and final-newline checks passed.
-- Application tests not run: documentation-only increment.
+| Check | Initial S1 result | Corrected S1 result |
+| --- | --- | --- |
+| Profile tests | 17 passed. | 18 passed. |
+| Full CLI suite | 224 passed in 22.682 seconds; none skipped. | 225 passed in 26.049 seconds; none skipped. |
+| Existing schema tests | All 12 passed, including 26 maintained jobs through real loaders and artifact error/pre-write behavior. | These checks still pass. |
+| Distribution build | The sdist and its wheel included both job component schemas and all three job definition schemas; wheel metadata declared `referencing`. | Both distributions were rebuilt and their schema inventories passed. |
+| Installed probe | Both profiles, all 29 missing-setting cases, local references, non-mutation, and artifact error classification passed. | Profile, missing-setting, non-mutation, and error checks passed independently, with job definition schemas present and temporarily absent. |
+| Documentation | Relative links and `git diff --check` passed. | Both checks passed again. |
 
-### Notes For Reviewers
+The full-suite command, run from `tools/gurubodh-cli`, was:
 
-Review the pilot scope, parent-issue completion gate, and explicit exception
-rules. The maintainer authorized this PR to be merged after checks, leaving
-#289 open.
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -v
+```
+
+Builds used `python -m build --no-isolation` in temporary source copies. Each wheel
+was built from its sdist and installed non-editably outside the checkout in a
+Python 3.12 environment with schema-validation dependencies. The copied
+`tests/check_installed_profiles.py` ran with `-I -B`, checked installed import/schema
+locations, and blocked networking. The
+[fixture guide](../../tools/gurubodh-cli/tests/fixtures/job-components/README.md)
+provides reproduction commands.
+
+No required S1 check was skipped. Live Gemini/R2/model execution and broader
+container/catalog discovery were outside scope. Only schema dependencies were
+needed for the installed probe.
+
+The original run recorded these temporary evidence locations (no longer
+available at the 2026-09-07 publication check):
+
+- `/private/tmp/gurubodh-s1.1yYtcR/` contains the initial `full-suite.log`,
+  `build.log`, `dist/`, probe, and environment.
+- `/private/tmp/gurubodh-s1-independent.eIUc9l/` contains correction logs,
+  distributions, and the copied probe. The installation remains at
+  `/private/tmp/gurubodh-s1.1yYtcR/build-env/`.
+
+These transient artifacts are not repository dependencies.
+
+### Reconciliation and next action
+
+R02, R03, and R18 are satisfied locally. Shared requirements remain partial;
+S2–S4 own the other five schemas, command/lab selections, environment/storage
+contracts, complete field mapping, and whole-issue integration. The S1 review
+found no uncovered requirement or scope expansion. Next is S2: subject
+manifest/edition and locale contracts. #284 waits for #283's completion review.
+
+The retrospective under #289 recorded the initial offline shared-schema design
+and the installed check that caught a defect missed by checkout tests. The
+property-ownership correction supersedes that design. The main process overhead
+is maintaining the long coverage table: link compact evidence instead of copying
+scope into handoffs. Test preparation should identify distribution form and
+import origin. These remain proposed refinements; the workflow is provisional,
+and wider adoption and reusable templates await the maintainer. Both issues
+remain open.
+
+### Prepared S1 PR description
+
+Title: `feat(cli): validate complete execution profiles (#283 S1)`
+
+Refs #283. Implements S1; S2–S4 remain pending. Both job component schemas own all
+29 property specifications without references to other schemas. Missing settings
+fail without defaults, and resource-ID mismatches produce safe configuration errors.
+
+Package both schemas and fix installed discovery through distribution records.
+Document property mappings, immutable policy IDs, and selection/retirement
+obligations. Complete jobs and runtime policy behavior remain unchanged.
+
+Verification: 225 CLI tests passed, including all 26 maintained jobs. Sdist/wheel
+inventories and the non-editable installed probe passed, including all 29
+missing-setting cases with job definition schemas present and absent and
+networking blocked. Markdown links and `git diff --check` passed; no required
+S1 check was skipped. #283's coverage is reconciled and #289 records the
+retrospective. Merge is not authorized.
+
+## S1 publication handoff — 2026-09-07
+
+The maintainer authorized committing, pushing, and opening the S1 PR on
+`issue-283-s1-profile-contracts`; merging remains a separate decision.
+The branch is based on current `origin/main` at `c97f89f`.
+[#292](https://github.com/Team-Gurubodh/gurubodh/issues/292) now owns the slice
+brief, current evidence, and publication status, including the PR/commit link.
+#283 retains authoritative requirement coverage. The earlier unpublished status
+above describes the implementation session, not the subsequent PR delivery.
+
+Publication verification passed: 225 CLI tests in 24.032 seconds, including
+18 profile tests and the existing 26-job checks; no skips. Fresh sdist/wheel
+inventories matched both schemas, and the non-editable installed probe passed
+with job definition schemas present and absent. All 21 relative Markdown links
+and `git diff --check` passed. No required S1 check was skipped; live providers
+and broader container/catalog checks remain outside S1. The previous temporary
+artifacts had expired, so the package checks were rebuilt from current sources.
+The PR and current delivery status are recorded in #292.
+
+Next action is PR review. R02/R03/R18 have S1 implementation evidence; shared
+requirements remain partial. S2–S4 and whole-issue completion remain pending,
+and #284 implementation still waits for that review. The process remains a
+pilot; publication does not adopt it repository-wide or authorize retirement.

@@ -46,9 +46,34 @@ not affect canonical proofreading output or resume compatibility.
 
 ## Schema and artifact references
 
+### Execution-profile component contracts
+
+`gurubodh.schema_validation.validate_component()` validates profiles independently.
+Each requires `component_schema_version: "1.0.0"`, a versioned `profile_id`
+such as `gemini-3.6-flash-v1` or `bge-m3-v1`, and complete `proofreading` or
+`chunking` settings. Each job component schema owns its specifications without
+references to other schemas. Unknown or missing fields fail without defaults;
+a supplied `expected_id` must match `profile_id`.
+
+The [fixtures](../../tests/fixtures/job-components/README.md) include examples
+and verification commands. The
+[profile decision](../../../../docs/decisions/0009-cli-execution-profile-contracts.md)
+maps all 29 fields to the assembled job configuration and defines identity and
+whole-profile precedence. Used IDs are immutable; policy changes require a new
+ID and explicit selection.
+
+Only profile validation is implemented. The future catalog uses
+`config/job-components/profiles/proofreading/` and
+`config/job-components/profiles/chunking/`. Production declarations, lookup,
+command/manifest/edition/invocation selection, and canonical/lab binding remain
+pending. Complete jobs and `--config` remain supported until the maintainer
+accepts comparison results under #288.
+
+### Jobs and artifacts
+
 Use the schemas in `config/jobs/` for required fields and validation. Generated artifact schemas are in `config/artifacts/`; their lifecycle and ownership are explained in [Artifact lifecycle](../concepts/artifact-lifecycle.md).
 
-The installed package includes both schema directories. Maintainers adding a
-job or artifact schema must add it to the shared validator mapping, route its
-producer through the validate-before-write helper, and add runtime tests for a
-valid payload and a rejected pre-write payload.
+The package includes job, artifact, and component schema directories. New job
+or artifact schemas require registration in the shared validator mapping,
+producer use of the validate-before-write helper, and runtime tests for valid
+payloads and rejection before writing.
