@@ -18,8 +18,12 @@ verification. A phase may be brief or marked not applicable, with a reason
 recorded. Sessions and phases need not have matching boundaries.
 
 Use this guide alongside the [GitHub workflow](./github-workflow.md).
-The current handoff is [Task-018](../tasks/018-slice-development-pilot.md);
-the rationale is [Decision-0008](../decisions/0008-slice-development-pilot.md).
+The [pilot handoff and history](https://github.com/Team-Gurubodh/gurubodh/issues/289#issuecomment-5571636976)
+now live in GitHub under the scoped documentation exception in
+[#300](https://github.com/Team-Gurubodh/gurubodh/issues/300). Use the relevant slice
+issue for its latest execution status and future handoffs; the migrated archive
+preserves historical session notes. The rationale for the pilot is
+[Decision-0008](../decisions/0008-slice-development-pilot.md).
 
 ## Authoritative Records
 

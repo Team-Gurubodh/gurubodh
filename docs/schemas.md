@@ -47,7 +47,7 @@ schema references. Every setting is required, including boolean and nullable pro
 optional `expected_id` checks selected-resource identity without lookup.
 
 Both schemas ship under `config/job-components/schemas/` and validate without
-job definition schemas. [Decision-0009](./decisions/0009-cli-execution-profile-contracts.md)
+job definition schemas. [Decision-0009](https://github.com/Team-Gurubodh/gurubodh/issues/292#issuecomment-5571635810)
 records field mappings, immutable IDs, the API, and downstream obligations.
 
 S2 adds strict `subject-manifest` and `locale-definition` components, also at
@@ -61,11 +61,11 @@ or `locale` and checks Python regex syntax without exposing rejected patterns.
 Both new schemas own their complete specifications, with only in-document
 references, and ship through the existing schema data-files declaration.
 They validate independently without job schemas, including in an installed wheel.
-[Decision-0010](./decisions/0010-cli-manifest-locale-contracts.md) records all S2
+[Decision-0010](https://github.com/Team-Gurubodh/gurubodh/issues/294#issuecomment-5571636132) records all S2
 fields, conditional shapes, path/identity grammar, and downstream mappings.
 All seven component kinds are now registered. S3's authoritative contract remains
 in [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296) under its documentation
-exception. The [S4 field mapping](./interfaces/assembled-job-field-mapping.md)
+exception. The [S4 field mapping](https://github.com/Team-Gurubodh/gurubodh/issues/298#issuecomment-5571636607)
 reconciles every assembled field and links combined verification. Component
 loading/selection remains #284 work; existing job schemas, metadata extensions,
 and maintained jobs are retained.

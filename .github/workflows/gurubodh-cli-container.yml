@@ -4,14 +4,12 @@ on:
   pull_request:
     paths:
       - "tools/gurubodh-cli/**"
-      - "docs/interfaces/assembled-job-field-mapping.md"
       - ".github/workflows/gurubodh-cli-container.yml"
   push:
     branches: [main]
     tags: ["cli-v*"]
     paths:
       - "tools/gurubodh-cli/**"
-      - "docs/interfaces/assembled-job-field-mapping.md"
       - ".github/workflows/gurubodh-cli-container.yml"
 
 permissions:
@@ -43,7 +41,6 @@ jobs:
           docker run --rm \
             --volume "${{ github.workspace }}/tools/gurubodh-cli/tests:/opt/gurubodh-cli/tests:ro" \
             --volume "${{ github.workspace }}/tools/gurubodh-cli/jobs:/opt/gurubodh-cli/jobs:ro" \
-            --volume "${{ github.workspace }}/docs:/docs:ro" \
             --workdir /opt/gurubodh-cli --entrypoint python \
             gurubodh-cli:smoke -m unittest discover -s tests -v
       - name: Verify CLI and bundled Node converter runtime
