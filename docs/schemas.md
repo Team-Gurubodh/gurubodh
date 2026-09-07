@@ -21,6 +21,9 @@
 - `tools/gurubodh-cli/config/job-components/schemas/chunking_profile.schema.json`
 - `tools/gurubodh-cli/config/job-components/schemas/subject_manifest.schema.json`
 - `tools/gurubodh-cli/config/job-components/schemas/locale_definition.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/command_definition.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/environment.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/storage_profile.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
 - `tools/seed-data-cli/config/glossary_artifact.schema.json`
 - `tools/seed-data-cli/config/seed_data_sources.schema.json`
@@ -60,8 +63,12 @@ references, and ship through the existing schema data-files declaration.
 They validate independently without job schemas, including in an installed wheel.
 [Decision-0010](./decisions/0010-cli-manifest-locale-contracts.md) records all S2
 fields, conditional shapes, path/identity grammar, and downstream mappings.
-Component loading/selection, the three S3 kinds, and S4's all-seven review remain
-pending. Existing job schemas, metadata extensions, and maintained jobs are retained.
+All seven component kinds are now registered. S3's authoritative contract remains
+in [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296) under its documentation
+exception. The [S4 field mapping](./interfaces/assembled-job-field-mapping.md)
+reconciles every assembled field and links combined verification. Component
+loading/selection remains #284 work; existing job schemas, metadata extensions,
+and maintained jobs are retained.
 
 The Gurubodh CLI executes its Draft 2020-12 job and artifact schemas at runtime.
 They are not documentation-only contracts:

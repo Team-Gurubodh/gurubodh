@@ -42,35 +42,59 @@ PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p t
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -v
 ```
 
+## S3 and S4 combined verification
+
+S3 fixtures add four command branches, development stores, and all three storage
+profiles. Their authoritative contract is [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296).
+S4 reuses the S1–S3 validation cases in `component_contract_cases.py` under one
+job-schema access prohibition, including standalone structural failures for all
+profile cases. Semantic interval/regex checks remain distinct from JSON Schema.
+The combined ownership check compares raw schema documents to cached validators
+and rejects external property references/default annotations. Separate mapping
+tests cover the documented field inventory, the existing 27-case matrix, twelve
+whole-profile selection examples, applicability, legacy complete-job shapes,
+preparation retry ordering, and the separate runtime model cache.
+Selection examples are contract oracles for #284, not a production resolver.
+
+Focused checkout checks (run the full CLI suite above as well):
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p 'test_component*.py' -v
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p 'test_command_storage*.py' -v
+```
+
 ## Distribution verification
 
 Build in a temporary copy to keep build metadata out of the checkout. The default
 `build` command creates an sdist, then its wheel, testing both distributions.
 Install only schema-validation dependencies; invoke no models or providers.
-Run from the CLI root using Python 3.12:
+Run these commands from the CLI root using Python 3.12:
 
 ```bash
 PROFILE_CHECK_ROOT=$(mktemp -d)
 mkdir "$PROFILE_CHECK_ROOT/source"
 cp -R gurubodh config pyproject.toml README.md "$PROFILE_CHECK_ROOT/source/"
 cp -R tests/fixtures/job-components "$PROFILE_CHECK_ROOT/fixtures"
-cp tests/check_installed_profiles.py "$PROFILE_CHECK_ROOT/check_installed_profiles.py"
-cp tests/check_installed_subject_locales.py tests/test_subject_locale_contracts.py "$PROFILE_CHECK_ROOT/"
+cp tests/check_installed_components.py tests/check_component_distributions.py tests/component_contract_cases.py tests/test_component_contract_completion.py tests/test_profile_contracts.py tests/test_subject_locale_contracts.py tests/test_command_storage_contracts.py "$PROFILE_CHECK_ROOT/"
 .venv/bin/python -m venv "$PROFILE_CHECK_ROOT/venv"
 "$PROFILE_CHECK_ROOT/venv/bin/python" -m pip install build 'setuptools>=68' wheel 'jsonschema>=4.23,<5' 'referencing>=0.35,<1'
 "$PROFILE_CHECK_ROOT/venv/bin/python" -m build --no-isolation --outdir "$PROFILE_CHECK_ROOT/dist" "$PROFILE_CHECK_ROOT/source"
+"$PROFILE_CHECK_ROOT/venv/bin/python" -B tests/check_component_distributions.py config/job-components/schemas "$PROFILE_CHECK_ROOT"/dist/*.tar.gz "$PROFILE_CHECK_ROOT"/dist/*.whl
 "$PROFILE_CHECK_ROOT/venv/bin/python" -m pip install --no-deps "$PROFILE_CHECK_ROOT"/dist/*.whl
 cd "$PROFILE_CHECK_ROOT"
-"$PROFILE_CHECK_ROOT/venv/bin/python" -I -B check_installed_profiles.py fixtures
-"$PROFILE_CHECK_ROOT/venv/bin/python" -I -B check_installed_subject_locales.py fixtures
+"$PROFILE_CHECK_ROOT/venv/bin/python" -I -B check_installed_components.py fixtures
 ```
 
-The probes verify installed import/schema paths, reject editable installs, and
-block networking. The S1 probe checks both profiles, all 29 missing-setting cases,
-non-mutation, and artifact errors. It repeats profile checks with job definition
-schemas temporarily absent, then restores them. Inspect both distributions for
-all four job component schemas. The S2 probe runs the complete validation case
-class (including standalone structural checks) with job schemas present and
-physically absent. It deliberately excludes the mapping class, which is checked
-separately in the checkout against existing job boundaries. #287 owns broader
-catalog/container discovery.
+The probe runs the all-seven ownership check and 44 reused validation methods
+with job schemas present, then repeats with them physically absent. Imports and
+schema locations must originate in the installation outside the checkout; all
+validation runs block networking. Job/artifact domain checks occur separately
+before hiding job schemas. No mapping case runs with job schemas absent.
+The distribution checker compares every component schema byte-for-byte against
+the checkout in both the sdist and its wheel. The full CLI suite separately
+includes all 26 maintained jobs, preparation, fonts, checkpoints, and imports.
+
+The earlier S1/S2/S3 probes remain available as `check_installed_profiles.py`,
+`check_installed_subject_locales.py`, and `check_installed_command_storage.py`.
+The combined probe covers their component-validation scope; broader catalog
+and container discovery belong to #287.

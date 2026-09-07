@@ -356,3 +356,81 @@ No required implementation check is skipped.
 commit, PR, and current delivery status. The earlier local/uncommitted statements
 describe the implementation session. #283 retains coverage and remains open for
 S3–S4 and whole-issue review; #284 implementation remains gated. Next is PR review.
+
+## S4 implementation handoff — 2026-09-07
+
+S1–S3 are merged, most recently S3 in PR #297. The maintainer reviewed S4's
+field ownership, profile selection, and validation/compatibility in separate
+discussions, then explicitly approved the consolidated contract and authorized
+implementation. Additional locale metadata waits for a separate change request
+when needed. [#298](https://github.com/Team-Gurubodh/gurubodh/issues/298) records
+the approved contract, execution evidence, and prepared PR description.
+
+S4 is implemented locally on `issue-298-s4-contract-reconciliation`, based on
+`6849ceb`. Changes are **uncommitted and unpublished**; no PR is open and nothing
+has been merged. The working tree contains the reviewable implementation.
+
+- The [field mapping](../interfaces/assembled-job-field-mapping.md) accounts for
+  all 116 command/field paths (56 prep, 38 chunks, 22 DOCX, including containers
+  and array items), component selection fields, omission/legacy rules, and
+  downstream responsibilities. S1/S2 records are retained and S3 remains
+  authoritative in #296 under its documentation exception.
+- Test preparation preceded the mapping: the initial combined run passed both
+  independence checks and failed on the missing mapping document. The finished
+  inventory now rejects missing/duplicate/unmapped job fields. Expanded existing
+  mapping tests and new selection/compatibility examples use real preparation
+  APIs, without adding a production resolver.
+- Final full CLI suite: **262 tests passed in 30.240 seconds, no skips**. This
+  includes 27 command/route/edition cases, twelve profile-selection examples,
+  all 26 maintained jobs, fonts, checkpoints, and import boundaries. Command:
+  `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -v`
+  from `tools/gurubodh-cli`.
+- All-seven ownership checks and 44 reused S1–S3 validation methods passed with
+  checkout job-schema access forbidden, then through a fresh non-editable wheel
+  installation with job schemas present and physically absent. Standalone
+  Draft 2020-12 checks use no external property registry. Networking is blocked;
+  installed imports/schema locations are asserted. Job/artifact error-domain
+  checks remain separate.
+- Sdist and its wheel contain all seven component schemas byte-for-byte from
+  the checkout. All 119 tracked runtime/schema/job/packaging files match merged
+  S3 exactly. Documentation links and whitespace checks pass. No required
+  verification was skipped; live providers/R2/models and later-series runtime
+  integration remain outside this slice.
+
+Reproduction is in the [fixture guide](../../tools/gurubodh-cli/tests/fixtures/job-components/README.md).
+Transient evidence is under `/private/tmp/gurubodh-s4-2ihmrsiw/`; the final full
+suite log is `/private/tmp/gurubodh-s4-full.log`. These are not repository inputs.
+
+Whole-issue review reread #283 and its empty discussion and reconciled R01–R39
+and all seven acceptance criteria. Technical requirements have local evidence;
+R38 retains S4 publication/PR delivery. #283 remains open and #284 remains gated
+until that final delivery/completion review. No requirement was removed or
+silently deferred; production resolution, fallback removal, auditing, CLI,
+discovery, migration/retirement, and process adoption retain their named later
+owners. Next action is maintainer review of the local diff before publication.
+
+## S4 publication handoff — 2026-09-07
+
+The maintainer authorized committing, pushing, and opening the S4 PR. This
+supersedes the implementation-session publication hold above; merging remains
+a separate decision. The branch is `issue-298-s4-contract-reconciliation`,
+based on current remote `main` at `6849ceb`.
+
+Publication verification confirmed that all 145 recorded test/runtime/schema
+inputs match the passing verification snapshot. The 262-test full-suite result
+and all-seven installed/distribution results remain applicable. No application
+change required repeating those checks. Documentation, whitespace, and commit
+checks are performed for publication; no required verification is skipped.
+
+[#298](https://github.com/Team-Gurubodh/gurubodh/issues/298) records the resulting
+commit/PR and current delivery status; #283 retains parent coverage and the
+completion-review gate. Earlier uncommitted/unpublished statements describe
+the implementation session. Next is PR review; this publication does not
+authorize merging or begin #284 implementation.
+
+The PR is [#299](https://github.com/Team-Gurubodh/gurubodh/pull/299), initially
+published as `c01d059`. Publication review found that container tests mount CLI
+tests/jobs but not the repository mapping consumed by S4's inventory test.
+A follow-up mounts repository docs read-only at `/docs` for that test run and
+adds the mapping document to the workflow's path triggers. The runtime image
+and application code remain unchanged; GitHub CI verifies the container boundary.
