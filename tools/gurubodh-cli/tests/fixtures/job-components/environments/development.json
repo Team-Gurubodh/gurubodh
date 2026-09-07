@@ -1,0 +1,30 @@
+{
+  "component_schema_version": "1.0.0",
+  "environment_id": "development",
+  "stores": {
+    "local_source_library": {
+      "backend": "local",
+      "root_dir": {
+        "$env": "GURUBODH_SOURCE_LIBRARY_ROOT"
+      }
+    },
+    "local_destination_library": {
+      "backend": "local",
+      "root_dir": {
+        "$env": "GURUBODH_CMS_LIBRARY_ROOT"
+      }
+    },
+    "r2_source_library": {
+      "backend": "r2",
+      "bucket": "gurubodh-library-dev",
+      "prefix": "source_library",
+      "url_base": null
+    },
+    "r2_destination_library": {
+      "backend": "r2",
+      "bucket": "gurubodh-library-dev",
+      "prefix": "cms_library",
+      "url_base": null
+    }
+  }
+}

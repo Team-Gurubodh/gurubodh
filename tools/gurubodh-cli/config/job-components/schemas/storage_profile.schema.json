@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/job-components/storage_profile.schema.json",
+  "title": "Gurubodh storage profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "component_schema_version",
+    "storage_profile_id",
+    "source_document",
+    "subject_artifact_source",
+    "subject_artifact_destination"
+  ],
+  "properties": {
+    "component_schema_version": {
+      "const": "1.0.0"
+    },
+    "storage_profile_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "source_document": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "subject_artifact_source": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "subject_artifact_destination": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*(?![\\s\\S])"
+    }
+  }
+}

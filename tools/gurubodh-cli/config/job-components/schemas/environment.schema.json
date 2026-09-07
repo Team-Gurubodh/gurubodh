@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/job-components/environment.schema.json",
+  "title": "Gurubodh environment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "component_schema_version",
+    "environment_id",
+    "stores"
+  ],
+  "properties": {
+    "component_schema_version": {
+      "const": "1.0.0"
+    },
+    "environment_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[_-][a-z0-9]+)*(?![\\s\\S])"
+    },
+    "stores": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z0-9]+(?:[_-][a-z0-9]+)*(?![\\s\\S])": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "backend",
+                "root_dir"
+              ],
+              "properties": {
+                "backend": {
+                  "const": "local"
+                },
+                "root_dir": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "$env"
+                  ],
+                  "properties": {
+                    "$env": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?![\\s\\S])"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "backend",
+                "bucket",
+                "prefix",
+                "url_base"
+              ],
+              "properties": {
+                "backend": {
+                  "const": "r2"
+                },
+                "bucket": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "prefix": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?!\\.{1,2}(?:/|(?![\\s\\S])))[^/\\\\:\\x00-\\x1f\\x7f\\x24{}]+(?:/(?!\\.{1,2}(?:/|(?![\\s\\S])))[^/\\\\:\\x00-\\x1f\\x7f\\x24{}]+)*(?![\\s\\S])"
+                },
+                "url_base": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

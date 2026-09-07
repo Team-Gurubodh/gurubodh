@@ -1,0 +1,15 @@
+{
+  "component_schema_version": "1.0.0",
+  "command_id": "generate-docx",
+  "job_schema_version": "1.0.0",
+  "pipeline": "generate-docx",
+  "source_role": "subject_artifact_source",
+  "destination_role": "subject_artifact_destination",
+  "naming_fields": [
+    "category_code",
+    "subject_code",
+    "title_slug",
+    "language"
+  ],
+  "default_profiles": {}
+}

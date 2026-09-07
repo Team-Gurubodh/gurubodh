@@ -1,0 +1,7 @@
+{
+  "component_schema_version": "1.0.0",
+  "command_id": "lab-proofread",
+  "default_profiles": {
+    "proofreading": "gemini-3.6-flash-v1"
+  }
+}
