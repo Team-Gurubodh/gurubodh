@@ -33,18 +33,25 @@ it.
 ## Error boundary
 
 `validate_component(instance, component_name, path=None, *, expected_id=None)`
-validates `proofreading-profile` and `chunking-profile` in memory. It returns
+validates `proofreading-profile`, `chunking-profile`, `subject-manifest`, and
+`locale-definition` in memory. It returns
 `None` without mutation, component lookup, or policy construction. `path` supplies
 diagnostic context; `expected_id` checks resource identity. Unknown kinds and
 malformed components raise `ConfigurationError`. Each job/component/artifact
 entry point selects its error domain explicitly.
 
-Job component schemas own their full specifications without schema references.
+Job component schemas own their full specifications without external property
+references. S2 uses only in-document definitions for shared manifest shapes.
 The cached validator loads only the requested schema, with no job definition
 schema or remote retrieval. After structural validation, it rejects proofreading
-progress intervals above the timeout without constructing runtime settings. See
+progress intervals above the timeout and compiles manifest regex patterns with
+explicit flags to reject invalid Python syntax. Compiler errors are sanitized;
+compiled values are discarded. Expected identity uses `profile_id`, `manifest_id`,
+or `locale` for the corresponding kind. See
 [Decision-0009](../../../../docs/decisions/0009-cli-execution-profile-contracts.md)
-for the profile contract and the boundary with later composition work.
+for the profile contract and
+[Decision-0010](../../../../docs/decisions/0010-cli-manifest-locale-contracts.md)
+for subject/locale fields and the boundary with later composition work.
 
 Expected failures below `gurubodh.cli` use the small hierarchy in
 `gurubodh/errors.py`: configuration, source validation, storage/publication,

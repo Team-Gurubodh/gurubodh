@@ -62,12 +62,37 @@ maps all 29 fields to the assembled job configuration and defines identity and
 whole-profile precedence. Used IDs are immutable; policy changes require a new
 ID and explicit selection.
 
-Only profile validation is implemented. The future catalog uses
+Profile and subject/locale component validation are implemented. The future catalog uses
 `config/job-components/profiles/proofreading/` and
 `config/job-components/profiles/chunking/`. Production declarations, lookup,
 command/manifest/edition/invocation selection, and canonical/lab binding remain
 pending. Complete jobs and `--config` remain supported until the maintainer
 accepts comparison results under #288.
+
+### Subject and locale component contracts
+
+`validate_component()` also accepts `subject-manifest` and `locale-definition`.
+Both require `component_schema_version: "1.0.0"` and reject unknown or missing
+properties. Optional `expected_id` matches `manifest_id` or `locale`; the display
+filename never supplies identity. Representative declarations live in the
+[component fixtures](../../tests/fixtures/job-components/README.md).
+
+A manifest declares its identity, explicit artifact root, and one or both
+`hi-IN`/`mr-IN` editions. Each edition owns its two-digit string release,
+DOCX source declaration, and chapter splitting. Disabled splitting is exactly
+`{"enabled": false}`; enabled literal splitting requires a pattern and forbids
+flags; enabled regex splitting requires a pattern and explicit flags (`[]`
+means none). Manifest/edition overrides contain only whole proofreading or
+chunking profile IDs. Nothing is inherited from another language edition.
+
+Locale JSON explicitly declares Devanagari, UTF-8, and summary markers. The
+selected locale supplies assembled metadata language; instruction templates
+remain in `locales.py`. Artifact `subject_dir` is the declared root plus `/` and
+locale. No value is inferred from a manifest ID or directory.
+
+[Decision-0010](../../../../docs/decisions/0010-cli-manifest-locale-contracts.md)
+defines the exact identity/path grammar, conditional shapes, and complete field
+mapping. These contracts do not activate composition or replace maintained jobs.
 
 ### Jobs and artifacts
 

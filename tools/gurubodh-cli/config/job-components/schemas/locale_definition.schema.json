@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/job-components/locale_definition.schema.json",
+  "title": "Gurubodh locale definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["component_schema_version", "locale", "metadata_defaults"],
+  "properties": {
+    "component_schema_version": { "const": "1.0.0" },
+    "locale": { "enum": ["hi-IN", "mr-IN"] },
+    "metadata_defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_script", "output_text_encoding", "summary_chapter_markers"],
+      "properties": {
+        "source_script": { "const": "Devanagari" },
+        "output_text_encoding": { "const": "UTF-8" },
+        "summary_chapter_markers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

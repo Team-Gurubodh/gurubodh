@@ -19,6 +19,8 @@
 - `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
 - `tools/gurubodh-cli/config/job-components/schemas/proofreading_profile.schema.json`
 - `tools/gurubodh-cli/config/job-components/schemas/chunking_profile.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/subject_manifest.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/locale_definition.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
 - `tools/seed-data-cli/config/glossary_artifact.schema.json`
 - `tools/seed-data-cli/config/seed_data_sources.schema.json`
@@ -44,7 +46,22 @@ optional `expected_id` checks selected-resource identity without lookup.
 Both schemas ship under `config/job-components/schemas/` and validate without
 job definition schemas. [Decision-0009](./decisions/0009-cli-execution-profile-contracts.md)
 records field mappings, immutable IDs, the API, and downstream obligations.
-Component loading, selection, and #283's other five component kinds remain pending.
+
+S2 adds strict `subject-manifest` and `locale-definition` components, also at
+format `1.0.0`. The manifest owns explicit identity/artifact root and complete
+locale editions (release, source, chapter splitting, optional whole-profile
+selections). Locale JSON owns declared metadata; the selected locale supplies
+assembled language. Regex flags and summary markers are explicit, including
+empty arrays. Validation matches optional `expected_id` against `manifest_id`
+or `locale` and checks Python regex syntax without exposing rejected patterns.
+
+Both new schemas own their complete specifications, with only in-document
+references, and ship through the existing schema data-files declaration.
+They validate independently without job schemas, including in an installed wheel.
+[Decision-0010](./decisions/0010-cli-manifest-locale-contracts.md) records all S2
+fields, conditional shapes, path/identity grammar, and downstream mappings.
+Component loading/selection, the three S3 kinds, and S4's all-seven review remain
+pending. Existing job schemas, metadata extensions, and maintained jobs are retained.
 
 The Gurubodh CLI executes its Draft 2020-12 job and artifact schemas at runtime.
 They are not documentation-only contracts:

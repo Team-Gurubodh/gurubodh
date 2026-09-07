@@ -1,0 +1,28 @@
+{
+  "component_schema_version": "1.0.0",
+  "manifest_id": "sub001_aps_example",
+  "identity": {
+    "category_code": "CAT001",
+    "subject_code": "SUB001",
+    "title_slug": "aps-example"
+  },
+  "artifact_root": "library/aps_example",
+  "editions": {
+    "hi-IN": {
+      "release": {
+        "version": "01",
+        "subversion": "01"
+      },
+      "source_document": {
+        "relative_path": "001_aps/legacy fonts/प्रबोधन.docx",
+        "font_encoding": "aps",
+        "file_format": "docx"
+      },
+      "chapter_split": {
+        "enabled": true,
+        "pattern_type": "literal",
+        "pattern": "प्रबोधन"
+      }
+    }
+  }
+}
