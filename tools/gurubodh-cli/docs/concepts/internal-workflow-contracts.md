@@ -32,6 +32,20 @@ it.
 
 ## Error boundary
 
+`validate_component(instance, component_name, path=None, *, expected_id=None)`
+validates `proofreading-profile` and `chunking-profile` in memory. It returns
+`None` without mutation, component lookup, or policy construction. `path` supplies
+diagnostic context; `expected_id` checks resource identity. Unknown kinds and
+malformed components raise `ConfigurationError`. Each job/component/artifact
+entry point selects its error domain explicitly.
+
+Job component schemas own their full specifications without schema references.
+The cached validator loads only the requested schema, with no job definition
+schema or remote retrieval. After structural validation, it rejects proofreading
+progress intervals above the timeout without constructing runtime settings. See
+[Decision-0009](../../../../docs/decisions/0009-cli-execution-profile-contracts.md)
+for the profile contract and the boundary with later composition work.
+
 Expected failures below `gurubodh.cli` use the small hierarchy in
 `gurubodh/errors.py`: configuration, source validation, storage/publication,
 and processing failures. The CLI catches the common `GurubodhError` base and

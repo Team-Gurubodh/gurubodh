@@ -17,6 +17,8 @@
 - `tools/gurubodh-cli/config/jobs/generate_chunks_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/generate_docx_job.schema.json`
 - `tools/gurubodh-cli/config/jobs/prep_subject_job.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/proofreading_profile.schema.json`
+- `tools/gurubodh-cli/config/job-components/schemas/chunking_profile.schema.json`
 - `tools/seed-data-cli/config/category_artifact.schema.json`
 - `tools/seed-data-cli/config/glossary_artifact.schema.json`
 - `tools/seed-data-cli/config/seed_data_sources.schema.json`
@@ -31,6 +33,18 @@
 ## Ownership Guidance
 
 ### Gurubodh CLI runtime authority
+
+The two profile job component schemas use format `1.0.0` and require a safe,
+versioned `profile_id` plus complete `proofreading` or `chunking` settings.
+They own all 18 proofreading and 11 chunking property specifications without
+schema references. Every setting is required, including boolean and nullable properties.
+`validate_component()` raises configuration-domain errors for malformed input;
+optional `expected_id` checks selected-resource identity without lookup.
+
+Both schemas ship under `config/job-components/schemas/` and validate without
+job definition schemas. [Decision-0009](./decisions/0009-cli-execution-profile-contracts.md)
+records field mappings, immutable IDs, the API, and downstream obligations.
+Component loading, selection, and #283's other five component kinds remain pending.
 
 The Gurubodh CLI executes its Draft 2020-12 job and artifact schemas at runtime.
 They are not documentation-only contracts:

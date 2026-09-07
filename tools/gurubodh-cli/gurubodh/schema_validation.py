@@ -1,4 +1,4 @@
-"""Executable JSON Schema boundaries for Gurubodh CLI jobs and artifacts."""
+"""Executable JSON Schema boundaries for CLI jobs, components, and artifacts."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from typing import Any, Iterable
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError, ValidationError
+from referencing import Registry
+from referencing.exceptions import Unresolvable
 
 from gurubodh.errors import ConfigurationError, ProcessingError
 
@@ -20,6 +22,11 @@ JOB_SCHEMAS = {
     "prep-subject": "prep_subject_job.schema.json",
     "generate-chunks": "generate_chunks_job.schema.json",
     "generate-docx": "generate_docx_job.schema.json",
+}
+
+COMPONENT_SCHEMAS = {
+    "proofreading-profile": "proofreading_profile.schema.json",
+    "chunking-profile": "chunking_profile.schema.json",
 }
 
 ARTIFACT_SCHEMAS = {
@@ -48,7 +55,13 @@ def _installed_schema_path(kind: str, filename: str) -> Path | None:
         package_distribution = distribution("gurubodh_cli")
     except PackageNotFoundError:
         return None
-    return Path(package_distribution.locate_file(Path("config") / kind / filename))
+    relative = Path("config") / kind / filename
+    # Wheel data-files may live at ../../../config relative to site-packages.
+    # RECORD owns that location; do not guess it from the module directory.
+    for entry in package_distribution.files or ():
+        if entry.parts[-len(relative.parts):] == relative.parts:
+            return Path(package_distribution.locate_file(entry))
+    return None
 
 
 @lru_cache(maxsize=None)
@@ -80,7 +93,10 @@ def _validator(kind: str, filename: str) -> Draft202012Validator:
         raise SchemaDefinitionError(
             f"Bundled Draft 2020-12 JSON Schema is invalid: {path}: {location} violates the meta-schema."
         ) from exc
-    return Draft202012Validator(schema, format_checker=FormatChecker())
+    # Explicit registries never retrieve unknown references over the network.
+    return Draft202012Validator(
+        schema, format_checker=FormatChecker(), registry=Registry()
+    )
 
 
 def _json_path(parts: Iterable[Any]) -> str:
@@ -277,14 +293,22 @@ def _validation_failure(
     return error_type(f"{prefix}:\n" + "\n".join(f"- {message}" for message in rendered))
 
 
-def _validate(instance: Any, kind: str, filename: str, prefix: str) -> None:
-    error_type = ConfigurationError if kind == "jobs" else ProcessingError
+def _validate(
+    instance: Any,
+    kind: str,
+    filename: str,
+    prefix: str,
+    error_type: type[ConfigurationError] | type[ProcessingError],
+) -> None:
     try:
         _ensure_json_compatible(instance)
         validator = _validator(kind, filename)
     except (SchemaDefinitionError, ValueError) as exc:
         raise error_type(f"{prefix}: {str(exc).rstrip('.')}.") from exc
-    errors = _actionable_errors(validator, instance)
+    try:
+        errors = _actionable_errors(validator, instance)
+    except Unresolvable as exc:
+        raise error_type(f"{prefix}: Bundled JSON Schema reference could not be resolved locally.") from exc
     if errors:
         raise _validation_failure(prefix, errors, error_type)
 
@@ -294,7 +318,40 @@ def validate_job(instance: Any, job_name: str, path: str | Path | None = None) -
     identity = f"{job_name} job"
     if path is not None:
         identity += f", {path}"
-    _validate(instance, "jobs", filename, f"Config validation failed ({identity})")
+    _validate(instance, "jobs", filename, f"Config validation failed ({identity})", ConfigurationError)
+
+
+def validate_component(
+    instance: Any,
+    component_name: str,
+    path: str | Path | None = None,
+    *,
+    expected_id: str | None = None,
+) -> None:
+    """Validate parsed component JSON without lookup, mutation, or defaults.
+
+    ``path`` is a display origin. A fixed-directory caller supplies
+    ``expected_id`` to check resource identity independently of that origin.
+    """
+    if component_name not in COMPONENT_SCHEMAS:
+        raise ConfigurationError("Config validation failed: unsupported component kind.")
+    identity = component_name
+    if path is not None:
+        identity += f", {path}"
+    prefix = f"Config validation failed ({identity})"
+    _validate(
+        instance, "job-components/schemas", COMPONENT_SCHEMAS[component_name],
+        prefix, ConfigurationError,
+    )
+    if expected_id is not None and instance["profile_id"] != expected_id:
+        raise ConfigurationError(f"{prefix}: $.profile_id must match the selected resource ID.")
+    if component_name == "proofreading-profile":
+        settings = instance["proofreading"]
+        if settings["request_progress_interval_seconds"] > settings["request_timeout_seconds"]:
+            raise ConfigurationError(
+                f"{prefix}: $.proofreading.request_progress_interval_seconds "
+                "must not exceed request_timeout_seconds."
+            )
 
 
 def validate_artifact(
@@ -306,7 +363,7 @@ def validate_artifact(
     identity = artifact_name
     if path is not None:
         identity += f", {path}"
-    _validate(instance, "artifacts", filename, f"Artifact validation failed ({identity})")
+    _validate(instance, "artifacts", filename, f"Artifact validation failed ({identity})", ProcessingError)
 
 
 def validated_artifact_json(
