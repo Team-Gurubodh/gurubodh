@@ -22,6 +22,7 @@ Use numbered filenames:
 | [0007](./0007-executable-cli-json-schema-boundaries.md) | Executable Gurubodh CLI JSON Schema Boundaries | Accepted |
 | [0008](./0008-slice-development-pilot.md) | Slice Development Pilot | Accepted for pilot only |
 | [0009](./0009-cli-execution-profile-contracts.md) | CLI Execution Profile Contracts | Accepted |
+| [0010](./0010-cli-manifest-locale-contracts.md) | CLI Manifest and Locale Contracts | Accepted |
 
 Keep `0000-template.md` as the local starter template.
 

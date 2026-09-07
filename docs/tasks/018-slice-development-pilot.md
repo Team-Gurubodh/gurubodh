@@ -243,3 +243,116 @@ Next action is PR review. R02/R03/R18 have S1 implementation evidence; shared
 requirements remain partial. S2–S4 and whole-issue completion remain pending,
 and #284 implementation still waits for that review. The process remains a
 pilot; publication does not adopt it repository-wide or authorize retirement.
+
+## S2 implementation handoff — 2026-09-07 (historical delivery status)
+
+The maintainer approved the [S2 scope (#294)](https://github.com/Team-Gurubodh/gurubodh/issues/294)
+and authorized implementation, explicitly reserving commits until after review.
+S1 merged in PR #293. S2 is on `issue-294-s2-manifest-locale-contracts`, based on
+current `main`/remote main at `ffdabd0`. The working tree was clean at entry.
+All S2 changes are **local, uncommitted, and unpublished**; no PR has been opened.
+
+### Contracts and implementation
+
+- Read the complete #294/#283 descriptions and empty discussions, current
+  workflow/handoff, existing schemas, validation, locale/font decisions, and
+  downstream #284 obligations. Scope and acceptance criteria are approved.
+- [Decision-0010](../decisions/0010-cli-manifest-locale-contracts.md) records
+  concrete identity/path grammar, explicit split shapes, metadata ownership,
+  expected-ID checks, safe regex diagnostics, and every S2 field's destination.
+  Disabled splitting contains only `enabled: false`; enabled regex splitting
+  requires explicit flags. These component rules preserve legacy job behavior.
+- Independent fixtures and 15 test methods preceded schema/validator changes.
+  Initial tests failed on missing component kinds. The separate mapping test
+  already passed existing preparation functions, establishing compatible field
+  construction without a production resolver.
+- Added standalone subject-manifest and locale-definition schemas, using only
+  in-document definitions. Extended the cached component boundary to validate
+  resource IDs and Python regex syntax without mutation, defaults, or raw regex
+  diagnostics. The existing data-files wildcard packages both schemas; no
+  packaging declaration change was needed. Updated the S1 installed probe to
+  permit additional registered kinds while retaining its profile checks.
+- Fixtures cover APS/Hindi, Unicode/Hindi/Marathi, independent bilingual releases,
+  all split modes, manifest/edition selections, and both locale definitions.
+  Existing jobs, job schemas, profile contracts, policy constructors, `--config`,
+  locale templates, source-font checks, and historical checkpoints are unchanged.
+
+### Verification
+
+- Focused S2 tests: **15 passed**. Structural invalid cases use both standalone
+  Draft 2020-12 and shared validation. Separate semantic tests cover regex flags
+  and sanitized compiler errors. Mapping tests use real prep/chunks/DOCX
+  preparation functions and local/R2 prep source shapes without source execution.
+- Full CLI suite: **240 passed in 27.006 seconds, no skips**, including all
+  26 maintained-job validations, S1 profiles, and existing error/import boundaries.
+  Command from `tools/gurubodh-cli`:
+  `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -v`.
+- Built the sdist and its wheel in a temporary source copy. Both inventories
+  contain all four component schemas byte-for-byte from the working tree.
+  Installed the wheel non-editably in an isolated Python 3.12 environment.
+- Installed S2 probe: **14 validation tests passed with job schemas present,
+  then all 14 passed with them physically absent**. The probe reuses the entire
+  validation case class, including standalone checks; mapping tests stay at the
+  separate job boundary. The S1 installed probe also passed both profiles,
+  29 missing-setting cases, non-mutation, and artifact error classification with
+  job schemas present and absent. Both probes block networking and assert
+  imports/schema paths originate in the installation outside the checkout.
+- Documentation relative links and `git diff --check` passed. No required S2
+  verification was skipped. Live sources/providers/R2/models, production catalog
+  discovery, and container rollout are outside S2.
+
+Reproduction commands are in the
+[fixture guide](../../tools/gurubodh-cli/tests/fixtures/job-components/README.md).
+Temporary evidence lives under `/private/tmp/gurubodh-s2-implementation.JZjK0z/`
+(`before.log`, `full-suite.log`, `build.log`, `dist/`, `installed-s2.log`, and
+`installed-profiles.log`); it is transient, not a repository dependency.
+
+### Reconciliation and next action
+
+R04, R05, R12, R13, and R17 have local implementation and verification evidence.
+S2 contributes to R01, R09–R11, R19–R25, R27, and R31–R39; shared requirements
+remain partial. #283 retains the authoritative checklist, with #294 owning S2
+execution evidence. No uncovered requirement or scope expansion was identified.
+S3 owns command/environment/storage contracts and lab binding; S4 owns complete
+mapping and all-seven review. #284 remains gated on #283's whole-issue review.
+
+Next action is maintainer review and clarification of the local diff. Do not
+commit, push, open a PR, or merge before the requested review and subsequent
+authorization. #294 remains open for delivery. The process remains provisional.
+
+### Prepared S2 PR description
+
+Title: `feat(cli): validate subject and locale components (#294, #283 S2)`
+
+Closes #294. Refs #283. Adds two self-contained component schemas for subject
+manifests, locale editions, and locale metadata. Invalid paths, releases, split
+declarations, and profile references fail without defaults; explicit resource
+identity and safe regex checks extend the existing validation boundary.
+
+Document field ownership and downstream mapping. Preserve complete jobs and
+runtime behavior; component lookup/composition and S3–S4 remain pending.
+
+Verification: 240 CLI tests passed with no skips, including 15 S2 tests and all
+26 maintained jobs. Sdist/wheel inventories and isolated installed S1/S2 probes
+passed with job schemas present and absent. Documentation links and whitespace
+checks passed. All changes remain uncommitted pending maintainer review.
+
+## S2 publication handoff — 2026-09-07
+
+The maintainer reviewed S2, clarified whole-profile override behavior, and
+authorized committing, pushing, and opening its PR. This fulfills the earlier
+hold before committing; merging remains a separate decision. The implementation
+is unchanged after review on `issue-294-s2-manifest-locale-contracts`, based on
+current remote `main` at `ffdabd0`.
+
+Publication verification confirmed that runtime sources, schemas, S2 tests,
+installed probes, and fixtures match the verified build/test inputs byte for
+byte. The existing 240-test result and both installed probes remain applicable;
+no application tests needed repeating for this handoff-only update. Documentation
+links, whitespace, and commit-message checks are validated for publication.
+No required implementation check is skipped.
+
+[#294](https://github.com/Team-Gurubodh/gurubodh/issues/294) records the resulting
+commit, PR, and current delivery status. The earlier local/uncommitted statements
+describe the implementation session. #283 retains coverage and remains open for
+S3–S4 and whole-issue review; #284 implementation remains gated. Next is PR review.

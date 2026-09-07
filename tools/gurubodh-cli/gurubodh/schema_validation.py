@@ -27,6 +27,8 @@ JOB_SCHEMAS = {
 COMPONENT_SCHEMAS = {
     "proofreading-profile": "proofreading_profile.schema.json",
     "chunking-profile": "chunking_profile.schema.json",
+    "subject-manifest": "subject_manifest.schema.json",
+    "locale-definition": "locale_definition.schema.json",
 }
 
 ARTIFACT_SCHEMAS = {
@@ -343,8 +345,11 @@ def validate_component(
         instance, "job-components/schemas", COMPONENT_SCHEMAS[component_name],
         prefix, ConfigurationError,
     )
-    if expected_id is not None and instance["profile_id"] != expected_id:
-        raise ConfigurationError(f"{prefix}: $.profile_id must match the selected resource ID.")
+    id_key = {"subject-manifest": "manifest_id", "locale-definition": "locale"}.get(
+        component_name, "profile_id"
+    )
+    if expected_id is not None and instance[id_key] != expected_id:
+        raise ConfigurationError(f"{prefix}: $.{id_key} must match the selected resource ID.")
     if component_name == "proofreading-profile":
         settings = instance["proofreading"]
         if settings["request_progress_interval_seconds"] > settings["request_timeout_seconds"]:
@@ -352,6 +357,21 @@ def validate_component(
                 f"{prefix}: $.proofreading.request_progress_interval_seconds "
                 "must not exceed request_timeout_seconds."
             )
+    if component_name == "subject-manifest":
+        for locale, edition in sorted(instance["editions"].items()):
+            split = edition["chapter_split"]
+            if split["enabled"] and split["pattern_type"] == "regex":
+                flags = re.NOFLAG
+                for flag in split["flags"]:
+                    flags |= re.RegexFlag[flag]
+                try:
+                    re.compile(split["pattern"], flags)
+                except (re.error, OverflowError, RecursionError):
+                    # Raw compiler errors can echo source text or group names.
+                    raise ConfigurationError(
+                        f"{prefix}: $.editions.{locale}.chapter_split.pattern "
+                        "must be a valid Python regular expression."
+                    ) from None
 
 
 def validate_artifact(

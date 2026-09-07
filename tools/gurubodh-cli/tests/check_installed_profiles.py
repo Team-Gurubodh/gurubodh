@@ -43,7 +43,7 @@ def main():
     dist = distribution("gurubodh_cli")
     direct_url = json.loads(dist.read_text("direct_url.json"))
     assert not direct_url.get("dir_info", {}).get("editable", False)
-    assert len(validation.COMPONENT_SCHEMAS) == 2
+    assert {"proofreading-profile", "chunking-profile"} <= validation.COMPONENT_SCHEMAS.keys()
 
     check_profiles(fixture_root, install_root)
     job_schema_dir = validation.schema_path("jobs", "prep_subject_job.schema.json").resolve().parent
