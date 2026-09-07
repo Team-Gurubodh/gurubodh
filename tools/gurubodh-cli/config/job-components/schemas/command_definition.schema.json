@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gurubodh.local/schemas/job-components/command_definition.schema.json",
+  "title": "Gurubodh command definition",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "component_schema_version",
+        "job_schema_version",
+        "pipeline_by_encoding",
+        "source_role",
+        "destination_role",
+        "naming_fields",
+        "default_profiles"
+      ],
+      "properties": {
+        "command_id": {
+          "const": "prep-subject"
+        },
+        "component_schema_version": {
+          "const": "1.0.0"
+        },
+        "job_schema_version": {
+          "const": "1.5.0"
+        },
+        "pipeline_by_encoding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "aps",
+            "unicode"
+          ],
+          "properties": {
+            "aps": {
+              "const": "legacy-docx-to-unicode"
+            },
+            "unicode": {
+              "const": "unicode-docx-ingest"
+            }
+          }
+        },
+        "source_role": {
+          "const": "source_document"
+        },
+        "destination_role": {
+          "const": "subject_artifact_destination"
+        },
+        "naming_fields": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "category_code",
+              "subject_code",
+              "title_slug",
+              "version",
+              "subversion"
+            ]
+          }
+        },
+        "default_profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proofreading"
+          ],
+          "properties": {
+            "proofreading": {
+              "$ref": "#/$defs/profile_id"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "component_schema_version",
+        "job_schema_version",
+        "pipeline",
+        "source_role",
+        "destination_role",
+        "naming_fields",
+        "default_profiles"
+      ],
+      "properties": {
+        "command_id": {
+          "const": "generate-chunks"
+        },
+        "component_schema_version": {
+          "const": "1.0.0"
+        },
+        "job_schema_version": {
+          "const": "1.2.0"
+        },
+        "pipeline": {
+          "const": "generate-chunks"
+        },
+        "source_role": {
+          "const": "subject_artifact_source"
+        },
+        "destination_role": {
+          "const": "subject_artifact_destination"
+        },
+        "naming_fields": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "category_code",
+              "subject_code",
+              "title_slug",
+              "version",
+              "subversion",
+              "language"
+            ]
+          }
+        },
+        "default_profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chunking"
+          ],
+          "properties": {
+            "chunking": {
+              "$ref": "#/$defs/profile_id"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "component_schema_version",
+        "job_schema_version",
+        "pipeline",
+        "source_role",
+        "destination_role",
+        "naming_fields",
+        "default_profiles"
+      ],
+      "properties": {
+        "command_id": {
+          "const": "generate-docx"
+        },
+        "component_schema_version": {
+          "const": "1.0.0"
+        },
+        "job_schema_version": {
+          "const": "1.0.0"
+        },
+        "pipeline": {
+          "const": "generate-docx"
+        },
+        "source_role": {
+          "const": "subject_artifact_source"
+        },
+        "destination_role": {
+          "const": "subject_artifact_destination"
+        },
+        "naming_fields": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "category_code",
+              "subject_code",
+              "title_slug",
+              "language"
+            ]
+          }
+        },
+        "default_profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [],
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "component_schema_version",
+        "default_profiles"
+      ],
+      "properties": {
+        "command_id": {
+          "const": "lab-proofread"
+        },
+        "component_schema_version": {
+          "const": "1.0.0"
+        },
+        "default_profiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proofreading"
+          ],
+          "properties": {
+            "proofreading": {
+              "$ref": "#/$defs/profile_id"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "profile_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*-v[1-9][0-9]*(?![\\s\\S])"
+    }
+  }
+}

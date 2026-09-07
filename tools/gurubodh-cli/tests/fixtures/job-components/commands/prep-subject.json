@@ -1,0 +1,21 @@
+{
+  "component_schema_version": "1.0.0",
+  "command_id": "prep-subject",
+  "job_schema_version": "1.5.0",
+  "pipeline_by_encoding": {
+    "aps": "legacy-docx-to-unicode",
+    "unicode": "unicode-docx-ingest"
+  },
+  "source_role": "source_document",
+  "destination_role": "subject_artifact_destination",
+  "naming_fields": [
+    "category_code",
+    "subject_code",
+    "title_slug",
+    "version",
+    "subversion"
+  ],
+  "default_profiles": {
+    "proofreading": "gemini-3.6-flash-v1"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "component_schema_version": "1.0.0",
+  "storage_profile_id": "r2-output",
+  "source_document": "local_source_library",
+  "subject_artifact_source": "local_destination_library",
+  "subject_artifact_destination": "r2_destination_library"
+}

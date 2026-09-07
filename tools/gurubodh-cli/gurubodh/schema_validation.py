@@ -29,6 +29,9 @@ COMPONENT_SCHEMAS = {
     "chunking-profile": "chunking_profile.schema.json",
     "subject-manifest": "subject_manifest.schema.json",
     "locale-definition": "locale_definition.schema.json",
+    "command-definition": "command_definition.schema.json",
+    "environment": "environment.schema.json",
+    "storage-profile": "storage_profile.schema.json",
 }
 
 ARTIFACT_SCHEMAS = {
@@ -118,6 +121,15 @@ def _path_key(parts: Iterable[Any]) -> tuple[tuple[int, Any], ...]:
     return tuple((0, part) if isinstance(part, int) else (1, str(part)) for part in parts)
 
 
+def _safe_component_parts(parts: tuple[Any, ...]) -> tuple[Any, ...]:
+    for index, part in enumerate(parts):
+        if not isinstance(part, int) and part != "$env" and not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_-]*", str(part)
+        ):
+            return parts[:index]
+    return parts
+
+
 def _json_type(value: Any) -> str:
     if value is None:
         return "null"
@@ -136,24 +148,27 @@ def _json_type(value: Any) -> str:
     return type(value).__name__
 
 
-def _ensure_json_compatible(value: Any, parts: tuple[Any, ...] = ()) -> None:
+def _ensure_json_compatible(
+    value: Any, parts: tuple[Any, ...] = (), *, safe_locations: bool = False,
+) -> None:
+    location = _json_path(_safe_component_parts(parts) if safe_locations else parts)
     if value is None or isinstance(value, (str, bool, int)):
         return
     if isinstance(value, float):
         if not math.isfinite(value):
-            raise ValueError(f"{_json_path(parts)} must contain a finite JSON number")
+            raise ValueError(f"{location} must contain a finite JSON number")
         return
     if isinstance(value, list):
         for index, item in enumerate(value):
-            _ensure_json_compatible(item, (*parts, index))
+            _ensure_json_compatible(item, (*parts, index), safe_locations=safe_locations)
         return
     if isinstance(value, dict):
         for key, item in value.items():
             if not isinstance(key, str):
-                raise ValueError(f"{_json_path(parts)} has a non-string object property name")
-            _ensure_json_compatible(item, (*parts, key))
+                raise ValueError(f"{location} has a non-string object property name")
+            _ensure_json_compatible(item, (*parts, key), safe_locations=safe_locations)
         return
-    raise ValueError(f"{_json_path(parts)} contains non-JSON value type {_json_type(value)}")
+    raise ValueError(f"{location} contains non-JSON value type {_json_type(value)}")
 
 
 def _leaf_errors(error: ValidationError) -> list[ValidationError]:
@@ -167,17 +182,21 @@ def _leaf_errors(error: ValidationError) -> list[ValidationError]:
         branches.setdefault(branch, []).extend(_leaf_errors(child))
 
     if isinstance(error.instance, dict) and isinstance(error.validator_value, list):
-        for branch_index, branch_schema in enumerate(error.validator_value):
-            if not isinstance(branch_schema, dict):
+        # Prefer a discriminator defined differently in every branch. A common
+        # component version must not select prep's errors for a chunks document.
+        constants = [
+            {name: spec["const"] for name, spec in branch.get("properties", {}).items()
+             if isinstance(spec, dict) and "const" in spec}
+            if isinstance(branch, dict) else {}
+            for branch in error.validator_value
+        ]
+        common = set.intersection(*(set(fields) for fields in constants))
+        for name in sorted(common):
+            values = [fields[name] for fields in constants]
+            if len({_expected(value) for value in values}) != len(values):
                 continue
-            properties = branch_schema.get("properties", {})
-            for property_name, property_schema in properties.items():
-                if (
-                    isinstance(property_schema, dict)
-                    and "const" in property_schema
-                    and error.instance.get(property_name) == property_schema["const"]
-                    and branch_index in branches
-                ):
+            for branch_index, value in enumerate(values):
+                if name in error.instance and error.instance[name] == value and branch_index in branches:
                     return branches[branch_index]
 
     def branch_score(item: tuple[Any, list[ValidationError]]) -> tuple[Any, ...]:
@@ -284,10 +303,20 @@ def _validation_failure(
     prefix: str,
     errors: list[ValidationError],
     error_type: type[ConfigurationError] | type[ProcessingError],
+    *,
+    safe_locations: bool = False,
 ) -> ConfigurationError | ProcessingError:
     messages: list[tuple[tuple[Any, ...], str]] = []
     for error in errors:
-        messages.extend(_messages_for(error))
+        if safe_locations and error.validator == "additionalProperties" and error.schema.get("patternProperties"):
+            # Dynamic keys are user values. An invalid store ID should be
+            # diagnosed at its owning map, not printed as a JSON-path segment.
+            messages.append((tuple(error.absolute_path), "contains an invalid property name."))
+            continue
+        for parts, message in _messages_for(error):
+            if safe_locations and (safe_parts := _safe_component_parts(parts)) != parts:
+                parts, message = safe_parts, "contains an invalid property name."
+            messages.append((parts, message))
     messages = sorted(set(messages), key=lambda item: (_path_key(item[0]), item[1]))
     rendered = [f"{_json_path(path)} {message}" for path, message in messages]
     if len(rendered) == 1:
@@ -303,7 +332,7 @@ def _validate(
     error_type: type[ConfigurationError] | type[ProcessingError],
 ) -> None:
     try:
-        _ensure_json_compatible(instance)
+        _ensure_json_compatible(instance, safe_locations=kind == "job-components/schemas")
         validator = _validator(kind, filename)
     except (SchemaDefinitionError, ValueError) as exc:
         raise error_type(f"{prefix}: {str(exc).rstrip('.')}.") from exc
@@ -312,7 +341,9 @@ def _validate(
     except Unresolvable as exc:
         raise error_type(f"{prefix}: Bundled JSON Schema reference could not be resolved locally.") from exc
     if errors:
-        raise _validation_failure(prefix, errors, error_type)
+        raise _validation_failure(
+            prefix, errors, error_type, safe_locations=kind == "job-components/schemas"
+        )
 
 
 def validate_job(instance: Any, job_name: str, path: str | Path | None = None) -> None:
@@ -345,9 +376,11 @@ def validate_component(
         instance, "job-components/schemas", COMPONENT_SCHEMAS[component_name],
         prefix, ConfigurationError,
     )
-    id_key = {"subject-manifest": "manifest_id", "locale-definition": "locale"}.get(
-        component_name, "profile_id"
-    )
+    id_key = {
+        "subject-manifest": "manifest_id", "locale-definition": "locale",
+        "command-definition": "command_id", "environment": "environment_id",
+        "storage-profile": "storage_profile_id",
+    }.get(component_name, "profile_id")
     if expected_id is not None and instance[id_key] != expected_id:
         raise ConfigurationError(f"{prefix}: $.{id_key} must match the selected resource ID.")
     if component_name == "proofreading-profile":

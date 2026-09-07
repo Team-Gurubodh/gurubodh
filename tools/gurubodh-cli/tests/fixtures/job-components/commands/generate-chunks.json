@@ -1,0 +1,19 @@
+{
+  "component_schema_version": "1.0.0",
+  "command_id": "generate-chunks",
+  "job_schema_version": "1.2.0",
+  "pipeline": "generate-chunks",
+  "source_role": "subject_artifact_source",
+  "destination_role": "subject_artifact_destination",
+  "naming_fields": [
+    "category_code",
+    "subject_code",
+    "title_slug",
+    "version",
+    "subversion",
+    "language"
+  ],
+  "default_profiles": {
+    "chunking": "bge-m3-semantic-window-v1"
+  }
+}
