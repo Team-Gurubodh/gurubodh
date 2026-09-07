@@ -427,3 +427,10 @@ commit/PR and current delivery status; #283 retains parent coverage and the
 completion-review gate. Earlier uncommitted/unpublished statements describe
 the implementation session. Next is PR review; this publication does not
 authorize merging or begin #284 implementation.
+
+The PR is [#299](https://github.com/Team-Gurubodh/gurubodh/pull/299), initially
+published as `c01d059`. Publication review found that container tests mount CLI
+tests/jobs but not the repository mapping consumed by S4's inventory test.
+A follow-up mounts repository docs read-only at `/docs` for that test run and
+adds the mapping document to the workflow's path triggers. The runtime image
+and application code remain unchanged; GitHub CI verifies the container boundary.
