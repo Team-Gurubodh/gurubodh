@@ -33,8 +33,8 @@ def add_project_option(parser):
     parser.add_argument(
         "--project-root",
         help=(
-            "Project root containing config/jobs/ and jobs/subjects/. If omitted, uses GURUBODH_CLI_ROOT "
-            "or walks upward from the current directory."
+            "Project root containing jobs/subjects/ and, optionally, one complete reusable component catalog. "
+            "If omitted, uses GURUBODH_CLI_ROOT or walks upward from the current directory."
         ),
     )
 
@@ -342,7 +342,7 @@ def _validate_job_options(parser, args, command):
 
 def _resolve_composed_job(context, args, command):
     return resolve_job(
-        ComponentCatalog(context.root), command=command, manifest_id=args.subject,
+        ComponentCatalog(context.root, context.resource_root), command=command, manifest_id=args.subject,
         locale=args.language, environment_id=args.environment, storage_profile_id=args.storage_profile,
         proofreading_profile_id=getattr(args, "proofreading_profile", None),
         chunking_profile_id=getattr(args, "chunking_profile", None),

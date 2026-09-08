@@ -3,19 +3,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from gurubodh.errors import ConfigurationError
+from gurubodh.resource_discovery import bundled_catalog_root, bundled_resource_path
 
 
 @dataclass(frozen=True)
 class ProjectContext:
     root: Path
     legacy_converter: Path
+    resource_root: Path | None = None
 
 
 def _looks_like_project_root(path):
-    return (
-        (path / "config" / "jobs" / "prep_subject_job.schema.json").is_file()
-        and (path / "jobs" / "subjects").is_dir()
-    )
+    return (path / "jobs" / "subjects").is_dir()
 
 
 def _find_project_root(start):
@@ -30,7 +29,7 @@ def resolve_project_context(project_root=None):
     if project_root:
         root = Path(project_root).expanduser().resolve()
         if not _looks_like_project_root(root):
-            raise ConfigurationError(f"Project root does not contain config/jobs/ and jobs/subjects/: {root}")
+            raise ConfigurationError(f"Project root does not contain jobs/subjects/: {root}")
     else:
         env_root = os.environ.get("GURUBODH_CLI_ROOT")
         if env_root:
@@ -47,7 +46,12 @@ def resolve_project_context(project_root=None):
 
     return ProjectContext(
         root=root,
-        legacy_converter=root / "scripts" / "legacy_font_convert.js",
+        legacy_converter=bundled_resource_path("scripts/legacy_font_convert.js"),
+        resource_root=(
+            root
+            if (root / "config" / "job-components").is_dir()
+            else bundled_catalog_root()
+        ),
     )
 
 

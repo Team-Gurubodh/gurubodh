@@ -287,7 +287,9 @@ class ProfileContractTests(unittest.TestCase):
             self.assertNotIn("secret-schema", str(raised.exception))
 
     def test_installed_schema_lookup_honors_relocated_distribution_records(self):
-        from gurubodh.schema_validation import _installed_schema_path
+        from pathlib import PurePosixPath
+
+        from gurubodh.resource_discovery import _installed_resource_path
 
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory)
@@ -299,11 +301,16 @@ class ProfileContractTests(unittest.TestCase):
             schema.parent.mkdir(parents=True)
             schema.write_text("{}")
             (metadata / "RECORD").write_text(f"../../../{relative},,\n")
-            with patch("gurubodh.schema_validation.distribution", return_value=PathDistribution(metadata)):
-                actual = _installed_schema_path("job-components/schemas", "chunking_profile.schema.json")
+            with patch(
+                "gurubodh.resource_discovery._distribution_for_import",
+                return_value=PathDistribution(metadata),
+            ):
+                actual = _installed_resource_path(PurePosixPath(relative))
                 self.assertEqual(actual.resolve(), schema.resolve())
                 self.assertTrue(actual.is_file())
-                self.assertIsNone(_installed_schema_path("jobs", "absent.schema.json"))
+                self.assertIsNone(
+                    _installed_resource_path(PurePosixPath("config/jobs/absent.schema.json"))
+                )
 
 
 if __name__ == "__main__":

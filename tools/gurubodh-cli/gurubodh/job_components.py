@@ -8,6 +8,7 @@ import re
 
 from gurubodh.contracts import ComponentSnapshot
 from gurubodh.errors import ConfigurationError
+from gurubodh.resource_discovery import bundled_catalog_root
 from gurubodh.schema_validation import validate_component
 
 
@@ -50,20 +51,26 @@ def _unique_object(pairs):
 
 
 class ComponentCatalog:
-    """One explicit CLI root; discovery across installations belongs to #287."""
+    """A project manifest catalog plus one non-mixing reusable catalog."""
 
-    def __init__(self, root: str | Path):
+    def __init__(self, root: str | Path, resource_root: str | Path | None = None):
         self.root = Path(root).resolve()
+        if resource_root is None:
+            project_resources = self.root / "config" / "job-components"
+            resource_root = self.root if project_resources.is_dir() else bundled_catalog_root()
+        self.resource_root = Path(resource_root).resolve()
 
     def load(self, kind: str, resource_id: str) -> ComponentSnapshot:
         validate_resource_id(kind, resource_id)
         if kind == "subject-manifest":
-            directory = self.root / "jobs" / "subjects" / resource_id
+            owner = self.root
+            directory = owner / "jobs" / "subjects" / resource_id
             path = directory / "manifest.json"
         else:
-            directory = self.root / "config" / "job-components" / _DIRECTORIES[kind]
+            owner = self.resource_root
+            directory = owner / "config" / "job-components" / _DIRECTORIES[kind]
             path = directory / f"{resource_id}.json"
-        origin = path.relative_to(self.root).as_posix()
+        origin = path.relative_to(owner).as_posix()
         context = f"Component lookup ({kind}, {origin})"
         try:
             resolved = path.resolve(strict=True)
