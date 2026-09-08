@@ -113,7 +113,9 @@ class ConfigurationProvenance:
             profiles=inputs.profiles if inputs else profiles,
             components=tuple(ComponentProvenance.capture(component) for component in
                              (inputs.components if inputs else components)),
-            invocation_profiles=inputs.invocation_profiles if inputs else (),
+            invocation_profiles=inputs.invocation_profiles if inputs else tuple(
+                (profile.kind, profile.profile_id) for profile in profiles if profile.selected_by == "invocation"
+            ),
             chapters=inputs.chapters if inputs else None,
             environment_bindings=tuple(sorted(bindings)),
         )

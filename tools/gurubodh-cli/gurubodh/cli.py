@@ -1,15 +1,18 @@
 import argparse
+import json
 import sys
 
 from gurubodh.docx.namespaces import register_namespaces
 from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
 from gurubodh.errors import GurubodhError
+from gurubodh.job_components import ComponentCatalog
+from gurubodh.job_composition import resolve_job
 from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
 from gurubodh.pipelines.generate_docx import run_generate_docx_job
-from gurubodh.pipelines.dispatcher import run_configured_job, run_legacy_job, run_unicode_job
+from gurubodh.pipelines.dispatcher import run_configured_job, run_prepared_job, run_legacy_job, run_unicode_job
 from gurubodh.project import resolve_project_context, resolve_project_path
 
 
@@ -21,13 +24,12 @@ PLANNED_COMMANDS = {
 }
 
 
-def add_common_options(parser):
-    parser.add_argument("--config", required=True, help="Path to a Gurubodh job JSON file.")
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Replace existing local output or R2 objects instead of failing.",
-    )
+COMPOSED_COMMANDS = ("prep-subject", "generate-chunks", "generate-docx")
+REQUIRED_SELECTORS = ("subject", "language", "environment", "storage_profile")
+OPTIONAL_SELECTORS = ("proofreading_profile", "chunking_profile", "chapters")
+
+
+def add_project_option(parser):
     parser.add_argument(
         "--project-root",
         help=(
@@ -35,6 +37,46 @@ def add_common_options(parser):
             "or walks upward from the current directory."
         ),
     )
+
+
+def add_composed_options(parser, command=None, *, required=False):
+    parser.add_argument("--subject", required=required, help="Subject manifest ID (not the subject code).")
+    parser.add_argument("--language", required=required, help="Explicit manifest edition: hi-IN or mr-IN.")
+    parser.add_argument("--environment", required=required, help="Environment component ID, e.g. development.")
+    parser.add_argument(
+        "--storage-profile", required=required,
+        help="Storage profile ID: local, r2-output, or r2. r2-output reads downstream artifacts locally.",
+    )
+    for kind, applicable in (("proofreading", "prep-subject"), ("chunking", "generate-chunks")):
+        if command is None or command == applicable:
+            parser.add_argument(
+                f"--{kind}-profile",
+                help=f"Complete {kind} profile ID ({applicable} only); replaces the selected JSON profile as a whole.",
+            )
+    if command is None or command == "generate-chunks":
+        parser.add_argument(
+            "--chapters", nargs="+", metavar="NNN",
+            help="generate-chunks only: unique three-ASCII-digit chapter numbers, e.g. --chapters 001 002.",
+        )
+
+
+def add_common_options(parser, command=None):
+    parser.add_argument(
+        "--config", required=command is None,
+        help="Temporary complete-job JSON compatibility mode; mutually exclusive with composed selectors. Retires after maintainer comparison acceptance.",
+    )
+    if command is not None:
+        add_composed_options(parser, command)
+        parser.epilog = (
+            "Choose --config OR all of --subject, --language, --environment, --storage-profile. "
+            "Profile precedence: command definition < manifest < edition < invocation; no scalar overrides."
+        )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing local output or R2 objects instead of failing.",
+    )
+    add_project_option(parser)
 
 
 def add_planned_command(subparsers, command):
@@ -56,9 +98,9 @@ def build_parser():
     prep_subject_parser = subparsers.add_parser(
         "prep-subject",
         help="Prepare subject artifacts using the pipeline declared by the job config.",
-        description="Read the job config and dispatch to its declared pipeline.",
+        description="Compose a job or read a temporary complete config, then dispatch its declared pipeline.",
     )
-    add_common_options(prep_subject_parser)
+    add_common_options(prep_subject_parser, "prep-subject")
     prep_subject_parser.add_argument(
         "--resume",
         action="store_true",
@@ -70,14 +112,33 @@ def build_parser():
         help="Generate candidate-manifest-bound semantic chunks from prepared chapter text.",
         description="Generate semantic chunk artifacts from an authoritative candidate manifest.",
     )
-    add_common_options(generate_chunks_parser)
+    add_common_options(generate_chunks_parser, "generate-chunks")
 
     generate_docx_parser = subparsers.add_parser(
         "generate-docx",
         help="Generate validated DOCX exports from canonical proofread chapter text.",
         description="Generate one candidate-manifest-bound DOCX export per canonical chapter.",
     )
-    add_common_options(generate_docx_parser)
+    add_common_options(generate_docx_parser, "generate-docx")
+
+    config_parser = subparsers.add_parser("config", help="Validate and inspect composed job configurations.")
+    config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
+    resolve_parser = config_subparsers.add_parser(
+        "resolve", help="Emit a validated assembled job as JSON without executing a workflow.",
+        description=(
+            "Emit deterministic job JSON to stdout without reading content or initializing providers/storage/models. "
+            "No provider credentials or downloaded model cache are required. "
+            "The JSON can be used with --config during comparison; permanent file-based replay is not promised."
+        ),
+        epilog="Profile precedence: command definition < manifest < edition < invocation; whole profiles only.",
+    )
+    resolve_parser.add_argument("--command", dest="resolved_command", required=True, choices=COMPOSED_COMMANDS)
+    add_composed_options(resolve_parser, required=True)
+    add_project_option(resolve_parser)
+    resolve_parser.add_argument(
+        "--provenance", action="store_true",
+        help="Emit separate provenance JSON to stderr; stdout remains executable job JSON only.",
+    )
 
     lab_parser = subparsers.add_parser(
         "lab",
@@ -97,7 +158,11 @@ def build_parser():
         "--lab-root", required=True, help="Explicit root for non-canonical lab output."
     )
     lab_proofread_parser.add_argument(
-        "--project-root", help="Gurubodh CLI project root, used only for the bundled legacy converter."
+        "--project-root", help="Gurubodh CLI project root for JSON profiles and the bundled legacy converter."
+    )
+    lab_proofread_parser.add_argument(
+        "--proofreading-profile",
+        help="Complete proofreading profile ID; otherwise use lab's JSON-declared default shared with canonical prep.",
     )
     lab_assemble_docx_parser = lab_subparsers.add_parser(
         "assemble-docx",
@@ -166,11 +231,49 @@ def _run_command(parser, args):
     if args.command in PLANNED_COMMANDS:
         parser.error(f"{args.command} is planned but not implemented yet.")
 
+    if args.command in COMPOSED_COMMANDS or args.command == "config":
+        command = args.resolved_command if args.command == "config" else args.command
+        _validate_job_options(parser, args, command)
+        context = resolve_project_context(args.project_root)
+        if args.command == "config":
+            job = _resolve_composed_job(context, args, command)
+            payload = json.dumps(job.to_payload(), ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False)
+            if args.provenance:
+                print(json.dumps(job.provenance.to_payload(), ensure_ascii=False, sort_keys=True, indent=2), file=sys.stderr)
+            print(payload)
+            return
+
+        config_path = resolve_project_path(context, args.config) if args.config is not None else None
+        if command == "prep-subject":
+            register_namespaces()
+            if config_path is not None:
+                run_configured_job(context, config_path, overwrite=args.overwrite, resume=args.resume)
+            else:
+                run_prepared_job(
+                    context, _resolve_composed_job(context, args, command),
+                    overwrite=args.overwrite, resume=args.resume,
+                )
+            return
+
+        loader = load_generate_chunks_job if command == "generate-chunks" else load_generate_docx_job
+        job = loader(config_path) if config_path is not None else _resolve_composed_job(context, args, command)
+        runner = run_generate_chunks_job if command == "generate-chunks" else run_generate_docx_job
+        try:
+            result = runner(context, job, overwrite=args.overwrite, config_path=config_path)
+        except Exception as exc:
+            parser.error(str(exc))
+        if command == "generate-chunks":
+            print(f"generate-chunks complete: {result['processed_chapter_count']} chapter(s), {result['total_chunk_count']} chunk(s)")
+        else:
+            print(f"generate-docx complete: {result['processed_chapter_count']} chapter DOCX file(s)")
+        return
+
     if args.command == "lab" and args.lab_command == "proofread":
         try:
             context = resolve_project_context(args.project_root)
             result = run_lab_proofread(
-                context, args.source, args.locale, args.lab_root, progress=print
+                context, args.source, args.locale, args.lab_root, progress=print,
+                proofreading_profile_id=args.proofreading_profile,
             )
         except Exception as exc:
             parser.error(str(exc))
@@ -200,33 +303,6 @@ def _run_command(parser, args):
         )
         return
 
-    if args.command == "generate-chunks":
-        context = resolve_project_context(args.project_root)
-        config_path = resolve_project_path(context, args.config)
-        config = load_generate_chunks_job(config_path)
-        try:
-            result = run_generate_chunks_job(context, config, overwrite=args.overwrite, config_path=config_path)
-        except Exception as exc:
-            parser.error(str(exc))
-        print(
-            "generate-chunks complete: "
-            f"{result['processed_chapter_count']} chapter(s), {result['total_chunk_count']} chunk(s)"
-        )
-        return
-
-    if args.command == "generate-docx":
-        context = resolve_project_context(args.project_root)
-        config_path = resolve_project_path(context, args.config)
-        config = load_generate_docx_job(config_path)
-        try:
-            result = run_generate_docx_job(
-                context, config, overwrite=args.overwrite, config_path=config_path
-            )
-        except Exception as exc:
-            parser.error(str(exc))
-        print(f"generate-docx complete: {result['processed_chapter_count']} chapter DOCX file(s)")
-        return
-
     if args.command == "compare-tokenizers":
         try:
             comparisons = run_compare_tokenizers(args, progress=lambda message: print(message, file=sys.stderr))
@@ -239,16 +315,39 @@ def _run_command(parser, args):
     config_path = resolve_project_path(context, args.config)
     register_namespaces()
 
-    if args.command == "prep-subject":
-        if args.resume and args.overwrite:
-            parser.error("--resume and --overwrite are mutually exclusive for prep-subject.")
-        run_configured_job(context, config_path, overwrite=args.overwrite, resume=args.resume)
-    elif args.command == "unicode-ingest":
+    if args.command == "unicode-ingest":
         run_unicode_job(config_path, overwrite=args.overwrite, context=context)
     elif args.command == "legacy-convert":
         run_legacy_job(context, config_path, overwrite=args.overwrite)
     else:
         parser.error(f"Unsupported command: {args.command}")
+
+
+def _validate_job_options(parser, args, command):
+    selectors = REQUIRED_SELECTORS + OPTIONAL_SELECTORS
+    if getattr(args, "config", None) is not None:
+        if any(getattr(args, name, None) is not None for name in selectors):
+            parser.error("--config and composed selectors are mutually exclusive.")
+    else:
+        missing = ["--" + name.replace("_", "-") for name in REQUIRED_SELECTORS if getattr(args, name, None) is None]
+        if missing:
+            parser.error("Composed mode requires explicit " + ", ".join(missing) + "; or use --config during comparison.")
+    if getattr(args, "resume", False) and args.overwrite:
+        parser.error("--resume and --overwrite are mutually exclusive for prep-subject.")
+    for name, applicable in (("proofreading_profile", "prep-subject"),
+                             ("chunking_profile", "generate-chunks"), ("chapters", "generate-chunks")):
+        if getattr(args, name, None) is not None and command != applicable:
+            parser.error(f"--{name.replace('_', '-')} is supported only by {applicable}.")
+
+
+def _resolve_composed_job(context, args, command):
+    return resolve_job(
+        ComponentCatalog(context.root), command=command, manifest_id=args.subject,
+        locale=args.language, environment_id=args.environment, storage_profile_id=args.storage_profile,
+        proofreading_profile_id=getattr(args, "proofreading_profile", None),
+        chunking_profile_id=getattr(args, "chunking_profile", None),
+        chapters=getattr(args, "chapters", None),
+    ).job
 
 
 if __name__ == "__main__":

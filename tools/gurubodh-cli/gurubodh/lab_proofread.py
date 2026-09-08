@@ -24,6 +24,7 @@ from gurubodh.contracts import Proofreader
 from gurubodh.docx.export import formatting_defaults, write_chapter_docx
 from gurubodh.docx.text import extract_docx_text
 from gurubodh.docx.validate import validate_docx
+from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_lab_proofreading
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
@@ -242,12 +243,18 @@ def run_lab_proofread(
     proofreader: Proofreader | None = None,
     settings: ProofreadingSettings | None = None,
     progress: Callable[[str], None] | None = None,
+    *,
+    proofreading_profile_id: str | None = None,
 ) -> dict[str, Any]:
     """Proofread one DOCX into a distinct non-canonical lab run."""
     locale = locale_spec(locale_name)
     root = _safe_lab_root(lab_root)
     source_path = Path(source).expanduser().resolve()
-    resolution = resolve_lab_proofreading(ComponentCatalog(context.root)) if settings is None else None
+    if settings is not None and proofreading_profile_id is not None:
+        raise ConfigurationError("Lab proofreading: settings and a profile selector are mutually exclusive.")
+    resolution = resolve_lab_proofreading(
+        ComponentCatalog(context.root), proofreading_profile_id=proofreading_profile_id,
+    ) if settings is None else None
     selected_settings = resolution.settings if resolution is not None else settings
     configuration = {
         "locale": locale_name,
