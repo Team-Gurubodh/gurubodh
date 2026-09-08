@@ -253,7 +253,8 @@ def run_lab_proofread(
     if settings is not None and proofreading_profile_id is not None:
         raise ConfigurationError("Lab proofreading: settings and a profile selector are mutually exclusive.")
     resolution = resolve_lab_proofreading(
-        ComponentCatalog(context.root), proofreading_profile_id=proofreading_profile_id,
+        ComponentCatalog(context.root, context.resource_root),
+        proofreading_profile_id=proofreading_profile_id,
     ) if settings is None else None
     selected_settings = resolution.settings if resolution is not None else settings
     configuration = {

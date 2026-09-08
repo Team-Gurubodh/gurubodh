@@ -50,6 +50,39 @@ jobs:
           docker run -i --rm --entrypoint node gurubodh-cli:smoke /opt/gurubodh-cli/scripts/legacy_font_convert.js <<<'{"converter":"aps","texts":[""]}'
           docker run --rm --entrypoint python gurubodh-cli:smoke -c "from gurubodh.audit import resolved_build_provenance; from pathlib import Path; assert resolved_build_provenance(Path('/opt/gurubodh-cli'))['source_revision'] == '${{ github.sha }}'"
           docker run --rm --entrypoint python gurubodh-cli:smoke -c "import json; from pathlib import Path; jobs = list(Path('/opt/gurubodh-cli/jobs/subjects').glob('*/*/generate-chunks.r2.json')); assert jobs; assert all(json.loads(job.read_text(encoding='utf-8'))['chunking']['local_files_only'] is True for job in jobs)"
+      - name: Verify installed component contracts and discovery
+        run: |
+          fixture_project="${RUNNER_TEMP}/gurubodh-fixture-project"
+          mkdir -p "${fixture_project}/jobs/subjects/sub001_aps_example"
+          cp tools/gurubodh-cli/tests/fixtures/job-components/subjects/aps-hindi.json \
+            "${fixture_project}/jobs/subjects/sub001_aps_example/manifest.json"
+          docker run --rm --user 0 \
+            --volume "${{ github.workspace }}/tools/gurubodh-cli/tests:/checks/tests:ro" \
+            --entrypoint python gurubodh-cli:smoke \
+            -I /checks/tests/check_installed_components.py /checks/tests/fixtures/job-components
+          docker run --rm --user 0 \
+            --volume "${{ github.workspace }}/tools/gurubodh-cli/tests:/checks/tests:ro" \
+            --volume "${fixture_project}:/work/project:ro" \
+            --tmpfs /work/source:rw \
+            --tmpfs /work/artifacts:rw \
+            --entrypoint python gurubodh-cli:smoke \
+            -I /checks/tests/check_installed_resources.py /work/project
+      - name: Inspect all composed commands offline
+        run: |
+          fixture_project="${RUNNER_TEMP}/gurubodh-fixture-project"
+          for command in prep-subject generate-chunks generate-docx; do
+            docker run --rm \
+              --volume "${fixture_project}:/work/project:ro" \
+              gurubodh-cli:smoke config resolve \
+              --command "${command}" \
+              --project-root /work/project \
+              --subject sub001_aps_example \
+              --language hi-IN \
+              --environment development \
+              --storage-profile r2 \
+            | docker run --rm -i --entrypoint python gurubodh-cli:smoke -c \
+              "import json, sys; job=json.load(sys.stdin); assert job['pipeline']; assert job['source']['backend'] == job['destination']['backend'] == 'r2'; command='${command}'; assert command != 'prep-subject' or (job['proofreading']['model'] == 'gemini-3.6-flash' and job['proofreading']['max_output_tokens'] == 16384); assert command != 'generate-chunks' or (job['chunking']['model_revision'] == '5617a9f61b028005a4858fdac845db406aefb181' and job['chunking']['local_files_only'] is True and job['chunking']['strategy_version'] == 'semantic-window-v1')"
+          done
 
   publish:
     needs: smoke-test

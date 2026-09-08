@@ -28,7 +28,8 @@ RUN printf '{\n  "source_revision": "%s",\n  "image_revision": "%s",\n  "image_v
 # compatible version, so the subsequent package install does not pull CUDA
 # libraries into a CPU runner image.
 RUN python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 \
-    && python -m pip install --no-cache-dir .
+    && python -m pip install --no-cache-dir . \
+    && python -I -c "from gurubodh.resource_discovery import bundled_resource_path; paths = ('config/job-components/commands/prep-subject.json', 'config/job-components/environments/development.json', 'config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json', 'config/job-components/profiles/chunking/bge-m3-semantic-window-v1.json', 'scripts/legacy_font_convert.js'); assert all(bundled_resource_path(path).is_file() for path in paths)"
 
 ENV GURUBODH_CLI_ROOT=/opt/gurubodh-cli \
     GURUBODH_BUILD_PROVENANCE_FILE=/opt/gurubodh-cli/gurubodh/build_provenance.json \

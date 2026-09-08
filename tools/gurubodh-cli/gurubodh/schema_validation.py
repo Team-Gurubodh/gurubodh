@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from importlib.metadata import PackageNotFoundError, distribution
 import json
 import math
 from pathlib import Path
@@ -16,6 +15,7 @@ from referencing import Registry
 from referencing.exceptions import Unresolvable
 
 from gurubodh.errors import ConfigurationError, ProcessingError
+from gurubodh.resource_discovery import BundledResourceError, bundled_resource_path
 
 
 JOB_SCHEMAS = {
@@ -51,37 +51,15 @@ class SchemaDefinitionError(ConfigurationError):
     """A required bundled schema is missing, malformed, or invalid."""
 
 
-def _source_tree_schema_path(kind: str, filename: str) -> Path:
-    return Path(__file__).resolve().parents[1] / "config" / kind / filename
-
-
-def _installed_schema_path(kind: str, filename: str) -> Path | None:
-    try:
-        package_distribution = distribution("gurubodh_cli")
-    except PackageNotFoundError:
-        return None
-    relative = Path("config") / kind / filename
-    # Wheel data-files may live at ../../../config relative to site-packages.
-    # RECORD owns that location; do not guess it from the module directory.
-    for entry in package_distribution.files or ():
-        if entry.parts[-len(relative.parts):] == relative.parts:
-            return Path(package_distribution.locate_file(entry))
-    return None
-
-
 @lru_cache(maxsize=None)
 def schema_path(kind: str, filename: str) -> Path:
-    candidates = (
-        _source_tree_schema_path(kind, filename),
-        _installed_schema_path(kind, filename),
-    )
-    for candidate in candidates:
-        if candidate is not None and candidate.is_file():
-            return candidate
-    locations = ", ".join(str(candidate) for candidate in candidates if candidate is not None)
-    raise SchemaDefinitionError(
-        f"Required bundled JSON Schema {kind}/{filename} was not found (checked: {locations})."
-    )
+    relative = Path("config") / kind / filename
+    try:
+        return bundled_resource_path(relative.as_posix())
+    except BundledResourceError as exc:
+        raise SchemaDefinitionError(
+            f"Required bundled JSON Schema {kind}/{filename} was not found: {exc}"
+        ) from exc
 
 
 @lru_cache(maxsize=None)
