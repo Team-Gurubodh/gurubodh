@@ -9,6 +9,8 @@ import tempfile
 import uuid
 from typing import Any, Callable
 
+from gurubodh.configuration_provenance import ConfigurationProvenance, provenance_markdown
+
 from gurubodh.audit import (
     AuditContext,
     AuditPaths,
@@ -152,6 +154,7 @@ def _report_markdown(report: dict[str, Any]) -> str:
                 f"`{attempt.get('server_retry_hint_used', False)}`."
                 for attempt in attempts
             )
+    lines.extend(provenance_markdown(report))
     return "\n".join(lines)
 
 
@@ -244,21 +247,26 @@ def run_lab_proofread(
     locale = locale_spec(locale_name)
     root = _safe_lab_root(lab_root)
     source_path = Path(source).expanduser().resolve()
-    selected_settings = (
-        resolve_lab_proofreading(ComponentCatalog(context.root)).settings
-        if settings is None else settings
-    )
+    resolution = resolve_lab_proofreading(ComponentCatalog(context.root)) if settings is None else None
+    selected_settings = resolution.settings if resolution is not None else settings
+    configuration = {
+        "locale": locale_name,
+        "lab_root": str(root),
+        "source": {"backend": "local", "path": str(source_path)},
+        "proofreading": selected_settings.public_dict(),
+    }
+    provenance = ConfigurationProvenance.capture(
+        configuration, components=resolution.components, profiles=(resolution.selection,),
+        command_definition_id="lab-proofread", edition=locale_name,
+    ) if resolution is not None else None
     run_id, run_dir = _run_directory(root)
     audit_context = AuditContext.create(
         COMMAND_NAME,
         ENTRY_POINT_LAB_PROOFREAD,
         context.root,
         run_id=run_id,
-        configuration={
-            "locale": locale_name,
-            "lab_root": str(root),
-            "proofreading": selected_settings.public_dict(),
-        },
+        configuration=configuration,
+        provenance=provenance,
         source_backend="local",
         destination_backend="local",
     )

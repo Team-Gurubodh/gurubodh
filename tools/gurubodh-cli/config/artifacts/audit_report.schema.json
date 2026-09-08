@@ -22,7 +22,10 @@
       "const": "gurubodh.audit-report"
     },
     "schema_version": {
-      "const": "2.0.0"
+      "enum": [
+        "2.0.0",
+        "2.1.0"
+      ]
     },
     "run_identity": {
       "type": "object",
@@ -44,19 +47,69 @@
         "build_provenance"
       ],
       "properties": {
-        "run_id": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["succeeded", "failed", "incomplete"] },
-        "started_at": { "type": "string", "format": "date-time" },
-        "completed_at": { "type": "string", "format": "date-time" },
-        "command": { "type": "string", "minLength": 1 },
-        "entry_point": { "type": "string", "minLength": 1 },
-        "package_version": { "type": "string", "minLength": 1 },
-        "config_path": { "type": ["string", "null"] },
-        "job_schema_version": { "type": ["string", "integer", "null"] },
-        "pipeline": { "type": ["string", "null"] },
-        "source_backend": { "type": ["string", "null"] },
-        "destination_backend": { "type": "string", "minLength": 1 },
-        "overwrite": { "type": "boolean" },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "incomplete"
+          ]
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry_point": {
+          "type": "string",
+          "minLength": 1
+        },
+        "package_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "job_schema_version": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ]
+        },
+        "pipeline": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_backend": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "destination_backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
         "build_provenance": {
           "type": "object",
           "additionalProperties": false,
@@ -68,17 +121,46 @@
             "image_created"
           ],
           "properties": {
-            "source": { "enum": ["embedded-container-manifest", "native-git-checkout", "unavailable"] },
-            "source_revision": { "type": ["string", "null"] },
-            "image_revision": { "type": ["string", "null"] },
-            "image_version": { "type": ["string", "null"] },
-            "image_created": { "type": ["string", "null"] }
+            "source": {
+              "enum": [
+                "embedded-container-manifest",
+                "native-git-checkout",
+                "unavailable"
+              ]
+            },
+            "source_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image_created": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         }
       }
     },
     "job_identity": {
-      "type": ["object", "null"]
+      "type": [
+        "object",
+        "null"
+      ]
     },
     "configuration_snapshot": {
       "type": "object"
@@ -88,28 +170,49 @@
     },
     "lifecycle": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["current_state", "transitions"],
+          "required": [
+            "current_state",
+            "transitions"
+          ],
           "properties": {
-            "current_state": { "type": "string", "minLength": 1 },
-            "transitions": { "type": "array" }
+            "current_state": {
+              "type": "string",
+              "minLength": 1
+            },
+            "transitions": {
+              "type": "array"
+            }
           }
         }
       ]
     },
     "publication": {
       "type": "object",
-      "required": ["backend", "status"],
+      "required": [
+        "backend",
+        "status"
+      ],
       "properties": {
-        "backend": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "minLength": 1 }
+        "backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "failure": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
           "additionalProperties": false,
@@ -121,11 +224,32 @@
             "request_diagnostics"
           ],
           "properties": {
-            "stage": { "type": "string", "minLength": 1, "maxLength": 80 },
-            "code": { "type": "string", "minLength": 1, "maxLength": 80 },
-            "error_type": { "type": "string", "minLength": 1, "maxLength": 120 },
-            "message": { "type": "string", "minLength": 1, "maxLength": 500 },
-            "request_diagnostics": { "type": ["object", "null"] }
+            "stage": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "error_type": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "request_diagnostics": {
+              "type": [
+                "object",
+                "null"
+              ]
+            }
           }
         }
       ]
@@ -133,14 +257,316 @@
     "report_artifacts": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["json", "markdown"],
+      "required": [
+        "json",
+        "markdown"
+      ],
       "properties": {
-        "json": { "type": "object" },
-        "markdown": { "type": "object" }
+        "json": {
+          "type": "object"
+        },
+        "markdown": {
+          "type": "object"
+        }
       }
     },
     "command_details": {
       "type": "object"
+    },
+    "configuration_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "input_mode",
+        "canonical_json",
+        "resolver_contract_version",
+        "assembled_configuration_sha256",
+        "job_schema_version",
+        "manifest_id",
+        "edition",
+        "command_definition_id",
+        "environment_id",
+        "storage_profile_id",
+        "profiles",
+        "components",
+        "invocation",
+        "environment_bindings"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "input_mode": {
+          "enum": [
+            "complete_config",
+            "composition"
+          ]
+        },
+        "canonical_json": {
+          "const": "safe-json-v1"
+        },
+        "resolver_contract_version": {
+          "enum": [
+            null,
+            "1.0.0"
+          ]
+        },
+        "assembled_configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "job_schema_version": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ]
+        },
+        "manifest_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "edition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "command_definition_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "environment_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "storage_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "profile_id",
+              "selected_by"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "proofreading",
+                  "chunking"
+                ]
+              },
+              "profile_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selected_by": {
+                "enum": [
+                  "command",
+                  "manifest",
+                  "edition",
+                  "invocation"
+                ]
+              }
+            }
+          },
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "resource_id",
+              "resource_reference",
+              "component_schema_version",
+              "content_sha256"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "subject-manifest",
+                  "locale-definition",
+                  "command-definition",
+                  "environment",
+                  "storage-profile",
+                  "proofreading-profile",
+                  "chunking-profile"
+                ]
+              },
+              "resource_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "resource_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "component_schema_version": {
+                "const": "1.0.0"
+              },
+              "content_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "uniqueItems": true
+        },
+        "invocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profiles",
+            "chapters"
+          ],
+          "properties": {
+            "profiles": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "proofreading": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "chunking": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "chapters": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9]{3}$"
+              }
+            }
+          }
+        },
+        "environment_bindings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?![\\s\\S])"
+          }
+        }
+      },
+      "description": "Safe captured resolution facts. content_sha256 hashes each complete sanitized component document. assembled_configuration_sha256 hashes only configuration_snapshot. safe-json-v1: UTF-8, no BOM/newline/whitespace, sorted object keys, ordered arrays, explicit null, unchanged Unicode, integral floats encoded as integers including negative zero, other finite floats in Python shortest round-trip JSON form. Redaction precedes hashing; no environment values or component bodies are exported here.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "input_mode": {
+                "const": "complete_config"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "resolver_contract_version": {
+                "type": "null"
+              },
+              "manifest_id": {
+                "type": "null"
+              },
+              "edition": {
+                "type": "null"
+              },
+              "command_definition_id": {
+                "type": "null"
+              },
+              "environment_id": {
+                "type": "null"
+              },
+              "storage_profile_id": {
+                "type": "null"
+              },
+              "components": {
+                "maxItems": 0
+              },
+              "profiles": {
+                "maxItems": 0
+              },
+              "invocation": {
+                "properties": {
+                  "profiles": {
+                    "maxProperties": 0
+                  },
+                  "chapters": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "resolver_contract_version": {
+                "const": "1.0.0"
+              },
+              "command_definition_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "edition": {
+                "type": "string",
+                "minLength": 1
+              },
+              "components": {
+                "minItems": 2
+              }
+            }
+          }
+        }
+      ]
     }
-  }
+  },
+  "description": "Writers emit 2.1.0 with required configuration provenance v1. Readers also accept unchanged historical 2.0.0 envelopes without provenance. Pre-envelope v1 reports remain outside this schema; checkpoint recovery keeps its independent historical reader. Component and configuration digests use safe-json-v1, never checkpoint identity.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "2.1.0"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "configuration_provenance"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "configuration_provenance"
+          ]
+        }
+      }
+    }
+  ]
 }

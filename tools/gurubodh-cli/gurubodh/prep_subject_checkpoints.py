@@ -34,6 +34,7 @@ from gurubodh.prep_checkpoint_store import WORK_RELATIVE_DIR
 from gurubodh.prep_subject_audit import (
     PREP_REPORT_RELATIVE_DIR,
     PrepSubjectAuditWriter,
+    write_preflight_failure,
 )
 from gurubodh.proofreading.artifacts import write_canonical_chapter_artifacts
 from gurubodh.proofreading.errors import ProofreadingError
@@ -151,6 +152,7 @@ def run_resumable_prep_job(
     project_root = Path(getattr(context, "root", Path.cwd()))
     reused: list[str] = []
     attempted: list[str] = []
+    failure_audited = False
     try:
         progress(
             "\n".join(
@@ -166,10 +168,29 @@ def run_resumable_prep_job(
                 )
             )
         )
-        manager.open()
-        source_path = manager.materialize_source()
-        validate_supported_source_fonts(source_path)
-        outcome = manager.begin(sha256_file(source_path))
+        try:
+            manager.open()
+            source_path = manager.materialize_source()
+            validate_supported_source_fonts(source_path)
+            outcome = manager.begin(sha256_file(source_path))
+        except BaseException as exc:
+            failure_audited = True
+            # The prepared job already owns a validated destination. Record this
+            # invocation without editing any historical checkpoint on failure.
+            try:
+                result = write_preflight_failure(
+                    project_root, config, config_path, entry_point, overwrite,
+                    manager.subject_dir, exc,
+                )
+                if manager.is_r2:
+                    for kind in ("json", "markdown"):
+                        path = result.paths[kind]
+                        manager.upload_audit_file(path, destination_object_key(
+                            config, PREP_REPORT_RELATIVE_DIR / path.name,
+                        ))
+            except BaseException as audit_error:
+                warn_audit_failure("prep-subject", audit_error, exc)
+            raise
         if outcome == "already_complete":
             progress(
                 "prep-subject already complete; the compatible checkpoint is "
@@ -231,6 +252,7 @@ def run_resumable_prep_job(
                 manager.discard_transient_preparation()
             except BaseException as exc:
                 manager.mark_global_failure(exc)
+                failure_audited = True
                 _write_prep_audit(
                     manager,
                     project_root,
@@ -280,6 +302,7 @@ def run_resumable_prep_job(
                 manager.mark_chapter_failure(chapter, exc)
                 if _is_global_proofreading_failure(exc):
                     manager.mark_global_failure(exc)
+                    failure_audited = True
                     _write_prep_audit(
                         manager,
                         project_root,
@@ -324,6 +347,7 @@ def run_resumable_prep_job(
                 "were retained. Re-run with --resume to retry failed or pending "
                 "chapters."
             )
+            failure_audited = True
             _write_prep_audit(
                 manager,
                 project_root,
@@ -343,6 +367,7 @@ def run_resumable_prep_job(
             manager.publish()
         except BaseException as exc:
             manager.mark_publication_failure(exc)
+            failure_audited = True
             _write_prep_audit(
                 manager,
                 project_root,
@@ -384,5 +409,12 @@ def run_resumable_prep_job(
             "counts": manager.state["counts"],
             "metrics": manager.report_metrics(),
         }
+    except BaseException as exc:
+        if not failure_audited and manager.state is not None:
+            _write_prep_audit(
+                manager, project_root, config_path, entry_point, "failed", reused, attempted,
+                failure_error=exc, failure_stage="execution",
+            )
+        raise
     finally:
         manager.close()

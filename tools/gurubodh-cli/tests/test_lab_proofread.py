@@ -81,7 +81,15 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(manifest["configuration_snapshot"]["proofreading"]["max_output_tokens"], 16384)
         details = manifest["command_details"]
         self.assertEqual(manifest["schema_name"], "gurubodh.audit-report")
-        self.assertEqual(manifest["schema_version"], "2.0.0")
+        self.assertEqual(manifest["schema_version"], "2.1.0")
+        provenance = manifest["configuration_provenance"]
+        self.assertEqual(provenance["input_mode"], "composition")
+        self.assertEqual(provenance["command_definition_id"], "lab-proofread")
+        self.assertEqual(provenance["profiles"], [{"kind": "proofreading",
+            "profile_id": "gemini-3.6-flash-v1", "selected_by": "command"}])
+        self.assertIsNone(provenance["manifest_id"])
+        self.assertIn(provenance["assembled_configuration_sha256"],
+                      (run_dir / "report/run_report.md").read_text())
         self.assertEqual(manifest["run_identity"]["status"], "succeeded")
         self.assertEqual(details["run_directory"], str(run_dir))
         self.assertTrue(details["non_canonical"])

@@ -7,9 +7,12 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from gurubodh.configuration_provenance import provenance_markdown
+
 from gurubodh.audit import (
     AuditContext,
     AuditWriter,
+    bounded_failure,
     destination_report_references,
     report_basename,
     report_paths,
@@ -27,6 +30,16 @@ PREP_REPORT_RELATIVE_DIR = Path("run_reports") / COMMAND_NAME
 
 def render_markdown(report: dict[str, Any]) -> str:
     run = report["run_identity"]
+    if report["job_identity"] is None:
+        failure = report["failure"]
+        return "\n".join([
+            "# Gurubodh prep-subject Run Report", "",
+            f"- Status: `{run['status']}`",
+            f"- Run: `{run['run_id']}`",
+            f"- Failure stage: `{failure['stage']}`",
+            f"- {failure['message']}",
+            *provenance_markdown(report),
+        ])
     identity = report["job_identity"]
     subject = identity["subject"]
     details = report["command_details"]
@@ -135,7 +148,29 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.append(
             f"- Semantic chunks invalidated: `{semantic.get('invalidated', False)}`"
         )
+    lines.extend(provenance_markdown(report))
     return "\n".join(lines)
+
+
+def write_preflight_failure(project_root, config, config_path, entry_point,
+                            overwrite, subject_dir, error):
+    """Audit a validated destination without inventing or modifying a checkpoint."""
+    context = AuditContext.create(
+        COMMAND_NAME, entry_point, project_root, config=config,
+        config_path=config_path, overwrite=overwrite,
+    )
+    writer = AuditWriter(
+        context, report_paths(subject_dir, report_basename(context), COMMAND_NAME),
+        lambda paths: destination_report_references(config, PREP_REPORT_RELATIVE_DIR, paths),
+    )
+    return writer.write(
+        status="failed", job_identity=None,
+        processing_summary={"source_validation_status": "failed_or_not_completed"},
+        lifecycle={"current_state": "preflight_failed", "transitions": []},
+        publication={"backend": context.destination_backend, "status": "not_ready"},
+        failure=bounded_failure(error, "preflight"),
+        command_details={"non_canonical": False}, renderer=render_markdown,
+    )
 
 
 class PrepSubjectAuditWriter:
