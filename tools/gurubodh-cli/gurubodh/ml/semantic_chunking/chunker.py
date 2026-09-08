@@ -21,12 +21,14 @@ class SemanticChunker:
 
     def __init__(
         self,
-        config: SemanticChunkConfig | None = None,
+        config: SemanticChunkConfig,
         model: Any | None = None,
         embedding_helper: TextEmbeddingHelper | None = None,
         progress: Callable[[str], None] | None = None,
     ) -> None:
-        self.config = config or SemanticChunkConfig()
+        if not isinstance(config, SemanticChunkConfig):
+            raise TypeError("SemanticChunker requires an explicit SemanticChunkConfig.")
+        self.config = config
         self._progress = progress
         self.embedding_helper = embedding_helper or SentenceTransformerEmbeddingHelper(
             provider=self.config.provider,

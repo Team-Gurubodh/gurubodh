@@ -1,6 +1,6 @@
 # Lab tools
 
-`gurubodh lab` commands are explicitly local and non-canonical. They do not read job JSON, publish to `cms_library/`, or alter canonical source artifacts.
+`gurubodh lab` commands are explicitly local and non-canonical. They do not publish to `cms_library/` or alter canonical source artifacts.
 
 ## Proofread one DOCX
 
@@ -22,7 +22,15 @@ subject workflows, while its `command_details.non_canonical` and publication
 record explicitly mark the output as non-canonical. None becomes CMS input or
 canonical subject text.
 
-Each Gemini attempt has a 120-second deadline by default and reports in-flight
+Proofreading reads `config/job-components/commands/lab-proofread.json` from the
+selected CLI project root and selects the complete shared
+`profiles/proofreading/gemini-3.6-flash-v1.json` component. This is the same
+JSON policy selected by canonical prep: Gemini 3.6 Flash with 16,384 output
+tokens. It requires no subject manifest. Missing or incomplete declarations
+fail before a lab run directory is created; Python supplies no policy defaults.
+See [Job configurations](../reference/job-configurations.md#execution-profile-component-contracts).
+
+The shared JSON policy gives each Gemini attempt a 120-second deadline and reports in-flight
 elapsed and remaining time every 15 seconds. HTTP 503 `UNAVAILABLE` is a
 temporary service-capacity condition, distinct from quota-related HTTP 429: it
 uses the same jittered 30-second then 90-second recovery schedule as

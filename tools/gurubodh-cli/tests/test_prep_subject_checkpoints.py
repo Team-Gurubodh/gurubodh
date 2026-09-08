@@ -10,6 +10,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from policy_fixtures import proofreading_settings
+
 from gurubodh.contracts import PrepSubjectJob
 from gurubodh.errors import GurubodhError
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
@@ -24,7 +26,7 @@ from gurubodh.prep_subject_checkpoints import (
     run_resumable_prep_job,
 )
 from gurubodh.locales import locale_spec
-from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
+from gurubodh.proofreading import ProofreadingError
 from gurubodh.prep_publication import LocalPrepPublisher
 from gurubodh.storage import CANONICAL_ARTIFACT_FILES
 
@@ -64,7 +66,7 @@ def config(root):
     return PrepSubjectJob(
         values,
         locale_spec("hi-IN"),
-        ProofreadingSettings(min_request_interval_seconds=0),
+        proofreading_settings(min_request_interval_seconds=0),
     )
 
 

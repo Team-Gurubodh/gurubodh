@@ -11,6 +11,7 @@ from collections.abc import Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
+import json
 from pathlib import Path
 from re import Pattern
 from typing import TYPE_CHECKING, Any, Callable, NotRequired, Protocol, TypedDict
@@ -116,6 +117,55 @@ class GenerateChunksJob(PreparedJob):
 @dataclass(frozen=True)
 class GenerateDocxJob(PreparedJob):
     pass
+
+
+@dataclass(frozen=True)
+class ComponentSnapshot:
+    """Exact validated input bytes, retained without a later filesystem read."""
+
+    kind: str
+    resource_id: str
+    origin: str
+    content: bytes = field(repr=False)
+
+    def to_payload(self) -> JsonObject:
+        return json.loads(self.content)
+
+
+@dataclass(frozen=True)
+class ProfileSelection:
+    kind: str
+    profile_id: str
+    selected_by: str
+
+
+@dataclass(frozen=True)
+class JobResolutionInputs:
+    """Immutable inputs for later audit integration, outside the job payload."""
+
+    command: str
+    manifest_id: str
+    locale: str
+    environment_id: str
+    storage_profile_id: str
+    invocation_profiles: tuple[tuple[str, str], ...]
+    chapters: tuple[str, ...] | None
+    profiles: tuple[ProfileSelection, ...]
+    components: tuple[ComponentSnapshot, ...]
+    root_bindings: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class ResolvedJob:
+    job: PrepSubjectJob | GenerateChunksJob | GenerateDocxJob
+    inputs: JobResolutionInputs
+
+
+@dataclass(frozen=True)
+class ResolvedProofreading:
+    settings: ProofreadingSettings
+    selection: ProfileSelection
+    components: tuple[ComponentSnapshot, ...]
 
 
 @dataclass(frozen=True)

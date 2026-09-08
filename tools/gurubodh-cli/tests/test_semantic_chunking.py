@@ -7,14 +7,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from policy_fixtures import chunking_settings
+
 from gurubodh.ml.embeddings import SentenceTransformerEmbeddingHelper
 from gurubodh.ml.semantic_chunking.chunker import SemanticChunker
 from gurubodh.ml.semantic_chunking.config import (
-    DEFAULT_MODEL_NAME,
-    DEFAULT_PROVIDER,
+    SUPPORTED_MODEL_NAME,
+    SUPPORTED_PROVIDER,
     MODEL_CACHE_ENV_VAR,
     ModelCacheConfigError,
-    SemanticChunkConfig,
     SemanticChunkConfigError,
 )
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
@@ -41,7 +42,7 @@ class FakeEmbeddingModel:
 
 def make_document(source_name, chunks, source_text):
     return ChunkedDocument(
-        source_name=source_name, provider=DEFAULT_PROVIDER, model_name=DEFAULT_MODEL_NAME,
+        source_name=source_name, provider=SUPPORTED_PROVIDER, model_name=SUPPORTED_MODEL_NAME,
         strategy_version="semantic-window-v1", threshold_percentile=80.0, min_chars=0,
         window_size=3, batch_size=16, normalize_contextual_vectors=True, device=None,
         breakpoint_threshold=None, chunks=chunks,
@@ -51,21 +52,21 @@ def make_document(source_name, chunks, source_text):
 
 
 class SemanticChunkingTests(unittest.TestCase):
-    def test_config_defaults_are_chunking_specific(self):
-        config = SemanticChunkConfig()
+    def test_explicit_config_is_chunking_specific(self):
+        config = chunking_settings()
         self.assertEqual(config.provider, "semantic-chunking")
         self.assertEqual(config.model_name, "BAAI/bge-m3")
         self.assertTrue(config.normalize_contextual_vectors)
         self.assertNotIn("embedding", json.dumps(config.provider_metadata()))
         with self.assertRaises(SemanticChunkConfigError):
-            SemanticChunkConfig(provider="other")
+            chunking_settings(provider="other")
         with self.assertRaises(SemanticChunkConfigError):
-            SemanticChunkConfig(normalize_contextual_vectors="yes")
+            chunking_settings(normalize_contextual_vectors="yes")
 
     def test_missing_model_cache_env_var_is_clear(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ModelCacheConfigError) as exc:
-                SemanticChunkConfig.from_env().resolved_cache_dir()
+                chunking_settings().resolved_cache_dir()
         self.assertIn(MODEL_CACHE_ENV_VAR, str(exc.exception))
 
     def test_embedding_helper_loads_pinned_model_and_encodes_batches(self):
@@ -98,7 +99,7 @@ class SemanticChunkingTests(unittest.TestCase):
 
     def test_contextual_encoding_is_the_only_encoding_pass(self):
         model = FakeEmbeddingModel()
-        document = SemanticChunker(SemanticChunkConfig(min_chars=0, threshold_percentile=50.0), model=model).chunk_text(
+        document = SemanticChunker(chunking_settings(min_chars=0, threshold_percentile=50.0), model=model).chunk_text(
             "पहला वाक्य।\n\nदूसरा वाक्य।", "chapter.txt"
         )
 

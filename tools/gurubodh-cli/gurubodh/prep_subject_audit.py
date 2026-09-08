@@ -15,6 +15,7 @@ from gurubodh.audit import (
     report_paths,
 )
 from gurubodh.storage import (
+    storage_backend,
     is_r2,
     subject_artifact_prefix,
 )
@@ -201,7 +202,7 @@ class PrepSubjectAuditWriter:
             else checkpoint_publication_state
         )
         publication = {
-            "backend": destination.get("backend", "local"),
+            "backend": storage_backend(destination),
             "status": publication_status,
             "checkpoint_state": checkpoint_publication_state,
             **publication_details,

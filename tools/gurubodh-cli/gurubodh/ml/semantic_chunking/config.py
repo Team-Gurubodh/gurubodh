@@ -9,9 +9,9 @@ from pathlib import Path
 from gurubodh.ml.errors import ModelCacheConfigError
 
 MODEL_CACHE_ENV_VAR = "GURUBODH_MODEL_CACHE_DIR"
-DEFAULT_PROVIDER = "semantic-chunking"
-DEFAULT_MODEL_NAME = "BAAI/bge-m3"
-DEFAULT_STRATEGY_VERSION = "semantic-window-v1"
+SUPPORTED_PROVIDER = "semantic-chunking"
+SUPPORTED_MODEL_NAME = "BAAI/bge-m3"
+SUPPORTED_STRATEGY_VERSION = "semantic-window-v1"
 
 
 class SemanticChunkConfigError(ValueError):
@@ -22,27 +22,27 @@ class SemanticChunkConfigError(ValueError):
 class SemanticChunkConfig:
     """Settings that control semantic chunking behavior."""
 
-    provider: str = DEFAULT_PROVIDER
-    model_name: str = DEFAULT_MODEL_NAME
-    threshold_percentile: float = 80.0
-    min_chars: int = 600
-    window_size: int = 3
-    batch_size: int = 16
-    normalize_contextual_vectors: bool = True
-    device: str | None = None
-    strategy_version: str = DEFAULT_STRATEGY_VERSION
-    model_revision: str | None = None
+    provider: str
+    model_name: str
+    threshold_percentile: float
+    min_chars: int
+    window_size: int
+    batch_size: int
+    normalize_contextual_vectors: bool
+    device: str | None
+    strategy_version: str
+    model_revision: str | None
+    local_files_only: bool
     cache_dir: Path | str | None = None
-    local_files_only: bool = False
 
     def __post_init__(self) -> None:
         self._validate()
 
     @classmethod
-    def from_env(cls, **overrides) -> "SemanticChunkConfig":
+    def from_env(cls, **settings) -> "SemanticChunkConfig":
         """Build config with the Gurubodh model cache env var as the cache path."""
-        cache_dir = overrides.pop("cache_dir", None) or os.environ.get(MODEL_CACHE_ENV_VAR)
-        return cls(cache_dir=cache_dir, **overrides)
+        cache_dir = settings.pop("cache_dir", None) or os.environ.get(MODEL_CACHE_ENV_VAR)
+        return cls(cache_dir=cache_dir, **settings)
 
     def resolved_cache_dir(self) -> Path:
         """Return the required local model cache directory."""
@@ -78,9 +78,9 @@ class SemanticChunkConfig:
         }
 
     def _validate(self) -> None:
-        if self.provider != DEFAULT_PROVIDER:
+        if self.provider != SUPPORTED_PROVIDER:
             raise SemanticChunkConfigError(f"Unsupported semantic chunking provider: {self.provider}")
-        if self.model_name != DEFAULT_MODEL_NAME:
+        if self.model_name != SUPPORTED_MODEL_NAME:
             raise SemanticChunkConfigError(f"Unsupported semantic chunking model: {self.model_name}")
         if not 0.0 <= self.threshold_percentile <= 100.0:
             raise SemanticChunkConfigError("threshold_percentile must be between 0 and 100.")
@@ -94,7 +94,7 @@ class SemanticChunkConfig:
             raise SemanticChunkConfigError("normalize_contextual_vectors must be true or false.")
         if self.device not in {None, "cpu", "mps", "cuda"}:
             raise SemanticChunkConfigError("device must be one of: cpu, mps, cuda.")
-        if self.strategy_version != DEFAULT_STRATEGY_VERSION:
+        if self.strategy_version != SUPPORTED_STRATEGY_VERSION:
             raise SemanticChunkConfigError(
                 f"Unsupported semantic chunking strategy_version: {self.strategy_version}"
             )

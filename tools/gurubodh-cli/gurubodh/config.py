@@ -4,6 +4,7 @@ import re
 from pathlib import PurePosixPath
 from typing import Any
 
+from gurubodh.complete_job_compat import chapter_split_flags, storage_backend
 from gurubodh.contracts import GenerateChunksJob, GenerateDocxJob, PrepSubjectJob
 from gurubodh.errors import ConfigurationError
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
@@ -29,7 +30,7 @@ def read_json(path):
 
 def chapter_split_regex_flags(chapter_split):
     compiled_flags = 0
-    for flag in chapter_split.get("flags", []):
+    for flag in chapter_split_flags(chapter_split):
         compiled_flags |= REGEX_FLAG_VALUES[flag]
     return compiled_flags
 
@@ -45,10 +46,6 @@ def prepare_chapter_split(chapter_split):
         raise ConfigurationError(
             f"Config error: chapter_split.pattern is not a valid regex: {exc}"
         ) from exc
-
-
-def storage_backend(section):
-    return section.get("backend", "local")
 
 
 def validate_language_partition(subject_dir, language, context):
@@ -132,6 +129,8 @@ def proofreading_config(config):
                 for field in ProofreadingSettings.__dataclass_fields__
             }
         )
+    except KeyError as exc:
+        raise ConfigurationError(f"Config error: proofreading.{exc.args[0]} is required") from None
     except ValueError as exc:
         raise ConfigurationError(f"Config error: proofreading.{exc}") from exc
     if settings.max_retry_delay_seconds < settings.initial_retry_delay_seconds:

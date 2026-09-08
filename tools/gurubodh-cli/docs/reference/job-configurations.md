@@ -66,12 +66,61 @@ All seven component validators are implemented; S3's contract remains in
 [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296). The
 [S4 field mapping](https://github.com/Team-Gurubodh/gurubodh/issues/298#issuecomment-5571636607)
 accounts for every assembled field, omission rule, and legacy allowance.
-The future catalog uses
-`config/job-components/profiles/proofreading/` and
-`config/job-components/profiles/chunking/`. Production declarations, lookup,
-command/manifest/edition/invocation selection, and runtime canonical/lab binding remain
-pending. Complete jobs and `--config` remain supported until the maintainer
-accepts comparison results under #288.
+The shared catalog now lives under `config/job-components/`: `commands/`,
+`environments/`, `storage-profiles/`, `locales/`, `profiles/proofreading/`, and
+`profiles/chunking/`. Prep and lab command JSON both select
+`gemini-3.6-flash-v1` (Gemini 3.6 Flash, 16,384 output tokens). Chunking selects
+`bge-m3-semantic-window-v1`, preserving the pinned BGE-M3 revision and existing
+78th-percentile, 550-character, three-sentence-window settings.
+
+### Compose through the Python API
+
+`ComponentCatalog(cli_root)` in `gurubodh.job_components` loads fixed resource
+IDs. `resolve_job()` in `gurubodh.job_composition` takes that catalog and explicit
+keyword selectors: `command`, `manifest_id`, `locale`, `environment_id`, and
+`storage_profile_id`. It returns `ResolvedJob`: `.job` is the existing typed
+prepared job, and `.inputs` retains immutable resolution inputs for subsequent
+audit integration. `.job.to_payload()` contains only assembled job fields.
+
+Manifests load from `jobs/subjects/<manifest-id>/manifest.json`. Shared IDs load
+from their fixed catalog directories. Lookup rejects unsafe IDs, symlink escapes,
+missing or wrong-kind resources, duplicate JSON properties, ID mismatches,
+unsupported versions, and malformed declarations before execution. All seven
+component kinds validate with their own schemas independently of job schemas;
+the assembled job then passes the existing job-schema and semantic checks.
+
+Optional `proofreading_profile_id` and `chunking_profile_id` arguments select
+complete applicable profiles. Precedence is command JSON → manifest → edition →
+invocation. Only the winning profile supplies settings; missing fields fail.
+Manifest/edition selections for other commands are ignored; irrelevant invocation
+selections fail. Only `generate-chunks` accepts `chapters`, a nonempty unique list
+of exact three-ASCII-digit strings; omission leaves selection unspecified.
+Other field overrides, interpolation, includes, and deep merging are unsupported.
+
+The development environment declares four stores. The `local`, `r2-output`,
+and `r2` storage profiles select their roles. Local bindings use
+`{"$env": "GURUBODH_SOURCE_LIBRARY_ROOT"}` and
+`{"$env": "GURUBODH_CMS_LIBRARY_ROOT"}`. Used values must be nonempty absolute
+paths; resolution performs no tilde or embedded-variable expansion and does not
+require directories to exist. It reads only used root names, never enumerates
+the environment, and rejects credential/model-cache variables as library roots.
+An R2-only job needs neither local root. Derived commands using `r2-output` read
+the **local destination library** and write R2; prep on that route reads the
+local source library and writes R2. Unused declarations still validate structurally.
+
+Composition reads configuration only: it does not access source content, load
+models, create provider/storage clients, update checkpoints, or write outputs.
+Component bytes, selections, chapters, and used non-secret root bindings are
+captured when the job is assembled, so later file changes cannot alter its
+recorded inputs. Model-cache location and credentials remain existing runtime
+environment inputs outside the job payload.
+
+Canonical composition is currently a Python API. CLI execution/inspection is
+owned by #286, broader resource packaging/discovery by #287, and maintained
+subject-manifest migration by #288. The 26 complete jobs and their `--config`
+execution path remain supported until the maintainer accepts the comparison
+results under #288. Historical optional-field interpretations are isolated in
+`complete_job_compat.py`; checkpoint-reading compatibility is retained separately.
 
 ### Subject and locale component contracts
 

@@ -30,6 +30,16 @@ Payload conversion methods return isolated copies. Mutating a serialization
 payload therefore cannot reset or consume the typed workflow result that owns
 it.
 
+`job_components.ComponentCatalog` loads and validates fixed component IDs from
+an explicit CLI root. `job_composition.resolve_job` constructs a fresh mapping
+field by field and calls the same preparation APIs. Its `ResolvedJob` separates
+the typed prepared job from `JobResolutionInputs`: frozen component byte
+snapshots, invocation/profile selections, and used root bindings. These snapshots
+are captured at resolution time and never reread to describe an assembled run.
+They are internal contracts for #285; no audit/checkpoint schema changes are
+introduced. The [configuration reference](../reference/job-configurations.md#compose-through-the-python-api)
+documents selection, routing, environment resolution, and remaining series work.
+
 ## Error boundary
 
 `validate_component(instance, component_name, path=None, *, expected_id=None)`
@@ -111,7 +121,8 @@ Proofreading is a package of independently testable components rather than a
 single provider-specific workflow module:
 
 - `proofreading/settings.py` owns the explicit provider and request-policy
-  configuration record.
+  configuration record. Every policy argument is required. Lab loads its complete
+  JSON-selected policy through `resolve_lab_proofreading()` before creating output.
 - `proofreading/gemini.py` is the only Gemini SDK adapter. It owns client
   initialization, request construction, and bounded in-flight progress.
 - `proofreading/service.py` applies provider-neutral orchestration around a raw
@@ -145,6 +156,12 @@ class; `gurubodh.ml.semantic_chunking.config.ModelCacheConfigError` remains a
 compatible import and catch target. Embedding infrastructure must not depend on
 semantic-chunking modules.
 
+`SemanticChunkConfig` requires every policy argument, including nullable device
+and model revision. `from_env()` binds only the existing model-cache input;
+missing policies fail. `SemanticChunker` requires an explicit configuration and
+rejects `None`. The model cache remains a runtime environment input with no
+guessed location.
+
 `gurubodh.ml.semantic_chunking` eagerly exports only `SemanticChunkConfig`,
 `Chunk`, and `ChunkedDocument`. The supported `SemanticChunker`,
 `ParagraphSegmenter`, and `SemanticChunkingParagraphSegmenter` package imports
@@ -177,6 +194,7 @@ From `tools/gurubodh-cli`, run the focused checks or normal verification:
 ```bash
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p test_import_boundaries.py -v
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p test_semantic_chunking.py -v
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -p test_job_composition.py -v
 PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -m unittest discover -s tests -v
 ```
 

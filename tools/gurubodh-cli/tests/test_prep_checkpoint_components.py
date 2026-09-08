@@ -2,6 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from policy_fixtures import proofreading_settings
+
 from gurubodh.canonical_release import (
     CHECKPOINT_SCHEMA_VERSION,
     JOB_STATE_RELATIVE_PATH,
@@ -21,7 +23,6 @@ from gurubodh.prep_coordination import (
 )
 from gurubodh.prep_metrics import PrepMetrics
 from gurubodh.prep_publication import LocalPrepPublisher, R2PrepPublisher
-from gurubodh.proofreading import ProofreadingSettings
 from gurubodh.storage import CANONICAL_ARTIFACT_FILES, PREP_ARTIFACT_DIRS
 
 
@@ -92,7 +93,7 @@ def prep_job(root: Path, destination: dict | None = None) -> PrepSubjectJob:
     return PrepSubjectJob(
         payload,
         locale_spec("hi-IN"),
-        ProofreadingSettings(min_request_interval_seconds=0),
+        proofreading_settings(min_request_interval_seconds=0),
     )
 
 

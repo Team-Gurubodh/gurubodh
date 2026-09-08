@@ -67,8 +67,10 @@ All seven component kinds are now registered. S3's authoritative contract remain
 in [#296](https://github.com/Team-Gurubodh/gurubodh/issues/296) under its documentation
 exception. The [S4 field mapping](https://github.com/Team-Gurubodh/gurubodh/issues/298#issuecomment-5571636607)
 reconciles every assembled field and links combined verification. Component
-loading/selection remains #284 work; existing job schemas, metadata extensions,
-and maintained jobs are retained.
+loading/selection is implemented by `ComponentCatalog` and `resolve_job`, with
+the shared catalog under `config/job-components/`. See the
+[composition API](../tools/gurubodh-cli/docs/reference/job-configurations.md#compose-through-the-python-api).
+Existing job schemas, metadata extensions, and maintained jobs are retained.
 
 The Gurubodh CLI executes its Draft 2020-12 job and artifact schemas at runtime.
 They are not documentation-only contracts:

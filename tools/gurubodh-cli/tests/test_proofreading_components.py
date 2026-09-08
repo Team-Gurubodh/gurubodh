@@ -4,6 +4,8 @@ from types import SimpleNamespace
 import tempfile
 import unittest
 
+from policy_fixtures import proofreading_settings
+
 from gurubodh.contracts import PrepSubjectJob
 from gurubodh.locales import locale_spec
 from gurubodh.naming import chapter_unmodified_source_filename
@@ -19,7 +21,6 @@ from gurubodh.proofreading.service import (
     ProofreadingService,
     RawProofreadingResponse,
 )
-from gurubodh.proofreading.settings import ProofreadingSettings
 from gurubodh.proofreading.validation import parse_structured_response
 
 
@@ -120,7 +121,7 @@ def prep_job(root):
     return PrepSubjectJob(
         payload,
         locale_spec("hi-IN"),
-        ProofreadingSettings(min_request_interval_seconds=0),
+        proofreading_settings(min_request_interval_seconds=0),
     )
 
 
@@ -155,7 +156,7 @@ class ProofreadingComponentTests(unittest.TestCase):
             )
 
     def test_request_policy_classifies_and_schedules_without_a_gemini_client(self):
-        settings = ProofreadingSettings(
+        settings = proofreading_settings(
             min_request_interval_seconds=3,
             unavailable_first_retry_delay_seconds=30,
             unavailable_second_retry_delay_seconds=90,
@@ -216,7 +217,7 @@ class ProofreadingComponentTests(unittest.TestCase):
             }
         )
         service = ProofreadingService(
-            ProofreadingSettings(min_request_interval_seconds=0),
+            proofreading_settings(min_request_interval_seconds=0),
             transport,
             provider_name="Fake",
             locale=locale_spec("hi-IN"),

@@ -10,10 +10,12 @@ from unittest.mock import patch
 
 from docx import Document
 
+from policy_fixtures import proofreading_settings
+
 from gurubodh.docx.export import validate_chapter_docx
 from gurubodh.legacy.font_detection import UnsupportedSourceFontError
 from gurubodh.lab_proofread import LAB_HEADING_2_PARAGRAPHS, run_lab_proofread
-from gurubodh.proofreading import ProofreadingError, ProofreadingSettings
+from gurubodh.proofreading import ProofreadingError
 from gurubodh.project import ProjectContext
 
 
@@ -41,6 +43,8 @@ class LabProofreadTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.root = Path(self.temp_dir.name)
+        shutil.copytree(Path(__file__).parents[1] / "config/job-components",
+                        self.root / "config/job-components")
         self.context = ProjectContext(
             root=self.root,
             legacy_converter=Path(__file__).parents[1] / "scripts" / "legacy_font_convert.js",
@@ -73,6 +77,8 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(source.read_bytes(), source_before)
         self.assertEqual(len(proofreader.calls), 1)
         manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
+        self.assertEqual(manifest["configuration_snapshot"]["proofreading"]["model"], "gemini-3.6-flash")
+        self.assertEqual(manifest["configuration_snapshot"]["proofreading"]["max_output_tokens"], 16384)
         details = manifest["command_details"]
         self.assertEqual(manifest["schema_name"], "gurubodh.audit-report")
         self.assertEqual(manifest["schema_version"], "2.0.0")
@@ -88,6 +94,7 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(manifest["run_identity"]["command"], "lab proofread")
         self.assertTrue((run_dir / "report" / "extracted_source.txt").is_file())
         self.assertTrue((run_dir / "output" / "source_proofread.txt").is_file())
+
         self.assertTrue((run_dir / "output" / "source_proofread.docx").is_file())
         self.assertTrue((run_dir / "README.md").is_file())
         self.assertTrue((run_dir / "report" / "proofreading.diff.txt").is_file())
@@ -99,6 +106,16 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(details["operator_readme"], "README.md")
         for relative, expected_sha256 in details["artifact_sha256"].items():
             self.assertEqual(hashlib.sha256((run_dir / relative).read_bytes()).hexdigest(), expected_sha256)
+
+    def test_missing_json_policy_fails_before_source_or_run_creation(self):
+        profile = self.root / "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"
+        profile.unlink()
+        from gurubodh.errors import ConfigurationError
+
+        with patch("gurubodh.lab_proofread.validate_docx", side_effect=AssertionError("source read")), \
+             patch("gurubodh.lab_proofread._run_directory", side_effect=AssertionError("output write")), \
+             self.assertRaises(ConfigurationError):
+            run_lab_proofread(self.context, self.root / "absent.docx", "hi-IN", self.root / "lab")
 
     def test_marathi_selects_the_marathi_locale(self):
         source = self.source_docx(text="हे गलत वाक्य आहे.")
@@ -179,7 +196,7 @@ class LabProofreadTests(unittest.TestCase):
                 "hi-IN",
                 self.root / "lab",
                 proofreader=proofreader,
-                settings=ProofreadingSettings(max_input_characters=5),
+                settings=proofreading_settings(max_input_characters=5),
                 progress=progress.append,
             )
         self.assertEqual(proofreader.calls, [])
