@@ -1,0 +1,46 @@
+{
+  "component_schema_version": "1.0.0",
+  "manifest_id": "sub123_spand_rahasya",
+  "identity": {
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya"
+  },
+  "artifact_root": "123_spand_rahasya",
+  "editions": {
+    "hi-IN": {
+      "release": {
+        "version": "01",
+        "subversion": "01"
+      },
+      "source_document": {
+        "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+        "font_encoding": "unicode",
+        "file_format": "docx"
+      },
+      "chapter_split": {
+        "enabled": true,
+        "pattern_type": "regex",
+        "pattern": "प्रबोधन.*?जनवरी.*?2026",
+        "flags": []
+      }
+    },
+    "mr-IN": {
+      "release": {
+        "version": "01",
+        "subversion": "01"
+      },
+      "source_document": {
+        "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_mr-IN.docx",
+        "font_encoding": "unicode",
+        "file_format": "docx"
+      },
+      "chapter_split": {
+        "enabled": true,
+        "pattern_type": "regex",
+        "pattern": "स्पंद रहस्य.*?जानेवारी.*?2026",
+        "flags": []
+      }
+    }
+  }
+}

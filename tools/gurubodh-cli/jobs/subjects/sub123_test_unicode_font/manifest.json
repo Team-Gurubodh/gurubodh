@@ -1,0 +1,29 @@
+{
+  "component_schema_version": "1.0.0",
+  "manifest_id": "sub123_test_unicode_font",
+  "identity": {
+    "category_code": "CAT001",
+    "subject_code": "SUB123",
+    "title_slug": "spand-rahasya"
+  },
+  "artifact_root": "123_test_unicode_font",
+  "editions": {
+    "hi-IN": {
+      "release": {
+        "version": "01",
+        "subversion": "01"
+      },
+      "source_document": {
+        "relative_path": "123_test_unicode_font/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+        "font_encoding": "unicode",
+        "file_format": "docx"
+      },
+      "chapter_split": {
+        "enabled": true,
+        "pattern_type": "regex",
+        "pattern": "प्रबोधन.*?जनवरी.*?2026",
+        "flags": []
+      }
+    }
+  }
+}

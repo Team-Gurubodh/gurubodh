@@ -219,7 +219,7 @@ class ProfileContractTests(unittest.TestCase):
                     self.assertFalse(standalone.is_valid(incomplete), (kind, key))
 
     def test_fixtures_match_maintained_policies_and_validate_in_existing_jobs(self):
-        paths = list((CLI_ROOT / "jobs").rglob("*.json"))
+        paths = list((CLI_ROOT / "jobs/subjects").glob("*/*/*.json"))
         self.assertEqual(len(paths), 26)
         for kind, (_, command) in PROFILES.items():
             for path in sorted((CLI_ROOT / "jobs").rglob(f"{command}.*.json")):

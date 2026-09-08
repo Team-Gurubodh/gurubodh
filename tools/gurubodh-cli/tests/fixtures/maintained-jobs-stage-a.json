@@ -1,0 +1,1403 @@
+{
+  "baseline_commit": "f2db7f6a5759355c6308f07e4b7338c5c6a5c8bb",
+  "capture": "Independent JSON snapshot of all 26 legacy files; only local root_dir values replaced with SOURCE_LIBRARY_ROOT/CMS_LIBRARY_ROOT tokens. SHA-256 records the original unmodified file bytes. Expected configurations are never produced by the composer.",
+  "jobs": [
+    {
+      "legacy_path": "jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.local.json",
+      "legacy_sha256": "ace5cdd240709f90158e47d996f1ee080f90119df952be1f263327efaddce99d",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub039_aacharan_shastra",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_aacharan_shastra/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_aacharan_shastra/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2-output.json",
+      "legacy_sha256": "07dc056c1d65df23abe0c608acfe0e24d05e8202192e8444a3a3961592a47f0b",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub039_aacharan_shastra",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_aacharan_shastra/hi-IN"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "39_aacharan_shastra/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json",
+      "legacy_sha256": "ab646ee2c9b2195a567dc9b7ab121a0c795d1438c57e6e7ed527fcac909f839f",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub039_aacharan_shastra",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "39_aacharan_shastra/hi-IN",
+          "url_base": null
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "39_aacharan_shastra/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.local.json",
+      "legacy_sha256": "0566838a529a0af3c9df3926e63ae40799634d96a339e918b0b5d933fbebe031",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub039_aacharan_shastra",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "legacy-docx-to-unicode",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "39_aacharan_shastra/aps_fonts/ms_word/sub039_aacharan_shastra.docx",
+          "font_encoding": "aps",
+          "file_format": "docx"
+        },
+        "destination": {
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_aacharan_shastra/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "literal",
+          "pattern": "प्रबोधन क्र"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2-output.json",
+      "legacy_sha256": "af6ebdc40d4638711195a3e07507593f85f3b7da45d9722f5f848908fd8b71c1",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub039_aacharan_shastra",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "legacy-docx-to-unicode",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "39_aacharan_shastra/aps_fonts/ms_word/sub039_aacharan_shastra.docx",
+          "font_encoding": "aps",
+          "file_format": "docx"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "39_aacharan_shastra/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "literal",
+          "pattern": "प्रबोधन क्र"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2.json",
+      "legacy_sha256": "97ef560864f33659b8125a56c6fcab3ce8acfad33cf4e4d28b4c4ad10a673ad5",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub039_aacharan_shastra",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "legacy-docx-to-unicode",
+        "source": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "key": "source_library/39_aacharan_shastra/aps_fonts/ms_word/sub039_aacharan_shastra.docx",
+          "font_encoding": "aps",
+          "file_format": "docx"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "39_aacharan_shastra/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "literal",
+          "pattern": "प्रबोधन क्र"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_test_aps_font/hi-IN/generate-chunks.local.json",
+      "legacy_sha256": "70bbdc8930d80ca3145cf5281fa90629f545944bbe5a9e9312440aba511575f6",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub039_test_aps_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_test_aps_font/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_test_aps_font/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_test_aps_font/hi-IN/generate-docx.local.json",
+      "legacy_sha256": "63cc8c0731a95094495685b42f7821a27f48d3c8a3eef48bbd007e998b851b1a",
+      "selectors": {
+        "command": "generate-docx",
+        "subject": "sub039_test_aps_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.0.0",
+        "pipeline": "generate-docx",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_test_aps_font/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_test_aps_font/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "language": "hi-IN"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_test_aps_font/hi-IN/prep-subject.local.json",
+      "legacy_sha256": "5dc203aa0bc45ddbfddcbffc4ee2dc4c2a7ab9da4455340b35a3fe11b728b807",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub039_test_aps_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "legacy-docx-to-unicode",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "39_test_aps_font/aps_fonts/ms_word/sub039_aacharan_shastra_hi-IN.docx",
+          "font_encoding": "aps",
+          "file_format": "docx"
+        },
+        "destination": {
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "39_test_aps_font/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "literal",
+          "pattern": "प्रबोधन क्र"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub039_test_aps_font/hi-IN/prep-subject.r2-output.json",
+      "legacy_sha256": "19aca2bf2ce13256de4a3e500483d4a2ada3b7070bcc0d910dc83c6dc5e972b6",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub039_test_aps_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "legacy-docx-to-unicode",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "39_test_aps_font/aps_fonts/ms_word/sub039_aacharan_shastra_hi-IN.docx",
+          "font_encoding": "aps",
+          "file_format": "docx"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "39_test_aps_font/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT004",
+          "subject_code": "SUB039",
+          "title_slug": "aacharan-shastra",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "literal",
+          "pattern": "प्रबोधन क्र"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json",
+      "legacy_sha256": "d67e9a1b9f404383b4d9e3dc594c7e6331dab9fdeb12a18b48879dd8d1ed2c8f",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2-output.json",
+      "legacy_sha256": "8aab58d3e6fa1602c94a174d9e702dc6a45a117e07a79a45b0bf6a1ad4437cae",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.r2.json",
+      "legacy_sha256": "3df0ec9ca6577111c9e6b521e350db05622cc605678953c5eec09efc856ef517",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.local.json",
+      "legacy_sha256": "464d53f4dd5f12a0af88ae70aa79275913a16535b71da86491da2aab1298e1bc",
+      "selectors": {
+        "command": "generate-docx",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.0.0",
+        "pipeline": "generate-docx",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "language": "hi-IN"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.r2-output.json",
+      "legacy_sha256": "7f0d8e602d96879eb8b90620f07b6d636ed66983fe626dec5fbbebb6aaf5b021",
+      "selectors": {
+        "command": "generate-docx",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.0.0",
+        "pipeline": "generate-docx",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "language": "hi-IN"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.r2.json",
+      "legacy_sha256": "20e5f3820fc77edbebae1492e6687400b9b85c0119e37f4da6c25a2b23f87313",
+      "selectors": {
+        "command": "generate-docx",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2"
+      },
+      "configuration": {
+        "schema_version": "1.0.0",
+        "pipeline": "generate-docx",
+        "source": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "language": "hi-IN"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json",
+      "legacy_sha256": "2a2e943ae3afb92277cfcbc4dba5e7e2485a0761cc8cee5ff911b8dc35b9d616",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "unicode-docx-ingest",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+          "font_encoding": "unicode",
+          "file_format": "docx"
+        },
+        "destination": {
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "regex",
+          "pattern": "प्रबोधन.*?जनवरी.*?2026"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2-output.json",
+      "legacy_sha256": "b8e8403bbf75eae9a8f5d5698de515ae1d6d044a042bef2b97007601b67f97cf",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "unicode-docx-ingest",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+          "font_encoding": "unicode",
+          "file_format": "docx"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "regex",
+          "pattern": "प्रबोधन.*?जनवरी.*?2026"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2.json",
+      "legacy_sha256": "444d0265d0288d3a503f5e4dd1d17b167d1a8fd22157914ec84bffada05960e8",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub123_spand_rahasya",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "unicode-docx-ingest",
+        "source": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "key": "source_library/123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+          "font_encoding": "unicode",
+          "file_format": "docx"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_spand_rahasya/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "regex",
+          "pattern": "प्रबोधन.*?जनवरी.*?2026"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/mr-IN/generate-chunks.local.json",
+      "legacy_sha256": "3ef6f91c464ac98a9eb49f8804677525ef057f1763b2c89f56016025928de941",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub123_spand_rahasya",
+        "language": "mr-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/mr-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/mr-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01",
+          "language": "mr-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/mr-IN/generate-docx.local.json",
+      "legacy_sha256": "d0f0eee4e31dfc36f7ef61ea7ffd4ca74362cc0dcd6ae248844a62f6290640b1",
+      "selectors": {
+        "command": "generate-docx",
+        "subject": "sub123_spand_rahasya",
+        "language": "mr-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.0.0",
+        "pipeline": "generate-docx",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/mr-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/mr-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "language": "mr-IN"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_spand_rahasya/mr-IN/prep-subject.local.json",
+      "legacy_sha256": "b5a9e3e53859f79013e6fc1c6316e1d120573299a0120c2b157113778bceb006",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub123_spand_rahasya",
+        "language": "mr-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "unicode-docx-ingest",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "123_spand_rahasya/unicode_fonts/ms_word/sub123_spand_rahasya_mr-IN.docx",
+          "font_encoding": "unicode",
+          "file_format": "docx"
+        },
+        "destination": {
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_spand_rahasya/mr-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "regex",
+          "pattern": "स्पंद रहस्य.*?जानेवारी.*?2026"
+        },
+        "metadata_defaults": {
+          "language": "mr-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_test_unicode_font/hi-IN/generate-chunks.local.json",
+      "legacy_sha256": "e08db8817ac41f663d31720d821a74afdd21c5dfb44e1242d71e59b008bf181a",
+      "selectors": {
+        "command": "generate-chunks",
+        "subject": "sub123_test_unicode_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.2.0",
+        "pipeline": "generate-chunks",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_test_unicode_font/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_test_unicode_font/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01",
+          "language": "hi-IN"
+        },
+        "chunking": {
+          "provider": "semantic-chunking",
+          "model": "BAAI/bge-m3",
+          "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+          "threshold_percentile": 78.0,
+          "min_chars": 550,
+          "window_size": 3,
+          "batch_size": 16,
+          "normalize_contextual_vectors": true,
+          "device": null,
+          "local_files_only": true,
+          "strategy_version": "semantic-window-v1"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_test_unicode_font/hi-IN/generate-docx.local.json",
+      "legacy_sha256": "34fcaefd3a352c0d3b48e0d13220cffd197c47cc974a89113c261df68cb10954",
+      "selectors": {
+        "command": "generate-docx",
+        "subject": "sub123_test_unicode_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.0.0",
+        "pipeline": "generate-docx",
+        "source": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_test_unicode_font/hi-IN"
+        },
+        "destination": {
+          "backend": "local",
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_test_unicode_font/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "language": "hi-IN"
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_test_unicode_font/hi-IN/prep-subject.local.json",
+      "legacy_sha256": "5903b31a910eaeeacd87dd3d6d92143f455a54cbf318154824a082ee0abdf7fa",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub123_test_unicode_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "local"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "unicode-docx-ingest",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "123_test_unicode_font/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+          "font_encoding": "unicode",
+          "file_format": "docx"
+        },
+        "destination": {
+          "root_dir": "CMS_LIBRARY_ROOT",
+          "subject_dir": "123_test_unicode_font/hi-IN"
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "regex",
+          "pattern": "प्रबोधन.*?जनवरी.*?2026"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    },
+    {
+      "legacy_path": "jobs/subjects/sub123_test_unicode_font/hi-IN/prep-subject.r2-output.json",
+      "legacy_sha256": "ef3c8f0a0515f4c20276ca5b2277cfd6bcdc39640259377699b8160bd8555705",
+      "selectors": {
+        "command": "prep-subject",
+        "subject": "sub123_test_unicode_font",
+        "language": "hi-IN",
+        "environment": "development",
+        "storage_profile": "r2-output"
+      },
+      "configuration": {
+        "schema_version": "1.5.0",
+        "pipeline": "unicode-docx-ingest",
+        "source": {
+          "root_dir": "SOURCE_LIBRARY_ROOT",
+          "relative_path": "123_test_unicode_font/unicode_fonts/ms_word/sub123_spand_rahasya_hi-IN.docx",
+          "font_encoding": "unicode",
+          "file_format": "docx"
+        },
+        "destination": {
+          "backend": "r2",
+          "bucket": "gurubodh-library-dev",
+          "prefix": "cms_library",
+          "subject_dir": "123_test_unicode_font/hi-IN",
+          "url_base": null
+        },
+        "naming": {
+          "category_code": "CAT001",
+          "subject_code": "SUB123",
+          "title_slug": "spand-rahasya",
+          "version": "01",
+          "subversion": "01"
+        },
+        "chapter_split": {
+          "enabled": true,
+          "pattern_type": "regex",
+          "pattern": "प्रबोधन.*?जनवरी.*?2026"
+        },
+        "metadata_defaults": {
+          "language": "hi-IN",
+          "source_script": "Devanagari",
+          "output_text_encoding": "UTF-8",
+          "summary_chapter_markers": [
+            "उपसंहार",
+            "उपसंहारात्मक",
+            "उपसंभारात्मक",
+            "उपसंभारात्त्मक",
+            "उपसंभार"
+          ]
+        },
+        "proofreading": {
+          "provider": "google-ai-studio",
+          "model": "gemini-3.6-flash",
+          "max_output_tokens": 16384,
+          "max_input_characters": 30000,
+          "max_retries": 3,
+          "initial_retry_delay_seconds": 2,
+          "max_retry_delay_seconds": 30,
+          "min_request_interval_seconds": 6,
+          "max_requests_per_minute": 8,
+          "max_estimated_input_tokens_per_minute": 20000,
+          "enabled": true,
+          "request_timeout_seconds": 120,
+          "request_progress_interval_seconds": 15,
+          "unavailable_max_retries": 2,
+          "unavailable_first_retry_delay_seconds": 30,
+          "unavailable_second_retry_delay_seconds": 90,
+          "unavailable_cooldown_seconds": 120,
+          "continue_on_error": false
+        }
+      }
+    }
+  ]
+}
