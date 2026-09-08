@@ -20,7 +20,6 @@ housed in the Gurubodh CLI.
 - Read `docs/limitations.md` before changing behavior near known constraints.
 - Read `docs/adr/` before changing previously decided architecture.
 - Read `docs/decisions/` before changing operational or process decisions.
-- Read `docs/schemas.md` before adding or changing structured data schemas.
 - Read `docs/tasks/` for task briefs, execution history, and recent context.
 </routing>
 
@@ -31,6 +30,14 @@ housed in the Gurubodh CLI.
 - Update documentation when setup, architecture, decisions, workflows, or schemas change.
 - Preserve secrets: do not copy values from `.env` files into tracked documentation.
 </working_rules>
+
+<composable_jobs_documentation>
+For GitHub Issues #283–#288, do not add repository implementation documentation.
+Keep technical contracts and execution evidence in the GitHub issues and tests.
+Operator-facing documentation belongs to a follow-up issue after #288 is
+implemented and the complete composable-jobs implementation has been tested.
+This scoped exception overrides documentation-update requirements for the series.
+</composable_jobs_documentation>
 
 <github_workflow>
 GitHub Issue-first workflow is mandatory for any task that modifies tracked files or repository state.

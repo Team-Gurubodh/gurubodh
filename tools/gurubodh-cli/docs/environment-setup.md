@@ -15,7 +15,7 @@ This is the authoritative guide to the local and container environment needed to
 | R2 `generate-chunks` | Pinned Docker image | Cloudflare R2 variables | Mounted BGE-M3 cache; `HF_HUB_OFFLINE=1` | A completed matching preparation release |
 | R2 `generate-docx` | Pinned Docker image | Cloudflare R2 variables | None | A completed matching preparation release |
 
-Job configuration selects the source and destination storage; it never contains credentials. Read [Job configurations](reference/job-configurations.md) before modifying a maintained job.
+Job configuration selects the source and destination storage; it never contains credentials. Read the job and its schema before modifying a maintained job.
 
 ## Local development runtime
 

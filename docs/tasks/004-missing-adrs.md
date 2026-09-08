@@ -25,7 +25,7 @@ Pending approval.
 
 Suggested execution plan:
 
-1. Review `docs/architecture.md`, `docs/goals.md`, `docs/limitations.md`, `docs/schemas.md`, and existing ADRs.
+1. Review `docs/architecture.md`, `docs/goals.md`, `docs/limitations.md`, and existing ADRs.
 2. Confirm whether each candidate topic below needs a standalone ADR or should be merged into another ADR.
 3. Prioritize the missing ADRs by implementation dependency and architectural risk.
 4. Draft approved ADRs using `docs/templates/adr-template.md`.

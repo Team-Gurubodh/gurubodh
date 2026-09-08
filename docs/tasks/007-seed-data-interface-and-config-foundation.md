@@ -77,8 +77,6 @@ use a lightweight interface document to define the CSV-to-artifact boundary.
 
 6. Update documentation indexes.
    - Make `docs/interfaces/` discoverable from `docs/README.md`.
-   - Register the planned seed-data schema location in `docs/schemas.md`, then
-     move it to current schema locations when the schema file is implemented.
    - Update `tools/seed-data-cli/README.md` to describe the external CSV source
      root and config-driven direction.
 

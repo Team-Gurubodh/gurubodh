@@ -41,6 +41,6 @@ The CLI otherwise uses `GURUBODH_CLI_ROOT`, then walks upward to find both `conf
 
 ## Next steps
 
-- Read the job and its schema before changing a source, destination, locale, or model setting: [Job configurations](reference/job-configurations.md).
+- Read the job and its schema before changing a source, destination, locale, or model setting.
 - Use R2 only through [R2 production runs](operations/r2-production-runs.md), after completing [Environment setup](environment-setup.md).
 - Learn what a successful run publishes in [Artifact lifecycle](concepts/artifact-lifecycle.md).

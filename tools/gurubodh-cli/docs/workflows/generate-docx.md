@@ -30,4 +30,4 @@ For R2, the old readiness manifest is removed first, validated DOCX objects uplo
 
 ## Controlled local assembly
 
-Use the non-canonical [Lab tools](lab-tools.md) only to combine controlled exports. They do not replace this workflow or make a combined document canonical.
+Use the non-canonical lab tools only to combine controlled exports. They do not replace this workflow or make a combined document canonical.

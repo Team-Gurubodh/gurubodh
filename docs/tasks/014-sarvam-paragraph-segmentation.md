@@ -780,7 +780,6 @@ representative Sarvam-backed run.
 ### Scope
 
 - Update `tools/gurubodh-cli/README.md`.
-- Update `docs/schemas.md`.
 - Add or update safe sample configs with segmentation disabled by default.
 - Document enabling segmentation with `SARVAM_API_KEY`.
 - Document span semantics and on-demand rendering.

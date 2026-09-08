@@ -25,7 +25,7 @@ This prepares canonical, proofread chapter artifacts locally. It needs an enviro
 | Prepare canonical chapter artifacts from a DOCX source | `prep-subject` | [Prepare a subject](docs/workflows/prepare-a-subject.md) |
 | Generate semantic chunks from prepared canonical text | `generate-chunks` | [Generate chunks](docs/workflows/generate-chunks.md) |
 | Generate one reviewable DOCX per canonical chapter | `generate-docx` | [Generate DOCX exports](docs/workflows/generate-docx.md) |
-| Experiment with a local DOCX without publishing canonical artifacts | `lab` | [Lab tools](docs/workflows/lab-tools.md) |
+| Experiment with a local DOCX without publishing canonical artifacts | `lab` | [Command reference](docs/reference/command-reference.md) |
 | Estimate BGE-M3 tokens (and optionally Sarvam prompt tokens) | `compare-tokenizers` | [Command reference](docs/reference/command-reference.md) |
 
 The supported production flow is:

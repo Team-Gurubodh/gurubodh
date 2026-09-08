@@ -89,10 +89,6 @@ docs/goals.md
 
 docs/limitations.md
 
-## Schemas
-
-docs/schemas.md
-
 ## Repository commands
 
 README.md
