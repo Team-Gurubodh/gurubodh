@@ -10,7 +10,6 @@ Keep `AGENTS.md` short and route durable project knowledge here.
 - `goals.md` - active goals, non-goals, and project direction.
 - `architecture.md` - current system architecture and boundaries.
 - `limitations.md` - known limitations, risks, and constraints.
-- `schemas.md` - schema locations, ownership, and maintenance rules.
 - `interfaces/` - lightweight interface contracts for subsystem boundaries.
 - `agents/agent-contract.md` - expanded guidance for AI agents.
 - `development/` - contributor workflow guides for GitHub, pull requests, and Conventional Commits.

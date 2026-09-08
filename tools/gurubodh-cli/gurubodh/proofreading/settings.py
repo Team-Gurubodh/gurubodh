@@ -9,22 +9,22 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ProofreadingSettings:
-    provider: str = "google-ai-studio"
-    model: str = "gemini-3.7-flash"
-    max_output_tokens: int = 8192
-    max_input_characters: int = 30000
-    max_retries: int = 3
-    initial_retry_delay_seconds: float = 2.0
-    max_retry_delay_seconds: float = 30.0
-    min_request_interval_seconds: float = 6.0
-    max_requests_per_minute: int = 8
-    max_estimated_input_tokens_per_minute: int = 20000
-    request_timeout_seconds: float = 120.0
-    request_progress_interval_seconds: float = 15.0
-    unavailable_max_retries: int = 2
-    unavailable_first_retry_delay_seconds: float = 30.0
-    unavailable_second_retry_delay_seconds: float = 90.0
-    unavailable_cooldown_seconds: float = 120.0
+    provider: str
+    model: str
+    max_output_tokens: int
+    max_input_characters: int
+    max_retries: int
+    initial_retry_delay_seconds: float
+    max_retry_delay_seconds: float
+    min_request_interval_seconds: float
+    max_requests_per_minute: int
+    max_estimated_input_tokens_per_minute: int
+    request_timeout_seconds: float
+    request_progress_interval_seconds: float
+    unavailable_max_retries: int
+    unavailable_first_retry_delay_seconds: float
+    unavailable_second_retry_delay_seconds: float
+    unavailable_cooldown_seconds: float
 
     def __post_init__(self) -> None:
         positive_settings = (

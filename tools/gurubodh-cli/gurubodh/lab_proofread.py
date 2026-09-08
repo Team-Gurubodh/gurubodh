@@ -22,6 +22,8 @@ from gurubodh.contracts import Proofreader
 from gurubodh.docx.export import formatting_defaults, write_chapter_docx
 from gurubodh.docx.text import extract_docx_text
 from gurubodh.docx.validate import validate_docx
+from gurubodh.job_components import ComponentCatalog
+from gurubodh.job_composition import resolve_lab_proofreading
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
 from gurubodh.legacy.font_detection import (
     detect_converter_for_font,
@@ -242,7 +244,10 @@ def run_lab_proofread(
     locale = locale_spec(locale_name)
     root = _safe_lab_root(lab_root)
     source_path = Path(source).expanduser().resolve()
-    selected_settings = settings or ProofreadingSettings()
+    selected_settings = (
+        resolve_lab_proofreading(ComponentCatalog(context.root)).settings
+        if settings is None else settings
+    )
     run_id, run_dir = _run_directory(root)
     audit_context = AuditContext.create(
         COMMAND_NAME,

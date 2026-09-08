@@ -146,8 +146,6 @@ When Gurubodh UI is released, in the early version, we may make use of Typically
 
 7. Update project documentation alongside implementation.
    - Update `docs/README.md` so `docs/interfaces/` is discoverable.
-   - Update `docs/schemas.md` if new schema locations or Strapi content types
-     are added.
    - Add `tools/seed-data-cli/README.md` explaining the seed-data workflow, Google
      Sheet usage, manual CSV download, validation, JSON generation, and Strapi
      ingestion.

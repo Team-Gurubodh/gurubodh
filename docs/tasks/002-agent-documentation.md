@@ -58,7 +58,6 @@ docs/
   goals.md
   architecture.md
   limitations.md
-  schemas.md
   agents/
     README.md
     agent-contract.md
@@ -110,7 +109,6 @@ docs/README.md
 docs/goals.md
 docs/architecture.md
 docs/limitations.md
-docs/schemas.md
 docs/agents/README.md
 docs/agents/agent-contract.md
 docs/adr/README.md

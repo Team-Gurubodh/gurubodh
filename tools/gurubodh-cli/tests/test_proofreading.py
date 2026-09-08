@@ -6,6 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from policy_fixtures import proofreading_settings
+
 from gurubodh.config import proofreading_config, validate_pipeline_matches_source
 from gurubodh.errors import GurubodhError
 from gurubodh.locales import locale_spec
@@ -13,7 +15,6 @@ from gurubodh.proofreading import (
     EDIT_LIST_SCHEMA,
     GeminiProofreader,
     ProofreadingError,
-    ProofreadingSettings,
     word_level_diff,
 )
 from gurubodh.schema_validation import validate_job
@@ -68,7 +69,7 @@ class ProofreadingTests(unittest.TestCase):
     def settings(self, **overrides):
         values = {"min_request_interval_seconds": 0, "max_requests_per_minute": 10}
         values.update(overrides)
-        return ProofreadingSettings(**values)
+        return proofreading_settings(**values)
 
     def test_word_level_diff_preserves_newlines_and_marks_replacement(self):
         rendered, summary = word_level_diff("पहला गलत शब्द।\n\nदूसरा वाक्य।", "पहला सही शब्द।\n\nदूसरा वाक्य।")
@@ -109,7 +110,7 @@ class ProofreadingTests(unittest.TestCase):
         with self.assertRaisesRegex(GurubodhError, "must not exceed request_timeout_seconds"):
             proofreading_config(invalid)
         with self.assertRaisesRegex(ValueError, "unavailable_cooldown_seconds must be greater than zero"):
-            ProofreadingSettings(unavailable_cooldown_seconds=0)
+            proofreading_settings(unavailable_cooldown_seconds=0)
 
     def test_prep_subject_schema_rejects_invalid_new_operational_settings(self):
         job_path = Path(__file__).parents[1] / "jobs" / "subjects" / "sub123_spand_rahasya" / "hi-IN" / "prep-subject.local.json"
@@ -144,7 +145,7 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(result["corrected_text"], "यह सही वाक्य है।")
         self.assertEqual(len(result["edits"]), 1)
         self.assertEqual(len(client.models.calls), 1)
-        self.assertEqual(client.models.calls[0]["model"], "gemini-3.7-flash")
+        self.assertEqual(client.models.calls[0]["model"], "gemini-3.6-flash")
         self.assertNotIn("temperature", client.models.calls[0]["config"].kwargs)
         self.assertEqual(client.models.calls[0]["config"].kwargs["http_options"], {"timeout": 120000})
 

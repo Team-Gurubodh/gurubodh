@@ -19,6 +19,7 @@ from gurubodh.contracts import CleanupResource, MaterializedSource, R2Client
 from gurubodh.errors import GurubodhError, ProcessingError, PublicationError
 from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import (
+    storage_backend,
     R2StorageClient,
     is_local,
     is_r2,
@@ -503,7 +504,7 @@ def run_derived_artifact_lifecycle(
     trace = LifecycleTrace()
     source = None
     generation = None
-    backend = config["destination"].get("backend", "local")
+    backend = storage_backend(config["destination"])
     publication = PublicationResult(
         backend=backend,
         ownership_scope=definition.output_relative_dir.as_posix(),

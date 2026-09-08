@@ -15,7 +15,7 @@ Canonical output is always UTF-8 Unicode text. Preparation does not publish a co
 
 ## Configuration
 
-Configured sources must be `.docx`. A preparation job declares source and destination, pipeline, supported source-font encoding, chapter split, naming, metadata defaults, locale, and a mandatory proofreading contract. Review [Job configurations](job-configurations.md) and the current job schema before editing a maintained job.
+Configured sources must be `.docx`. A preparation job declares source and destination, pipeline, supported source-font encoding, chapter split, naming, metadata defaults, locale, and a mandatory proofreading contract. Review the current job schema before editing a maintained job.
 
 ## Source-font safety boundary
 

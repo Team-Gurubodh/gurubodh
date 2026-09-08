@@ -3,6 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
 
+from gurubodh.complete_job_compat import storage_backend, storage_url_base
 from gurubodh.contracts import R2Downloader, R2Uploader
 from gurubodh.errors import ConfigurationError, SourceValidationError, StorageError
 
@@ -178,10 +179,6 @@ def cleanup_r2_legacy_full_subject(config, r2_client=None):
     )
 
 
-def storage_backend(config_section):
-    return config_section.get("backend", LOCAL_BACKEND)
-
-
 def is_local(config_section):
     return storage_backend(config_section) == LOCAL_BACKEND
 
@@ -314,7 +311,7 @@ def source_reference(config):
         "backend": R2_BACKEND,
         "bucket": source["bucket"],
         "key": key,
-        "url": optional_url(source.get("url_base"), key),
+        "url": optional_url(storage_url_base(source), key),
     }
 
 
@@ -332,7 +329,7 @@ def destination_artifact_reference(config, relative_path):
         "backend": R2_BACKEND,
         "bucket": destination["bucket"],
         "key": key,
-        "url": optional_url(destination.get("url_base"), key),
+        "url": optional_url(storage_url_base(destination), key),
     }
 
 

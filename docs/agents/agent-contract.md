@@ -21,7 +21,6 @@ The root `AGENTS.md` remains the canonical instruction entry point.
 - Architecture: `docs/architecture.md`
 - Goals and non-goals: `docs/goals.md`
 - Known limitations: `docs/limitations.md`
-- Schemas: `docs/schemas.md`
 - ADRs: `docs/adr/`
 - Operational decisions: `docs/decisions/`
 - Task history: `docs/tasks/`
@@ -44,7 +43,6 @@ Do not create skills for single decisions, ordinary documentation, or one-off ta
 <documentation_responsibilities>
 - Update ADRs for durable architecture decisions.
 - Update `docs/decisions/` for operational, process, or product decisions.
-- Update `docs/schemas.md` when schema locations or schema rules change.
 - Update `docs/tasks/` when a task brief or execution history changes.
 - Update root `README.md` only for high-level project navigation and common commands.
 </documentation_responsibilities>

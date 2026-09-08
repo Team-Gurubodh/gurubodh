@@ -9,17 +9,15 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 - [Prepare a subject](workflows/prepare-a-subject.md) — canonical preparation, proofreading, resume, and replacement behavior.
 - [Generate chunks](workflows/generate-chunks.md) — derive semantic chunks from a prepared release.
 - [Generate DOCX exports](workflows/generate-docx.md) — create rebuildable, human-readable chapter exports.
-- [Lab tools](workflows/lab-tools.md) — local, non-canonical experiments.
 
 ## Operations and concepts
 
 - [R2 production runs](operations/r2-production-runs.md) — immutable Docker images, R2 credentials, and the BGE-M3 cache volume.
 - [Artifact lifecycle](concepts/artifact-lifecycle.md) — ownership, invalidation, readiness markers, locales, and audit reports.
-- [Internal workflow contracts](concepts/internal-workflow-contracts.md) — typed runtime records, JSON conversion points, injectable seams, and domain errors.
 
 ## Reference
 
-- [Reference index](reference/README.md) — job configuration, storage, and command-reference links.
+- [Reference index](reference/README.md) — schemas and command-reference links.
 - [Legacy DOCX conversion](reference/legacy-docx-conversion.md) — source conversion details.
 - [Semantic chunking](reference/semantic-chunking.md) — local model and supported command boundary.
 - [Legacy font mapping status](reference/legacy-font-mapping-status-and-future-work.md) — implementation notes and known mapping risks; not an operator runbook.

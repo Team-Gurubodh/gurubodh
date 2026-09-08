@@ -1,0 +1,15 @@
+{
+  "component_schema_version": "1.0.0",
+  "locale": "mr-IN",
+  "metadata_defaults": {
+    "source_script": "Devanagari",
+    "output_text_encoding": "UTF-8",
+    "summary_chapter_markers": [
+      "उपसंहार",
+      "उपसंहारात्मक",
+      "उपसंभारात्मक",
+      "उपसंभारात्त्मक",
+      "उपसंभार"
+    ]
+  }
+}

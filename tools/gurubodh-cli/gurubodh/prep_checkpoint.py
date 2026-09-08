@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from gurubodh.audit import bounded_failure
+from gurubodh.complete_job_compat import chapter_split_flags
 from gurubodh.canonical_release import (
     CHECKPOINT_CONTRACT_VERSION,
     CHECKPOINT_SCHEMA_VERSION,
@@ -77,7 +78,7 @@ def safe_config_inputs(config: PrepSubjectJob) -> dict[str, Any]:
         if not key.startswith("_")
     }
     if chapter_split.get("pattern_type") == "regex":
-        chapter_split["flags"] = sorted(chapter_split.get("flags", []))
+        chapter_split["flags"] = sorted(chapter_split_flags(chapter_split))
     return {
         "pipeline": config["pipeline"],
         "chapter_split": chapter_split,

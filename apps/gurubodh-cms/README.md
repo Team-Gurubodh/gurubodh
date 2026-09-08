@@ -79,9 +79,6 @@ Content type schemas live under:
 src/api/**/content-types/**/schema.json
 ```
 
-Update `docs/schemas.md` when schema locations or schema ownership rules
-change.
-
 ## Related Documentation
 
 - `../../README.md` - monorepo structure and common commands.

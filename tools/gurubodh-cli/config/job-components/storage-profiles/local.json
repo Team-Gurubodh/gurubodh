@@ -1,0 +1,7 @@
+{
+  "component_schema_version": "1.0.0",
+  "storage_profile_id": "local",
+  "source_document": "local_source_library",
+  "subject_artifact_source": "local_destination_library",
+  "subject_artifact_destination": "local_destination_library"
+}

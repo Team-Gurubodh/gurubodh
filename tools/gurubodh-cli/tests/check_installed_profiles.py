@@ -1,4 +1,4 @@
-"""Run with an isolated interpreter; see docs/concepts/internal-workflow-contracts.md."""
+"""Run with an isolated interpreter to validate installed execution-profile schemas."""
 
 import copy
 from importlib.metadata import distribution

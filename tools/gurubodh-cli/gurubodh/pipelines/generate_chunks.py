@@ -40,6 +40,7 @@ from gurubodh.ml.semantic_chunking.segmenter import ParagraphSegmenter, Semantic
 from gurubodh.naming import chapter_chunks_output_filename
 from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import (
+    storage_backend,
     CHUNKS_REPORT_DIR,
     destination_artifact_reference,
     is_r2,
@@ -216,7 +217,7 @@ def build_chunk_manifest(
     result_payload = result.to_payload()
     return {
         "schema_version": SEMANTIC_CHUNKS_MANIFEST_SCHEMA_VERSION,
-        "run": {"pipeline": config["pipeline"], "source_backend": config["source"].get("backend", "local"), "destination_backend": config["destination"].get("backend", "local"), "output_directory": destination_output_location(config, job)},
+        "run": {"pipeline": config["pipeline"], "source_backend": storage_backend(config["source"]), "destination_backend": storage_backend(config["destination"]), "output_directory": destination_output_location(config, job)},
         "document": {"category_code": config["naming"]["category_code"], "subject_code": config["naming"]["subject_code"], "title_slug": config["naming"]["title_slug"], "language": config["naming"]["language"], "version": f"v{config['naming']['version']}.{config['naming']['subversion']}"},
         "source_candidate_manifest": candidate_manifest_binding(job), "chunking": chunking_metadata(semantic_config),
         "counts": {"total_chapter_count": result.source_chapter_count, "processed_chapter_count": result.processed_chapter_count, "skipped_chapter_count": result.skipped_chapter_count, "failed_chapter_count": result.failed_chapter_count, "total_chunk_count": result.total_chunk_count, "total_estimated_token_count": result.total_estimated_token_count},
