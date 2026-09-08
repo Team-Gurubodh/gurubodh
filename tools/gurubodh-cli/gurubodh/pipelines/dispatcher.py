@@ -7,12 +7,22 @@ from gurubodh.constants import (
     PIPELINE_UNICODE_DOCX_INGEST,
 )
 from gurubodh.errors import ConfigurationError
+from gurubodh.contracts import PrepSubjectJob
 from gurubodh.pipelines.legacy_docx_to_unicode import run_legacy_docx_to_unicode
 from gurubodh.pipelines.unicode_docx_ingest import run_unicode_docx_ingest
 
 
 def run_configured_job(context, config_path, entry_point=ENTRY_POINT_PREP_SUBJECT, overwrite=False, resume=False):
+    """Temporary complete-file compatibility boundary for comparison runs."""
     config = load_prep_subject_job(config_path)
+    return run_prepared_job(context, config, entry_point, overwrite, resume, config_path)
+
+
+def run_prepared_job(
+    context, config: PrepSubjectJob, entry_point=ENTRY_POINT_PREP_SUBJECT,
+    overwrite=False, resume=False, config_path=None,
+):
+    """Dispatch a validated job with its typed provenance, without file loading."""
     pipeline = config["pipeline"]
     if pipeline == PIPELINE_UNICODE_DOCX_INGEST:
         return run_unicode_docx_ingest(

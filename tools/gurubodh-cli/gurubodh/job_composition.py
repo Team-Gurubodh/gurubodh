@@ -225,13 +225,19 @@ def resolve_job(
     return ResolvedJob(replace(prepared, provenance=provenance), inputs)
 
 
-def resolve_lab_proofreading(catalog: ComponentCatalog) -> ResolvedProofreading:
+def resolve_lab_proofreading(
+    catalog: ComponentCatalog, *, proofreading_profile_id: str | None = None,
+) -> ResolvedProofreading:
     """Resolve lab's JSON-owned default, without a manifest or canonical job."""
     command = catalog.load("command-definition", "lab-proofread")
     profile_id = command.to_payload()["default_profiles"]["proofreading"]
+    selected_by = "command"
+    if proofreading_profile_id is not None:
+        profile_id = proofreading_profile_id
+        selected_by = "invocation"
     profile = catalog.load("proofreading-profile", profile_id)
     return ResolvedProofreading(
         proofreading_config(profile.to_payload()),
-        ProfileSelection("proofreading", profile_id, "command"),
+        ProfileSelection("proofreading", profile_id, selected_by),
         (command, profile),
     )

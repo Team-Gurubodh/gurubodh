@@ -125,6 +125,47 @@ class LabProofreadTests(unittest.TestCase):
              self.assertRaises(ConfigurationError):
             run_lab_proofread(self.context, self.root / "absent.docx", "hi-IN", self.root / "lab")
 
+    def test_explicit_profile_is_complete_audited_and_non_canonical(self):
+        profile_path = self.root / "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"
+        profile = json.loads(profile_path.read_text())
+        profile["profile_id"] = "lab-selected-v1"
+        profile["proofreading"]["max_retries"] = 1
+        (profile_path.parent / "lab-selected-v1.json").write_text(json.dumps(profile))
+        result = run_lab_proofread(
+            self.context, self.source_docx(), "hi-IN", self.root / "lab",
+            proofreader=FakeProofreader(), proofreading_profile_id="lab-selected-v1",
+        )
+        report = json.loads(result["manifest_path"].read_text())
+        expected = {key: value for key, value in profile["proofreading"].items()
+                    if key not in {"enabled", "continue_on_error"}}
+        expected["mandatory"] = True
+        self.assertEqual(report["configuration_snapshot"]["proofreading"], expected)
+        provenance = report["configuration_provenance"]
+        self.assertEqual(provenance["profiles"], [{"kind": "proofreading",
+            "profile_id": "lab-selected-v1", "selected_by": "invocation"}])
+        self.assertIsNone(provenance["manifest_id"])
+        self.assertEqual(provenance["invocation"]["profiles"], {"proofreading": "lab-selected-v1"})
+        self.assertTrue(report["command_details"]["non_canonical"])
+        self.assertFalse(report["publication"]["canonical"])
+
+    def test_invalid_or_partial_explicit_profile_fails_before_source_and_output(self):
+        from gurubodh.errors import ConfigurationError
+
+        profile_path = self.root / "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"
+        profile = json.loads(profile_path.read_text())
+        profile["profile_id"] = "partial-v1"
+        del profile["proofreading"]["max_retries"]
+        (profile_path.parent / "partial-v1.json").write_text(json.dumps(profile))
+        with patch("gurubodh.lab_proofread.validate_docx", side_effect=AssertionError("source read")), \
+             patch("gurubodh.lab_proofread._run_directory", side_effect=AssertionError("output write")):
+            for identity in ("../outside", "missing-v1", "partial-v1"):
+                with self.subTest(identity=identity), self.assertRaises(ConfigurationError):
+                    run_lab_proofread(self.context, self.root / "absent.docx", "hi-IN", self.root / "lab",
+                                     proofreading_profile_id=identity)
+            with self.assertRaisesRegex(ConfigurationError, "mutually exclusive"):
+                run_lab_proofread(self.context, self.root / "absent.docx", "hi-IN", self.root / "lab",
+                                 settings=proofreading_settings(), proofreading_profile_id="partial-v1")
+
     def test_marathi_selects_the_marathi_locale(self):
         source = self.source_docx(text="हे गलत वाक्य आहे.")
         result = run_lab_proofread(self.context, source, "mr-IN", self.root / "lab", proofreader=FakeProofreader("चुकीचे"))
