@@ -126,7 +126,7 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                 self.assertEqual(Path(case["legacy_path"]).parts[-3:],
                     (s["subject"], s["language"], f"{s['command']}.{s['storage_profile']}.json"))
 
-    def test_manifests_validate_independently_and_preserve_each_edition(self):
+    def test_manifests_validate_independently(self):
         paths = sorted((CLI_ROOT / "jobs/subjects").glob("*/manifest.json"))
         self.assertEqual(len(paths), 4)
         with without_job_schemas():
@@ -134,17 +134,7 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                 manifest = self.catalog.load("subject-manifest", path.parent.name).to_payload()
                 self.assertNotIn("profile_overrides", manifest)
                 self.assertNotIn("/Users/", path.read_text())
-                for locale, edition in manifest["editions"].items():
-                    old = next(c["configuration"] for c in CASES if c["selectors"] == {
-                        "command": "prep-subject", "subject": manifest["manifest_id"],
-                        "language": locale, "environment": "development", "storage_profile": "local"})
-                    self.assertEqual(manifest["artifact_root"] + "/" + locale, old["destination"]["subject_dir"])
-                    self.assertEqual(manifest["identity"], {k: old["naming"][k] for k in
-                                                         ("category_code", "subject_code", "title_slug")})
-                    self.assertEqual(edition["release"], {k: old["naming"][k] for k in ("version", "subversion")})
-                    self.assertEqual(edition["source_document"], {k: old["source"][k] for k in
-                                                               ("relative_path", "font_encoding", "file_format")})
-                    self.assertEqual(edition["chapter_split"], normalize(old)["chapter_split"])
+                for edition in manifest["editions"].values():
                     self.assertNotIn("profile_overrides", edition)
                 target = self.root / path.relative_to(CLI_ROOT)
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -155,6 +145,58 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                     target.write_text(json.dumps(invalid))
                     with self.assertRaises(ConfigurationError):
                         ComponentCatalog(self.root).load("subject-manifest", manifest["manifest_id"])
+
+    def test_manifests_preserve_every_legacy_edition(self):
+        # The immutable baseline owns legacy parity; valid additional editions
+        # have no legacy counterpart and must not be added to that snapshot.
+        for case in CASES:
+            selectors = case["selectors"]
+            if selectors["command"] != "prep-subject" or selectors["storage_profile"] != "local":
+                continue
+            with self.subTest(subject=selectors["subject"], locale=selectors["language"]):
+                manifest = self.catalog.load("subject-manifest", selectors["subject"]).to_payload()
+                edition = manifest["editions"][selectors["language"]]
+                old = case["configuration"]
+                self.assertEqual(manifest["artifact_root"] + "/" + selectors["language"],
+                                 old["destination"]["subject_dir"])
+                self.assertEqual(manifest["identity"], {k: old["naming"][k] for k in
+                                                     ("category_code", "subject_code", "title_slug")})
+                self.assertEqual(edition["release"], {k: old["naming"][k] for k in ("version", "subversion")})
+                self.assertEqual(edition["source_document"], {k: old["source"][k] for k in
+                                                           ("relative_path", "font_encoding", "file_format")})
+                self.assertEqual(edition["chapter_split"], normalize(old)["chapter_split"])
+
+    def test_marathi_unicode_test_edition_resolves_across_storage_profiles(self):
+        relative = "123_test_unicode_font/unicode_fonts/ms_word/sub123_spand_rahasya_mr-IN.docx"
+        for route in ("local", "r2-output", "r2"):
+            with self.subTest(route=route):
+                job = resolve_job(self.catalog, command="prep-subject",
+                    manifest_id="sub123_test_unicode_font", locale="mr-IN",
+                    environment_id="development", storage_profile_id=route, environ=self.environ).job
+                payload = job.to_payload()
+                self.assertEqual(job.locale.language, "mr-IN")
+                self.assertEqual(payload["pipeline"], "unicode-docx-ingest")
+                self.assertEqual(payload["source"]["font_encoding"], "unicode")
+                self.assertEqual(payload["source"]["file_format"], "docx")
+                if route == "r2":
+                    self.assertEqual(payload["source"]["backend"], "r2")
+                    self.assertEqual(payload["source"]["key"], "source_library/" + relative)
+                else:
+                    self.assertEqual(payload["source"]["backend"], "local")
+                    self.assertEqual(payload["source"]["root_dir"], self.environ["GURUBODH_SOURCE_LIBRARY_ROOT"])
+                    self.assertEqual(payload["source"]["relative_path"], relative)
+                self.assertEqual(payload["destination"]["backend"], "local" if route == "local" else "r2")
+                self.assertEqual(payload["destination"]["subject_dir"], "123_test_unicode_font/mr-IN")
+                self.assertEqual(payload["naming"], {
+                    "category_code": "CAT001", "subject_code": "SUB123", "title_slug": "spand-rahasya",
+                    "version": "01", "subversion": "01",
+                })
+                self.assertEqual(payload["chapter_split"], {
+                    "enabled": True, "pattern_type": "regex",
+                    "pattern": "स्पंद रहस्य.*?जानेवारी.*?2026", "flags": [],
+                })
+                self.assertIsNotNone(job.compiled_chapter_pattern.search("स्पंद रहस्य जानेवारी 2026"))
+                self.assertIsNone(job.compiled_chapter_pattern.search("प्रबोधन जनवरी 2026"))
 
     def test_all_26_pairs_through_real_preparation_boundaries_report_exact_differences(self):
         for case in CASES:
