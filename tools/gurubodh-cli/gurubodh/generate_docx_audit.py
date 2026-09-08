@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from gurubodh.configuration_provenance import provenance_markdown
+
 from gurubodh.audit import (
     AuditContext,
     AuditWriter,
@@ -82,6 +84,7 @@ def render_markdown(report):
                 f"- Message: {report['failure']['message']}",
             ]
         )
+    lines.extend(provenance_markdown(report))
     return "\n".join(lines)
 
 

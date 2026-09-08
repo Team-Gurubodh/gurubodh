@@ -129,7 +129,7 @@ class AuditTests(unittest.TestCase):
         old_report = copy.deepcopy(report)
         old_report["schema_version"] = "1.0.0"
         with self.assertRaisesRegex(
-            GurubodhError, r'\$\.schema_version must equal "2\.0\.0"'
+            GurubodhError, r'\$\.schema_version must be one of'
         ):
             validate_artifact(old_report, "audit report")
 

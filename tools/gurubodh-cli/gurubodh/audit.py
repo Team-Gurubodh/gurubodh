@@ -17,6 +17,10 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from gurubodh import __version__
+from gurubodh.audit_configuration import (
+    REDACTED, _config_payload, safe_configuration_snapshot, redact_mapping, redact_value,
+)
+from gurubodh.configuration_provenance import ConfigurationProvenance, configuration_digest
 from gurubodh.diagnostics import safe_request_diagnostics
 from gurubodh.errors import ProcessingError
 from gurubodh.schema_validation import validate_artifact
@@ -24,7 +28,7 @@ from gurubodh.time_utils import utc_now
 
 
 AUDIT_REPORT_SCHEMA_NAME = "gurubodh.audit-report"
-AUDIT_REPORT_SCHEMA_VERSION = "2.0.0"
+AUDIT_REPORT_SCHEMA_VERSION = "2.1.0"
 AUDIT_ENVELOPE_KEYS = frozenset(
     (
         "schema_name",
@@ -32,6 +36,7 @@ AUDIT_ENVELOPE_KEYS = frozenset(
         "run_identity",
         "job_identity",
         "configuration_snapshot",
+        "configuration_provenance",
         "processing_summary",
         "lifecycle",
         "publication",
@@ -39,21 +44,6 @@ AUDIT_ENVELOPE_KEYS = frozenset(
         "report_artifacts",
         "command_details",
     )
-)
-REDACTED = "[redacted]"
-CONFIG_SNAPSHOT_KEYS = (
-    "schema_version",
-    "pipeline",
-    "source",
-    "destination",
-    "naming",
-    "chunking",
-    "chapters",
-    "chapter_split",
-    "metadata_defaults",
-    "proofreading",
-    "locale",
-    "lab_root",
 )
 AUDIT_STATUSES = frozenset(("succeeded", "failed", "incomplete"))
 
@@ -125,6 +115,7 @@ class AuditContext:
     overwrite: bool
     build_provenance: dict[str, Any]
     configuration_snapshot: dict[str, Any]
+    configuration_provenance: ConfigurationProvenance
 
     @classmethod
     def create(
@@ -141,6 +132,7 @@ class AuditContext:
         configuration: Mapping[str, Any] | None = None,
         source_backend: str | None = None,
         destination_backend: str | None = None,
+        provenance: ConfigurationProvenance | None = None,
     ) -> AuditContext:
         payload = _config_payload(config)
         source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
@@ -149,6 +141,17 @@ class AuditContext:
             if isinstance(payload.get("destination"), dict)
             else {}
         )
+        snapshot = safe_configuration_snapshot(configuration if configuration is not None else payload)
+        provenance = provenance or getattr(config, "provenance", None)
+        if provenance is None:
+            provenance = ConfigurationProvenance.capture(
+                config if config is not None and configuration is None else snapshot,
+                input_mode="complete_config",
+            )
+        elif provenance.assembled_configuration_sha256 != configuration_digest(snapshot):
+            raise ValueError("Configuration differs from captured provenance; resolve the job again.")
+        if provenance.input_mode == "composition":
+            config_path = None
         now = datetime.now(timezone.utc)
         return cls(
             command_name=command_name,
@@ -166,9 +169,8 @@ class AuditContext:
             ),
             overwrite=overwrite,
             build_provenance=resolved_build_provenance(project_root),
-            configuration_snapshot=safe_configuration_snapshot(
-                configuration if configuration is not None else payload
-            ),
+            configuration_snapshot=snapshot,
+            configuration_provenance=provenance,
         )
 
     def run_identity(self, status: str) -> dict[str, Any]:
@@ -212,7 +214,7 @@ class AuditWriter:
             )
         )
         self.references = (
-            deepcopy(reference_builder(self.audit_paths))
+            redact_mapping(deepcopy(reference_builder(self.audit_paths)))
             if reference_builder
             else local_report_references(self.audit_paths)
         )
@@ -232,7 +234,14 @@ class AuditWriter:
         failure: dict[str, Any] | None,
         command_details: dict[str, Any],
     ) -> dict[str, Any]:
-        return json_safe(
+        if configuration_digest(self.context.configuration_snapshot) != (
+            self.context.configuration_provenance.assembled_configuration_sha256
+        ):
+            raise AuditWriteError("Audit configuration snapshot differs from its captured digest.")
+        # Command builders already exclude content and sanitize diagnostics.
+        # Their source_text/corrected_text fields can be artifact references or
+        # filenames; apply credential/URL redaction without discarding those.
+        return redact_mapping(json_safe(
             {
                 "schema_name": AUDIT_REPORT_SCHEMA_NAME,
                 "schema_version": AUDIT_REPORT_SCHEMA_VERSION,
@@ -241,6 +250,7 @@ class AuditWriter:
                 "configuration_snapshot": deepcopy(
                     self.context.configuration_snapshot
                 ),
+                "configuration_provenance": self.context.configuration_provenance.to_payload(),
                 "processing_summary": processing_summary,
                 "lifecycle": lifecycle,
                 "publication": publication,
@@ -248,7 +258,7 @@ class AuditWriter:
                 "report_artifacts": deepcopy(self.references),
                 "command_details": command_details,
             }
-        )
+        ), redact_content=False)
 
     def write(
         self,
@@ -282,7 +292,7 @@ class AuditWriter:
             if finalize_payload is not None:
                 finalized = finalize_payload(report, self.audit_paths)
                 if finalized is not None:
-                    report = json_safe(finalized)
+                    report = redact_mapping(json_safe(finalized), redact_content=False)
             validate_artifact(report, "audit report", self.audit_paths.json)
             json_bytes = deterministic_json(report).encode("utf-8")
             _write_bytes_atomically(self.audit_paths.json, json_bytes)
@@ -303,75 +313,6 @@ class AuditWriter:
                 ),
             },
         )
-
-
-def _config_payload(config: Mapping[str, Any] | None) -> dict[str, Any]:
-    if config is None:
-        return {}
-    converter = getattr(config, "to_payload", None)
-    value = converter() if callable(converter) else dict(config)
-    return value if isinstance(value, dict) else {}
-
-
-def _secret_key(key: str) -> bool:
-    normalized = re.sub(r"[^a-z0-9]+", "_", key.lower()).strip("_")
-    return bool(
-        re.search(
-            r"(?:^|_)(?:api_key|apikey|access_key|secret|secret_key|token|password|credential|credentials|authorization)(?:$|_)",
-            normalized,
-        )
-    )
-
-
-_OMIT = object()
-
-
-def _safe_configuration_value(value: Any, key: str | None = None) -> Any:
-    if key is not None and _secret_key(key):
-        return REDACTED
-    if value is None or isinstance(value, (str, bool, int)):
-        return value
-    if isinstance(value, float):
-        return value if value == value and value not in (float("inf"), float("-inf")) else _OMIT
-    if isinstance(value, Mapping):
-        sanitized: dict[str, Any] = {}
-        for raw_key, item in value.items():
-            item_key = str(raw_key)
-            if item_key.startswith("_"):
-                continue
-            safe_item = _safe_configuration_value(item, item_key)
-            if safe_item is not _OMIT:
-                sanitized[item_key] = safe_item
-        return sanitized
-    if isinstance(value, (list, tuple)):
-        sanitized_items = [_safe_configuration_value(item) for item in value]
-        return [item for item in sanitized_items if item is not _OMIT]
-    # Paths, compiled expressions, providers, clients, and all other runtime
-    # objects are deliberately absent from a configuration snapshot.
-    return _OMIT
-
-
-def safe_configuration_snapshot(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Return only schema-shaped, JSON-safe configuration with secrets removed."""
-    payload = _config_payload(config)
-    selected = {
-        key: payload[key]
-        for key in CONFIG_SNAPSHOT_KEYS
-        if key in payload
-    }
-    sanitized = _safe_configuration_value(selected)
-    return sanitized if isinstance(sanitized, dict) else {}
-
-
-def redact_value(key: str, value: Any) -> Any:
-    """Compatibility helper for callers that need the centralized policy."""
-    safe = _safe_configuration_value(value, key)
-    return None if safe is _OMIT else safe
-
-
-def redact_mapping(data: Mapping[str, Any]) -> dict[str, Any]:
-    sanitized = _safe_configuration_value(data)
-    return sanitized if isinstance(sanitized, dict) else {}
 
 
 def json_safe(data: Any) -> Any:

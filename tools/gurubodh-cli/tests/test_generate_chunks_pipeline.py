@@ -308,7 +308,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
 
         self.assertEqual(segmenter.calls, 1)
         self.assertEqual(audit["schema_name"], "gurubodh.audit-report")
-        self.assertEqual(audit["schema_version"], "2.0.0")
+        self.assertEqual(audit["schema_version"], "2.1.0")
         self.assertEqual(result["source_chapter_count"], 1)
         self.assertNotIn("dense_embedding", rendered)
         self.assertNotIn('"embedding"', rendered)

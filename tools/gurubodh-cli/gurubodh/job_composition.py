@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
+
+from gurubodh.configuration_provenance import ConfigurationProvenance
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -213,11 +216,13 @@ def resolve_job(
             job["chapters"] = list(selected_chapters)
     origin = f"composed {command}: {manifest_id}/{locale}, {environment_id}/{storage_profile_id}"
     prepared = _PREPARERS[command](job, origin)
-    return ResolvedJob(prepared, JobResolutionInputs(
+    inputs = JobResolutionInputs(
         command, manifest_id, locale, environment_id, storage_profile_id,
         tuple(invocation.items()), selected_chapters, tuple(profiles), tuple(snapshots),
         tuple(bindings.items()),
-    ))
+    )
+    provenance = ConfigurationProvenance.capture(prepared, inputs=inputs)
+    return ResolvedJob(replace(prepared, provenance=provenance), inputs)
 
 
 def resolve_lab_proofreading(catalog: ComponentCatalog) -> ResolvedProofreading:

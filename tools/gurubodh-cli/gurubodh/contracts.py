@@ -17,6 +17,7 @@ from re import Pattern
 from typing import TYPE_CHECKING, Any, Callable, NotRequired, Protocol, TypedDict
 
 if TYPE_CHECKING:
+    from gurubodh.configuration_provenance import ConfigurationProvenance
     from gurubodh.locales import LocaleSpec
     from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
     from gurubodh.proofreading.settings import ProofreadingSettings
@@ -83,6 +84,7 @@ class PreparedJob(Mapping[str, Any]):
 
     _payload: JsonObject = field(repr=False)
     locale: LocaleSpec
+    provenance: ConfigurationProvenance | None = field(default=None, kw_only=True)
 
     def __getitem__(self, key: str) -> Any:
         return self._payload[key]

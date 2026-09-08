@@ -672,7 +672,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             report_payload = json.loads(report.read_text(encoding="utf-8"))
             self.assertNotIn("पहला गलत पाठ", report.read_text(encoding="utf-8"))
             self.assertEqual(report_payload["schema_name"], "gurubodh.audit-report")
-            self.assertEqual(report_payload["schema_version"], "2.0.0")
+            self.assertEqual(report_payload["schema_version"], "2.1.0")
             self.assertEqual(
                 report_payload["job_identity"]["subject"]["language"], "hi-IN"
             )
