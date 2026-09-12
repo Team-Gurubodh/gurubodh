@@ -84,6 +84,12 @@ Maintained chunk jobs use `local_files_only: true`. Supply the same volume and `
 
 ## Run maintained jobs
 
+Add `-t` to `docker run` when an operator is watching an interactive run and
+wants terminal color detection, for example `docker run --rm -t ...`. Without
+`-t`, redirected output, and whenever `NO_COLOR` is set, the CLI emits the same
+explicit outcomes as plain text. Color is limited to the whole-command outcome
+line and immediate failures; counts and locations remain uncolored.
+
 ```bash
 docker run --rm --env PYTHONUNBUFFERED=1 --env GEMINI_API_KEY \
   --env CLOUDFLARE_R2_ACCOUNT_ID --env CLOUDFLARE_R2_ACCESS_KEY_ID \
@@ -102,7 +108,9 @@ chapter filename stem in place of the placeholder:
 ```
 
 These lines describe final publication after proofreading. The content manifest
-uploads last; the existing completion and Gemini/R2 attempt summaries follow.
+uploads last; the final outcome then distinguishes proofreading results, Gemini
+request completion, checkpoint upload operations, canonical-publication upload
+operations, and final publication readiness.
 A failed chapter upload produces no success line for that chapter. A resumed job
 that publishes its retained workspace reports the chapters again; resuming an
 already-complete job does not publish them again.

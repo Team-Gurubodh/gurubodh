@@ -24,6 +24,7 @@ from gurubodh.errors import ProcessingError
 from gurubodh.legacy.font_detection import validate_supported_source_fonts
 from gurubodh.paths import ensure_job_dirs
 from gurubodh.pipelines.common import validate_and_split
+from gurubodh.presentation import CommandPresentation, present_prep_summary
 from gurubodh.prep_checkpoint import (
     PrepCheckpointManager,
     compatibility_record_from_inputs as _compatibility_record_from_inputs,
@@ -135,8 +136,10 @@ def run_resumable_prep_job(
     progress: Callable[[str], None] = print,
     clock: Callable[[], float] | None = None,
     sleeper: Callable[[float], None] | None = None,
+    presentation: CommandPresentation | None = None,
 ) -> dict[str, Any]:
     """Orchestrate preparation over narrow checkpoint and provider interfaces."""
+    presenter = presentation or CommandPresentation("prep-subject", progress)
     manager = PrepCheckpointManager(
         config,
         resume,
@@ -144,12 +147,60 @@ def run_resumable_prep_job(
         r2_client=r2_client,
         clock=clock or time.time,
         sleeper=sleeper or time.sleep,
-        progress=progress,
+        progress=lambda message: presenter.stage("operation", message),
     )
     project_root = Path(getattr(context, "root", Path.cwd()))
     reused: list[str] = []
     attempted: list[str] = []
     failure_audited = False
+    summary_reported = False
+    current_stage = "preflight"
+
+    def report_summary(
+        outcome: str,
+        audit_result=None,
+        *,
+        failure_stage: str | None = None,
+    ) -> None:
+        nonlocal summary_reported
+        artifact_root = None
+        if manager.state is not None:
+            publication = manager.state.get("publication") or {}
+            if publication.get("state") == "succeeded":
+                artifact_root = (
+                    (
+                        f"r2://{manager.destination['bucket']}/"
+                        f"{subject_artifact_prefix(manager.destination)}"
+                    )
+                    if manager.is_r2
+                    else str(manager.subject_dir)
+                )
+        present_prep_summary(
+            presenter,
+            outcome=outcome,
+            state=manager.state,
+            metrics=manager.report_metrics(),
+            reused_count=len(reused),
+            report_references=(
+                (
+                    audit_result.references
+                    if manager.is_r2
+                    else {
+                        kind: {
+                            "backend": "local",
+                            "path": str(audit_result.paths[kind]),
+                        }
+                        for kind in ("json", "markdown")
+                    }
+                )
+                if audit_result is not None
+                else None
+            ),
+            artifact_root=artifact_root,
+            failure_stage=failure_stage,
+        )
+        summary_reported = True
+
     try:
         progress(
             "\n".join(
@@ -166,12 +217,14 @@ def run_resumable_prep_job(
             )
         )
         try:
+            presenter.stage("preflight", "opening the job and validating the source")
             manager.open()
             source_path = manager.materialize_source()
             validate_supported_source_fonts(source_path)
             outcome = manager.begin(sha256_file(source_path))
         except BaseException as exc:
             failure_audited = True
+            presenter.failure("preflight", exc)
             # The prepared job already owns a validated destination. Record this
             # invocation without editing any historical checkpoint on failure.
             try:
@@ -187,13 +240,16 @@ def run_resumable_prep_job(
                         ))
             except BaseException as audit_error:
                 warn_audit_failure("prep-subject", audit_error, exc)
+                result = None
+            report_summary("failed", result, failure_stage="preflight")
             raise
         if outcome == "already_complete":
-            progress(
-                "prep-subject already complete; the compatible checkpoint is "
-                "succeeded. No Gemini requests were made."
-            )
-            _write_prep_audit(
+            reused = [
+                chapter["chapter_number"]
+                for chapter in manager.state["chapters"]
+                if chapter["state"] == ChapterStatus.SUCCEEDED.value
+            ]
+            audit_result = _write_prep_audit(
                 manager,
                 project_root,
                 entry_point,
@@ -201,7 +257,7 @@ def run_resumable_prep_job(
                 reused,
                 attempted,
             )
-            manager.print_metrics_summary()
+            report_summary("succeeded", audit_result)
             return {
                 "status": "succeeded",
                 "already_complete": True,
@@ -213,12 +269,18 @@ def run_resumable_prep_job(
         ensure_job_dirs(paths)
         if not manager.state.get("chapters"):
             try:
-                progress(
-                    "[prepare] Building chapter source snapshots from the "
-                    "configured DOCX in the checkpoint workspace."
+                current_stage = "preparation"
+                presenter.stage(
+                    "preparation",
+                    "building chapter source snapshots from the configured DOCX",
                 )
                 transient_dir = manager.workspace_dir / ".transient"
                 transient_dir.mkdir(parents=True, exist_ok=True)
+
+                def preparation_progress(message: str) -> None:
+                    presenter.stage("preparation", message)
+                    manager.heartbeat()
+
                 preparation = prepare_source_docx(
                     source_path,
                     transient_dir / "prepared-source.docx",
@@ -228,7 +290,7 @@ def run_resumable_prep_job(
                     config,
                     preparation,
                     paths,
-                    progress=lambda *_: manager.heartbeat(),
+                    progress=preparation_progress,
                 )
                 manager.set_chapter_plan(
                     sorted(
@@ -249,7 +311,8 @@ def run_resumable_prep_job(
             except BaseException as exc:
                 manager.mark_global_failure(exc)
                 failure_audited = True
-                _write_prep_audit(
+                presenter.failure("preparation", exc)
+                audit_result = _write_prep_audit(
                     manager,
                     project_root,
                     entry_point,
@@ -259,16 +322,20 @@ def run_resumable_prep_job(
                     failure_error=exc,
                     failure_stage="preparation",
                 )
-                manager.print_metrics_summary()
+                report_summary(
+                    "failed", audit_result, failure_stage="preparation"
+                )
                 raise
 
         manager.discard_transient_preparation()
         reused = manager.reconcile_successes()
         consecutive_infrastructure_failures = 0
+        current_stage = "proofreading"
         chapter_proofreader = proofreader or GeminiProofreader(
             config.proofreading_settings, locale=config.locale
         )
-        for chapter in manager.state["chapters"]:
+        chapters = manager.state["chapters"]
+        for position, chapter in enumerate(chapters, start=1):
             if chapter["state"] == ChapterStatus.SUCCEEDED.value:
                 continue
             manager.wait_for_proofreading_cooldown()
@@ -287,18 +354,25 @@ def run_resumable_prep_job(
                         "converter_counts", {}
                     ),
                     entry_point=entry_point,
-                    progress=lambda message, n=chapter["chapter_number"]: progress(
-                        f"[proofread {n}] {message}"
+                    progress=lambda message, n=chapter["chapter_number"], p=position: presenter.chapter(
+                        n, message, position=p, total=len(chapters)
                     ),
                 )
                 manager.mark_chapter_success(chapter, chapter_result)
                 consecutive_infrastructure_failures = 0
             except ProofreadingError as exc:
                 manager.mark_chapter_failure(chapter, exc)
+                presenter.failure(
+                    "proofreading",
+                    exc,
+                    chapter=chapter["chapter_number"],
+                    position=position,
+                    total=len(chapters),
+                )
                 if _is_global_proofreading_failure(exc):
                     manager.mark_global_failure(exc)
                     failure_audited = True
-                    _write_prep_audit(
+                    audit_result = _write_prep_audit(
                         manager,
                         project_root,
                         entry_point,
@@ -308,7 +382,9 @@ def run_resumable_prep_job(
                         failure_error=exc,
                         failure_stage="proofreading",
                     )
-                    manager.print_metrics_summary()
+                    report_summary(
+                        "failed", audit_result, failure_stage="proofreading"
+                    )
                     raise
                 if exc.code == "service_unavailable":
                     manager.impose_service_unavailable_cooldown(
@@ -325,9 +401,10 @@ def run_resumable_prep_job(
                         consecutive_infrastructure_failures
                         >= INFRASTRUCTURE_FAILURE_CIRCUIT_BREAKER
                     ):
-                        progress(
-                            "[proofread] Infrastructure failure circuit breaker "
-                            "opened; remaining chapters remain pending."
+                        presenter.stage(
+                            "proofreading",
+                            "infrastructure failure circuit breaker opened; "
+                            "remaining chapters remain pending",
                         )
                         break
 
@@ -342,7 +419,7 @@ def run_resumable_prep_job(
                 "chapters."
             )
             failure_audited = True
-            _write_prep_audit(
+            audit_result = _write_prep_audit(
                 manager,
                 project_root,
                 entry_point,
@@ -352,16 +429,21 @@ def run_resumable_prep_job(
                 failure_error=incomplete_error,
                 failure_stage="proofreading",
             )
-            manager.print_metrics_summary()
+            report_summary(
+                "incomplete", audit_result, failure_stage="proofreading"
+            )
             raise incomplete_error
 
+        current_stage = "publication"
+        presenter.stage("publication", "publishing validated canonical artifacts")
         manager.prepare_for_publication()
         try:
             manager.publish()
         except BaseException as exc:
             manager.mark_publication_failure(exc)
             failure_audited = True
-            _write_prep_audit(
+            presenter.failure("publication", exc)
+            audit_result = _write_prep_audit(
                 manager,
                 project_root,
                 entry_point,
@@ -371,9 +453,13 @@ def run_resumable_prep_job(
                 failure_error=exc,
                 failure_stage="publication",
             )
-            manager.print_metrics_summary()
+            report_summary(
+                "failed", audit_result, failure_stage="publication"
+            )
             raise
-        _write_prep_audit(
+        current_stage = "reporting"
+        presenter.stage("reporting", "writing final audit reports")
+        audit_result = _write_prep_audit(
             manager,
             project_root,
             entry_point,
@@ -381,19 +467,7 @@ def run_resumable_prep_job(
             reused,
             attempted,
         )
-        counts = manager.state["counts"]
-        artifact_root = (
-            subject_artifact_prefix(manager.destination)
-            if manager.is_r2
-            else str(manager.subject_dir)
-        )
-        progress(
-            "prep-subject complete; canonical artifacts were published "
-            f"successfully to {artifact_root}. Chapters: "
-            f"{counts['succeeded']} succeeded, {counts['failed']} failed, "
-            f"{counts['pending']} pending."
-        )
-        manager.print_metrics_summary()
+        report_summary("succeeded", audit_result)
         return {
             "status": "succeeded",
             "already_complete": False,
@@ -402,10 +476,15 @@ def run_resumable_prep_job(
         }
     except BaseException as exc:
         if not failure_audited and manager.state is not None:
-            _write_prep_audit(
+            audit_result = _write_prep_audit(
                 manager, project_root, entry_point, "failed", reused, attempted,
                 failure_error=exc, failure_stage="execution",
             )
+        else:
+            audit_result = None
+        if not summary_reported:
+            presenter.failure(current_stage, exc)
+            report_summary("failed", audit_result, failure_stage=current_stage)
         raise
     finally:
         manager.close()

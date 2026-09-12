@@ -180,16 +180,14 @@ def convert_docx(path, font_name, legacy_converter, output_path, text_path=None,
     if text_path is not None:
         text_path.write_text("\n\n".join(text for text in extracted if text.strip()) + "\n", encoding="utf-8")
 
-    if progress:
-        progress("prepare", output_path)
-    else:
-        print(f"wrote {output_path}")
-        if text_path is not None:
-            print(f"wrote {text_path}")
+    emit = progress or print
+    emit(f"wrote {output_path}")
+    if text_path is not None:
+        emit(f"wrote {text_path}")
     if converter_counts:
         summary = ", ".join(f"{name}: {count}" for name, count in sorted(converter_counts.items()))
-        print(f"converter groups: {summary}")
-    print(f"converted {total_nodes} text nodes ({total_chars} legacy characters)")
+        emit(f"converter groups: {summary}")
+    emit(f"converted {total_nodes} text nodes ({total_chars} legacy characters)")
     return {
         "output_path": output_path,
         "text_path": text_path,

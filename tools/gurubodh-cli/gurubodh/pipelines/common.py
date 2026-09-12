@@ -3,7 +3,8 @@ from gurubodh.docx.validate import validate_docx
 
 
 def validate_and_split(config, result, paths, progress=None):
-    print("[validate] Validating the prepared source DOCX before chapter detection.")
+    emit = progress or print
+    emit("validating the prepared source DOCX before chapter detection")
     validate_docx(result["output_path"])
 
     chapter_split = config["chapter_split"]
