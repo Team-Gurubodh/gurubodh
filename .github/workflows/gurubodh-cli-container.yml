@@ -19,8 +19,30 @@ env:
   IMAGE_NAME: ghcr.io/team-gurubodh/gurubodh-cli
 
 jobs:
-  smoke-test:
+  distributions:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify sdist and wheel runtime resources
+        run: |
+          python -m pip install build
+          python -m build --outdir "${RUNNER_TEMP}/dist" tools/gurubodh-cli
+          python tools/gurubodh-cli/tests/check_resource_distributions.py \
+            tools/gurubodh-cli "${RUNNER_TEMP}"/dist/*.tar.gz "${RUNNER_TEMP}"/dist/*.whl
+
+  smoke-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     steps:
@@ -31,10 +53,11 @@ jobs:
         with:
           context: tools/gurubodh-cli
           load: true
+          platforms: linux/${{ matrix.arch }}
           tags: gurubodh-cli:smoke
           build-args: |
             SOURCE_REVISION=${{ github.sha }}
-            IMAGE_VERSION=smoke-${{ github.sha }}
+            IMAGE_VERSION=sha-${{ github.sha }}
             IMAGE_CREATED=${{ github.event.repository.updated_at }}
       - name: Run CLI unit tests
         run: |
@@ -46,8 +69,14 @@ jobs:
         run: |
           docker run --rm gurubodh-cli:smoke --help
           docker run --rm --entrypoint node gurubodh-cli:smoke --version
-          docker run -i --rm --entrypoint node gurubodh-cli:smoke /opt/gurubodh-cli/scripts/legacy_font_convert.js <<<'{"converter":"aps","texts":[""]}'
           docker run --rm --entrypoint python gurubodh-cli:smoke -c "from gurubodh.audit import resolved_build_provenance; from pathlib import Path; assert resolved_build_provenance(Path('/opt/gurubodh-cli'))['source_revision'] == '${{ github.sha }}'"
+      - name: Execute installed command workflows offline as the runtime user
+        run: |
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp:rw,mode=1777 \
+            --volume "${{ github.workspace }}/tools/gurubodh-cli/tests:/checks/tests:ro" \
+            --entrypoint python gurubodh-cli:smoke \
+            -I -B /checks/tests/check_installed_runtime.py
       - name: Verify installed component contracts and discovery
         run: |
           fixture_project="${RUNNER_TEMP}/gurubodh-fixture-project"
@@ -91,42 +120,53 @@ jobs:
             test_maintained_job_migration.MaintainedJobMigrationTests.test_all_26_maintained_selectors_inspect_via_cli \
             test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_validate_independently \
             test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_preserve_every_legacy_edition
+      - name: Export the tested image for publication
+        if: github.event_name == 'push'
+        run: |
+          docker tag gurubodh-cli:smoke gurubodh-cli:tested-${{ matrix.arch }}
+          docker save gurubodh-cli:tested-${{ matrix.arch }} | gzip > "${RUNNER_TEMP}/image-${{ matrix.arch }}.tar.gz"
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push'
+        with:
+          name: tested-image-${{ matrix.arch }}
+          path: ${{ runner.temp }}/image-${{ matrix.arch }}.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
 
   publish:
-    needs: smoke-test
+    needs: [distributions, smoke-test]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: tested-image-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/tested-images
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Derive image tags
-        id: tags
+      - name: Publish tested images and assemble multi-platform tags
         env:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
         run: |
-          tags="${IMAGE_NAME}:sha-${SHA}"
-          if [ "$REF_TYPE" = "tag" ]; then tags="${tags},${IMAGE_NAME}:${REF_NAME}"; fi
-          echo "tags=${tags}" >> "$GITHUB_OUTPUT"
-      - name: Build and publish multi-platform image
-        uses: docker/build-push-action@v7
-        with:
-          context: tools/gurubodh-cli
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.tags.outputs.tags }}
-          build-args: |
-            SOURCE_REVISION=${{ github.sha }}
-            IMAGE_VERSION=sha-${{ github.sha }}
-            IMAGE_CREATED=${{ github.event.repository.updated_at }}
+          for arch in amd64 arm64; do
+            gunzip -c "${RUNNER_TEMP}/tested-images/image-${arch}.tar.gz" | docker load
+            docker tag "gurubodh-cli:tested-${arch}" "${IMAGE_NAME}:sha-${SHA}-${arch}"
+            docker push "${IMAGE_NAME}:sha-${SHA}-${arch}"
+            docker image rm "gurubodh-cli:tested-${arch}" "${IMAGE_NAME}:sha-${SHA}-${arch}"
+          done
+          tags=(--tag "${IMAGE_NAME}:sha-${SHA}")
+          if [ "$REF_TYPE" = "tag" ]; then tags+=(--tag "${IMAGE_NAME}:${REF_NAME}"); fi
+          docker buildx imagetools create "${tags[@]}" \
+            "${IMAGE_NAME}:sha-${SHA}-amd64" "${IMAGE_NAME}:sha-${SHA}-arm64"

@@ -2,7 +2,7 @@ import json
 import shutil
 import subprocess
 
-from gurubodh.errors import ConfigurationError
+from gurubodh.errors import ConfigurationError, ProcessingError
 
 
 def required_command(name):
@@ -25,14 +25,21 @@ def convert_texts(texts, converter, legacy_converter):
     if not legacy_converter.exists():
         raise ConfigurationError(f"Missing legacy converter: {legacy_converter}")
 
-    proc = subprocess.run(
-        ["node", str(legacy_converter)],
-        input=json.dumps({"converter": converter, "texts": texts}, ensure_ascii=False),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=True,
-    )
+    try:
+        proc = subprocess.run(
+            ["node", str(legacy_converter)],
+            input=json.dumps({"converter": converter, "texts": texts}, ensure_ascii=False),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or "").strip() or "Node produced no error output."
+        raise ProcessingError(
+            f"Legacy font converter {converter!r} failed (exit {exc.returncode}; "
+            f"script: {legacy_converter}). Node stderr:\n{detail}"
+        ) from exc
     converted = json.loads(proc.stdout)
     return [postprocess_unicode_text(text, converter) for text in converted]
 

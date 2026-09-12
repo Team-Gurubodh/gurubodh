@@ -17,6 +17,44 @@ docker run --rm --entrypoint node gurubodh-cli:local --version
 
 The image runs as a non-root user and contains Python 3.12, Node for the APS converter, no credentials, no content artifacts, and no BGE-M3 weights. `/work` is temporary; `/var/cache/gurubodh/models` is the model cache path.
 
+## Automated image verification
+
+The container workflow checks wheels and source distributions, then builds and
+tests both `linux/amd64` and `linux/arm64` on native runners. Publication waits for
+both architectures and the distribution check. It transfers the tested images
+to the publish job and assembles their multi-platform manifest without rebuilding.
+
+Alongside the full CLI unit suite and configuration/maintained-selector checks,
+the installed-runtime gate runs as the normal non-root user, from `/work`, with
+network access disabled and a read-only container filesystem. Only `/tmp` is
+writable; tests and synthetic fixtures are mounted separately from application
+code. Python isolated mode and install-origin assertions prevent checkout
+imports from masking missing installed resources.
+
+The gate checks the installed APS vendor mapping against its pinned hash and
+nonempty golden cases, executes APS/Hindi and Unicode/Marathi preparation, then
+generates semantic chunks and Word exports from the resulting canonical release.
+It verifies text preservation, checkpoint completion, lab proofreading, lab DOCX
+assembly/append, tokenizer output, overwrite rejection and planned-command errors.
+The image build itself also requires a real installed APS conversion to pass.
+
+Gemini SDK responses and model/tokenizer loading use deterministic test substitutes;
+the pipelines, conversion, schemas, semantic chunker and artifact writers remain
+real. R2 routing and failure/lifecycle behavior have offline unit coverage.
+These checks do not validate live Gemini/Sarvam availability, R2 permissions,
+downloaded BGE-M3 weights, or every source document's font mappings. Credentials,
+model-cache setup and supported source fonts remain runtime requirements.
+
+To run the installed-runtime gate against a local build from the monorepo root:
+
+```bash
+docker run --rm --network none --read-only \
+  --tmpfs /tmp:rw,mode=1777 \
+  --volume "$PWD/tools/gurubodh-cli/tests:/checks/tests:ro" \
+  --entrypoint python gurubodh-cli:local \
+  -I -B /checks/tests/check_installed_runtime.py
+```
+
 ## Before a production run
 
 Complete [Environment setup](../environment-setup.md) for R2 credentials, Gemini scope, named-volume creation, `HF_HUB_OFFLINE=1`, and secret-handling rules. Use a maintained subject with the `r2` storage profile and an immutable image reference.
