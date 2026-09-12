@@ -92,6 +92,21 @@ docker run --rm --env PYTHONUNBUFFERED=1 --env GEMINI_API_KEY \
   prep-subject --subject sub039_aacharan_shastra --language hi-IN --environment development --storage-profile r2
 ```
 
+During final R2 publication, `prep-subject` reports the destination and chapter/file
+counts, then prints a line after all five files for each chapter upload successfully.
+For example, a three-chapter run includes the following line, with the actual
+chapter filename stem in place of the placeholder:
+
+```text
+  [01/03] <chapter-filename-stem> (canonical text, canonical metadata, unmodified source, diff, proofreading details)
+```
+
+These lines describe final publication after proofreading. The content manifest
+uploads last; the existing completion and Gemini/R2 attempt summaries follow.
+A failed chapter upload produces no success line for that chapter. A resumed job
+that publishes its retained workspace reports the chapters again; resuming an
+already-complete job does not publish them again.
+
 Run the matching chunk-generation job with the pre-provisioned cache:
 
 ```bash

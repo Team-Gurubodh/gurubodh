@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from gurubodh.contracts import PrepSubjectJob, R2Client
 from gurubodh.prep_metrics import PrepMetrics
@@ -19,6 +19,7 @@ from gurubodh.storage import (
     invalidate_local_semantic_artifacts,
     invalidate_r2_chapter_docx_artifacts,
     invalidate_r2_semantic_artifacts,
+    subject_artifact_prefix,
 )
 
 
@@ -114,11 +115,14 @@ class R2PrepPublisher:
         config: PrepSubjectJob,
         client: R2Client,
         metrics: PrepMetrics,
+        *,
+        progress: Callable[[str], None] = print,
     ) -> None:
         self.config = config
         self.destination = config["destination"]
         self.client = client
         self.metrics = metrics
+        self.progress = progress
 
     def publish_canonical(
         self, workspace_dir: Path, overwrite: bool
@@ -146,7 +150,36 @@ class R2PrepPublisher:
             key=lambda item: item[0].relative_to(workspace_dir)
             == manifest_relative
         )
+        chapters = _chapter_upload_groups(uploads, workspace_dir)
+        chapter_keys = {
+            key for files in chapters.values() for _, key, _ in files
+        }
+        self.progress(f"Publishing {len(uploads)} artifact(s) to:")
+        self.progress(
+            f"  r2://{self.destination['bucket']}/"
+            f"{subject_artifact_prefix(self.destination)}"
+        )
+        if chapters:
+            self.progress(
+                f"chapter artifacts: {len(chapters)} chapters / "
+                f"{len(chapter_keys)} files"
+            )
+        for index, (stem, files) in enumerate(sorted(chapters.items()), start=1):
+            for path, key, _ in files:
+                self.metrics.upload(
+                    self.client,
+                    self.destination,
+                    path,
+                    key,
+                    category="canonical_publication_artifacts",
+                )
+            labels = ", ".join(label for _, _, label in files)
+            self.progress(f"  [{index:02d}/{len(chapters):02d}] {stem} ({labels})")
+
+        # Non-chapter artifacts retain their order, with the readiness manifest last.
         for path, key in uploads:
+            if key in chapter_keys:
+                continue
             self.metrics.upload(
                 self.client,
                 self.destination,
@@ -186,12 +219,37 @@ class R2PrepPublisher:
         return invalidate_r2_semantic_artifacts(self.config, self.client)
 
 
+def _chapter_upload_groups(
+    uploads: list[tuple[Path, str]], workspace_dir: Path
+) -> dict[str, list[tuple[Path, str, str]]]:
+    """Group chapter files in the historical operator-facing label order."""
+    chapters: dict[str, list[tuple[Path, str, str]]] = {}
+    for directory, suffix, label in (
+        ("text_and_metadata", ".txt", "canonical text"),
+        ("text_and_metadata", ".json", "canonical metadata"),
+        ("unmodified_source_text", "_unmodified_source.txt", "unmodified source"),
+        ("proofreading", ".proofread.diff.txt", "diff"),
+        ("proofreading", ".proofread.json", "proofreading details"),
+    ):
+        for path, key in uploads:
+            relative = path.relative_to(workspace_dir)
+            if (
+                relative.parent == Path("chapters") / directory
+                and relative.name.endswith(suffix)
+            ):
+                stem = relative.name.removesuffix(suffix)
+                chapters.setdefault(stem, []).append((path, key, label))
+    return chapters
+
+
 def create_prep_publisher(
     config: PrepSubjectJob,
     subject_dir: Path,
     metrics: PrepMetrics,
     client: R2Client | None,
+    *,
+    progress: Callable[[str], None] = print,
 ) -> PrepPublisher:
     if client is not None:
-        return R2PrepPublisher(config, client, metrics)
+        return R2PrepPublisher(config, client, metrics, progress=progress)
     return LocalPrepPublisher(subject_dir)

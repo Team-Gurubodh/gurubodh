@@ -154,6 +154,66 @@ def prepare_unicode(source_path, output_path, progress):
 
 
 class PrepSubjectCheckpointTests(unittest.TestCase):
+    def test_r2_publication_progress_on_failure_resume_and_completed_noop(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            job = with_payload(config(root), destination={
+                "backend": "r2", "bucket": "test-bucket", "prefix": "cms_library",
+                "subject_dir": "subject/hi-IN", "url_base": None,
+            })
+            prefix = "cms_library/subject/hi-IN/"
+
+            class InterruptedPublicationClient(FakeR2Client):
+                details_attempts = 0
+
+                def upload_file(self, path, bucket, key):
+                    if key.startswith(prefix + "chapters/proofreading/") and key.endswith(".proofread.json"):
+                        self.details_attempts += 1
+                        if self.details_attempts == 2:
+                            raise RuntimeError("publication interrupted")
+                    super().upload_file(path, bucket, key)
+
+            client = InterruptedPublicationClient()
+            first = FakeProofreader(["CHAPTER 1\nपहला सही पाठ।", "CHAPTER 2\nदूसरा सही पाठ।"])
+            messages = []
+            with self.assertRaisesRegex(GurubodhError, "publication interrupted"):
+                run_resumable_prep_job(
+                    job, "prep-subject", False, False, prepare_unicode,
+                    r2_client=client, proofreader=first, progress=messages.append,
+                )
+            state = json.loads(client.objects[prefix + JOB_STATE_RELATIVE_PATH.as_posix()])
+            stems = [chapter["source_filename"].removesuffix("_unmodified_source.txt") for chapter in state["chapters"]]
+            labels = "canonical text, canonical metadata, unmodified source, diff, proofreading details"
+            expected = [f"  [{index:02d}/02] {stem} ({labels})" for index, stem in enumerate(stems, start=1)]
+            self.assertEqual([line for line in messages if line.startswith("  [")], expected[:1])
+            self.assertNotIn(prefix + "chapters/chapter_content_manifest.json", client.objects)
+            self.assertFalse(any(line.startswith("prep-subject complete;") for line in messages))
+
+            resumed = FakeProofreader([])
+            messages.clear()
+            upload_start = len(client.uploads)
+            result = run_resumable_prep_job(
+                job, "prep-subject", False, True, prepare_unicode,
+                r2_client=client, proofreader=resumed, progress=messages.append,
+            )
+            self.assertEqual(resumed.calls, [])
+            self.assertEqual([line for line in messages if line.startswith("  [")], expected)
+            self.assertEqual(result["status"], "succeeded")
+            canonical_uploads = [key for key in client.uploads[upload_start:] if key.startswith(prefix + "chapters/")]
+            self.assertEqual(len(canonical_uploads), 12)
+            self.assertEqual(canonical_uploads[-1], prefix + "chapters/chapter_content_manifest.json")
+            self.assertTrue(messages[-2].startswith("prep-subject complete;"))
+            self.assertTrue(messages[-1].startswith("prep-subject metrics: Gemini generate_content attempts 0"))
+
+            messages.clear()
+            result = run_resumable_prep_job(
+                job, "prep-subject", False, True, prepare_unicode,
+                r2_client=client, proofreader=resumed, progress=messages.append,
+            )
+            self.assertTrue(result["already_complete"])
+            self.assertFalse(any(line.startswith(("Publishing ", "  [")) for line in messages))
+
     def test_compatibility_record_has_a_deterministic_output_affecting_contract(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
