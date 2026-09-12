@@ -1,5 +1,7 @@
 # Task-014: Sarvam Paragraph Segmentation Metadata
 
+> Historical task plan: command examples reflect earlier interfaces. For the current CLI, use installed help and the [#288 migration record](https://github.com/Team-Gurubodh/gurubodh/issues/288).
+
 <record_type>task_plan</record_type>
 <status>proposed</status>
 <owners>Gurubodh maintainers</owners>

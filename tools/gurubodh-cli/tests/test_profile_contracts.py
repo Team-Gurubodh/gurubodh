@@ -2,6 +2,8 @@
 
 import copy
 from importlib.metadata import PathDistribution
+from migration_fixtures import CASES, explicit_baseline
+
 import json
 from pathlib import Path
 import tempfile
@@ -219,15 +221,15 @@ class ProfileContractTests(unittest.TestCase):
                     self.assertFalse(standalone.is_valid(incomplete), (kind, key))
 
     def test_fixtures_match_maintained_policies_and_validate_in_existing_jobs(self):
-        paths = list((CLI_ROOT / "jobs/subjects").glob("*/*/*.json"))
-        self.assertEqual(len(paths), 26)
+        self.assertEqual(len(CASES), 26)
         for kind, (_, command) in PROFILES.items():
-            for path in sorted((CLI_ROOT / "jobs").rglob(f"{command}.*.json")):
-                job = json.loads(path.read_text())
-                with self.subTest(path=path):
+            for case in CASES:
+                if case["selectors"]["command"] != command:
+                    continue
+                job = explicit_baseline(case)
+                with self.subTest(path=case["legacy_path"]):
                     self.assertEqual(job[kind], profile(kind)[kind])
-                    job[kind] = profile(kind)[kind]
-                    validate_job(job, command, path)
+                    validate_job(job, command)
 
     def test_existing_error_domains_are_preserved(self):
         with self.assertRaises(ConfigurationError):

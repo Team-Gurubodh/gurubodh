@@ -4,7 +4,7 @@ Gurubodh CLI prepares Gurubodh subject content from DOCX files and produces the 
 
 ## Start here
 
-If you are new to the tool, use a maintained local job first. From the monorepo root:
+If you are new to the tool, use a maintained subject with local storage first. Set `GURUBODH_SOURCE_LIBRARY_ROOT` and `GURUBODH_CMS_LIBRARY_ROOT` to your absolute local library paths. From the monorepo root:
 
 ```bash
 make cli-venv
@@ -13,7 +13,7 @@ make cli-install
 cd tools/gurubodh-cli
 export GEMINI_API_KEY=...
 gurubodh prep-subject \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
 This prepares canonical, proofread chapter artifacts locally. It needs an environment-only Gemini API key. Do not add credentials to a job file, command history, image, or repository configuration. See [Environment setup](docs/environment-setup.md) for the runtime and variables, and [Getting started](docs/getting-started.md) before using `--overwrite`, R2, or an unfamiliar job.
@@ -54,7 +54,7 @@ afterward.
 
 ## Safety essentials
 
-- Start with a `.local.json` maintained job. R2 jobs and Docker are for operators who have read the production runbook.
+- Start with a maintained subject and the `local` storage profile. R2 jobs and Docker are for operators who have read the production runbook.
 - Treat `--overwrite` as a deliberate replacement operation. It is scoped to the invoking command's artifacts, but it is not an atomic, versioned R2 release.
 - `prep-subject` is a single-writer operation per destination. The local advisory lock and R2 advisory lease are guardrails only, not reliable distributed mutual exclusion; concurrent runs can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
 - Run `gurubodh <command> --help` for the exact installed command interface; job schemas under `config/jobs/` define the machine-validated configuration.

@@ -152,12 +152,12 @@ def render_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def write_preflight_failure(project_root, config, config_path, entry_point,
+def write_preflight_failure(project_root, config, entry_point,
                             overwrite, subject_dir, error):
     """Audit a validated destination without inventing or modifying a checkpoint."""
     context = AuditContext.create(
         COMMAND_NAME, entry_point, project_root, config=config,
-        config_path=config_path, overwrite=overwrite,
+        overwrite=overwrite,
     )
     writer = AuditWriter(
         context, report_paths(subject_dir, report_basename(context), COMMAND_NAME),
@@ -180,7 +180,6 @@ class PrepSubjectAuditWriter:
         self,
         project_root: str | Path,
         config,
-        config_path,
         entry_point: str,
         overwrite: bool,
         state: dict[str, Any],
@@ -194,9 +193,8 @@ class PrepSubjectAuditWriter:
             COMMAND_NAME,
             entry_point,
             project_root,
-            config_path=config_path,
             config=config,
-            overwrite=overwrite,
+           overwrite=overwrite,
             run_id=run["run_id"],
             started_at=run.get("last_started_at") or run.get("started_at"),
         )

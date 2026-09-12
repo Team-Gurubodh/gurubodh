@@ -3,7 +3,6 @@ import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
 
-from gurubodh.complete_job_compat import storage_backend, storage_url_base
 from gurubodh.contracts import R2Downloader, R2Uploader
 from gurubodh.errors import ConfigurationError, SourceValidationError, StorageError
 
@@ -67,7 +66,7 @@ def r2_existing_artifacts_error(command, bucket, keys, artifact_label):
             "With --overwrite, prep-owned text/provenance artifacts will be replaced; same-release chapter DOCX "
             "and semantic chunk artifacts will be invalidated; and legacy full_subject artifacts will be removed. "
             "Audit history and unrelated subject files will be preserved.\n\n"
-            "Run gurubodh generate-chunks --config <generate-chunks-job> before relying on RAG/chunk outputs."
+            "Run gurubodh generate-chunks with the matching subject, language, environment and storage selectors before relying on RAG/chunk outputs."
         )
     elif command == "generate-chunks":
         overwrite_effect = (
@@ -177,6 +176,10 @@ def cleanup_r2_legacy_full_subject(config, r2_client=None):
         "the text-only prep artifact contract was published",
         r2_client,
     )
+
+
+def storage_backend(section):
+    return section["backend"]
 
 
 def is_local(config_section):
@@ -311,7 +314,7 @@ def source_reference(config):
         "backend": R2_BACKEND,
         "bucket": source["bucket"],
         "key": key,
-        "url": optional_url(storage_url_base(source), key),
+        "url": optional_url(source["url_base"], key),
     }
 
 
@@ -329,7 +332,7 @@ def destination_artifact_reference(config, relative_path):
         "backend": R2_BACKEND,
         "bucket": destination["bucket"],
         "key": key,
-        "url": optional_url(storage_url_base(destination), key),
+        "url": optional_url(destination["url_base"], key),
     }
 
 

@@ -1,4 +1,4 @@
-"""Issue #286: public invocation, inspection, and temporary compatibility."""
+"""Issues #286/#288: composed invocation, inspection, and retired input rejection."""
 
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from io import StringIO
@@ -13,7 +13,6 @@ from unittest.mock import patch
 from component_contract_cases import without_job_schemas
 from gurubodh.cli import main
 from gurubodh.config import (
-    load_generate_chunks_job, load_generate_docx_job, load_prep_subject_job,
     prepare_generate_chunks_job, prepare_generate_docx_job, prepare_prep_subject_job,
 )
 from gurubodh.contracts import GenerateChunksJob, GenerateDocxJob, PrepSubjectJob
@@ -22,8 +21,6 @@ from test_job_composition import CLI_ROOT, FIXTURES, KINDS
 
 PREPARERS = {"prep-subject": prepare_prep_subject_job,
              "generate-chunks": prepare_generate_chunks_job, "generate-docx": prepare_generate_docx_job}
-LOADERS = {"prep-subject": load_prep_subject_job,
-           "generate-chunks": load_generate_chunks_job, "generate-docx": load_generate_docx_job}
 RUNNERS = {
     "prep-subject": "gurubodh.pipelines.dispatcher.run_legacy_docx_to_unicode",
     "generate-chunks": "gurubodh.cli.run_generate_chunks_job",
@@ -85,7 +82,6 @@ class ComposedCliTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 0)
             help_text = " ".join(stdout.getvalue().split())
             for phrase in ("manifest ID", "--language", "--environment", "--storage-profile",
-                           "mutually exclusive", "Retires after maintainer comparison acceptance",
                            "command definition < manifest < edition < invocation", "r2-output"):
                 self.assertIn(phrase, help_text)
             self.assertEqual("--proofreading-profile" in help_text, command == "prep-subject")
@@ -95,7 +91,7 @@ class ComposedCliTests(unittest.TestCase):
         with redirect_stdout(stdout), self.assertRaises(SystemExit):
             main(["config", "resolve", "--help"])
         help_text = " ".join(stdout.getvalue().split())
-        for phrase in ("stdout", "stderr", "--provenance", "without reading content", "permanent file-based replay is not promised"):
+        for phrase in ("stdout", "stderr", "--provenance", "without reading content", "exported JSON is not an executable input"):
             self.assertIn(phrase, help_text)
 
     def test_all_commands_routes_and_editions_dispatch_prepared_jobs_with_provenance(self):
@@ -122,16 +118,15 @@ class ComposedCliTests(unittest.TestCase):
                         self.assertEqual(job["destination"]["backend"], "local" if route == "local" else "r2")
                         if command == "prep-subject":
                             self.assertTrue(args[2] if unicode_prep else args[3])
-                            self.assertIsNone(args[3] if unicode_prep else args[4])
                             self.assertFalse(kwargs["resume"])
                         else:
                             self.assertTrue(kwargs["overwrite"])
-                            self.assertIsNone(kwargs["config_path"])
+                            self.assertNotIn("config_path", kwargs)
 
-    def test_inspection_is_deterministic_valid_replayable_and_has_no_side_effects(self):
+    def test_inspection_is_deterministic_valid_and_has_no_side_effects(self):
         before = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         forbidden = [
-            *RUNNERS.values(), "gurubodh.cli.run_prepared_job", "gurubodh.cli.run_configured_job",
+            *RUNNERS.values(), "gurubodh.cli.run_prepared_job",
             "gurubodh.storage.R2StorageClient.__init__", "gurubodh.storage.materialize_source",
             "gurubodh.proofreading.gemini.GeminiProofreader.__init__",
             "gurubodh.ml.embeddings.SentenceTransformerEmbeddingHelper.__init__",
@@ -139,7 +134,6 @@ class ComposedCliTests(unittest.TestCase):
             "gurubodh.prep_checkpoint.PrepCheckpointManager.__init__",
             "gurubodh.docx.text.extract_docx_text", "socket.socket", "subprocess.Popen",
         ]
-        exports = []
         with ExitStack() as stack:
             for name in forbidden:
                 stack.enter_context(patch(name, side_effect=AssertionError(name)))
@@ -156,27 +150,21 @@ class ComposedCliTests(unittest.TestCase):
                     job = PREPARERS[command](payload, "CLI inspection")
                     self.assertEqual(job.to_payload(), payload)
                     self.assertEqual(json.loads(provenance)["storage_profile_id"], route)
-                    exports.append((command, payload))
             with patch.dict(os.environ, {}, clear=True):
                 for command in PREPARERS:
                     self.resolve(command, "r2")
         after = {p.relative_to(self.root): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         self.assertEqual(before, after)
-        for command, payload in exports:
-            path = self.write("export.json", payload)
-            self.assertEqual(LOADERS[command](path).to_payload(), payload)
 
     def test_missing_mixed_and_unsupported_inputs_fail_before_resolution(self):
         with patch("gurubodh.cli.resolve_project_context", side_effect=AssertionError("unexpected project lookup")):
             for command in PREPARERS:
-                self.error([command], "Composed mode requires explicit")
+                self.error([command], "required")
                 selectors = self.selectors()
                 for option in ("--subject", "--language", "--environment", "--storage-profile"):
                     index = selectors.index(option)
                     self.error([command, *selectors[:index], *selectors[index + 2:]], option)
-                for option, value in (("--subject", "example"), ("--language", "hi-IN"),
-                                      ("--environment", "development"), ("--storage-profile", "r2")):
-                    self.error([command, "--config", "job.json", option, value], "mutually exclusive")
+                self.error([command, *selectors, "--config", "job.json"], "unrecognized arguments")
                 self.error([command, *selectors, "--model", "arbitrary"], "unrecognized arguments")
                 self.error([command, *selectors, "--max-output-tokens", "123"], "unrecognized arguments")
             for command, flag, value in (("prep-subject", "--chapters", "001"),
@@ -187,13 +175,8 @@ class ComposedCliTests(unittest.TestCase):
                 self.error([command, *self.selectors(), flag, value], "unrecognized arguments")
                 self.error(["config", "resolve", "--command", command, *self.selectors(), flag, value], "supported only")
             for command in ("generate-chunks", "generate-docx"):
-                self.error([command, "--config", "job.json", "--resume"], "unrecognized arguments")
-            for mode in (["--config", "job.json"], self.selectors()):
-                self.error(["prep-subject", *mode, "--overwrite", "--resume"], "mutually exclusive")
-            for flag, values, command in (("--proofreading-profile", ["x-v1"], "prep-subject"),
-                                          ("--chunking-profile", ["x-v1"], "generate-chunks"),
-                                          ("--chapters", ["001"], "generate-chunks")):
-                self.error([command, "--config", "job.json", flag, *values], "mutually exclusive")
+                self.error([command, *self.selectors(), "--resume"], "unrecognized arguments")
+            self.error(["prep-subject", *self.selectors(), "--overwrite", "--resume"], "mutually exclusive")
             self.error(["config", "resolve", "--command", "generate-docx", *self.selectors(), "--config", "job.json"], "unrecognized arguments")
 
     def test_chapter_selection_preserves_order_and_validation(self):
@@ -271,41 +254,16 @@ class ComposedCliTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.error(["config", "resolve", "--command", "generate-docx", *self.selectors()], "GURUBODH_CMS_LIBRARY_ROOT")
 
-    def test_complete_jobs_remain_exact_without_loading_components(self):
-        paths = sorted((CLI_ROOT / "jobs/subjects").glob("*/*/*.json"))
-        self.assertEqual(len(paths), 26)
-        with patch("gurubodh.cli.ComponentCatalog", side_effect=AssertionError("complete jobs must not compose")):
-            for path in paths:
-                command = path.name.split(".")[0]
-                payload = json.loads(path.read_text())
-                runner_name = RUNNERS[command]
-                unicode_prep = command == "prep-subject" and payload["source"]["font_encoding"] == "unicode"
-                if unicode_prep:
-                    runner_name = "gurubodh.pipelines.dispatcher.run_unicode_docx_ingest"
-                with patch(runner_name, return_value={"processed_chapter_count": 1, "total_chunk_count": 1}) as runner:
-                    self.invoke([command, "--project-root", str(self.root), "--config", str(path)])
-                job = runner.call_args.args[0 if unicode_prep else 1]
-                self.assertEqual(job.to_payload(), payload)
-                # Historical loading leaves audit provenance to AuditContext;
-                # it must not acquire composed provenance or JSON defaults.
-                self.assertIsNone(job.provenance)
-
-    def test_resume_dispatch_and_deprecated_entry_points_keep_file_compatibility(self):
-        with patch(RUNNERS["prep-subject"]) as runner:
-            self.invoke(["prep-subject", *self.selectors(), "--resume"])
-        self.assertTrue(runner.call_args.kwargs["resume"])
-        self.assertFalse(runner.call_args.args[3])
-        for command, runner_name, filename, job_index in (
-            ("legacy-convert", RUNNERS["prep-subject"], "sub039_test_aps_font", 1),
-            ("unicode-ingest", "gurubodh.pipelines.dispatcher.run_unicode_docx_ingest", "sub123_test_unicode_font", 0),
-        ):
-            path = CLI_ROOT / f"jobs/subjects/{filename}/hi-IN/prep-subject.local.json"
-            with patch(runner_name) as runner, patch("gurubodh.cli.ComponentCatalog", side_effect=AssertionError("composition")):
-                self.invoke([command, "--project-root", str(self.root), "--config", str(path), "--overwrite"])
-            self.assertIsInstance(runner.call_args.args[job_index], PrepSubjectJob)
-            self.assertEqual(runner.call_args.kwargs["config_path"], path)
-            self.assertEqual(runner.call_args.args[job_index + 1], f"python3 -m gurubodh {command}")
-            self.assertTrue(runner.call_args.args[job_index + 2])
+    def test_retired_aliases_and_loaders_are_unavailable(self):
+        import gurubodh.config as configuration
+        import gurubodh.pipelines.dispatcher as dispatcher
+        for name in ("load_prep_subject_job", "load_generate_chunks_job", "load_generate_docx_job"):
+            self.assertFalse(hasattr(configuration, name))
+        for name in ("run_configured_job", "run_unicode_job", "run_legacy_job"):
+            self.assertFalse(hasattr(dispatcher, name))
+        with patch("gurubodh.cli.resolve_project_context", side_effect=AssertionError("project lookup")):
+            for alias in ("legacy-convert", "unicode-ingest"):
+                self.error([alias, "--config", "missing.json"], "invalid choice")
 
     def test_lab_profile_selector_preserves_manifest_free_interface(self):
         for profile in (None, "gemini-3.6-flash-v1"):
@@ -316,38 +274,28 @@ class ComposedCliTests(unittest.TestCase):
             self.assertEqual(runner.call_args.args[1:3], ("source.docx", "mr-IN"))
             self.assertEqual(runner.call_args.kwargs["proofreading_profile_id"], profile)
 
-    def test_project_discovery_and_relative_complete_config_resolution_are_preserved(self):
-        payload, _ = self.resolve("generate-docx")
-        self.write("comparison.json", payload)
+    def test_project_discovery_is_preserved(self):
         for environment_root in (False, True):
-            for composed in (False, True):
-                arguments = self.selectors()[2:] if composed else ["--config", "comparison.json"]
-                with patch("pathlib.Path.cwd", return_value=self.root / "jobs/subjects"), \
-                     patch.dict(os.environ, {"GURUBODH_CLI_ROOT": str(self.root)} if environment_root else {}), \
-                     patch(RUNNERS["generate-docx"], return_value={"processed_chapter_count": 1}) as runner:
-                    self.invoke(["generate-docx", *arguments])
-                self.assertEqual(runner.call_args.args[0].root, self.root)
-                self.assertEqual(runner.call_args.kwargs["config_path"], None if composed else self.root / "comparison.json")
+            with patch("pathlib.Path.cwd", return_value=self.root / "jobs/subjects"), \
+                 patch.dict(os.environ, {"GURUBODH_CLI_ROOT": str(self.root)} if environment_root else {}), \
+                 patch(RUNNERS["generate-docx"], return_value={"processed_chapter_count": 1}) as runner:
+                self.invoke(["generate-docx", *self.selectors()[2:]])
+            self.assertEqual(runner.call_args.args[0].root, self.root)
 
-    def test_exported_configuration_dispatches_through_complete_config_mode(self):
+    def test_exported_configuration_is_not_an_executable_input(self):
         for command in PREPARERS:
             payload, _ = self.resolve(command)
             path = self.write("resolved.json", payload)
-            with patch(RUNNERS[command], return_value={"processed_chapter_count": 1, "total_chunk_count": 1}) as runner:
-                self.invoke([command, "--project-root", str(self.root), "--config", str(path)])
-            self.assertEqual(runner.call_args.args[1].to_payload(), payload)
+            with patch(RUNNERS[command], side_effect=AssertionError("execution forbidden")):
+                self.error([command, *self.selectors(), "--config", str(path)], "unrecognized arguments")
 
-    def test_resume_reaches_both_prep_pipelines_in_both_input_modes(self):
+    def test_resume_reaches_both_prep_pipelines(self):
         for subject in ("sub001_aps_example", "sub123_spand_rahasya"):
-            selectors = self.selectors(subject=subject)
-            stdout, _ = self.invoke(["config", "resolve", "--command", "prep-subject", *selectors])
-            self.write("resolved.json", json.loads(stdout))
             runner_name = (RUNNERS["prep-subject"] if subject == "sub001_aps_example"
                            else "gurubodh.pipelines.dispatcher.run_unicode_docx_ingest")
-            for arguments in (selectors, ["--project-root", str(self.root), "--config", "resolved.json"]):
-                with patch(runner_name) as runner:
-                    self.invoke(["prep-subject", *arguments, "--resume"])
-                self.assertTrue(runner.call_args.kwargs["resume"])
+            with patch(runner_name) as runner:
+                self.invoke(["prep-subject", *self.selectors(subject=subject), "--resume"])
+            self.assertTrue(runner.call_args.kwargs["resume"])
 
 
 if __name__ == "__main__":

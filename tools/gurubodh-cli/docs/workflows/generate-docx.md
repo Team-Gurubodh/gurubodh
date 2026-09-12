@@ -6,7 +6,7 @@
 
 ```bash
 gurubodh generate-docx \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.local.json
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
 The command requires the current `prep-subject` state to be `succeeded` and bound to the exact chapter manifest it reads. It validates every listed metadata/text pair, produces one DOCX per chapter in a unique staged workspace, validates the complete package, and revalidates the source release immediately before publishing:

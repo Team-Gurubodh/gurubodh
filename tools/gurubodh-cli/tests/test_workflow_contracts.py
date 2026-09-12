@@ -1,4 +1,3 @@
-import json
 import unittest
 from contextlib import redirect_stderr
 from copy import deepcopy
@@ -6,13 +5,14 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+from migration_fixtures import baseline_job
+
 from gurubodh.canonical_source import safe_relative_path
 from gurubodh.cli import main
 from gurubodh.config import (
-    load_generate_chunks_job,
-    load_generate_docx_job,
-    load_prep_subject_job,
+    prepare_generate_chunks_job,
     prepare_generate_docx_job,
+    prepare_prep_subject_job,
 )
 from gurubodh.contracts import (
     CandidateManifestBinding,
@@ -49,16 +49,15 @@ CLI_ROOT = Path(__file__).parents[1]
 class WorkflowContractTests(unittest.TestCase):
     def test_job_conversion_keeps_runtime_values_outside_json_payloads(self):
         cases = (
-            ("prep-subject.local.json", load_prep_subject_job, PrepSubjectJob),
-            ("generate-chunks.local.json", load_generate_chunks_job, GenerateChunksJob),
-            ("generate-docx.local.json", load_generate_docx_job, GenerateDocxJob),
+            ("prep-subject", prepare_prep_subject_job, PrepSubjectJob),
+            ("generate-chunks", prepare_generate_chunks_job, GenerateChunksJob),
+            ("generate-docx", prepare_generate_docx_job, GenerateDocxJob),
         )
-        for filename, loader, expected_type in cases:
-            path = next((CLI_ROOT / "jobs").rglob(filename))
-            raw = json.loads(path.read_text(encoding="utf-8"))
+        for command, preparer, expected_type in cases:
+            raw = baseline_job(command)
 
-            with self.subTest(filename=filename):
-                prepared = loader(path)
+            with self.subTest(command=command):
+                prepared = preparer(raw)
                 self.assertIsInstance(prepared, expected_type)
                 self.assertEqual(prepared.to_payload(), raw)
                 self.assertFalse(
@@ -222,7 +221,8 @@ class WorkflowContractTests(unittest.TestCase):
             redirect_stderr(stderr),
             self.assertRaises(SystemExit) as raised,
         ):
-            main(["generate-docx", "--config", "missing.json"])
+            main(["generate-docx", "--subject", "example", "--language", "hi-IN",
+                  "--environment", "development", "--storage-profile", "local"])
 
         self.assertEqual(raised.exception.code, 2)
         self.assertIn("invalid project boundary", stderr.getvalue())

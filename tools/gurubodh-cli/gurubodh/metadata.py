@@ -2,7 +2,6 @@ import hashlib
 import re
 import unicodedata
 
-from gurubodh.complete_job_compat import summary_chapter_markers as complete_job_summary_markers
 from gurubodh.constants import CHAPTER_METADATA_SCHEMA_VERSION
 from gurubodh.content_identity import build_content_identity
 from gurubodh.naming import version_label
@@ -54,7 +53,7 @@ def text_artifact_integrity(text):
 
 def summary_chapter_markers(config):
     defaults = config.get("metadata_defaults", {})
-    return complete_job_summary_markers(defaults)
+    return defaults["summary_chapter_markers"]
 
 
 def automated_tags(text, summary_markers=None):

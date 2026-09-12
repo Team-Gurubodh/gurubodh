@@ -8,7 +8,7 @@ After configuring `GEMINI_API_KEY` as described in [Environment setup](../enviro
 
 ```bash
 gurubodh prep-subject \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
 The job must declare `hi-IN` or `mr-IN`, `Devanagari`, and UTF-8 output. `subject_dir` is a safe POSIX-relative nested path ending in that language, such as `123_spand_rahasya/hi-IN`. The two supported locales use their own proofreading instructions but share the structured response contract.
@@ -64,7 +64,7 @@ When an individual chapter fails, the command completes independently processabl
 
 ```bash
 gurubodh prep-subject \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json \
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local \
   --resume
 ```
 
@@ -72,7 +72,7 @@ gurubodh prep-subject \
 
 ```bash
 gurubodh prep-subject \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json \
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local \
   --overwrite
 ```
 

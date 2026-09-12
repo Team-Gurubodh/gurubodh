@@ -266,7 +266,6 @@ class GenerateChunksWorkflow:
         self,
         context,
         config,
-        config_path,
         entry_point,
         overwrite,
         destination_subject,
@@ -280,7 +279,6 @@ class GenerateChunksWorkflow:
         self.result = ChunkGenerationSummary(source_chapter_count=0)
         self.audit = GenerateChunksAuditWriter(
             context,
-            config_path,
             config,
             entry_point,
             overwrite,
@@ -388,7 +386,6 @@ def run_generate_chunks_job(
     config: GenerateChunksJob,
     entry_point=ENTRY_POINT_GENERATE_CHUNKS,
     overwrite=False,
-    config_path=None,
     segmenter: ParagraphSegmenter | None = None,
     r2_client=None,
     progress=print,
@@ -407,7 +404,6 @@ def run_generate_chunks_job(
     workflow = GenerateChunksWorkflow(
         context,
         config,
-        config_path,
         entry_point,
         overwrite,
         destination_subject,

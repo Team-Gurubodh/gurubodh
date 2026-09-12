@@ -194,7 +194,6 @@ class GenerateChunksAuditWriter:
     def __init__(
         self,
         context,
-        config_path,
         config,
         entry_point,
         overwrite,
@@ -206,7 +205,6 @@ class GenerateChunksAuditWriter:
             COMMAND_NAME,
             entry_point,
             context.root,
-            config_path=config_path,
             config=config,
             overwrite=overwrite,
         )

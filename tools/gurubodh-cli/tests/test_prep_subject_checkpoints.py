@@ -61,7 +61,7 @@ def config(root):
         "destination": {"backend": "local", "root_dir": str(root), "subject_dir": "subject/hi-IN"},
         "naming": {"category_code": "CAT001", "subject_code": "SUB123", "title_slug": "checkpoint-test", "version": "01", "subversion": "01"},
         "chapter_split": {"enabled": True, "pattern_type": "literal", "pattern": "CHAPTER"},
-        "metadata_defaults": {"language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
+        "metadata_defaults": {"summary_chapter_markers": [], "language": "hi-IN", "source_script": "Devanagari", "output_text_encoding": "UTF-8"},
     }
     return PrepSubjectJob(
         values,
@@ -260,13 +260,14 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 "enabled": True,
                 "pattern_type": "regex",
                 "pattern": "CHAPTER",
+                "flags": [],
             }})
             source_sha256 = "a" * 64
-            omitted = compatibility_record(base, source_sha256)
+            baseline = compatibility_record(base, source_sha256)
 
             explicit_empty = copy.deepcopy(base)
             explicit_empty["chapter_split"]["flags"] = []
-            self.assertEqual(compatibility_record(explicit_empty, source_sha256), omitted)
+            self.assertEqual(compatibility_record(explicit_empty, source_sha256), baseline)
 
             ordered = copy.deepcopy(base)
             ordered["chapter_split"]["flags"] = ["MULTILINE", "IGNORECASE"]
@@ -281,7 +282,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
     def test_legacy_regex_flag_records_resume_when_the_flag_set_is_equivalent(self):
         cases = (
             ("omitted-to-explicit", None, []),
-            ("explicit-to-omitted", [], None),
+            ("explicit-to-explicit", [], []),
             ("reordered", ["MULTILINE", "IGNORECASE"], ["IGNORECASE", "MULTILINE"]),
         )
         source_sha256 = "a" * 64
@@ -295,6 +296,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                         "enabled": True,
                         "pattern_type": "regex",
                         "pattern": "CHAPTER",
+                        "flags": [],
                     }})
                     current_config = copy.deepcopy(stored_config)
                     if stored_flags is not None:
@@ -391,7 +393,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "python3 -m gurubodh prep-subject",
                     False,
                     False,
-                    None,
                     prepare,
                 )
 
@@ -415,7 +416,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             write_docx(source)
             output = io.StringIO()
             with redirect_stdout(output):
-                unicode_runner.call_args.args[5](source, root / "output.docx")
+                unicode_runner.call_args.args[4](source, root / "output.docx")
             self.assertIn("[prepare] Reading the Unicode source DOCX directly", output.getvalue())
             self.assertFalse((root / "output.docx").exists())
 
@@ -436,7 +437,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             output = io.StringIO()
             with patch.object(legacy_docx_to_unicode, "convert_docx", return_value={}) as convert:
                 with redirect_stdout(output):
-                    legacy_runner.call_args.args[5](root / "source.docx", root / "output.docx", lambda *_: None)
+                    legacy_runner.call_args.args[4](root / "source.docx", root / "output.docx", lambda *_: None)
             self.assertIn("[prepare] Converting the legacy source DOCX to a transient Unicode working copy", output.getvalue())
             self.assertTrue(convert.called)
             self.assertIsNone(convert.call_args.args[4])
@@ -462,7 +463,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                         "python3 -m gurubodh prep-subject",
                         overwrite,
                         False,
-                        None,
                         unicode_docx_ingest.prepare_unicode_docx,
                     )
 
@@ -539,7 +539,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 legacy_docx_to_unicode.run_legacy_docx_to_unicode(
                     context,
                     job_config,
-                    "python3 -m gurubodh legacy-convert",
+                    "python3 -m gurubodh prep-subject",
                 )
 
             subject = root / "subject" / "hi-IN"
@@ -550,7 +550,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertFalse((subject / "chapters" / "msword").exists())
             metadata_path = next((subject / "chapters" / "text_and_metadata").glob("*.json"))
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            self.assertEqual(metadata["processing"]["entry_point"], "python3 -m gurubodh legacy-convert")
+            self.assertEqual(metadata["processing"]["entry_point"], "python3 -m gurubodh prep-subject")
             self.assertEqual(metadata["conversion"]["converter_counts"], {"aps": 2})
 
     def test_compatible_succeeded_resume_reports_already_complete_without_preparation_or_gemini(self):
@@ -563,7 +563,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 "CHAPTER 2\nदूसरा सही पाठ。",
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
-                run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode)
+                run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, prepare_unicode)
 
             resumed = FakeProofreader([])
             output = io.StringIO()
@@ -571,7 +571,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=resumed),
                 redirect_stdout(output),
             ):
-                result = run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, True, None, prepare_unicode)
+                result = run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, True, prepare_unicode)
 
             self.assertTrue(result["already_complete"])
             self.assertEqual(resumed.calls, [])
@@ -602,7 +602,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     False,
                     False,
-                    None,
                     prepare_unicode,
                 )
 
@@ -626,7 +625,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     False,
                     True,
-                    None,
                     prepare_unicode,
                 )
 
@@ -656,7 +654,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
                 with self.assertRaisesRegex(GurubodhError, "incomplete"):
-                    run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode)
+                    run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, prepare_unicode)
 
             subject = root / "subject" / "hi-IN"
             state_path = subject / JOB_STATE_RELATIVE_PATH
@@ -699,7 +697,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
 
             second = FakeProofreader(["CHAPTER 2\nदूसरा सही पाठ।"])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=second):
-                result = run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, True, None, prepare_unicode)
+                result = run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, True, prepare_unicode)
 
             state = json.loads(state_path.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "succeeded")
@@ -739,7 +737,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 self.assertRaisesRegex(GurubodhError, "incomplete"),
             ):
                 run_resumable_prep_job(
-                    job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode
+                    job_config, "python3 -m gurubodh prep-subject", False, False, prepare_unicode
                 )
 
             cooldown_sleep.assert_called_once()
@@ -783,7 +781,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     False,
                     False,
-                    None,
                     prepare_unicode,
                 )
 
@@ -811,7 +808,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=first):
                 with self.assertRaisesRegex(GurubodhError, "incomplete"):
-                    run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, None, prepare_unicode, r2_client=client)
+                    run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, False, prepare_unicode, r2_client=client)
 
             state_key = "cms_library/subject/hi-IN/run_state/prep-subject/job-state.json"
             state = json.loads(client.objects[state_key].decode("utf-8"))
@@ -904,7 +901,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
 
             second = FakeProofreader(["CHAPTER 2\nदूसरा सही पाठ।"])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=second):
-                run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, True, None, prepare_unicode, r2_client=client)
+                run_resumable_prep_job(job_config, "python3 -m gurubodh prep-subject", False, True, prepare_unicode, r2_client=client)
 
             state = json.loads(client.objects[state_key].decode("utf-8"))
             self.assertEqual(state["state"], "succeeded")
@@ -940,7 +937,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                         "python3 -m gurubodh prep-subject",
                         True,
                         False,
-                        None,
                         prepare_unicode,
                     )
 
@@ -1007,7 +1003,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     True,
                     False,
-                    None,
                     prepare_unicode,
                 )
 
@@ -1040,7 +1035,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     False,
                     True,
-                    None,
                     prepare_unicode,
                 )
 
@@ -1103,7 +1097,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "python3 -m gurubodh prep-subject",
                     True,
                     False,
-                    None,
                     prepare_unicode,
                 )
 
@@ -1140,14 +1133,14 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             ])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=failed):
                 with self.assertRaisesRegex(GurubodhError, "incomplete"):
-                    run_resumable_prep_job(job_config, "prep-subject", False, False, None, prepare_unicode)
+                    run_resumable_prep_job(job_config, "prep-subject", False, False, prepare_unicode)
 
             state_path = root / "subject" / "hi-IN" / JOB_STATE_RELATIVE_PATH
             state = json.loads(state_path.read_text(encoding="utf-8"))
             state["compatibility"]["output_affecting_inputs"]["checkpoint_contract_version"] = 1
             state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             with self.assertRaisesRegex(GurubodhError, "incompatible artifact contract.*--overwrite"):
-                run_resumable_prep_job(job_config, "prep-subject", False, True, None, prepare_unicode)
+                run_resumable_prep_job(job_config, "prep-subject", False, True, prepare_unicode)
 
     def test_successful_r2_overwrite_cleans_only_same_locale_after_manifest_upload(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1174,7 +1167,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             })
             proofreader = FakeProofreader(["CHAPTER 1\nसही।", "CHAPTER 2\nसही।"])
             with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", return_value=proofreader):
-                run_resumable_prep_job(job_config, "prep-subject", True, False, None, prepare_unicode, r2_client=client)
+                run_resumable_prep_job(job_config, "prep-subject", True, False, prepare_unicode, r2_client=client)
 
             self.assertFalse(any(key.startswith(same_root + "chapters/msword/") for key in client.objects))
             self.assertFalse(any(key.startswith(same_root + "chapters/semantic_chunks/") for key in client.objects))
@@ -1249,7 +1242,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     True,
                     False,
-                    None,
                     prepare_unicode,
                     r2_client=client,
                 )
@@ -1271,7 +1263,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     "prep-subject",
                     False,
                     True,
-                    None,
                     prepare_unicode,
                     r2_client=client,
                 )
@@ -1334,7 +1325,6 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                         "prep-subject",
                         True,
                         False,
-                        None,
                         prepare_unicode,
                         r2_client=client,
                     )

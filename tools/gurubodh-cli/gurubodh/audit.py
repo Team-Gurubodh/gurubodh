@@ -124,7 +124,6 @@ class AuditContext:
         entry_point: str,
         project_root: str | Path,
         *,
-        config_path: str | Path | None = None,
         config: Mapping[str, Any] | None = None,
         overwrite: bool = False,
         run_id: str | None = None,
@@ -146,12 +145,10 @@ class AuditContext:
         if provenance is None:
             provenance = ConfigurationProvenance.capture(
                 config if config is not None and configuration is None else snapshot,
-                input_mode="complete_config",
+                input_mode="in_memory",
             )
         elif provenance.assembled_configuration_sha256 != configuration_digest(snapshot):
             raise ValueError("Configuration differs from captured provenance; resolve the job again.")
-        if provenance.input_mode == "composition":
-            config_path = None
         now = datetime.now(timezone.utc)
         return cls(
             command_name=command_name,
@@ -160,12 +157,12 @@ class AuditContext:
             started_at=started_at or now.replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             filename_timestamp=now.strftime("%Y%m%dT%H%M%S%fZ"),
             package_version=__version__,
-            config_path=str(config_path) if config_path is not None else None,
+            config_path=None,
             job_schema_version=payload.get("schema_version"),
             pipeline=payload.get("pipeline"),
-            source_backend=source_backend or source.get("backend") or ("local" if source else None),
+            source_backend=source_backend or source.get("backend"),
             destination_backend=(
-                destination_backend or destination.get("backend") or "local"
+                destination_backend or destination["backend"]
             ),
             overwrite=overwrite,
             build_provenance=resolved_build_provenance(project_root),

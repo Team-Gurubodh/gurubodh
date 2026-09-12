@@ -8,5 +8,3 @@ input_word
 converted_word
 .env
 .env.*
-jobs/**/*.local.json
-jobs/**/*.r2-output.json

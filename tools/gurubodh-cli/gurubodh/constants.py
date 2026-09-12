@@ -15,18 +15,12 @@ PIPELINE_GENERATE_CHUNKS = "generate-chunks"
 PIPELINE_GENERATE_DOCX = "generate-docx"
 
 ENTRY_POINT_PREP_SUBJECT = "python3 -m gurubodh prep-subject"
-ENTRY_POINT_LEGACY_DOCX_TO_UNICODE = "python3 -m gurubodh legacy-convert"
-ENTRY_POINT_UNICODE_DOCX_INGEST = "python3 -m gurubodh unicode-ingest"
 ENTRY_POINT_GENERATE_CHUNKS = "python3 -m gurubodh generate-chunks"
 ENTRY_POINT_GENERATE_DOCX = "python3 -m gurubodh generate-docx"
 ENTRY_POINT_LAB_PROOFREAD = "python3 -m gurubodh lab proofread"
 SEMANTIC_CHUNKS_OUTPUT_DIR = "semantic_chunks"
 DOCX_OUTPUT_DIR = "msword"
 
-PIPELINE_ENTRY_POINTS = {
-    PIPELINE_LEGACY_DOCX_TO_UNICODE: ENTRY_POINT_LEGACY_DOCX_TO_UNICODE,
-    PIPELINE_UNICODE_DOCX_INGEST: ENTRY_POINT_UNICODE_DOCX_INGEST,
-}
 
 SUPPORTED_LEGACY_ENCODINGS = {"aps"}
 SUPPORTED_FONT_ENCODINGS = SUPPORTED_LEGACY_ENCODINGS | {"unicode"}

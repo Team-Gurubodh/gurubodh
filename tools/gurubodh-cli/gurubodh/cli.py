@@ -3,7 +3,6 @@ import json
 import sys
 
 from gurubodh.docx.namespaces import register_namespaces
-from gurubodh.config import load_generate_chunks_job, load_generate_docx_job
 from gurubodh.errors import GurubodhError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job
@@ -12,8 +11,8 @@ from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
 from gurubodh.pipelines.generate_docx import run_generate_docx_job
-from gurubodh.pipelines.dispatcher import run_configured_job, run_prepared_job, run_legacy_job, run_unicode_job
-from gurubodh.project import resolve_project_context, resolve_project_path
+from gurubodh.pipelines.dispatcher import run_prepared_job
+from gurubodh.project import resolve_project_context
 
 
 PLANNED_COMMANDS = {
@@ -25,8 +24,6 @@ PLANNED_COMMANDS = {
 
 
 COMPOSED_COMMANDS = ("prep-subject", "generate-chunks", "generate-docx")
-REQUIRED_SELECTORS = ("subject", "language", "environment", "storage_profile")
-OPTIONAL_SELECTORS = ("proofreading_profile", "chunking_profile", "chapters")
 
 
 def add_project_option(parser):
@@ -60,17 +57,11 @@ def add_composed_options(parser, command=None, *, required=False):
         )
 
 
-def add_common_options(parser, command=None):
-    parser.add_argument(
-        "--config", required=command is None,
-        help="Temporary complete-job JSON compatibility mode; mutually exclusive with composed selectors. Retires after maintainer comparison acceptance.",
+def add_common_options(parser, command):
+    add_composed_options(parser, command, required=True)
+    parser.epilog = (
+        "Profile precedence: command definition < manifest < edition < invocation; no scalar overrides."
     )
-    if command is not None:
-        add_composed_options(parser, command)
-        parser.epilog = (
-            "Choose --config OR all of --subject, --language, --environment, --storage-profile. "
-            "Profile precedence: command definition < manifest < edition < invocation; no scalar overrides."
-        )
     parser.add_argument(
         "--overwrite",
         action="store_true",
@@ -98,7 +89,7 @@ def build_parser():
     prep_subject_parser = subparsers.add_parser(
         "prep-subject",
         help="Prepare subject artifacts using the pipeline declared by the job config.",
-        description="Compose a job or read a temporary complete config, then dispatch its declared pipeline.",
+        description="Compose a job from explicit selectors, then dispatch its declared pipeline.",
     )
     add_common_options(prep_subject_parser, "prep-subject")
     prep_subject_parser.add_argument(
@@ -128,7 +119,7 @@ def build_parser():
         description=(
             "Emit deterministic job JSON to stdout without reading content or initializing providers/storage/models. "
             "No provider credentials or downloaded model cache are required. "
-            "The JSON can be used with --config during comparison; permanent file-based replay is not promised."
+            "The JSON is for audit/debugging inspection only; exported JSON is not an executable input."
         ),
         epilog="Profile precedence: command definition < manifest < edition < invocation; whole profiles only.",
     )
@@ -200,20 +191,6 @@ def build_parser():
     add_planned_command(subparsers, "download-subject")
     add_planned_command(subparsers, "delete-subject")
 
-    legacy_parser = subparsers.add_parser(
-        "legacy-convert",
-        help="[deprecated] Run only the legacy DOCX to Unicode pipeline.",
-        description="[deprecated] Convert supported legacy-font DOCX input to Unicode, then split chapters.",
-    )
-    add_common_options(legacy_parser)
-
-    unicode_parser = subparsers.add_parser(
-        "unicode-ingest",
-        help="[deprecated] Run only the Unicode DOCX ingest pipeline.",
-        description="[deprecated] Copy Unicode DOCX input, extract text, split chapters, and reject non-Unicode jobs.",
-    )
-    add_common_options(unicode_parser)
-
     return parser
 
 
@@ -243,23 +220,15 @@ def _run_command(parser, args):
             print(payload)
             return
 
-        config_path = resolve_project_path(context, args.config) if args.config is not None else None
+        job = _resolve_composed_job(context, args, command)
         if command == "prep-subject":
             register_namespaces()
-            if config_path is not None:
-                run_configured_job(context, config_path, overwrite=args.overwrite, resume=args.resume)
-            else:
-                run_prepared_job(
-                    context, _resolve_composed_job(context, args, command),
-                    overwrite=args.overwrite, resume=args.resume,
-                )
+            run_prepared_job(context, job, overwrite=args.overwrite, resume=args.resume)
             return
 
-        loader = load_generate_chunks_job if command == "generate-chunks" else load_generate_docx_job
-        job = loader(config_path) if config_path is not None else _resolve_composed_job(context, args, command)
         runner = run_generate_chunks_job if command == "generate-chunks" else run_generate_docx_job
         try:
-            result = runner(context, job, overwrite=args.overwrite, config_path=config_path)
+            result = runner(context, job, overwrite=args.overwrite)
         except Exception as exc:
             parser.error(str(exc))
         if command == "generate-chunks":
@@ -311,27 +280,10 @@ def _run_command(parser, args):
         print(format_json(comparisons) if args.format == "json" else format_text(comparisons))
         return
 
-    context = resolve_project_context(args.project_root)
-    config_path = resolve_project_path(context, args.config)
-    register_namespaces()
-
-    if args.command == "unicode-ingest":
-        run_unicode_job(config_path, overwrite=args.overwrite, context=context)
-    elif args.command == "legacy-convert":
-        run_legacy_job(context, config_path, overwrite=args.overwrite)
-    else:
-        parser.error(f"Unsupported command: {args.command}")
+    parser.error(f"Unsupported command: {args.command}")
 
 
 def _validate_job_options(parser, args, command):
-    selectors = REQUIRED_SELECTORS + OPTIONAL_SELECTORS
-    if getattr(args, "config", None) is not None:
-        if any(getattr(args, name, None) is not None for name in selectors):
-            parser.error("--config and composed selectors are mutually exclusive.")
-    else:
-        missing = ["--" + name.replace("_", "-") for name in REQUIRED_SELECTORS if getattr(args, name, None) is None]
-        if missing:
-            parser.error("Composed mode requires explicit " + ", ".join(missing) + "; or use --config during comparison.")
     if getattr(args, "resume", False) and args.overwrite:
         parser.error("--resume and --overwrite are mutually exclusive for prep-subject.")
     for name, applicable in (("proofreading_profile", "prep-subject"),

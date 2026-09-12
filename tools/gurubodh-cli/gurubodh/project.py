@@ -53,13 +53,3 @@ def resolve_project_context(project_root=None):
             else bundled_catalog_root()
         ),
     )
-
-
-def resolve_project_path(context, path):
-    path = Path(path).expanduser()
-    if path.is_absolute():
-        return path
-    cwd_path = (Path.cwd() / path).resolve()
-    if cwd_path.exists():
-        return cwd_path
-    return (context.root / path).resolve()

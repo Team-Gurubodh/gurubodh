@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from gurubodh.config import prepare_prep_subject_job, prepare_generate_chunks_job, storage_backend
+from gurubodh.config import prepare_prep_subject_job, prepare_generate_chunks_job
 from gurubodh.errors import ConfigurationError
 from gurubodh.schema_validation import validate_component
 from test_command_storage_contracts import fixture
@@ -126,36 +126,35 @@ class SelectionMappingTests(unittest.TestCase):
         # Inapplicable invocation flags are a future resolver/CLI rejection, not
         # a component-validator feature exercised by these examples.
 
-    def test_legacy_prep_allowances_remain_separate_from_component_requirements(self):
+    def test_retired_omission_allowances_fail_at_in_memory_preparation(self):
+        from copy import deepcopy
         policy = fixture("proofreading/gemini-3.6-flash-v1.json")["proofreading"]
         with tempfile.TemporaryDirectory() as root:
-            job = example_job(root, "prep-subject", policy)
-            del job["source"]["backend"], job["destination"]["backend"]
-            job["source"]["bucket"] = "inactive-legacy-field"
-            job["chapter_split"] = {"enabled": False, "pattern_type": "regex", "pattern": "unused"}
-            del job["metadata_defaults"]["summary_chapter_markers"]
-            job["metadata_defaults"]["legacy_extension"] = "preserved-input-only"
-            job["naming"]["version"] = "01\n"
-            prepared = prepare_prep_subject_job(job)
-            self.assertEqual(prepared.to_payload(), job)
-            self.assertEqual(storage_backend(job["source"]), "local")
-            self.assertIsNone(prepared.compiled_chapter_pattern)
-            job["chapter_split"] = {"enabled": True, "pattern_type": "regex", "pattern": "^chapter"}
-            self.assertEqual(prepare_prep_subject_job(job).to_payload(), job)
+            base = example_job(root, "prep-subject", policy)
+            for section, field in (("source", "backend"), ("destination", "backend"),
+                                   ("metadata_defaults", "summary_chapter_markers")):
+                job = deepcopy(base)
+                del job[section][field]
+                with self.subTest(section=section, field=field), self.assertRaisesRegex(ConfigurationError, field):
+                    prepare_prep_subject_job(job)
+            for enabled in (True, False):
+                job = deepcopy(base)
+                job["chapter_split"] = {"enabled": enabled, "pattern_type": "regex", "pattern": "chapter"}
+                with self.assertRaisesRegex(ConfigurationError, "flags"):
+                    prepare_prep_subject_job(job)
+            job = deepcopy(base)
             job["source"] = {"backend": "r2", "bucket": "example", "key": "source/example.docx",
                              "font_encoding": "unicode", "file_format": "docx"}
-            job["destination"] = {"backend": "r2", "bucket": "example", "prefix": "artifacts",
-                                  "subject_dir": "explicit/root/hi-IN"}
+            with self.assertRaisesRegex(ConfigurationError, "url_base"):
+                prepare_prep_subject_job(job)
+            job["source"]["url_base"] = None
             self.assertEqual(prepare_prep_subject_job(job).to_payload(), job)
-        # The corresponding component allowances are rejected by real validators.
-        locale = fixture("locales/hi-IN.json")
-        locale["metadata_defaults"]["legacy_extension"] = "not-a-declared-component-field"
-        with self.assertRaises(ConfigurationError):
-            validate_component(locale, "locale-definition")
-        manifest = fixture("subjects/aps-hindi.json")
-        manifest["editions"]["hi-IN"]["chapter_split"] = job["chapter_split"]
-        with self.assertRaises(ConfigurationError):
-            validate_component(manifest, "subject-manifest")
+            job["destination"] = {"backend": "r2", "bucket": "example", "prefix": "artifacts",
+                                  "subject_dir": job["destination"]["subject_dir"]}
+            with self.assertRaisesRegex(ConfigurationError, "url_base"):
+                prepare_prep_subject_job(job)
+            job["destination"]["url_base"] = None
+            self.assertEqual(prepare_prep_subject_job(job).to_payload(), job)
 
 
 if __name__ == "__main__":

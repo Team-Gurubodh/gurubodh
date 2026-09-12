@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from docx import Document
 
-from gurubodh.config import load_generate_docx_job
+from gurubodh.config import prepare_generate_docx_job
 from gurubodh.content_identity import build_content_identity
 from gurubodh.docx.export import generated_title, write_chapter_docx
 from gurubodh.errors import GurubodhError, SourceValidationError
@@ -247,11 +247,6 @@ class GenerateDocxPipelineTests(unittest.TestCase):
             root=Path(self.temp_dir.name), legacy_converter=Path(self.temp_dir.name) / "converter.js"
         )
 
-    def load(self, config):
-        path = Path(self.temp_dir.name) / "generate-docx.json"
-        path.write_text(json.dumps(config), encoding="utf-8")
-        return load_generate_docx_job(path), path
-
     def test_local_generation_uses_manifest_order_title_and_exact_body_mapping(self):
         config = base_config(self.temp_dir.name)
         texts = ["पहली पंक्ति।\nदूसरी पंक्ति।\n\nदूसरा अनुच्छेद।\n", "अंतिम अध्याय।\n"]
@@ -260,10 +255,10 @@ class GenerateDocxPipelineTests(unittest.TestCase):
             path: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in (subject / "chapters" / "text_and_metadata").iterdir()
         }
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         result = run_generate_docx_job(
-            self.context, loaded, config_path=config_path, progress=lambda _: None
+            self.context, loaded, progress=lambda _: None
         )
 
         output = subject / "chapters" / "msword"
@@ -303,10 +298,10 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         output.mkdir(parents=True)
         previous = output / "previous.docx"
         previous.write_bytes(b"previous")
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         with self.assertRaisesRegex(GurubodhError, "already exists"):
-            run_generate_docx_job(self.context, loaded, config_path=config_path, progress=lambda _: None)
+            run_generate_docx_job(self.context, loaded, progress=lambda _: None)
 
         self.assertEqual(previous.read_bytes(), b"previous")
         report = next((subject / "run_reports" / "generate-docx").glob("*.json"))
@@ -325,12 +320,12 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         semantic = subject / "chapters" / "semantic_chunks" / "keep.json"
         semantic.parent.mkdir(parents=True)
         semantic.write_text("keep", encoding="utf-8")
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         with patch("gurubodh.pipelines.generate_docx.write_chapter_docx", side_effect=ValueError("bad docx")):
             with self.assertRaisesRegex(GurubodhError, "bad docx"):
                 run_generate_docx_job(
-                    self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
+                    self.context, loaded, overwrite=True, progress=lambda _: None
                 )
 
         self.assertEqual(previous.read_bytes(), b"previous")
@@ -353,10 +348,10 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         (output / "old.docx").write_bytes(b"old")
         unrelated = subject / "notes.txt"
         unrelated.write_text("keep", encoding="utf-8")
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         run_generate_docx_job(
-            self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
+            self.context, loaded, overwrite=True, progress=lambda _: None
         )
 
         self.assertFalse((output / "old.docx").exists())
@@ -374,11 +369,11 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         output.mkdir(parents=True)
         previous = output / "previous.docx"
         previous.write_bytes(b"previous")
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         with self.assertRaisesRegex(GurubodhError, "metadata subject identity does not match"):
             run_generate_docx_job(
-                self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
+                self.context, loaded, overwrite=True, progress=lambda _: None
             )
 
         self.assertEqual(previous.read_bytes(), b"previous")
@@ -395,10 +390,10 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         state["state"] = "publishing"
         state["publication"]["state"] = "publishing"
         state_path.write_text(json.dumps(state), encoding="utf-8")
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
         with self.assertRaisesRegex(GurubodhError, "latest prep-subject job is not succeeded"):
             run_generate_docx_job(
-                self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
+                self.context, loaded, overwrite=True, progress=lambda _: None
             )
         self.assertEqual(previous.read_bytes(), b"previous")
 
@@ -411,7 +406,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(GurubodhError, "canonical changed"):
                 run_generate_docx_job(
-                    self.context, loaded, overwrite=True, config_path=config_path, progress=lambda _: None
+                    self.context, loaded, overwrite=True, progress=lambda _: None
                 )
         self.assertEqual(previous.read_bytes(), b"previous")
 
@@ -424,13 +419,12 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         semantic = f"{root}/chapters/semantic_chunks/keep.json"
         objects.update({old_manifest: b"old manifest", old_docx: b"old docx", semantic: b"keep"})
         client = FakeR2Client(objects)
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         result = run_generate_docx_job(
             self.context,
             loaded,
             overwrite=True,
-            config_path=config_path,
             r2_client=client,
             progress=lambda _: None,
         )
@@ -462,14 +456,13 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         manifest_key = f"{root}/chapters/msword/docx_manifest.json"
         objects[manifest_key] = b"old manifest"
         client = FakeR2Client(objects, fail_docx_upload=True)
-        loaded, config_path = self.load(config)
+        loaded = prepare_generate_docx_job(config)
 
         with self.assertRaisesRegex(GurubodhError, "simulated DOCX upload failure"):
             run_generate_docx_job(
                 self.context,
                 loaded,
                 overwrite=True,
-                config_path=config_path,
                 r2_client=client,
                 progress=lambda _: None,
             )
@@ -481,19 +474,19 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         config = base_config(self.temp_dir.name)
         config["schema_version"] = "9.9.9"
         with self.assertRaisesRegex(GurubodhError, r"\$\.schema_version must equal \"1\.0\.0\""):
-            self.load(config)
+            prepare_generate_docx_job(config)
         config = base_config(self.temp_dir.name)
         config["source"]["subject_dir"] = "../hi-IN"
         with self.assertRaisesRegex(GurubodhError, "must not contain"):
-            self.load(config)
+            prepare_generate_docx_job(config)
         config = base_config(self.temp_dir.name)
         config["naming"]["title_slug"] = "unsafe slug"
         with self.assertRaisesRegex(GurubodhError, r"\$\.naming\.title_slug must match"):
-            self.load(config)
+            prepare_generate_docx_job(config)
         config = base_config(self.temp_dir.name)
         config["destination"]["backend"] = "unsupported"
         with self.assertRaisesRegex(GurubodhError, r"\$\.destination\.backend must equal"):
-            self.load(config)
+            prepare_generate_docx_job(config)
 
 
 if __name__ == "__main__":

@@ -113,6 +113,7 @@ def prep_job(root):
             "pattern": "CHAPTER",
         },
         "metadata_defaults": {
+            "summary_chapter_markers": [],
             "language": "hi-IN",
             "source_script": "Devanagari",
             "output_text_encoding": "UTF-8",
