@@ -55,7 +55,9 @@ class SchemaValidationTests(unittest.TestCase):
             "generate-docx": load_generate_docx_job,
         }
 
-        for path in sorted((CLI_ROOT / "jobs").rglob("*.json")):
+        paths = sorted((CLI_ROOT / "jobs/subjects").glob("*/*/*.json"))
+        self.assertEqual(len(paths), 26)
+        for path in paths:
             command = path.name.split(".", 1)[0]
             with self.subTest(path=path):
                 loaded = loaders[command](path)

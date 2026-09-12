@@ -1,0 +1,28 @@
+{
+  "component_schema_version": "1.0.0",
+  "manifest_id": "sub039_aacharan_shastra",
+  "identity": {
+    "category_code": "CAT004",
+    "subject_code": "SUB039",
+    "title_slug": "aacharan-shastra"
+  },
+  "artifact_root": "39_aacharan_shastra",
+  "editions": {
+    "hi-IN": {
+      "release": {
+        "version": "01",
+        "subversion": "01"
+      },
+      "source_document": {
+        "relative_path": "39_aacharan_shastra/aps_fonts/ms_word/sub039_aacharan_shastra.docx",
+        "font_encoding": "aps",
+        "file_format": "docx"
+      },
+      "chapter_split": {
+        "enabled": true,
+        "pattern_type": "literal",
+        "pattern": "प्रबोधन क्र"
+      }
+    }
+  }
+}

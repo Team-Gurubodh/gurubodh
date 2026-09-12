@@ -12,16 +12,12 @@ import unittest
 from unittest.mock import patch
 
 from component_contract_cases import without_job_schemas
-from gurubodh.config import (
-    load_generate_chunks_job, load_generate_docx_job, load_prep_subject_job,
-)
 from gurubodh.contracts import GenerateChunksJob, GenerateDocxJob, PrepSubjectJob
 from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job, resolve_lab_proofreading
 from gurubodh.ml.semantic_chunking.chunker import SemanticChunker
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
-from gurubodh.prep_checkpoint import compatibility_record
 from gurubodh.proofreading.settings import ProofreadingSettings
 
 
@@ -450,71 +446,6 @@ class CompositionTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             SemanticChunker(None)
 
-    def test_all_26_complete_jobs_keep_effective_settings_and_checkpoint_identity(self):
-        # Comparison fixtures only: migrate no maintained subject manifests.
-        maintained = CLI_ROOT / "jobs/subjects"
-        for path in sorted(maintained.glob("*/*/prep-subject.local.json")):
-            complete = json.loads(path.read_text())
-            manifest_id, locale = path.parent.parent.name, path.parent.name
-            relative = f"jobs/subjects/{manifest_id}/manifest.json"
-            naming = complete["naming"]
-            target = self.root / relative
-            manifest = self.read(relative) if target.is_file() else {
-                "component_schema_version": "1.0.0", "manifest_id": manifest_id,
-                "identity": {key: naming[key] for key in ("category_code", "subject_code", "title_slug")},
-                "artifact_root": complete["destination"]["subject_dir"].removesuffix("/" + locale),
-                "editions": {},
-            }
-            # Replace the representative manifest when it shares a maintained ID.
-            if manifest_id == "sub123_spand_rahasya" and locale == "hi-IN":
-                manifest["artifact_root"] = complete["destination"]["subject_dir"].removesuffix("/" + locale)
-                manifest["editions"] = {}
-                manifest.pop("profile_overrides", None)
-            split = copy.deepcopy(complete["chapter_split"])
-            if split.get("pattern_type") == "regex":
-                split["flags"] = split.get("flags", [])
-            manifest["editions"][locale] = {
-                "release": {"version": naming["version"], "subversion": naming["subversion"]},
-                "source_document": {key: complete["source"][key]
-                                    for key in ("relative_path", "font_encoding", "file_format")},
-                "chapter_split": split,
-            }
-            self.write(relative, manifest)
-        loaders = {"prep-subject": load_prep_subject_job, "generate-chunks": load_generate_chunks_job,
-                   "generate-docx": load_generate_docx_job}
-        count = 0
-        for path in sorted(maintained.glob("*/*/*.json")):
-            command, route, extension = path.name.split(".")
-            with self.subTest(path=path.relative_to(maintained)):
-                original = json.loads(path.read_text())
-                # Replace only machine-specific library roots in the file-loaded
-                # comparison. Preserve optional legacy omissions in its payload.
-                for side in ("source", "destination"):
-                    if "root_dir" in original[side]:
-                        variable = ("GURUBODH_SOURCE_LIBRARY_ROOT" if command == "prep-subject" and side == "source"
-                                    else "GURUBODH_CMS_LIBRARY_ROOT")
-                        original[side]["root_dir"] = self.environ[variable]
-                legacy_file = self.write("comparison.json", original)
-                legacy = loaders[command](legacy_file)
-                composed = self.resolve(command=command, storage_profile_id=route,
-                                        manifest_id=path.parent.parent.name, locale=path.parent.name).job
-                self.assertEqual(legacy.to_payload(), original)
-                normalized = copy.deepcopy(original)
-                for side in ("source", "destination"):
-                    normalized[side].setdefault("backend", "local")
-                    if normalized[side]["backend"] == "r2":
-                        normalized[side].setdefault("url_base", None)
-                if command == "prep-subject":
-                    if normalized["chapter_split"].get("pattern_type") == "regex":
-                        normalized["chapter_split"].setdefault("flags", [])
-                    self.assertEqual(legacy.proofreading_settings, composed.proofreading_settings)
-                    self.assertEqual(legacy.compiled_chapter_pattern, composed.compiled_chapter_pattern)
-                    self.assertEqual(compatibility_record(legacy, "a" * 64), compatibility_record(composed, "a" * 64))
-                elif command == "generate-chunks":
-                    self.assertEqual(legacy.semantic_chunk_config, composed.semantic_chunk_config)
-                self.assertEqual(composed.to_payload(), normalized)
-                count += 1
-        self.assertEqual(count, 26)
 
 
 if __name__ == "__main__":

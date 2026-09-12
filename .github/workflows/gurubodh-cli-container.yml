@@ -83,6 +83,16 @@ jobs:
             | docker run --rm -i --entrypoint python gurubodh-cli:smoke -c \
               "import json, sys; job=json.load(sys.stdin); assert job['pipeline']; assert job['source']['backend'] == job['destination']['backend'] == 'r2'; command='${command}'; assert command != 'prep-subject' or (job['proofreading']['model'] == 'gemini-3.6-flash' and job['proofreading']['max_output_tokens'] == 16384); assert command != 'generate-chunks' or (job['chunking']['model_revision'] == '5617a9f61b028005a4858fdac845db406aefb181' and job['chunking']['local_files_only'] is True and job['chunking']['strategy_version'] == 'semantic-window-v1')"
           done
+      - name: Inspect all 26 maintained selectors from the baked catalog
+        run: |
+          docker run --rm \
+            --volume "${{ github.workspace }}/tools/gurubodh-cli/tests:/opt/gurubodh-cli/tests:ro" \
+            --env PYTHONPATH=/opt/gurubodh-cli/tests \
+            --workdir /opt/gurubodh-cli --entrypoint python \
+            gurubodh-cli:smoke -B -m unittest -v \
+            test_maintained_job_migration.MaintainedJobMigrationTests.test_all_26_maintained_selectors_inspect_via_cli \
+            test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_validate_independently \
+            test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_preserve_every_legacy_edition
 
   publish:
     needs: smoke-test
