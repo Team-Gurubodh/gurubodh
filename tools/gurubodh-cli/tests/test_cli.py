@@ -2,7 +2,7 @@ import unittest
 from contextlib import redirect_stderr
 from io import StringIO
 
-from gurubodh.cli import PLANNED_COMMANDS, build_parser, main
+from gurubodh.cli import build_parser
 
 
 class CliTests(unittest.TestCase):
@@ -13,39 +13,29 @@ class CliTests(unittest.TestCase):
             "prep-subject",
             "generate-chunks",
             "generate-docx",
+            "config",
             "lab",
-            "regenerate-embeddings",
             "compare-tokenizers",
-            "update-metadata",
-            "download-subject",
-            "delete-subject",
         ]
 
         positions = [help_text.index(f"    {command}") for command in expected_order]
 
         self.assertEqual(positions, sorted(positions))
 
-    def test_help_omits_retired_commands(self):
+    def test_help_omits_retired_and_planned_commands(self):
         parser = build_parser()
         normalized_help = " ".join(parser.format_help().split())
 
-        self.assertNotIn("unicode-ingest", normalized_help)
-        self.assertNotIn("legacy-convert", normalized_help)
-
-    def test_help_lists_planned_commands(self):
-        parser = build_parser()
-        help_text = parser.format_help()
-        normalized_help = " ".join(help_text.split())
-
-        for command, command_help in PLANNED_COMMANDS.items():
-            self.assertIn(command, help_text)
-            self.assertIn(f"[planned] {command_help}", normalized_help)
-
-        self.assertIn("generate-chunks", help_text)
-        self.assertIn("generate-docx", help_text)
-        self.assertIn("compare-tokenizers", help_text)
-        self.assertNotIn("[planned] Generate semantic text chunks from prepared chapter text files.", normalized_help)
-        self.assertNotIn("[planned] Compare BGE-M3 and optional Sarvam token counts for chapter text.", normalized_help)
+        omitted_commands = (
+            "unicode-ingest",
+            "legacy-convert",
+            "regenerate-embeddings",
+            "update-metadata",
+            "download-subject",
+            "delete-subject",
+        )
+        for command in omitted_commands:
+            self.assertNotIn(command, normalized_help)
 
     def test_generate_docx_has_overwrite_but_no_resume(self):
         parser = build_parser()
@@ -93,14 +83,21 @@ class CliTests(unittest.TestCase):
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
             parser.parse_args(["lab", "append-docx", "a.docx", "b.docx", "--page-break", "--no-page-break"])
 
-    def test_planned_command_exits_with_clear_message(self):
-        stderr = StringIO()
+    def test_removed_planned_commands_are_rejected(self):
+        parser = build_parser()
 
-        with redirect_stderr(stderr), self.assertRaises(SystemExit) as exit_context:
-            main(["download-subject"])
+        for command in (
+            "regenerate-embeddings",
+            "update-metadata",
+            "download-subject",
+            "delete-subject",
+        ):
+            stderr = StringIO()
+            with redirect_stderr(stderr), self.assertRaises(SystemExit) as exit_context:
+                parser.parse_args([command])
 
-        self.assertEqual(exit_context.exception.code, 2)
-        self.assertIn("download-subject is planned but not implemented yet.", stderr.getvalue())
+            self.assertEqual(exit_context.exception.code, 2)
+            self.assertIn("invalid choice", stderr.getvalue())
 
 
 if __name__ == "__main__":

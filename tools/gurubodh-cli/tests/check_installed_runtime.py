@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 from docx import Document
 import gurubodh
-from gurubodh.cli import COMPOSED_COMMANDS, PLANNED_COMMANDS, main
+from gurubodh.cli import COMPOSED_COMMANDS, main
 from gurubodh.legacy.converter import convert_texts
 from gurubodh.resource_discovery import bundled_resource_path
 
@@ -196,8 +196,6 @@ def run():
         assert gemini.call_count == 4, gemini.call_count
         assert embeddings.call_count == 2, embeddings.call_count
         assert tokenizer.call_count == 2, tokenizer.call_count
-        for command in PLANNED_COMMANDS:
-            invoke([command], error="planned but not implemented")
         # Exercise the installed console-script entry point as a subprocess too.
         for argv in (["--help"], ["prep-subject", "--help"], ["lab", "--help"]):
             subprocess.run(["gurubodh", *argv], check=True, capture_output=True, text=True)

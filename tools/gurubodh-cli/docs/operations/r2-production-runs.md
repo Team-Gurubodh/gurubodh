@@ -35,7 +35,7 @@ The gate checks the installed APS vendor mapping against its pinned hash and
 nonempty golden cases, executes APS/Hindi and Unicode/Marathi preparation, then
 generates semantic chunks and Word exports from the resulting canonical release.
 It verifies text preservation, checkpoint completion, lab proofreading, lab DOCX
-assembly/append, tokenizer output, overwrite rejection and planned-command errors.
+assembly/append, tokenizer output, overwrite rejection, and installed CLI help entry points.
 The image build itself also requires a real installed APS conversion to pass.
 
 Gemini SDK responses and model/tokenizer loading use deterministic test substitutes;

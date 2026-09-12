@@ -15,14 +15,6 @@ from gurubodh.pipelines.dispatcher import run_prepared_job
 from gurubodh.project import resolve_project_context
 
 
-PLANNED_COMMANDS = {
-    "regenerate-embeddings": "Regenerate vector embeddings for prepared semantic chunks.",
-    "update-metadata": "Update subject and chapter metadata from the configured metadata source.",
-    "download-subject": "Download subject source files and existing artifacts from configured storage.",
-    "delete-subject": "Delete a subject and its generated artifacts from configured storage.",
-}
-
-
 COMPOSED_COMMANDS = ("prep-subject", "generate-chunks", "generate-docx")
 
 
@@ -68,15 +60,6 @@ def add_common_options(parser, command):
         help="Replace existing local output or R2 objects instead of failing.",
     )
     add_project_option(parser)
-
-
-def add_planned_command(subparsers, command):
-    help_text = PLANNED_COMMANDS[command]
-    subparsers.add_parser(
-        command,
-        help=f"[planned] {help_text}",
-        description=f"[planned] {help_text}",
-    )
 
 
 def build_parser():
@@ -178,18 +161,12 @@ def build_parser():
         "--no-page-break", dest="page_break", action="store_false", help="Append without a page break."
     )
 
-    add_planned_command(subparsers, "regenerate-embeddings")
-
     compare_tokenizers_parser = subparsers.add_parser(
         "compare-tokenizers",
         help="Compare BGE-M3 and optional Sarvam token counts for chapter text.",
         description="Estimate local BGE-M3 token counts and optionally compare them with Sarvam prompt token counts.",
     )
     add_compare_tokenizers_options(compare_tokenizers_parser)
-
-    add_planned_command(subparsers, "update-metadata")
-    add_planned_command(subparsers, "download-subject")
-    add_planned_command(subparsers, "delete-subject")
 
     return parser
 
@@ -204,9 +181,6 @@ def main(argv=None):
 
 
 def _run_command(parser, args):
-
-    if args.command in PLANNED_COMMANDS:
-        parser.error(f"{args.command} is planned but not implemented yet.")
 
     if args.command in COMPOSED_COMMANDS or args.command == "config":
         command = args.resolved_command if args.command == "config" else args.command

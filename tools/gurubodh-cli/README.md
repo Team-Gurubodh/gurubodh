@@ -76,4 +76,4 @@ is plain text. Set `NO_COLOR` to any value to disable color explicitly.
 
 ## Documentation map
 
-The [CLI documentation index](docs/README.md) is the entry point for focused guides, operational runbooks, concepts, and reference material. Documentation describes current behavior; planned command names shown by `gurubodh --help` are not supported workflows.
+The [CLI documentation index](docs/README.md) is the entry point for focused guides, operational runbooks, concepts, and reference material. Documentation and `gurubodh --help` describe the currently supported command surface.
