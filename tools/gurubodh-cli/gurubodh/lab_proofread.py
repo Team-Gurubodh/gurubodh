@@ -36,6 +36,7 @@ from gurubodh.legacy.font_detection import (
 from gurubodh.locales import locale_spec
 from gurubodh.proofreading.errors import ProofreadingError
 from gurubodh.proofreading.gemini import GeminiProofreader
+from gurubodh.presentation import CommandPresentation, present_lab_summary
 from gurubodh.proofreading.settings import ProofreadingSettings
 from gurubodh.proofreading.text_comparison import word_level_diff
 from gurubodh.time_utils import utc_now
@@ -290,8 +291,11 @@ def run_lab_proofread(
             {"state": "source_validation", "entered_at": audit_context.started_at}
         ],
     }
+    output = progress or (lambda _message: None)
+    presentation = CommandPresentation(COMMAND_NAME, output)
+    response = None
     if progress:
-        progress(f"Lab proofread run ID: {run_id} (output: {run_dir})")
+        presentation.stage("setup", f"created run {run_id} at {run_dir}")
 
     def enter(state: str) -> None:
         lifecycle["current_state"] = state
@@ -313,8 +317,9 @@ def run_lab_proofread(
         enter("source_conversion")
         if encodings:
             if progress:
-                progress(
-                    "Converting detected legacy-font text to a transient Unicode DOCX."
+                presentation.stage(
+                    "source conversion",
+                    "converting detected legacy-font text to a transient Unicode DOCX",
                 )
             with tempfile.TemporaryDirectory(
                 prefix="legacy-conversion-", dir=run_dir
@@ -325,7 +330,9 @@ def run_lab_proofread(
                     target_devanagari_font(),
                     context.legacy_converter,
                     converted,
-                    progress=lambda *_: None,
+                    progress=lambda message: presentation.stage(
+                        "source conversion", message
+                    ),
                 )
                 source_text = _canonical_text(extract_docx_text(converted))
                 details["source"]["legacy_conversion"] = {
@@ -350,10 +357,15 @@ def run_lab_proofread(
                 f"Extracted source has {len(source_text)} characters; configured proofreading limit is {selected_settings.max_input_characters}.",
             )
         if progress:
-            progress("Sending one structured Gemini proofreading request.")
+            presentation.stage(
+                "proofreading", "sending one structured Gemini proofreading request"
+            )
         response = (
             proofreader or GeminiProofreader(selected_settings, locale=locale)
-        ).proofread(source_text, progress=progress)
+        ).proofread(
+            source_text,
+            progress=lambda message: presentation.stage("proofreading", message),
+        )
         corrected_text = _canonical_text(response["corrected_text"])
         output_stem = f"{source_path.stem}_proofread"
         corrected_text_path = run_dir / "output" / f"{output_stem}.txt"
@@ -434,11 +446,12 @@ def run_lab_proofread(
         _write_text(run_dir / "README.md", _run_readme(details))
     except Exception as exc:
         failed_stage = lifecycle["current_state"]
+        presentation.failure(failed_stage.replace("_", " "), exc)
         final_dir = _finalize_run(run_dir, "failed")
         details["run_directory"] = str(final_dir)
         enter("failed")
         try:
-            _write_final_reports(
+            result = _write_final_reports(
                 final_dir,
                 audit_context,
                 details,
@@ -448,23 +461,64 @@ def run_lab_proofread(
             )
         except BaseException as audit_error:
             warn_audit_failure(COMMAND_NAME, audit_error, exc)
-        if progress:
-            progress(f"Lab proofread run failed: {final_dir}")
+            result = None
+        present_lab_summary(
+            presentation,
+            outcome="failed",
+            failure_stage=failed_stage,
+            source_validated=bool(details["source"].get("sha256")),
+            proofreading_succeeded=False,
+            response=response,
+            error=exc,
+            run_directory=str(final_dir),
+            report_reference=(
+                {"backend": "local", "path": str(result.paths["json"])}
+                if result is not None
+                else None
+            ),
+            output_available=False,
+        )
         raise
 
     final_dir = _finalize_run(run_dir, "succeeded")
     details["run_directory"] = str(final_dir)
     enter("succeeded")
-    result = _write_final_reports(
-        final_dir,
-        audit_context,
-        details,
-        "succeeded",
-        None,
-        lifecycle,
+    try:
+        result = _write_final_reports(
+            final_dir,
+            audit_context,
+            details,
+            "succeeded",
+            None,
+            lifecycle,
+        )
+    except BaseException as exc:
+        presentation.failure("reporting", exc)
+        present_lab_summary(
+            presentation,
+            outcome="failed",
+            failure_stage="reporting",
+            source_validated=True,
+            proofreading_succeeded=True,
+            response=response,
+            error=exc,
+            run_directory=str(final_dir),
+            report_reference=None,
+            output_available=True,
+        )
+        raise
+    present_lab_summary(
+        presentation,
+        outcome="succeeded",
+        failure_stage=None,
+        source_validated=True,
+        proofreading_succeeded=True,
+        response=response,
+        error=None,
+        run_directory=str(final_dir),
+        report_reference={"backend": "local", "path": str(result.paths["json"])},
+        output_available=True,
     )
-    if progress:
-        progress(f"Lab proofread run succeeded: {final_dir}")
     return {
         "run_id": run_id,
         "run_directory": final_dir,

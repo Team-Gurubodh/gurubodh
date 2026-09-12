@@ -33,6 +33,7 @@ from gurubodh.derived_artifact_lifecycle import (
     run_derived_artifact_lifecycle,
 )
 from gurubodh.errors import ProcessingError
+from gurubodh.presentation import CommandPresentation
 from gurubodh.generate_chunks_audit import GenerateChunksAuditWriter
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig
 from gurubodh.ml.semantic_chunking.file_io import validate_document_for_source
@@ -140,13 +141,14 @@ def write_chunk_artifacts(
     segmenter: ParagraphSegmenter,
     progress=print,
     summary: ChunkGenerationSummary | None = None,
+    presentation: CommandPresentation | None = None,
 ) -> ChunkGenerationSummary:
     chapters = job.candidate_sources
     result = summary or ChunkGenerationSummary(source_chapter_count=0)
+    presenter = presentation or CommandPresentation("generate-chunks", progress)
     result.source_chapter_count = len(job.candidate_manifest.chapters)
     result.skipped_chapter_count = len(job.candidate_manifest.chapters) - len(chapters)
     for position, source in enumerate(chapters, 1):
-        prefix = f"[{position}/{len(chapters)}] {source.text_path.name}:"
         filename = chapter_chunks_output_filename(config, int(source.chapter_number))
         metadata = source.metadata
         in_progress = ChunkChapterSummary(
@@ -162,11 +164,26 @@ def write_chunk_artifacts(
         )
         result.chapters.append(in_progress)
         try:
-            progress(f"{prefix} reading source text")
+            presenter.chapter(
+                source.chapter_number,
+                f"reading {source.text_path.name}",
+                position=position,
+                total=len(chapters),
+            )
             text = source.text_path.read_text(encoding="utf-8")
-            progress(f"{prefix} segmenting {len(text)} characters")
+            presenter.chapter(
+                source.chapter_number,
+                f"segmenting {len(text)} characters",
+                position=position,
+                total=len(chapters),
+            )
             document = segmenter.segment(text, source_name=source.text_path.name)
-            progress(f"{prefix} validating chunks")
+            presenter.chapter(
+                source.chapter_number,
+                "validating chunks",
+                position=position,
+                total=len(chapters),
+            )
             validate_document_for_source(text, document)
             path = job.paths.semantic_chunks / filename
             write_json_artifact(
@@ -185,11 +202,23 @@ def write_chunk_artifacts(
             result.chunk_artifacts_written += 1
             result.total_chunk_count += document.chunk_count
             result.total_estimated_token_count += document.estimated_token_count
-            progress(f"{prefix} wrote {document.chunk_count} chunk(s)")
+            presenter.chapter(
+                source.chapter_number,
+                f"wrote {document.chunk_count} chunk(s)",
+                position=position,
+                total=len(chapters),
+            )
         except BaseException as error:
             in_progress.status = GenerationStatus.FAILED
             in_progress.error = str(error)[:500] or error.__class__.__name__
             result.failed_chapter_count += 1
+            presenter.failure(
+                "generation",
+                error,
+                chapter=source.chapter_number,
+                position=position,
+                total=len(chapters),
+            )
             raise
     return result
 
@@ -270,11 +299,13 @@ class GenerateChunksWorkflow:
         overwrite,
         destination_subject,
         segmenter,
+        presentation,
     ):
         self.config = config
         self.semantic_config = config.semantic_chunk_config
         self.destination_subject = Path(destination_subject)
         self.segmenter = segmenter
+        self.presentation = presentation
         self.job = None
         self.result = ChunkGenerationSummary(source_chapter_count=0)
         self.audit = GenerateChunksAuditWriter(
@@ -332,8 +363,12 @@ class GenerateChunksWorkflow:
             segmenter,
             progress=progress,
             summary=self.result,
+            presentation=self.presentation,
         )
         self.result.audit_report_references = self.audit.references
+        return self.result
+
+    def current_generation(self):
         return self.result
 
     def build_readiness_manifest(self, source, generation):
@@ -389,7 +424,9 @@ def run_generate_chunks_job(
     segmenter: ParagraphSegmenter | None = None,
     r2_client=None,
     progress=print,
+    presentation: CommandPresentation | None = None,
 ) -> ChunkGenerationSummary:
+    presenter = presentation or CommandPresentation("generate-chunks", progress)
     definition = DerivedArtifactDefinition(
         command_name="generate-chunks",
         output_relative_dir=SEMANTIC_CHUNKS_RELATIVE_DIR,
@@ -408,6 +445,7 @@ def run_generate_chunks_job(
         overwrite,
         destination_subject,
         segmenter,
+        presenter,
     )
     lifecycle = run_derived_artifact_lifecycle(
         config,
@@ -419,6 +457,7 @@ def run_generate_chunks_job(
         destination_subject=destination_subject,
         destination_temporary=destination_temporary,
         source_revalidator=revalidate_source_release,
+        presentation=presenter,
     )
     result = lifecycle.generation
     result.publication = lifecycle.publication

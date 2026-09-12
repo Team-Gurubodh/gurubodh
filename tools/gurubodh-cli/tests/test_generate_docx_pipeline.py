@@ -457,6 +457,7 @@ class GenerateDocxPipelineTests(unittest.TestCase):
         objects[manifest_key] = b"old manifest"
         client = FakeR2Client(objects, fail_docx_upload=True)
         loaded = prepare_generate_docx_job(config)
+        messages = []
 
         with self.assertRaisesRegex(GurubodhError, "simulated DOCX upload failure"):
             run_generate_docx_job(
@@ -464,11 +465,48 @@ class GenerateDocxPipelineTests(unittest.TestCase):
                 loaded,
                 overwrite=True,
                 r2_client=client,
-                progress=lambda _: None,
+                progress=messages.append,
             )
 
         self.assertNotIn(manifest_key, client.objects)
         self.assertTrue(any("/run_reports/generate-docx/" in key for key in client.objects))
+        self.assertIn("generate-docx: failed — publication failed", messages)
+        self.assertIn(
+            "DOCX generation: 1 chapter succeeded, 0 failed.", messages
+        )
+        self.assertIn(
+            "Final publication: failed; output is not ready.", messages
+        )
+
+    def test_audit_failure_after_processing_reports_published_output_and_original_error(self):
+        config = base_config(self.temp_dir.name)
+        subject, _ = write_local_release(
+            self.temp_dir.name, config, ["शुद्ध पाठ।\n"]
+        )
+        loaded = prepare_generate_docx_job(config)
+        messages = []
+
+        with patch(
+            "gurubodh.pipelines.generate_docx.GenerateDocxAuditWriter.write",
+            side_effect=OSError("audit disk failure"),
+        ), self.assertRaisesRegex(GurubodhError, "audit disk failure"):
+            run_generate_docx_job(
+                self.context,
+                loaded,
+                progress=messages.append,
+            )
+
+        output = subject / "chapters" / "msword"
+        self.assertTrue((output / "docx_manifest.json").is_file())
+        self.assertIn("generate-docx: failed — success audit failed", messages)
+        self.assertIn(
+            "DOCX generation: 1 chapter succeeded, 0 failed.", messages
+        )
+        self.assertIn(
+            "Final publication: succeeded; output is ready.", messages
+        )
+        self.assertIn(f"Output: {output}", messages)
+        self.assertFalse(any(line.startswith("Report (") for line in messages))
 
     def test_invalid_dedicated_job_fails_before_pipeline(self):
         config = base_config(self.temp_dir.name)

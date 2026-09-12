@@ -59,6 +59,21 @@ afterward.
 - `prep-subject` is a single-writer operation per destination. The local advisory lock and R2 advisory lease are guardrails only, not reliable distributed mutual exclusion; concurrent runs can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
 - Run `gurubodh <command> --help` for the exact installed command interface; job schemas under `config/jobs/` define the machine-validated configuration.
 
+## Terminal progress and outcomes
+
+`prep-subject`, `generate-chunks`, `generate-docx`, and `lab proofread` use the
+same stage and chapter prefixes, announce a bounded processing failure when it
+happens, and finish with an explicit `succeeded`, `failed`, or `incomplete`
+outcome. Final summaries distinguish processing from publication, identify
+reused, skipped, or pending work when applicable, and print available output
+and report locations. Request and upload counts appear only where they are
+measured; a completed Gemini request does not by itself mean that its response
+passed proofreading validation.
+
+On an interactive terminal, only a successful whole-command outcome is green;
+immediate failures and failed or incomplete outcomes are red. Redirected output
+is plain text. Set `NO_COLOR` to any value to disable color explicitly.
+
 ## Documentation map
 
 The [CLI documentation index](docs/README.md) is the entry point for focused guides, operational runbooks, concepts, and reference material. Documentation describes current behavior; planned command names shown by `gurubodh --help` are not supported workflows.

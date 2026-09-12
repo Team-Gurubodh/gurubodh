@@ -71,8 +71,12 @@ class LabProofreadTests(unittest.TestCase):
         self.assertEqual(run_dir.parent.name, "succeeded")
         self.assertRegex(result["run_id"], r"^\d{8}-\d{6}-[a-f0-9]{6}$")
         active_dir = run_dir.parent.parent / "active" / result["run_id"]
-        self.assertEqual(progress[0], f"Lab proofread run ID: {result['run_id']} (output: {active_dir})")
-        self.assertEqual(progress[-1], f"Lab proofread run succeeded: {run_dir}")
+        self.assertEqual(
+            progress[0],
+            f"[lab proofread setup] created run {result['run_id']} at {active_dir}",
+        )
+        self.assertIn("lab proofread: succeeded — proofreading completed", progress)
+        self.assertEqual(progress[-1], f"Report: {result['manifest_path']}")
         self.assertFalse(active_dir.exists())
         self.assertEqual(source.read_bytes(), source_before)
         self.assertEqual(len(proofreader.calls), 1)
@@ -260,7 +264,11 @@ class LabProofreadTests(unittest.TestCase):
             manifest["command_details"]["run_directory"], str(failed_dir)
         )
         self.assertEqual(list((runs / "active").iterdir()), [])
-        self.assertEqual(progress[-1], f"Lab proofread run failed: {failed_dir}")
+        self.assertIn("lab proofread: failed — proofreading failed", progress)
+        self.assertEqual(
+            Path(progress[-1].removeprefix("Report: ")).resolve(),
+            manifests[0].resolve(),
+        )
 
     def test_terminal_503_records_safe_capacity_diagnostics_in_the_failed_lab_report(self):
         source = self.source_docx()
@@ -313,6 +321,7 @@ class LabProofreadTests(unittest.TestCase):
                 raise primary
 
         stderr = StringIO()
+        progress = []
         with (
             patch(
                 "gurubodh.lab_proofread._write_final_reports",
@@ -327,10 +336,16 @@ class LabProofreadTests(unittest.TestCase):
                 "hi-IN",
                 self.root / "lab",
                 proofreader=FailingProofreader(),
+                progress=progress.append,
             )
 
         self.assertIn("preserving the primary ProofreadingError", stderr.getvalue())
         self.assertIn("audit disk failure", stderr.getvalue())
+        self.assertIn("lab proofread: failed — proofreading failed", progress)
+        self.assertIn(
+            "Local output: not available; the lab run did not complete.", progress
+        )
+        self.assertFalse(any(line.startswith("Report:") for line in progress))
 
     def test_rejects_canonical_lab_root_and_invalid_locale(self):
         source = self.source_docx()

@@ -228,25 +228,20 @@ def _run_command(parser, args):
 
         runner = run_generate_chunks_job if command == "generate-chunks" else run_generate_docx_job
         try:
-            result = runner(context, job, overwrite=args.overwrite)
+            runner(context, job, overwrite=args.overwrite)
         except Exception as exc:
             parser.error(str(exc))
-        if command == "generate-chunks":
-            print(f"generate-chunks complete: {result['processed_chapter_count']} chapter(s), {result['total_chunk_count']} chunk(s)")
-        else:
-            print(f"generate-docx complete: {result['processed_chapter_count']} chapter DOCX file(s)")
         return
 
     if args.command == "lab" and args.lab_command == "proofread":
         try:
             context = resolve_project_context(args.project_root)
-            result = run_lab_proofread(
+            run_lab_proofread(
                 context, args.source, args.locale, args.lab_root, progress=print,
                 proofreading_profile_id=args.proofreading_profile,
             )
         except Exception as exc:
             parser.error(str(exc))
-        print(f"lab proofread complete: {result['run_directory']}")
         return
 
     if args.command == "lab" and args.lab_command == "assemble-docx":

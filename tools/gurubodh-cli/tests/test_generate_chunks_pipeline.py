@@ -571,6 +571,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         objects[manifest_key] = "old manifest"
         client = FakeR2Client(objects, fail_chunk_upload=True)
         loaded = prepare_generate_chunks_job(config)
+        messages = []
 
         with self.assertRaisesRegex(GurubodhError, "simulated chunk upload failure"):
             run_generate_chunks_job(
@@ -579,7 +580,7 @@ class GenerateChunksPipelineTests(unittest.TestCase):
                 overwrite=True,
                 segmenter=FakeSegmenter(),
                 r2_client=client,
-                progress=lambda _: None,
+                progress=messages.append,
             )
 
         self.assertNotIn(manifest_key, client.objects)
@@ -592,6 +593,15 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         report = json.loads(failure_reports[0])
         self.assertEqual(report["failure"]["stage"], "publication")
         self.assertEqual(report["publication"]["status"], "failed")
+        self.assertIn(
+            "generate-chunks: failed — publication failed", messages
+        )
+        self.assertIn(
+            "Chunk generation: 1 chapter succeeded, 0 failed.", messages
+        )
+        self.assertIn(
+            "Final publication: failed; output is not ready.", messages
+        )
 
     def test_r2_materializes_only_selected_manifest_artifacts(self):
         config = base_config(self.temp_dir.name)

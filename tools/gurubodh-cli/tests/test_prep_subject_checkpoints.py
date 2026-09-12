@@ -185,10 +185,15 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             state = json.loads(client.objects[prefix + JOB_STATE_RELATIVE_PATH.as_posix()])
             stems = [chapter["source_filename"].removesuffix("_unmodified_source.txt") for chapter in state["chapters"]]
             labels = "canonical text, canonical metadata, unmodified source, diff, proofreading details"
-            expected = [f"  [{index:02d}/02] {stem} ({labels})" for index, stem in enumerate(stems, start=1)]
-            self.assertEqual([line for line in messages if line.startswith("  [")], expected[:1])
+            expected = [
+                f"[prep-subject operation]   [{index:02d}/02] {stem} ({labels})"
+                for index, stem in enumerate(stems, start=1)
+            ]
+            self.assertEqual(
+                [line for line in messages if "]   [" in line], expected[:1]
+            )
             self.assertNotIn(prefix + "chapters/chapter_content_manifest.json", client.objects)
-            self.assertFalse(any(line.startswith("prep-subject complete;") for line in messages))
+            self.assertFalse(any(line.startswith("prep-subject: succeeded") for line in messages))
 
             resumed = FakeProofreader([])
             messages.clear()
@@ -198,13 +203,16 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 r2_client=client, proofreader=resumed, progress=messages.append,
             )
             self.assertEqual(resumed.calls, [])
-            self.assertEqual([line for line in messages if line.startswith("  [")], expected)
+            self.assertEqual([line for line in messages if "]   [" in line], expected)
             self.assertEqual(result["status"], "succeeded")
             canonical_uploads = [key for key in client.uploads[upload_start:] if key.startswith(prefix + "chapters/")]
             self.assertEqual(len(canonical_uploads), 12)
             self.assertEqual(canonical_uploads[-1], prefix + "chapters/chapter_content_manifest.json")
-            self.assertTrue(messages[-2].startswith("prep-subject complete;"))
-            self.assertTrue(messages[-1].startswith("prep-subject metrics: Gemini generate_content attempts 0"))
+            self.assertIn("prep-subject: succeeded — 2 chapters prepared", messages)
+            self.assertIn(
+                "R2 canonical-publication upload operations: 12 succeeded, 0 failed (excludes audit reports).",
+                messages,
+            )
 
             messages.clear()
             result = run_resumable_prep_job(
@@ -212,7 +220,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 r2_client=client, proofreader=resumed, progress=messages.append,
             )
             self.assertTrue(result["already_complete"])
-            self.assertFalse(any(line.startswith(("Publishing ", "  [")) for line in messages))
+            self.assertFalse(
+                any("Publishing " in line or "]   [" in line for line in messages)
+            )
 
     def test_compatibility_record_has_a_deterministic_output_affecting_contract(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -477,7 +487,10 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             output = io.StringIO()
             with redirect_stdout(output):
                 unicode_runner.call_args.args[4](source, root / "output.docx")
-            self.assertIn("[prepare] Reading the Unicode source DOCX directly", output.getvalue())
+            self.assertIn(
+                "[prep-subject preparation] reading the Unicode source DOCX",
+                output.getvalue(),
+            )
             self.assertFalse((root / "output.docx").exists())
 
         legacy_config = {"pipeline": "legacy-docx-to-unicode"}
@@ -498,7 +511,10 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             with patch.object(legacy_docx_to_unicode, "convert_docx", return_value={}) as convert:
                 with redirect_stdout(output):
                     legacy_runner.call_args.args[4](root / "source.docx", root / "output.docx", lambda *_: None)
-            self.assertIn("[prepare] Converting the legacy source DOCX to a transient Unicode working copy", output.getvalue())
+            self.assertIn(
+                "[prep-subject preparation] converting the legacy source DOCX",
+                output.getvalue(),
+            )
             self.assertTrue(convert.called)
             self.assertIsNone(convert.call_args.args[4])
 
@@ -526,16 +542,22 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                         unicode_docx_ingest.prepare_unicode_docx,
                     )
 
-                expected = (
-                    f"prep-subject complete; canonical artifacts were published successfully to "
-                    f"{root / 'subject' / 'hi-IN'}. Chapters: 2 succeeded, 0 failed, 0 pending."
-                )
                 self.assertEqual(result["status"], "succeeded")
-                self.assertIn(expected, output.getvalue())
+                self.assertIn(
+                    "prep-subject: succeeded — 2 chapters prepared",
+                    output.getvalue(),
+                )
+                self.assertIn(
+                    f"Output: {root / 'subject' / 'hi-IN'}",
+                    output.getvalue(),
+                )
                 self.assertTrue(output.getvalue().startswith("=" * 72 + "\n"))
                 self.assertIn("IMPORTANT: prep-subject is single-writer per destination.", output.getvalue())
                 self.assertIn("checkpoint/workspace artifacts.\n", output.getvalue())
-                self.assertIn("prep-subject metrics: Gemini generate_content attempts 2 (2 succeeded, 0 failed).", output.getvalue())
+                self.assertIn(
+                    "Gemini requests: 2 completed, 0 request failures.",
+                    output.getvalue(),
+                )
                 state = json.loads(
                     (
                         root
@@ -636,11 +658,14 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             self.assertTrue(result["already_complete"])
             self.assertEqual(resumed.calls, [])
             self.assertNotIn("[prepare]", output.getvalue())
+            self.assertIn("prep-subject: succeeded — 2 chapters prepared", output.getvalue())
             self.assertIn(
-                "prep-subject already complete; the compatible checkpoint is succeeded. No Gemini requests were made.",
+                "Reused: 2 successful chapter checkpoints.", output.getvalue()
+            )
+            self.assertIn(
+                "Gemini requests: 0 completed, 0 request failures.",
                 output.getvalue(),
             )
-            self.assertIn("prep-subject metrics: Gemini generate_content attempts 0 (0 succeeded, 0 failed).", output.getvalue())
 
     def test_legacy_succeeded_resume_migrates_without_authorizing_cleanup(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -823,6 +848,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                 ]
             )
             stderr = io.StringIO()
+            output = io.StringIO()
 
             with (
                 patch(
@@ -834,6 +860,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
                     side_effect=OSError("audit disk failure"),
                 ),
                 redirect_stderr(stderr),
+                redirect_stdout(output),
                 self.assertRaisesRegex(GurubodhError, "prep-subject is incomplete"),
             ):
                 run_resumable_prep_job(
@@ -846,6 +873,51 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
 
             self.assertIn("preserving the primary ProcessingError", stderr.getvalue())
             self.assertIn("audit disk failure", stderr.getvalue())
+            self.assertIn(
+                "prep-subject: incomplete — 2 chapters failed", output.getvalue()
+            )
+            self.assertNotIn("Report (json):", output.getvalue())
+
+    def test_invalid_response_reports_completed_request_before_incomplete_summary(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_docx(root / "source.docx")
+            invalid = ProofreadingError(
+                "invalid_response",
+                "structured response did not validate",
+                request_attempts=1,
+                successful_request_attempts=1,
+            )
+            proofreader = FakeProofreader(
+                [invalid, "CHAPTER 2\nदूसरा सही पाठ।"]
+            )
+            messages = []
+
+            with self.assertRaisesRegex(GurubodhError, "incomplete"):
+                run_resumable_prep_job(
+                    config(root),
+                    "prep-subject",
+                    False,
+                    False,
+                    prepare_unicode,
+                    proofreader=proofreader,
+                    progress=messages.append,
+                )
+
+            immediate = next(
+                index
+                for index, message in enumerate(messages)
+                if "chapter 001 proofreading] failed: structured response" in message
+            )
+            summary = messages.index("prep-subject: incomplete — 1 chapter failed")
+            self.assertLess(immediate, summary)
+            self.assertIn(
+                "Gemini requests: 2 completed, 0 request failures.", messages
+            )
+            self.assertIn(
+                "Final publication: not performed; preparation incomplete.",
+                messages,
+            )
 
     def test_fake_r2_retains_checkpoint_workspace_then_publishes_canonical_manifest_last(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -96,6 +96,7 @@ def split_docx_into_chapters(
     progress=None,
     compiled_pattern=None,
 ):
+    emit = progress or print
     with zipfile.ZipFile(docx_path) as docx:
         document_xml = docx.read("word/document.xml")
 
@@ -108,19 +109,22 @@ def split_docx_into_chapters(
         body, chapter_split, compiled_pattern
     )
     if not chapters:
-        print(f"no chapters found using pattern: {chapter_split['pattern']}")
+        emit(f"no chapters found using pattern: {chapter_split['pattern']}")
         return []
 
     subject_blocks = detect_subject_blocks(preface)
     unmodified_source_text_dir.mkdir(parents=True, exist_ok=True)
 
-    print(
-        f"[split] Detected {len(chapters)} chapter(s); creating ordered "
+    emit(
+        f"detected {len(chapters)} chapter(s); creating ordered "
         "unmodified-source text snapshots sequentially."
     )
     outputs = []
     for index, blocks in enumerate(chapters, start=1):
-        print(f"[split {index:02d}/{len(chapters):02d}] Extracting the chapter source-text snapshot.")
+        emit(
+            f"chapter {index:02d}/{len(chapters):02d}: extracting the "
+            "source-text snapshot"
+        )
         if config:
             unmodified_source_name = chapter_unmodified_source_filename(config, index)
         else:
@@ -134,9 +138,12 @@ def split_docx_into_chapters(
         # after the strict proofreading response has been validated.
         unmodified_source_path.write_text(text_value + "\n", encoding="utf-8")
         if progress:
-            progress(f"split {index:02d}/{len(chapters):02d}", unmodified_source_path)
+            progress(f"wrote source snapshot {unmodified_source_path.name}")
         outputs.append(unmodified_source_path)
 
     if not progress:
-        print(f"wrote {len(outputs)} unmodified chapter text files under {unmodified_source_text_dir}")
+        emit(
+            f"wrote {len(outputs)} unmodified chapter text files under "
+            f"{unmodified_source_text_dir}"
+        )
     return outputs

@@ -17,6 +17,7 @@ from gurubodh.audit import AuditWriteResult, bounded_failure, warn_audit_failure
 from gurubodh.canonical_source import revalidate_source_release
 from gurubodh.contracts import CleanupResource, MaterializedSource, R2Client
 from gurubodh.errors import GurubodhError, ProcessingError, PublicationError
+from gurubodh.presentation import CommandPresentation, present_derived_summary
 from gurubodh.schema_validation import write_json_artifact
 from gurubodh.storage import (
     storage_backend,
@@ -147,6 +148,8 @@ class DerivedArtifactWorkflow(Protocol[GenerationT]):
     def build_readiness_manifest(
         self, source: MaterializedSource, generation: GenerationT
     ) -> dict[str, Any]: ...
+
+    def current_generation(self) -> GenerationT: ...
 
     def validate_staged_package(
         self,
@@ -491,6 +494,7 @@ def run_derived_artifact_lifecycle(
     destination_subject: Path | None = None,
     destination_temporary: CleanupResource | None = None,
     source_revalidator: Callable[..., None] = revalidate_source_release,
+    presentation: CommandPresentation | None = None,
 ) -> LifecycleResult[GenerationT]:
     """Execute the ordered lifecycle and preserve the original failure."""
     needs_r2 = is_r2(config["source"]) or is_r2(config["destination"])
@@ -510,6 +514,7 @@ def run_derived_artifact_lifecycle(
         ownership_scope=definition.output_relative_dir.as_posix(),
         overwrite_requested=overwrite,
     )
+    audit = None
 
     try:
         with tempfile.TemporaryDirectory(
@@ -517,6 +522,8 @@ def run_derived_artifact_lifecycle(
         ) as stage_dir:
             staged_output = Path(stage_dir) / definition.output_relative_dir.name
             trace.enter(LifecycleState.PREFLIGHT)
+            if presentation:
+                presentation.stage("preflight", "checking the destination")
             preflight_destination(
                 config,
                 definition,
@@ -527,15 +534,31 @@ def run_derived_artifact_lifecycle(
             )
 
             trace.enter(LifecycleState.SOURCE_VALIDATION)
-            source = workflow.materialize_and_validate_source(client, progress)
+            if presentation:
+                presentation.stage("source", "validating the canonical source")
+            source_progress = (
+                lambda message: presentation.stage("source", message)
+                if presentation
+                else progress(message)
+            )
+            source = workflow.materialize_and_validate_source(client, source_progress)
 
             trace.enter(LifecycleState.GENERATION)
+            if presentation:
+                presentation.stage("processing", "generating staged artifacts")
             staged_output.mkdir(parents=True, exist_ok=False)
+            processing_progress = (
+                lambda message: presentation.stage("processing", message)
+                if presentation
+                else progress(message)
+            )
             generation = workflow.generate_staged_artifacts(
-                source, staged_output, progress
+                source, staged_output, processing_progress
             )
 
             trace.enter(LifecycleState.STAGED_VALIDATION)
+            if presentation:
+                presentation.stage("validation", "validating the staged package")
             manifest_payload = workflow.build_readiness_manifest(source, generation)
             readiness_manifest = staged_output / definition.readiness_manifest_filename
             if definition.readiness_manifest_artifact_name:
@@ -555,6 +578,8 @@ def run_derived_artifact_lifecycle(
             )
 
             trace.enter(LifecycleState.SOURCE_REVALIDATION)
+            if presentation:
+                presentation.stage("source", "revalidating before publication")
             source_revalidator(
                 config,
                 source.candidate_manifest,
@@ -563,6 +588,8 @@ def run_derived_artifact_lifecycle(
             )
 
             trace.enter(LifecycleState.PUBLICATION)
+            if presentation:
+                presentation.stage("publication", "publishing validated artifacts")
             if is_local(config["destination"]):
                 publish_local(
                     definition,
@@ -579,10 +606,16 @@ def run_derived_artifact_lifecycle(
                     overwrite,
                     publication,
                     client,
-                    progress,
+                    (
+                        lambda message: presentation.stage("publication", message)
+                        if presentation
+                        else progress(message)
+                    ),
                 )
 
             trace.enter(LifecycleState.SUCCESS_AUDIT)
+            if presentation:
+                presentation.stage("reporting", "writing final audit reports")
             audit = workflow.write_audit(
                 "succeeded",
                 trace,
@@ -590,14 +623,37 @@ def run_derived_artifact_lifecycle(
                 generation,
                 publication.as_dict(),
                 None,
-                announce=is_local(config["destination"]),
+                announce=False,
             )
             if is_r2(config["destination"]):
                 _upload_audit_reports(config, definition, audit, client)
-                progress(
-                    f"Published {definition.command_name} audit reports under "
+                report_message = (
+                    f"published audit reports under "
                     f"r2://{config['destination']['bucket']}/"
                     f"{subject_artifact_object_key(config['destination'], definition.report_relative_dir)}/"
+                )
+                if presentation:
+                    presentation.stage("reporting", report_message)
+                else:
+                    progress(report_message)
+            if presentation:
+                present_derived_summary(
+                    presentation,
+                    outcome="succeeded",
+                    generation=generation,
+                    source_count=len(source.candidate_manifest.chapters),
+                    publication=publication.as_dict(),
+                    report_references=(
+                        audit.references
+                        if is_r2(config["destination"])
+                        else {
+                            kind: {
+                                "backend": "local",
+                                "path": str(audit.paths[kind]),
+                            }
+                            for kind in ("json", "markdown")
+                        }
+                    ),
                 )
             return LifecycleResult(
                 source=source,
@@ -613,6 +669,24 @@ def run_derived_artifact_lifecycle(
         }:
             _ensure_r2_not_ready(publication, client)
         failure = _failure_details(trace.current_state, error)
+        current_generation = generation
+        if presentation:
+            if current_generation is None:
+                current_generation = workflow.current_generation()
+            failed_chapters = getattr(
+                current_generation, "failed_chapter_count", None
+            )
+            if failed_chapters is None:
+                failed_chapters = sum(
+                    1
+                    for chapter in getattr(current_generation, "chapters", ())
+                    if getattr(getattr(chapter, "status", None), "value", None)
+                    == "failed"
+                )
+            if not (
+                trace.current_state is LifecycleState.GENERATION and failed_chapters
+            ):
+                presentation.failure(trace.current_state.value, error)
         try:
             audit = workflow.write_audit(
                 "failed",
@@ -621,12 +695,41 @@ def run_derived_artifact_lifecycle(
                 generation,
                 publication.as_dict(),
                 failure,
-                announce=is_local(config["destination"]),
+                announce=False,
             )
             if is_r2(config["destination"]):
                 _upload_audit_reports(config, definition, audit, client)
         except BaseException as audit_error:
             warn_audit_failure(definition.command_name, audit_error, error)
+            audit = None
+        if presentation:
+            present_derived_summary(
+                presentation,
+                outcome="failed",
+                generation=current_generation,
+                source_count=(
+                    len(source.candidate_manifest.chapters)
+                    if source is not None
+                    else None
+                ),
+                publication=publication.as_dict(),
+                report_references=(
+                    (
+                        audit.references
+                        if is_r2(config["destination"])
+                        else {
+                            kind: {
+                                "backend": "local",
+                                "path": str(audit.paths[kind]),
+                            }
+                            for kind in ("json", "markdown")
+                        }
+                    )
+                    if audit is not None
+                    else None
+                ),
+                failure_stage=trace.current_state.value,
+            )
         if not isinstance(error, Exception):
             raise
         if isinstance(error, GurubodhError):

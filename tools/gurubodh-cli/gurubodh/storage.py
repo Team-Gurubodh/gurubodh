@@ -358,7 +358,7 @@ def local_source_path(config):
     return root_dir / relative_path
 
 
-def materialize_source(config, r2_client: R2Downloader | None = None):
+def materialize_source(config, r2_client: R2Downloader | None = None, progress=print):
     source = config["source"]
     if is_local(source):
         path = local_source_path(config)
@@ -368,7 +368,7 @@ def materialize_source(config, r2_client: R2Downloader | None = None):
     filename = PurePosixPath(source["key"]).name
     path = Path(temp_dir.name) / filename
     client = r2_client or R2StorageClient.from_env()
-    print(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
+    progress(f"downloading R2 source r2://{source['bucket']}/{source['key']}")
     client.download_file(source["bucket"], source["key"], path)
     return path, temp_dir
 

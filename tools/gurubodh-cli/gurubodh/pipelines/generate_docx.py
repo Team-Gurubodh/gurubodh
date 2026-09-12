@@ -40,6 +40,7 @@ from gurubodh.docx.export import (
 )
 from gurubodh.errors import ProcessingError
 from gurubodh.generate_docx_audit import GenerateDocxAuditWriter
+from gurubodh.presentation import CommandPresentation
 from gurubodh.storage import (
     DOCX_REPORT_DIR,
     destination_artifact_reference,
@@ -64,10 +65,12 @@ def generate_docx_artifacts(
     output_dir,
     progress=print,
     summary: DocxGenerationSummary | None = None,
+    presentation: CommandPresentation | None = None,
 ) -> DocxGenerationSummary:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     result = summary or DocxGenerationSummary()
+    presenter = presentation or CommandPresentation("generate-docx", progress)
     for index, source in enumerate(sources, start=1):
         chapter_number = source.chapter_number
         filename = _docx_filename(source)
@@ -87,7 +90,12 @@ def generate_docx_artifacts(
             docx_artifact=destination_artifact_reference(config, DOCX_RELATIVE_DIR / filename),
         )
         result.chapters.append(chapter)
-        progress(f"[{index:02d}/{len(sources):02d}] chapter {chapter_number}: generating {filename}")
+        presenter.chapter(
+            chapter_number,
+            f"generating {filename}",
+            position=index,
+            total=len(sources),
+        )
         try:
             text = source.text_path.read_text(encoding="utf-8")
             write_chapter_docx(path, text, title, config["naming"]["language"])
@@ -96,8 +104,20 @@ def generate_docx_artifacts(
         except Exception as exc:
             chapter.status = GenerationStatus.FAILED
             chapter.error = str(exc)[:500] or exc.__class__.__name__
+            presenter.failure(
+                "generation",
+                exc,
+                chapter=chapter_number,
+                position=index,
+                total=len(sources),
+            )
             raise
-        progress(f"[{index:02d}/{len(sources):02d}] chapter {chapter_number}: validated")
+        presenter.chapter(
+            chapter_number,
+            "validated",
+            position=index,
+            total=len(sources),
+        )
     return result
 
 
@@ -163,10 +183,12 @@ class GenerateDocxWorkflow:
         entry_point,
         overwrite,
         destination_subject,
+        presentation,
     ):
         self.context = context
         self.config = config
         self.summary = DocxGenerationSummary()
+        self.presentation = presentation
         self.audit = GenerateDocxAuditWriter(
             context,
             config,
@@ -200,7 +222,11 @@ class GenerateDocxWorkflow:
             staged_output,
             progress,
             summary=self.summary,
+            presentation=self.presentation,
         )
+        return self.summary
+
+    def current_generation(self):
         return self.summary
 
     def build_readiness_manifest(self, source, generation):
@@ -257,7 +283,9 @@ def run_generate_docx_job(
     overwrite=False,
     r2_client=None,
     progress=print,
+    presentation: CommandPresentation | None = None,
 ) -> DocxGenerationSummary:
+    presenter = presentation or CommandPresentation("generate-docx", progress)
     definition = DerivedArtifactDefinition(
         command_name="generate-docx",
         output_relative_dir=DOCX_RELATIVE_DIR,
@@ -274,6 +302,7 @@ def run_generate_docx_job(
         entry_point,
         overwrite,
         destination_subject,
+        presenter,
     )
     lifecycle = run_derived_artifact_lifecycle(
         config,
@@ -285,6 +314,7 @@ def run_generate_docx_job(
         destination_subject=destination_subject,
         destination_temporary=destination_temporary,
         source_revalidator=revalidate_source_release,
+        presentation=presenter,
     )
     result = lifecycle.generation
     result.docx_manifest = destination_artifact_reference(

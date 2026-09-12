@@ -446,6 +446,7 @@ class PrepCheckpointManager:
         path, self.source_temp_dir = materialize_source(
             self.config,
             r2_client=self.r2_client or self.store.client,
+            progress=self.progress,
         )
         return path
 
@@ -870,9 +871,6 @@ class PrepCheckpointManager:
 
     def report_metrics(self) -> dict[str, Any]:
         return self.metrics_service.report()
-
-    def print_metrics_summary(self) -> None:
-        self.metrics_service.print_summary(self.progress)
 
     def close(self) -> None:
         if self.state and self.coordinator.release(self.state):

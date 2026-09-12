@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from gurubodh.contracts import R2Client
 from gurubodh.storage import upload_r2_file
@@ -140,19 +140,3 @@ class PrepMetrics:
                 else None
             ),
         }
-
-    def print_summary(self, progress: Callable[[str], None] = print) -> None:
-        gemini = self.values["gemini_generate_content_requests"]
-        summary = (
-            "prep-subject metrics: Gemini generate_content attempts "
-            f"{gemini['attempts_total']} ({gemini['attempts_succeeded']} "
-            f"succeeded, {gemini['attempts_failed']} failed)"
-        )
-        r2 = self.values["r2_object_upload_requests"]
-        if r2 is not None:
-            summary += (
-                "; R2 object-upload attempts "
-                f"{r2['attempts_total']} ({r2['attempts_succeeded']} succeeded, "
-                f"{r2['attempts_failed']} failed)"
-            )
-        progress(summary + ".")
