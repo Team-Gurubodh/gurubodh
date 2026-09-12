@@ -18,4 +18,4 @@ gurubodh lab --help
 - `lab proofread`, `lab assemble-docx`, and `lab append-docx` are local, non-canonical tools.
 - `compare-tokenizers` estimates BGE-M3 tokens for chapter text. It can call Sarvam only when both its API key and explicit external-API approval flags are supplied. Its progress is written to stderr; JSON output is available with `--format json`.
 
-The former preparation aliases are retired; use `prep-subject` with explicit selectors. The accepted migration map and retirement decision are tracked in [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288). Commands labelled `[planned]` in `gurubodh --help` are not supported workflows and have no operator guide yet.
+The former preparation aliases are retired; use `prep-subject` with explicit selectors. The accepted migration map and retirement decision are tracked in [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288).
