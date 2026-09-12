@@ -91,7 +91,8 @@ jobs:
             --workdir /opt/gurubodh-cli --entrypoint python \
             gurubodh-cli:smoke -B -m unittest -v \
             test_maintained_job_migration.MaintainedJobMigrationTests.test_all_26_maintained_selectors_inspect_via_cli \
-            test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_validate_independently_and_preserve_each_edition
+            test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_validate_independently \
+            test_maintained_job_migration.MaintainedJobMigrationTests.test_manifests_preserve_every_legacy_edition
 
   publish:
     needs: smoke-test
