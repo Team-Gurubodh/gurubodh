@@ -18,11 +18,11 @@ The editable install exposes `gurubodh` while keeping it linked to this checkout
 
 ## Your first run
 
-Choose a maintained `.local.json` job. It reads local input and writes local artifacts. Its source and destination paths are deliberate project data, so review the job before executing it.
+Choose a maintained subject and the `local` storage profile. Review its manifest and selected components before execution. Bind `GURUBODH_SOURCE_LIBRARY_ROOT` and `GURUBODH_CMS_LIBRARY_ROOT` to your absolute local library paths; these variables are required for local preparation.
 
 ```bash
 gurubodh prep-subject \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
 The command validates and reads the source DOCX, prepares proofread canonical chapter text and metadata, and publishes a subject manifest only when all chapters succeed. It also writes audit reports. Continue with [Prepare a subject](workflows/prepare-a-subject.md) for outputs and recovery.
@@ -34,13 +34,13 @@ Run maintained jobs from `tools/gurubodh-cli`. From somewhere else, pass the CLI
 ```bash
 gurubodh prep-subject \
   --project-root /path/to/gurubodh/tools/gurubodh-cli \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.local.json
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
-The CLI otherwise uses `GURUBODH_CLI_ROOT`, then walks upward to find both `config/jobs/prep_subject_job.schema.json` and `jobs/subjects/`. Relative job paths resolve from the current directory when possible, then from that project root.
+The CLI otherwise uses `GURUBODH_CLI_ROOT`, then walks upward to find `jobs/subjects/`.
 
 ## Next steps
 
-- Read the job and its schema before changing a source, destination, locale, or model setting.
+- Read the subject manifest and selected components before changing a source, destination, locale, or model setting.
 - Use R2 only through [R2 production runs](operations/r2-production-runs.md), after completing [Environment setup](environment-setup.md).
 - Learn what a successful run publishes in [Artifact lifecycle](concepts/artifact-lifecycle.md).

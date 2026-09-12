@@ -1,8 +1,5 @@
-from gurubodh.config import load_prep_subject_job
 from gurubodh.constants import (
-    ENTRY_POINT_LEGACY_DOCX_TO_UNICODE,
     ENTRY_POINT_PREP_SUBJECT,
-    ENTRY_POINT_UNICODE_DOCX_INGEST,
     PIPELINE_LEGACY_DOCX_TO_UNICODE,
     PIPELINE_UNICODE_DOCX_INGEST,
 )
@@ -12,15 +9,9 @@ from gurubodh.pipelines.legacy_docx_to_unicode import run_legacy_docx_to_unicode
 from gurubodh.pipelines.unicode_docx_ingest import run_unicode_docx_ingest
 
 
-def run_configured_job(context, config_path, entry_point=ENTRY_POINT_PREP_SUBJECT, overwrite=False, resume=False):
-    """Temporary complete-file compatibility boundary for comparison runs."""
-    config = load_prep_subject_job(config_path)
-    return run_prepared_job(context, config, entry_point, overwrite, resume, config_path)
-
-
 def run_prepared_job(
     context, config: PrepSubjectJob, entry_point=ENTRY_POINT_PREP_SUBJECT,
-    overwrite=False, resume=False, config_path=None,
+    overwrite=False, resume=False,
 ):
     """Dispatch a validated job with its typed provenance, without file loading."""
     pipeline = config["pipeline"]
@@ -29,32 +20,9 @@ def run_prepared_job(
             config,
             entry_point,
             overwrite,
-            config_path,
             resume=resume,
             context=context,
         )
     if pipeline == PIPELINE_LEGACY_DOCX_TO_UNICODE:
-        return run_legacy_docx_to_unicode(context, config, entry_point, overwrite, config_path, resume=resume)
+        return run_legacy_docx_to_unicode(context, config, entry_point, overwrite, resume=resume)
     raise ConfigurationError(f"Config error: unsupported pipeline {pipeline!r}")
-
-
-def run_unicode_job(config_path, overwrite=False, context=None):
-    config = load_prep_subject_job(config_path)
-    return run_unicode_docx_ingest(
-        config,
-        ENTRY_POINT_UNICODE_DOCX_INGEST,
-        overwrite,
-        config_path=config_path,
-        context=context,
-    )
-
-
-def run_legacy_job(context, config_path, overwrite=False):
-    config = load_prep_subject_job(config_path)
-    return run_legacy_docx_to_unicode(
-        context,
-        config,
-        ENTRY_POINT_LEGACY_DOCX_TO_UNICODE,
-        overwrite,
-        config_path=config_path,
-    )

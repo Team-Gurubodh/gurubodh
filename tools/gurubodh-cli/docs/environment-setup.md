@@ -38,7 +38,7 @@ copy individual schema files into the environment by hand.
 
 Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`, so install Node locally before running an APS job. The production image already includes Node.
 
-Run maintained job files from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Getting started](getting-started.md) explains project-root detection.
+Run maintained subjects from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Getting started](getting-started.md) explains project-root detection.
 
 ## Credentials and secret handling
 

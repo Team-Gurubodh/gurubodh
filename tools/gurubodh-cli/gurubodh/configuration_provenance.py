@@ -73,7 +73,7 @@ class ComponentProvenance:
 
 @dataclass(frozen=True)
 class ConfigurationProvenance:
-    input_mode: Literal["complete_config", "composition"]
+    input_mode: Literal["in_memory", "composition"]
     assembled_configuration_sha256: str
     job_schema_version: str | int | None
     manifest_id: str | None = None

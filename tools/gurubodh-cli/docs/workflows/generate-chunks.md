@@ -16,7 +16,7 @@ After setting `GURUBODH_MODEL_CACHE_DIR` through [Environment setup](../environm
 
 ```bash
 gurubodh generate-chunks \
-  --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-chunks.local.json
+  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
 The command validates the candidate manifest and its selected metadata/text pairs before initializing the model. It generates one `*.chunks.json` per chapter and `semantic_chunks_manifest.json` in a unique staged workspace, validates the complete package, then revalidates the canonical release immediately before publication. The manifest is the readiness marker. Published output and run reports live under:

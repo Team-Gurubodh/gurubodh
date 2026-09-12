@@ -300,6 +300,7 @@
         "input_mode": {
           "enum": [
             "complete_config",
+            "in_memory",
             "composition"
           ]
         },
@@ -481,7 +482,7 @@
           "if": {
             "properties": {
               "input_mode": {
-                "const": "complete_config"
+                "enum": ["complete_config", "in_memory"]
               }
             }
           },

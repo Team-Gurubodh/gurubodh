@@ -2,10 +2,10 @@ import json
 import os
 import time
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from migration_fixtures import baseline_job
 from policy_fixtures import proofreading_settings
 
 from gurubodh.config import proofreading_config, validate_pipeline_matches_source
@@ -79,8 +79,8 @@ class ProofreadingTests(unittest.TestCase):
         self.assertEqual(summary["changed_segments"], 1)
 
     def test_proofreading_runtime_configuration_uses_explicit_job_values_and_cross_field_rule(self):
-        job_path = Path(__file__).parents[1] / "jobs" / "subjects" / "sub123_spand_rahasya" / "hi-IN" / "prep-subject.local.json"
-        job = json.loads(job_path.read_text(encoding="utf-8"))
+        job_path = "independent baseline"
+        job = baseline_job("prep-subject")
         settings = proofreading_config(job)
 
         self.assertEqual(settings.model, "gemini-3.6-flash")
@@ -113,15 +113,15 @@ class ProofreadingTests(unittest.TestCase):
             proofreading_settings(unavailable_cooldown_seconds=0)
 
     def test_prep_subject_schema_rejects_invalid_new_operational_settings(self):
-        job_path = Path(__file__).parents[1] / "jobs" / "subjects" / "sub123_spand_rahasya" / "hi-IN" / "prep-subject.local.json"
-        valid_job = json.loads(job_path.read_text(encoding="utf-8"))
+        job_path = "independent baseline"
+        valid_job = baseline_job("prep-subject")
         validate_job(valid_job, "prep-subject", job_path)
 
         valid_job["proofreading"].pop("request_timeout_seconds")
         with self.assertRaisesRegex(GurubodhError, r"proofreading\.request_timeout_seconds.*is required"):
             validate_job(valid_job, "prep-subject", job_path)
 
-        valid_job = json.loads(job_path.read_text(encoding="utf-8"))
+        valid_job = baseline_job("prep-subject")
         valid_job["proofreading"]["unavailable_cooldown_seconds"] = 0
         with self.assertRaisesRegex(GurubodhError, r"proofreading\.unavailable_cooldown_seconds"):
             validate_job(valid_job, "prep-subject", job_path)

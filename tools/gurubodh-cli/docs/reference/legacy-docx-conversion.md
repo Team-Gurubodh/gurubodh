@@ -11,7 +11,7 @@ The job's top-level `pipeline` and `source.font_encoding` select one route:
 
 Canonical output is always UTF-8 Unicode text. Preparation does not publish a converted full-subject DOCX or chapter DOCX. It retains the extracted input as a source-text snapshot and publishes proofread canonical text only after the entire subject succeeds.
 
-`prep-subject` reads the configured route and is the normal command. `unicode-ingest` and `legacy-convert` are deprecated strict aliases; use them only when their additional pipeline assertion is specifically needed.
+`prep-subject` selects the conversion or Unicode ingest pipeline from the chosen manifest edition. Use the invocation in [Prepare a subject](../workflows/prepare-a-subject.md); the former strict aliases are retired.
 
 ## Configuration
 

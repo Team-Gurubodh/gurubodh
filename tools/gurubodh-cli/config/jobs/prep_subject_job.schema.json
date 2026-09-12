@@ -18,8 +18,7 @@
       "properties": {
         "backend": {
           "type": "string",
-          "enum": ["local", "r2"],
-          "default": "local"
+          "enum": ["local", "r2"]
         },
         "root_dir": {
           "type": "string",
@@ -38,8 +37,7 @@
           "minLength": 1
         },
         "url_base": {
-          "type": ["string", "null"],
-          "default": null
+          "type": ["string", "null"]
         },
         "font_encoding": {
           "type": "string",
@@ -50,7 +48,7 @@
           "const": "docx"
         }
       },
-      "required": ["font_encoding", "file_format"],
+      "required": ["backend", "font_encoding", "file_format"],
       "allOf": [
         {
           "if": {
@@ -62,7 +60,7 @@
             "required": ["backend"]
           },
           "then": {
-            "required": ["bucket", "key"]
+            "required": ["bucket", "key", "url_base"]
           },
           "else": {
             "required": ["root_dir", "relative_path"]
@@ -73,12 +71,11 @@
     },
     "destination": {
       "type": "object",
-      "required": ["subject_dir"],
+      "required": ["backend", "subject_dir"],
       "properties": {
         "backend": {
           "type": "string",
-          "enum": ["local", "r2"],
-          "default": "local"
+          "enum": ["local", "r2"]
         },
         "root_dir": {
           "type": "string",
@@ -86,21 +83,18 @@
         },
         "bucket": {
           "type": "string",
-          "minLength": 1,
-          "default": "gurubodh-library-dev"
+          "minLength": 1
         },
         "prefix": {
           "type": "string",
-          "minLength": 1,
-          "default": "cms_library"
+          "minLength": 1
         },
         "subject_dir": {
           "type": "string",
           "minLength": 1
         },
         "url_base": {
-          "type": ["string", "null"],
-          "default": null
+          "type": ["string", "null"]
         }
       },
       "allOf": [
@@ -114,7 +108,7 @@
             "required": ["backend"]
           },
           "then": {
-            "required": ["bucket", "prefix"]
+            "required": ["bucket", "prefix", "url_base"]
           },
           "else": {
             "required": ["root_dir"]
@@ -177,11 +171,14 @@
             "type": "string",
             "enum": ["IGNORECASE", "MULTILINE", "DOTALL", "VERBOSE"]
           },
-          "uniqueItems": true,
-          "default": []
+          "uniqueItems": true
         }
       },
       "allOf": [
+        {
+          "if": {"properties": {"pattern_type": {"const": "regex"}}, "required": ["pattern_type"]},
+          "then": {"required": ["flags"]}
+        },
         {
           "if": {
             "properties": {
@@ -215,7 +212,7 @@
     },
     "metadata_defaults": {
       "type": "object",
-      "required": ["language", "source_script", "output_text_encoding"],
+      "required": ["language", "source_script", "output_text_encoding", "summary_chapter_markers"],
       "properties": {
         "language": {
           "type": "string",

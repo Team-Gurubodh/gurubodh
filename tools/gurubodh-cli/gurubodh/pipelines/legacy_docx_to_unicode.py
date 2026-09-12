@@ -4,7 +4,7 @@ from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
 from gurubodh.prep_subject_checkpoints import run_resumable_prep_job
 
 
-def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, config_path=None, resume=False, r2_client=None):
+def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, resume=False, r2_client=None):
     validate_pipeline_matches_source(config, PIPELINE_LEGACY_DOCX_TO_UNICODE)
     font_name = target_devanagari_font()
 
@@ -24,7 +24,6 @@ def run_legacy_docx_to_unicode(context, config, entry_point, overwrite=False, co
         entry_point,
         overwrite,
         resume,
-        config_path,
         prepare,
         r2_client=r2_client,
         context=context,

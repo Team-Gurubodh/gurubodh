@@ -17,7 +17,7 @@ from test_prep_subject_checkpoints import (
     FakeProofreader, FakeR2Client, prepare_unicode, write_docx,
 )
 from gurubodh.audit import AuditContext, AuditWriter, report_paths, safe_configuration_snapshot
-from gurubodh.config import load_prep_subject_job, prepare_prep_subject_job
+from gurubodh.config import prepare_prep_subject_job
 from gurubodh.configuration_provenance import canonical_json, configuration_digest, provenance_markdown
 from gurubodh.errors import GurubodhError
 from gurubodh.prep_checkpoint import compatibility_record
@@ -177,6 +177,14 @@ class ConfigurationProvenanceTests(unittest.TestCase):
         del old["configuration_provenance"]
         validate_artifact(old, "audit report")
         self.assertEqual(provenance_markdown(old), [])
+        # Historical complete-file audits remain inspectable after execution retirement.
+        historical = self.envelope(prepare_prep_subject_job(self.resolve().job.to_payload()))
+        self.assertEqual(historical["configuration_provenance"]["input_mode"], "in_memory")
+        self.assertIsNone(historical["run_identity"]["config_path"])
+        historical["configuration_provenance"]["input_mode"] = "complete_config"
+        historical["run_identity"]["config_path"] = "retired-job.json"
+        validate_artifact(historical, "audit report")
+        self.assertIn("complete_config", "\n".join(provenance_markdown(historical)))
         for change in (lambda r: r.pop("configuration_provenance"),
                        lambda r: r["configuration_provenance"].update(schema_version="2.0.0"),
                        lambda r: r["configuration_provenance"].update(assembled_configuration_sha256="bad"),
@@ -205,13 +213,12 @@ class ConfigurationProvenanceTests(unittest.TestCase):
         write_docx(path)
         return job
 
-    def test_complete_composed_overwrite_resume_local_and_fake_r2(self):
+    def test_in_memory_composed_overwrite_resume_local_and_fake_r2(self):
         for route in ("local", "r2-output"):
             for composed_first in (False, True):
                 with self.subTest(route=route, composed_first=composed_first):
                     composed = self.unicode_job(route)
-                    config_path = self.write("comparison.json", composed.to_payload())
-                    complete = load_prep_subject_job(config_path)
+                    complete = prepare_prep_subject_job(composed.to_payload())
                     first, resumed = (composed, complete) if composed_first else (complete, composed)
                     self.assertEqual(compatibility_record(first, "a" * 64), compatibility_record(resumed, "a" * 64))
                     client = FakeR2Client() if route == "r2-output" else None
@@ -226,10 +233,10 @@ class ConfigurationProvenanceTests(unittest.TestCase):
                     with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                         with self.assertRaisesRegex(GurubodhError, "incomplete"):
                             run_resumable_prep_job(first, "test", True, False,
-                                None if composed_first else config_path, prepare_unicode,
+                                prepare_unicode,
                                 proofreader=FakeProofreader(["CHAPTER 1\nसही।", failure]), r2_client=client)
                         run_resumable_prep_job(resumed, "test", False, True,
-                            config_path if composed_first else None, prepare_unicode,
+                            prepare_unicode,
                             proofreader=FakeProofreader(["CHAPTER 2\nसही।"]), r2_client=client)
                     if client:
                         records = [json.loads(data) for key, data in client.objects.items()
@@ -245,7 +252,7 @@ class ConfigurationProvenanceTests(unittest.TestCase):
                     self.assertTrue(state["replacement_authorized"])
                     self.assertEqual(state["state"], "succeeded")
                     self.assertEqual({r["run_identity"]["status"] for r in records}, {"succeeded", "incomplete"})
-                    self.assertEqual({r["configuration_provenance"]["input_mode"] for r in records}, {"complete_config", "composition"})
+                    self.assertEqual({r["configuration_provenance"]["input_mode"] for r in records}, {"in_memory", "composition"})
                     self.assertEqual(len({r["configuration_provenance"]["assembled_configuration_sha256"] for r in records}), 1)
                     for report in records:
                         validate_artifact(report, "audit report")
@@ -259,7 +266,7 @@ class ConfigurationProvenanceTests(unittest.TestCase):
             prep = self.unicode_job(route)
             client = FakeR2Client() if route == "r2-output" else None
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                run_resumable_prep_job(prep, "test", False, False, None, prepare_unicode,
+                run_resumable_prep_job(prep, "test", False, False, prepare_unicode,
                     proofreader=FakeProofreader(["CHAPTER 1\nसही।", "CHAPTER 2\nसही।"]), r2_client=client)
             for command, runner in (("generate-docx", run_generate_docx_job),
                                     ("generate-chunks", run_generate_chunks_job)):
@@ -298,7 +305,7 @@ class ConfigurationProvenanceTests(unittest.TestCase):
                 (Path(job["source"]["root_dir"]) / job["source"]["relative_path"]).unlink()
                 client = FakeR2Client() if route == "r2-output" else None
                 with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), self.assertRaises(Exception):
-                    run_resumable_prep_job(job, "test", False, False, None,
+                    run_resumable_prep_job(job, "test", False, False,
                                           prepare_unicode, r2_client=client)
                 if client:
                     records = [json.loads(data) for key, data in client.objects.items()
@@ -317,7 +324,7 @@ class ConfigurationProvenanceTests(unittest.TestCase):
         with patch("gurubodh.prep_subject_checkpoints.GeminiProofreader", side_effect=RuntimeError("Provider initialization failed")), \
              redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), \
              self.assertRaisesRegex(RuntimeError, "initialization failed"):
-            run_resumable_prep_job(job, "test", False, False, None, prepare_unicode)
+            run_resumable_prep_job(job, "test", False, False, prepare_unicode)
         subject = Path(job["destination"]["root_dir"]) / job["destination"]["subject_dir"]
         reports = list(subject.rglob("run_reports/**/*.json"))
         self.assertEqual(len(reports), 1)

@@ -19,7 +19,7 @@ The image runs as a non-root user and contains Python 3.12, Node for the APS con
 
 ## Before a production run
 
-Complete [Environment setup](../environment-setup.md) for R2 credentials, Gemini scope, named-volume creation, `HF_HUB_OFFLINE=1`, and secret-handling rules. Use a maintained `.r2.json` job and an immutable image reference.
+Complete [Environment setup](../environment-setup.md) for R2 credentials, Gemini scope, named-volume creation, `HF_HUB_OFFLINE=1`, and secret-handling rules. Use a maintained subject with the `r2` storage profile and an immutable image reference.
 
 `prep-subject` has one writer per destination. Its R2 advisory lease is only a guardrail and does not provide reliable distributed mutual exclusion. Do not overlap runners for the same subject and locale: they can duplicate Gemini requests and overwrite checkpoint/workspace artifacts.
 
@@ -51,7 +51,7 @@ docker run --rm --env PYTHONUNBUFFERED=1 --env GEMINI_API_KEY \
   --env CLOUDFLARE_R2_ACCOUNT_ID --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  prep-subject --config jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2.json
+  prep-subject --subject sub039_aacharan_shastra --language hi-IN --environment development --storage-profile r2
 ```
 
 Run the matching chunk-generation job with the pre-provisioned cache:
@@ -62,7 +62,7 @@ docker run --rm --env PYTHONUNBUFFERED=1 --env HF_HUB_OFFLINE=1 \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  generate-chunks --config jobs/subjects/sub039_aacharan_shastra/hi-IN/generate-chunks.r2.json
+  generate-chunks --subject sub039_aacharan_shastra --language hi-IN --environment development --storage-profile r2
 ```
 
 Generate DOCX exports after preparation when they are needed:
@@ -72,7 +72,7 @@ docker run --rm \
   --env CLOUDFLARE_R2_ACCOUNT_ID --env CLOUDFLARE_R2_ACCESS_KEY_ID \
   --env CLOUDFLARE_R2_SECRET_ACCESS_KEY \
   ghcr.io/team-gurubodh/gurubodh-cli:sha-<full-git-sha> \
-  generate-docx --config jobs/subjects/sub123_spand_rahasya/hi-IN/generate-docx.r2.json
+  generate-docx --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile r2
 ```
 
 DOCX generation needs R2 credentials but neither Gemini nor model cache. All commands download inputs to temporary container storage and upload their owned outputs to R2.

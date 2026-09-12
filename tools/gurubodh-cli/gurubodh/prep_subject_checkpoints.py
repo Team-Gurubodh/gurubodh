@@ -68,7 +68,6 @@ def _is_global_proofreading_failure(exc: ProofreadingError) -> bool:
 def _write_prep_audit(
     manager: PrepCheckpointManager,
     project_root: Path,
-    config_path: Path | None,
     entry_point: str,
     status: str,
     reused: list[str],
@@ -83,7 +82,6 @@ def _write_prep_audit(
         writer = PrepSubjectAuditWriter(
             project_root,
             manager.config,
-            config_path,
             entry_point,
             manager.overwrite,
             manager.state.to_payload(),
@@ -127,7 +125,6 @@ def run_resumable_prep_job(
     entry_point: str,
     overwrite: bool,
     resume: bool,
-    config_path: Path | None,
     prepare_source_docx: Callable[
         [Path, Path, Callable[..., None]], dict[str, Any]
     ],
@@ -179,7 +176,7 @@ def run_resumable_prep_job(
             # invocation without editing any historical checkpoint on failure.
             try:
                 result = write_preflight_failure(
-                    project_root, config, config_path, entry_point, overwrite,
+                    project_root, config, entry_point, overwrite,
                     manager.subject_dir, exc,
                 )
                 if manager.is_r2:
@@ -199,7 +196,6 @@ def run_resumable_prep_job(
             _write_prep_audit(
                 manager,
                 project_root,
-                config_path,
                 entry_point,
                 "succeeded",
                 reused,
@@ -256,7 +252,6 @@ def run_resumable_prep_job(
                 _write_prep_audit(
                     manager,
                     project_root,
-                    config_path,
                     entry_point,
                     "failed",
                     reused,
@@ -306,7 +301,6 @@ def run_resumable_prep_job(
                     _write_prep_audit(
                         manager,
                         project_root,
-                        config_path,
                         entry_point,
                         "failed",
                         reused,
@@ -351,7 +345,6 @@ def run_resumable_prep_job(
             _write_prep_audit(
                 manager,
                 project_root,
-                config_path,
                 entry_point,
                 "incomplete",
                 reused,
@@ -371,7 +364,6 @@ def run_resumable_prep_job(
             _write_prep_audit(
                 manager,
                 project_root,
-                config_path,
                 entry_point,
                 "failed",
                 reused,
@@ -384,7 +376,6 @@ def run_resumable_prep_job(
         _write_prep_audit(
             manager,
             project_root,
-            config_path,
             entry_point,
             "succeeded",
             reused,
@@ -412,7 +403,7 @@ def run_resumable_prep_job(
     except BaseException as exc:
         if not failure_audited and manager.state is not None:
             _write_prep_audit(
-                manager, project_root, config_path, entry_point, "failed", reused, attempted,
+                manager, project_root, entry_point, "failed", reused, attempted,
                 failure_error=exc, failure_stage="execution",
             )
         raise

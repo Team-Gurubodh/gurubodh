@@ -160,7 +160,6 @@ class GenerateDocxWorkflow:
         self,
         context,
         config,
-        config_path,
         entry_point,
         overwrite,
         destination_subject,
@@ -170,7 +169,6 @@ class GenerateDocxWorkflow:
         self.summary = DocxGenerationSummary()
         self.audit = GenerateDocxAuditWriter(
             context,
-            config_path,
             config,
             entry_point,
             overwrite,
@@ -257,7 +255,6 @@ def run_generate_docx_job(
     config: GenerateDocxJob,
     entry_point=ENTRY_POINT_GENERATE_DOCX,
     overwrite=False,
-    config_path=None,
     r2_client=None,
     progress=print,
 ) -> DocxGenerationSummary:
@@ -274,7 +271,6 @@ def run_generate_docx_job(
     workflow = GenerateDocxWorkflow(
         context,
         config,
-        config_path,
         entry_point,
         overwrite,
         destination_subject,

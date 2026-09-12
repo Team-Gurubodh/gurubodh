@@ -19,20 +19,18 @@ class CliTests(unittest.TestCase):
             "update-metadata",
             "download-subject",
             "delete-subject",
-            "legacy-convert",
-            "unicode-ingest",
         ]
 
         positions = [help_text.index(f"    {command}") for command in expected_order]
 
         self.assertEqual(positions, sorted(positions))
 
-    def test_help_marks_legacy_commands_deprecated(self):
+    def test_help_omits_retired_commands(self):
         parser = build_parser()
         normalized_help = " ".join(parser.format_help().split())
 
-        self.assertIn("[deprecated] Run only the Unicode DOCX ingest pipeline.", normalized_help)
-        self.assertIn("[deprecated] Run only the legacy DOCX to Unicode pipeline.", normalized_help)
+        self.assertNotIn("unicode-ingest", normalized_help)
+        self.assertNotIn("legacy-convert", normalized_help)
 
     def test_help_lists_planned_commands(self):
         parser = build_parser()

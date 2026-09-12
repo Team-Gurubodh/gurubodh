@@ -1,9 +1,8 @@
-"""#288 Stage A: independent legacy snapshots and maintained selector parity."""
+"""#288: retained independent snapshots and composed execution regression coverage."""
 
 from collections import Counter
 from contextlib import redirect_stderr, redirect_stdout
 import copy
-import hashlib
 import io
 import json
 from pathlib import Path
@@ -15,8 +14,9 @@ import unittest
 from unittest.mock import patch
 
 from component_contract_cases import without_job_schemas
+from migration_fixtures import explicit_baseline
 from gurubodh.cli import main
-from gurubodh.config import load_generate_chunks_job, load_generate_docx_job, load_prep_subject_job
+from gurubodh.config import prepare_generate_chunks_job, prepare_generate_docx_job, prepare_prep_subject_job
 from gurubodh.errors import ConfigurationError, GurubodhError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job
@@ -33,8 +33,8 @@ from test_prep_subject_checkpoints import FakeProofreader, FakeR2Client, prepare
 CLI_ROOT = Path(__file__).resolve().parents[1]
 BASELINE = json.loads((CLI_ROOT / "tests/fixtures/maintained-jobs-stage-a.json").read_text())
 CASES = BASELINE["jobs"]
-LOADERS = {"prep-subject": load_prep_subject_job, "generate-chunks": load_generate_chunks_job,
-           "generate-docx": load_generate_docx_job}
+PREPARERS = {"prep-subject": prepare_prep_subject_job, "generate-chunks": prepare_generate_chunks_job,
+           "generate-docx": prepare_generate_docx_job}
 R2_SOURCE_URL_DIFFERENCES = {
     "jobs/subjects/sub039_aacharan_shastra/hi-IN/prep-subject.r2.json",
     "jobs/subjects/sub123_spand_rahasya/hi-IN/prep-subject.r2.json",
@@ -89,18 +89,16 @@ class MaintainedJobMigrationTests(unittest.TestCase):
 
     def pair(self, case):
         s = case["selectors"]
-        path = self.root / "legacy.json"
-        path.write_text(json.dumps(bind_roots(case["configuration"], self.environ), ensure_ascii=False))
-        old = LOADERS[s["command"]](path)
+        old = PREPARERS[s["command"]](bind_roots(explicit_baseline(case), self.environ))
         new = resolve_job(self.catalog, command=s["command"], manifest_id=s["subject"],
             locale=s["language"], environment_id=s["environment"],
             storage_profile_id=s["storage_profile"], environ=self.environ).job
         return old, new
 
-    def test_inventory_snapshot_and_legacy_files_are_complete_and_unchanged(self):
+    def test_inventory_snapshot_is_complete_and_legacy_files_are_absent(self):
         paths = {p.relative_to(CLI_ROOT).as_posix()
-                 for p in (CLI_ROOT / "jobs/subjects").glob("*/*/*.json")}
-        self.assertEqual(paths, {c["legacy_path"] for c in CASES})
+                 for p in (CLI_ROOT / "jobs/subjects").rglob("*.json") if p.name != "manifest.json"}
+        self.assertEqual(paths, set())
         self.assertEqual(len(CASES), 26)
         self.assertEqual(Counter(c["selectors"]["command"] for c in CASES),
                          {"prep-subject": 11, "generate-chunks": 9, "generate-docx": 6})
@@ -112,8 +110,9 @@ class MaintainedJobMigrationTests(unittest.TestCase):
         for case in CASES:
             with self.subTest(path=case["legacy_path"]):
                 path = CLI_ROOT / case["legacy_path"]
-                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), case["legacy_sha256"])
-                payload = json.loads(path.read_text())
+                self.assertFalse(path.exists())
+                self.assertRegex(case["legacy_sha256"], r"^[0-9a-f]{64}$")
+                payload = copy.deepcopy(case["configuration"])
                 s = case["selectors"]
                 self.assertEqual(payload["schema_version"], {
                     "prep-subject": "1.5.0", "generate-chunks": "1.2.0", "generate-docx": "1.0.0",
@@ -202,7 +201,7 @@ class MaintainedJobMigrationTests(unittest.TestCase):
         for case in CASES:
             with self.subTest(path=case["legacy_path"]):
                 old, new = self.pair(case)
-                differences = configuration_differences(normalize(old.to_payload()), normalize(new.to_payload()))
+                differences = configuration_differences(normalize(bind_roots(case["configuration"], self.environ)), normalize(new.to_payload()))
                 # #288 does not permit normalizing source.url_base. Retain and
                 # report this difference for maintainer review in these two
                 # cases, while rejecting any other difference in any field.
@@ -286,12 +285,12 @@ class MaintainedJobMigrationTests(unittest.TestCase):
     def prep(self, job, texts, client, *, overwrite=False, resume=False, outcomes=None):
         reader = FakeProofreader(texts if outcomes is None else outcomes)
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-            run_resumable_prep_job(job, "Stage A comparison", overwrite, resume,
-                None if job.provenance else self.root / "legacy.json", prepare_unicode,
+            run_resumable_prep_job(job, "Retained baseline regression", overwrite, resume,
+                prepare_unicode,
                 proofreader=reader, r2_client=client)
         return reader
 
-    def test_all_11_prep_jobs_resume_across_modes_and_invalidate_derived_outputs(self):
+    def test_all_11_prep_jobs_resume_across_in_memory_and_composed_inputs_and_invalidate_derived_outputs(self):
         for case in CASES:
             if case["selectors"]["command"] != "prep-subject":
                 continue
@@ -324,7 +323,7 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                     reports = self.reports(files, "prep-subject")
                     self.assertEqual({r["run_identity"]["status"] for r in reports}, {"incomplete", "succeeded"})
                     self.assertEqual({r["configuration_provenance"]["input_mode"] for r in reports},
-                                     {"complete_config", "composition"})
+                                     {"in_memory", "composition"})
                     canonical = {name: value for name, value in files.items()
                                  if name.startswith("chapters/text_and_metadata/") and name.endswith(".txt")}
                     self.assertEqual(len(canonical), 2)
@@ -426,7 +425,7 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                     self.assertEqual(len(reports), 3)
                     self.assertEqual({r["run_identity"]["status"] for r in reports}, {"succeeded", "failed"})
                     self.assertEqual({r["configuration_provenance"]["input_mode"] for r in reports},
-                                     {"composition" if job.provenance else "complete_config"})
+                                     {"composition" if job.provenance else "in_memory"})
                     summaries.append(sorted((r["run_identity"]["status"], r["run_identity"]["overwrite"],
                         r["lifecycle"]["current_state"], tuple(t["state"] for t in r["lifecycle"]["transitions"]))
                         for r in reports))

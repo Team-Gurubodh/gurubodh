@@ -15,7 +15,7 @@ config/artifacts/
 ```
 
 The package installs `jsonschema` and bundles these files for native, wheel,
-and container execution. Job loaders validate raw JSON before converting it to
+and container execution. In-memory validators validate assembled job configurations before converting them to
 typed prepared-job records; schema-governed artifact writers validate payloads before
 serialization or publication. When maintaining a schema boundary, update the
 shared mapping and runtime enforcement tests together with the schema.

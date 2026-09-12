@@ -1,10 +1,8 @@
 from copy import deepcopy
-import json
 import re
 from pathlib import PurePosixPath
 from typing import Any
 
-from gurubodh.complete_job_compat import chapter_split_flags, storage_backend
 from gurubodh.contracts import GenerateChunksJob, GenerateDocxJob, PrepSubjectJob
 from gurubodh.errors import ConfigurationError
 from gurubodh.ml.semantic_chunking.config import SemanticChunkConfig, SemanticChunkConfigError
@@ -21,16 +19,9 @@ REGEX_FLAG_VALUES = {
 }
 
 
-def read_json(path):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ConfigurationError(f"Invalid JSON in {path}: {exc}") from exc
-
-
 def chapter_split_regex_flags(chapter_split):
     compiled_flags = 0
-    for flag in chapter_split_flags(chapter_split):
+    for flag in chapter_split["flags"]:
         compiled_flags |= REGEX_FLAG_VALUES[flag]
     return compiled_flags
 
@@ -156,10 +147,6 @@ def prepare_prep_subject_job(
     return PrepSubjectJob(config, locale, settings, compiled_pattern)
 
 
-def load_prep_subject_job(path):
-    return prepare_prep_subject_job(read_json(path), str(path))
-
-
 def prepare_generate_chunks_job(
     job: dict[str, Any], origin: str | None = "in-memory job"
 ) -> GenerateChunksJob:
@@ -201,10 +188,6 @@ def prepare_generate_chunks_job(
     return GenerateChunksJob(config, locale_spec(language), semantic_config)
 
 
-def load_generate_chunks_job(path):
-    return prepare_generate_chunks_job(read_json(path), str(path))
-
-
 def prepare_generate_docx_job(
     job: dict[str, Any], origin: str | None = "in-memory job"
 ) -> GenerateDocxJob:
@@ -221,7 +204,7 @@ def prepare_generate_docx_job(
         raise ConfigurationError(f"Config error: naming.language is invalid: {exc}") from exc
 
     for section, context in ((source, "source"), (destination, "destination")):
-        backend = storage_backend(section)
+        backend = section["backend"]
         validate_subject_artifact_storage(section, context, language)
         if backend == "r2":
             validate_safe_posix_prefix(section["prefix"], f"{context}.prefix")
@@ -231,7 +214,3 @@ def prepare_generate_docx_job(
             "language-qualified root"
         )
     return GenerateDocxJob(config, locale)
-
-
-def load_generate_docx_job(path):
-    return prepare_generate_docx_job(read_json(path), str(path))
