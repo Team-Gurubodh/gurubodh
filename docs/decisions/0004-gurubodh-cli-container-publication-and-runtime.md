@@ -33,6 +33,12 @@ jobs without replacing native Python development workflows.
 - `/opt/gurubodh-cli` is the project root, `/work` is the writable temporary
   workspace, and `/var/cache/gurubodh/models` is the persistent model-cache
   mount point. The image runs as a non-root `gurubodh` user.
+- Under [#310](https://github.com/Team-Gurubodh/gurubodh/issues/310), publication
+  requires native tests on both supported architectures and package-resource
+  distribution checks. Installed command execution runs offline as the runtime
+  user, including real APS conversion. The publish job uses the tested image
+  archives without rebuilding; architecture-specific SHA tags support assembly
+  of the final multi-platform tag. See the [verification coverage and limits](../../tools/gurubodh-cli/docs/operations/r2-production-runs.md#automated-image-verification).
 
 ## Rationale
 

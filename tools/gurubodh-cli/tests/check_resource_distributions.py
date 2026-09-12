@@ -12,6 +12,7 @@ def expected_resources(cli_root: Path) -> dict[str, bytes]:
         *sorted((cli_root / "config/artifacts").glob("*.schema.json")),
         *sorted((cli_root / "config/job-components").rglob("*.json")),
         cli_root / "scripts/legacy_font_convert.js",
+        *sorted((cli_root / "scripts/vendor").glob("*.js")),
     ]
     return {
         path.relative_to(cli_root).as_posix(): path.read_bytes() for path in paths
@@ -27,7 +28,7 @@ def archive_matches(name: str, relative: str) -> bool:
 def main():
     cli_root, sdist, wheel = map(Path, sys.argv[1:])
     expected = expected_resources(cli_root)
-    assert len(expected) == 32, sorted(expected)
+    assert "scripts/vendor/hindietools_aps_prakash_to_unicode.js" in expected
 
     with tarfile.open(sdist) as archive:
         files = [entry for entry in archive.getmembers() if entry.isfile()]

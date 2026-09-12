@@ -2,6 +2,7 @@
 
 from importlib.metadata import distribution
 import json
+import shutil
 from pathlib import Path
 import sys
 import unittest
@@ -58,12 +59,14 @@ def main():
     jobs = validation.schema_path("jobs", "prep_subject_job.schema.json").resolve().parent
     assert jobs.is_relative_to(install_root), jobs
     hidden = jobs.with_name("jobs-hidden-for-s4-check")
-    jobs.rename(hidden)
+    # OverlayFS may reject a directory rename from a lower image layer (EXDEV).
+    # shutil.move preserves the physical-absence check on those Docker engines.
+    shutil.move(jobs, hidden)
     try:
         assert not jobs.exists()
         run_cases()
     finally:
-        hidden.rename(jobs)
+        shutil.move(hidden, jobs)
         validation.schema_path.cache_clear()
         validation._validator.cache_clear()
     print(f"All seven schemas passed; {cases.validation_suite().countTestCases()} reused validation cases "
