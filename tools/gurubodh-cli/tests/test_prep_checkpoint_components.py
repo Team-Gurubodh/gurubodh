@@ -9,7 +9,7 @@ from gurubodh.canonical_release import (
     JOB_STATE_RELATIVE_PATH,
 )
 from gurubodh.contracts import PrepCheckpointState, PrepSubjectJob
-from gurubodh.errors import ProcessingError
+from gurubodh.errors import ProcessingError, StorageError
 from gurubodh.locales import locale_spec
 from gurubodh.prep_checkpoint import PrepCheckpointManager
 from gurubodh.prep_checkpoint_store import (
@@ -402,6 +402,82 @@ class PrepCoordinationTests(unittest.TestCase):
 
 
 class PrepPublicationTests(unittest.TestCase):
+    def test_r2_chapter_progress_follows_successful_uploads(self):
+        for fail_at in (None, 1, 5, 7, 10, 12):
+            with self.subTest(fail_at=fail_at), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                workspace = root / "workspace"
+                stems = ("001_प्रकरण.v01", "002_प्रकरण.v01")
+                # Write chapters in reverse order to exercise deterministic reporting.
+                for stem in reversed(stems):
+                    for relative in (
+                        f"chapters/text_and_metadata/{stem}.txt",
+                        f"chapters/text_and_metadata/{stem}.json",
+                        f"chapters/unmodified_source_text/{stem}_unmodified_source.txt",
+                        f"chapters/proofreading/{stem}.proofread.diff.txt",
+                        f"chapters/proofreading/{stem}.proofread.json",
+                    ):
+                        path = workspace / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text("{}", encoding="utf-8")
+                for relative in (
+                    "chapters/proofreading/proofreading_manifest.json",
+                    "chapters/chapter_content_manifest.json",
+                ):
+                    (workspace / relative).write_text("{}", encoding="utf-8")
+
+                class FailingClient(FakeR2Client):
+                    def upload_file(self, path, bucket, key):
+                        if len(self.uploads) + 1 == fail_at:
+                            raise RuntimeError("upload interrupted")
+                        super().upload_file(path, bucket, key)
+
+                client = FailingClient()
+                destination = {
+                    "backend": "r2", "bucket": "test-bucket",
+                    "prefix": "cms_library", "subject_dir": "subject/hi-IN",
+                }
+                metrics = PrepMetrics(True)
+                events = []
+                publisher = R2PrepPublisher(
+                    prep_job(root, destination), client, metrics,
+                    progress=lambda message: events.append((message, list(client.uploads))),
+                )
+                prefix = "cms_library/subject/hi-IN/"
+                stale_key = prefix + "chapters/text_and_metadata/old.txt"
+                client.objects[stale_key] = b"old"
+                if fail_at is None:
+                    publisher.publish_canonical(workspace, True)
+                    self.assertNotIn(stale_key, client.objects)
+                else:
+                    with self.assertRaisesRegex(StorageError, "upload interrupted"):
+                        publisher.publish_canonical(workspace, True)
+                    self.assertIn(stale_key, client.objects)
+
+                labels = "canonical text, canonical metadata, unmodified source, diff, proofreading details"
+                completed = 2 if fail_at is None else min((fail_at - 1) // 5, 2)
+                chapter_events = [(line, keys) for line, keys in events if line.startswith("  [")]
+                self.assertEqual(len(chapter_events), completed)
+                for index, (line, keys) in enumerate(chapter_events, start=1):
+                    self.assertEqual(line, f"  [{index:02d}/02] {stems[index - 1]} ({labels})")
+                    self.assertEqual(len(keys), index * 5)
+                    self.assertTrue(all(stems[index - 1] in key for key in keys[-5:]))
+                self.assertEqual([line for line, _ in events[:3]], [
+                    "Publishing 12 artifact(s) to:",
+                    "  r2://test-bucket/cms_library/subject/hi-IN/",
+                    "chapter artifacts: 2 chapters / 10 files",
+                ])
+                self.assertTrue(all(not keys for _, keys in events[:3]))
+                counters = metrics.report()["r2_object_upload_requests"]
+                self.assertEqual(counters["attempts_total"], fail_at or 12)
+                self.assertEqual(counters["attempts_succeeded"], len(client.uploads))
+                self.assertEqual(counters["attempts_failed"], int(fail_at is not None))
+                if fail_at is None:
+                    self.assertEqual(len(set(client.uploads)), 12)
+                    self.assertEqual(client.uploads[-1], prefix + "chapters/chapter_content_manifest.json")
+                else:
+                    self.assertNotIn(prefix + "chapters/chapter_content_manifest.json", client.objects)
+
     @staticmethod
     def _write_release(workspace: Path) -> None:
         for relative in PREP_ARTIFACT_DIRS:

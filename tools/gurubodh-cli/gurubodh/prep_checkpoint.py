@@ -212,6 +212,7 @@ class PrepCheckpointManager:
             self.subject_dir,
             self.metrics_service,
             self.store.client,
+            progress=progress,
         )
         self.source_temp_dir: tempfile.TemporaryDirectory | None = None
 
