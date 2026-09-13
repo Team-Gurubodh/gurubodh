@@ -31,6 +31,28 @@ font, including every ShreeLipi/Sri-Lipi/Shree Dev variant, stops the run. Use
 an approved Unicode or APS DOCX, or ask a maintainer to review a genuinely
 Unicode source family for addition to the central allowlist.
 
+Approvals for both `prep-subject` and `lab proofread` live in
+[`config/policies/source-fonts.json`](../../config/policies/source-fonts.json).
+To approve another Unicode family, add its complete name to
+`approved_unicode_font_families`, retaining `schema_version: "1.0.0"`, then
+test and rebuild/reinstall the CLI package or container. No Python change is
+needed. The bundled policy is shared across all subjects and languages;
+subject manifests, execution profiles, project catalogs, and the working
+directory cannot override it.
+
+Family matching ignores case and collapses whitespace, but requires the whole
+name: approving `Mangal` does not approve `Mangal Extra`. The
+[`source-fonts.schema.json`](../../config/policies/source-fonts.schema.json)
+schema rejects unknown fields, empty lists, blank names, duplicates, and
+wildcards. Runtime validation also rejects duplicates after normalization and
+entries matching known APS or unsupported ShreeLipi classifications. Legacy
+detection and conversion rules remain unchanged.
+
+Each source preflight loads and validates the policy. Missing, unreadable, or
+malformed policy data stops processing with a configuration error; there is no
+fallback allowlist. Reinstall from a complete package or checkout if a bundled
+policy or schema is missing or damaged.
+
 For example:
 
 ```text

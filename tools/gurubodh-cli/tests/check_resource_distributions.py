@@ -10,6 +10,7 @@ def expected_resources(cli_root: Path) -> dict[str, bytes]:
     paths = [
         *sorted((cli_root / "config/jobs").glob("*.schema.json")),
         *sorted((cli_root / "config/artifacts").glob("*.schema.json")),
+        *sorted((cli_root / "config/policies").glob("*.json")),
         *sorted((cli_root / "config/job-components").rglob("*.json")),
         cli_root / "scripts/legacy_font_convert.js",
         *sorted((cli_root / "scripts/vendor").glob("*.js")),

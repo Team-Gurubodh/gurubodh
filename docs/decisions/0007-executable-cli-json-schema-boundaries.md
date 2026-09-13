@@ -15,6 +15,8 @@ That allowed the documented contract and runtime behavior to diverge.
 
 Treat the JSON Schemas under `tools/gurubodh-cli/config/jobs/` and
 `tools/gurubodh-cli/config/artifacts/` as executable structural authorities.
+The shared source-font policy under `tools/gurubodh-cli/config/policies/`
+also uses this validator and ships with its strict schema under #307.
 Raw jobs validate before conversion to typed prepared-job records; runtime-only
 values do not become job payload keys. Every schema-governed artifact
 payload validates before serialization, checksum calculation, staging, local

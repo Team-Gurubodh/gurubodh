@@ -46,6 +46,10 @@ ARTIFACT_SCHEMAS = {
     "semantic chunks manifest": "semantic_chunks_manifest.schema.json",
 }
 
+POLICY_SCHEMAS = {
+    "source-fonts": "source-fonts.schema.json",
+}
+
 
 class SchemaDefinitionError(ConfigurationError):
     """A required bundled schema is missing, malformed, or invalid."""
@@ -383,6 +387,16 @@ def validate_component(
                         f"{prefix}: $.editions.{locale}.chapter_split.pattern "
                         "must be a valid Python regular expression."
                     ) from None
+
+
+def validate_policy(instance: Any, policy_name: str, path: str | Path | None = None) -> None:
+    identity = f"{policy_name} policy"
+    if path is not None:
+        identity += f", {path}"
+    _validate(
+        instance, "policies", POLICY_SCHEMAS[policy_name],
+        f"Config validation failed ({identity})", ConfigurationError,
+    )
 
 
 def validate_artifact(

@@ -24,8 +24,14 @@ run without a job-level override.
 `source.font_encoding: "shreelipi"` is removed from the prep-subject job
 contract. This is an intentional breaking validation change: existing
 ShreeLipi jobs fail rather than producing potentially corrupt content. The
-approved Unicode allowlist remains centrally maintained in code and requires
-maintainer review for additions.
+approved Unicode allowlist requires maintainer review for additions. Following
+[#307](https://github.com/Team-Gurubodh/gurubodh/issues/307), it is centrally
+maintained in the bundled `tools/gurubodh-cli/config/policies/source-fonts.json`
+policy, validated against its strict schema. Both `prep-subject` and
+`lab proofread` use this policy across subjects and languages; manifests and
+execution profiles cannot override it. Approvals match complete names after
+case and whitespace normalization, and cannot conflict with legacy-font
+classifications. Missing or invalid policy data fails closed.
 
 ## Impact
 

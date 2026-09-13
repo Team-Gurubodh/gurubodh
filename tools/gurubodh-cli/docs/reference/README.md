@@ -12,6 +12,7 @@ config/jobs/prep_subject_job.schema.json
 config/jobs/generate_chunks_job.schema.json
 config/jobs/generate_docx_job.schema.json
 config/artifacts/
+config/policies/source-fonts.schema.json
 ```
 
 The package installs `jsonschema` and bundles these files for native, wheel,
