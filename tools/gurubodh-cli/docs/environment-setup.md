@@ -15,7 +15,7 @@ This is the authoritative guide to the local and container environment needed to
 | R2 `generate-chunks` | Pinned Docker image | Cloudflare R2 variables | Mounted BGE-M3 cache; `HF_HUB_OFFLINE=1` | A completed matching preparation release |
 | R2 `generate-docx` | Pinned Docker image | Cloudflare R2 variables | None | A completed matching preparation release |
 
-Job configuration selects the source and destination storage; it never contains credentials. Read the job and its schema before modifying a maintained job.
+The [configuration reference](reference/configuration.md#storage-and-library-roots) owns environment/storage terminology, command-specific library-root requirements, and path routing. Configuration never contains credentials.
 
 ## Local development runtime
 
@@ -32,14 +32,14 @@ gurubodh --help
 The editable install keeps the `gurubodh` command linked to the checked-out source. If the virtual environment was copied or moved, recreate it or run `make cli-install` again so its generated wrappers use the current path.
 
 Installation also provides the Draft 2020-12 `jsonschema` runtime and bundles
-the CLI job/artifact schemas and shared source-font policy with its schema.
+the component catalog, component/job/artifact schemas, and shared source-font policy with its schema.
 If a command reports a missing or invalid bundled policy or schema, reinstall
 the package from a complete checkout or image; do not copy individual resource
 files into the environment by hand.
 
 Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`, so install Node locally before running an APS job. The production image already includes Node.
 
-Run maintained subjects from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Getting started](getting-started.md) explains project-root detection.
+Run maintained subjects from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Configuration](reference/configuration.md#project-and-resource-discovery) explains project and resource discovery.
 
 ## Credentials and secret handling
 

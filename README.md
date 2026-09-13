@@ -26,6 +26,8 @@ their documented workflows; they are not end-user applications.
 - **Prepare subject content:** use the [Gurubodh CLI README](tools/gurubodh-cli/README.md).
   It routes new contributors to environment setup, normal preparation, chunk
   generation, DOCX exports, and production operations.
+  See the [configuration reference](tools/gurubodh-cli/docs/reference/configuration.md)
+  to trace command selectors to manifests, profiles, and storage locations.
 - **Manage category, subject, or glossary seed data:** use the
   [seed-data CLI README](tools/seed-data-cli/README.md) for CSV validation,
   reviewable artifacts, and Strapi ingestion workflows.

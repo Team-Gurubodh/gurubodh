@@ -36,23 +36,9 @@ Supported backends:
 - `local` - development and compatibility filesystem storage.
 - `r2` - Cloudflare R2 object storage using the S3-compatible API.
 
-For R2, the development bucket is:
-
-```text
-gurubodh-library-dev
-```
-
-Source DOCX objects are expected under:
-
-```text
-source_library/
-```
-
-Prepared CMS-library artifacts are expected under:
-
-```text
-cms_library/
-```
+The [CLI configuration reference](../../tools/gurubodh-cli/docs/reference/configuration.md#storage-and-library-roots)
+owns current environment stores, bucket/prefix values, library-root bindings,
+and command-specific routing. The layout below uses the maintained CMS prefix.
 
 ## Artifact Layout
 

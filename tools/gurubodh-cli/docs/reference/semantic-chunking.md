@@ -8,7 +8,7 @@ Semantic chunking is installed with the `gurubodh` package and requires Python `
 
 ## Supported interface
 
-The config-driven `gurubodh generate-chunks` command is the only supported folder-level semantic-chunk workflow. The former unregistered module CLI and generic folder writer are retired; they produced a separate, non-canonical output shape with ambiguous ownership. Internal chunking classes remain implementation details of the maintained command and do not define another artifact contract.
+The selector-driven `gurubodh generate-chunks` command is the only supported folder-level semantic-chunk workflow. The former unregistered module CLI and generic folder writer are retired; they produced a separate, non-canonical output shape with ambiguous ownership. Internal chunking classes remain implementation details of the maintained command and do not define another artifact contract.
 
 Maintained chunk artifacts include model/configuration metadata, zero-based end-exclusive character spans, chunk checksums, estimated BGE-M3 token counts, and a source/chunks checksum round trip. Finalized embedding vectors are not persisted.
 

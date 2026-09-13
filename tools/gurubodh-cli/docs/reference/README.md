@@ -1,22 +1,24 @@
 # Reference
 
+- [Composed configuration](configuration.md) — selectors, setting ownership, storage routing, and resource discovery.
 - [Command reference](command-reference.md) — current command families and how to obtain exact installed help.
 - [Legacy DOCX conversion](legacy-docx-conversion.md) — supported Unicode and legacy-font source handling.
 - [Semantic chunking](semantic-chunking.md) — model-cache and supported command boundary.
 - [Legacy font mapping status](legacy-font-mapping-status-and-future-work.md) — mapping risks and future-work record.
 
-Schemas are the machine-validated source of truth:
+## Schema boundaries
 
-```text
-config/jobs/prep_subject_job.schema.json
-config/jobs/generate_chunks_job.schema.json
-config/jobs/generate_docx_job.schema.json
-config/artifacts/
-config/policies/source-fonts.schema.json
-```
+- [Component schemas](../../config/job-components/schemas/) validate manifests,
+  locales, command definitions, environments, storage profiles, and execution profiles.
+- [Retained assembled-job schemas](../../config/jobs/) validate the in-memory
+  result of composition before conversion to typed jobs. They do not restore
+  complete-job file execution.
+- [Artifact schemas](../../config/artifacts/) validate governed output payloads
+  before serialization or publication.
+- [Source-font policy schema](../../config/policies/source-fonts.schema.json)
+  validates the shared [font policy](legacy-docx-conversion.md#source-font-safety-boundary).
 
-The package installs `jsonschema` and bundles these files for native, wheel,
-and container execution. In-memory validators validate assembled job configurations before converting them to
-typed prepared-job records; schema-governed artifact writers validate payloads before
-serialization or publication. When maintaining a schema boundary, update the
-shared mapping and runtime enforcement tests together with the schema.
+These resources ship with the package for native, wheel, and container use.
+The shared [validator](../../gurubodh/schema_validation.py) owns the schema
+mapping and diagnostics; its [runtime enforcement tests](../../tests/test_schema_validation.py)
+cover the executable boundaries.
