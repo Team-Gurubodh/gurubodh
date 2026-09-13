@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 from policy_fixtures import proofreading_settings
 
 from gurubodh.contracts import PrepSubjectJob
-from gurubodh.errors import GurubodhError
+from gurubodh.errors import GurubodhError, ProcessingError
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
 from gurubodh.prep_subject_checkpoints import (
     CHECKPOINT_CONTRACT_VERSION,
@@ -34,11 +34,11 @@ from gurubodh.storage import CANONICAL_ARTIFACT_FILES
 DOCUMENT_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p><w:r><w:t>विषय परीक्षण</w:t></w:r></w:p>
-    <w:p><w:r><w:t>CHAPTER 1</w:t></w:r></w:p>
-    <w:p><w:r><w:t>पहला गलत पाठ।</w:t></w:r></w:p>
-    <w:p><w:r><w:t>CHAPTER 2</w:t></w:r></w:p>
-    <w:p><w:r><w:t>दूसरा गलत पाठ।</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr><w:t>विषय परीक्षण</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr><w:t>CHAPTER 1</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr><w:t>पहला गलत पाठ।</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr><w:t>CHAPTER 2</w:t></w:r></w:p>
+    <w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr><w:t>दूसरा गलत पाठ।</w:t></w:r></w:p>
     <w:sectPr />
   </w:body>
 </w:document>
@@ -449,7 +449,7 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
 
     def test_unsupported_source_font_fails_before_preparation_or_canonical_artifacts(self):
         unsafe_xml = DOCUMENT_XML.replace(
-            "<w:r><w:t>विषय परीक्षण</w:t></w:r>",
+            '<w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr><w:t>विषय परीक्षण</w:t></w:r>',
             '<w:r><w:rPr><w:rFonts w:ascii="SHREE-DEV7-0708" /></w:rPr><w:t>विषय परीक्षण</w:t></w:r>',
         )
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -457,7 +457,9 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
             write_docx(root / "source.docx", unsafe_xml)
             prepare = Mock(side_effect=prepare_unicode)
 
-            with self.assertRaisesRegex(ValueError, "conversion is disabled"):
+            with self.assertRaisesRegex(
+                ValueError, "Unicode-only source-font requirement"
+            ):
                 run_resumable_prep_job(
                     config(root),
                     "python3 -m gurubodh prep-subject",
@@ -468,6 +470,56 @@ class PrepSubjectCheckpointTests(unittest.TestCase):
 
             prepare.assert_not_called()
             self.assertFalse((root / "subject" / "hi-IN" / "chapters").exists())
+
+    def test_unicode_font_rejection_on_resume_does_not_reuse_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source.docx"
+            write_docx(source)
+            failed = FakeProofreader(
+                [
+                    ProofreadingError("invalid_response", "first failure"),
+                    ProofreadingError("invalid_response", "second failure"),
+                ]
+            )
+            with self.assertRaisesRegex(ProcessingError, "incomplete"):
+                run_resumable_prep_job(
+                    config(root),
+                    "prep-subject",
+                    False,
+                    False,
+                    prepare_unicode,
+                    proofreader=failed,
+                )
+
+            state_path = root / "subject" / "hi-IN" / JOB_STATE_RELATIVE_PATH
+            checkpoint_before = state_path.read_bytes()
+            unsafe_xml = DOCUMENT_XML.replace(
+                'w:ascii="Mangal"', 'w:ascii="APS-DV-Prakash"', 1
+            )
+            write_docx(source, unsafe_xml)
+            prepare = Mock(side_effect=prepare_unicode)
+            resumed = FakeProofreader([])
+
+            with self.assertRaisesRegex(
+                ValueError,
+                r'Unicode-only source-font requirement.*APS-DV-Prakash.*word/document\.xml',
+            ):
+                run_resumable_prep_job(
+                    config(root),
+                    "prep-subject",
+                    False,
+                    True,
+                    prepare,
+                    proofreader=resumed,
+                )
+
+            prepare.assert_not_called()
+            self.assertEqual(resumed.calls, [])
+            self.assertEqual(state_path.read_bytes(), checkpoint_before)
+            self.assertFalse(
+                (root / "subject" / "hi-IN" / "chapters" / "chapter_content_manifest.json").exists()
+            )
 
     def test_pipeline_banners_are_emitted_only_when_preparation_callback_runs(self):
         pipeline_config = {"pipeline": "unicode-docx-ingest"}

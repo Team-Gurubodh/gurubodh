@@ -20,8 +20,12 @@ from gurubodh.canonical_release import (
     validate_canonical_release_gate,
 )
 from gurubodh.contracts import ChapterStatus, PrepSubjectJob, Proofreader
+from gurubodh.constants import PIPELINE_UNICODE_DOCX_INGEST
 from gurubodh.errors import ProcessingError
-from gurubodh.legacy.font_detection import validate_supported_source_fonts
+from gurubodh.legacy.font_detection import (
+    validate_supported_source_fonts,
+    validate_unicode_source_fonts,
+)
 from gurubodh.paths import ensure_job_dirs
 from gurubodh.pipelines.common import validate_and_split
 from gurubodh.presentation import CommandPresentation, present_prep_summary
@@ -220,7 +224,10 @@ def run_resumable_prep_job(
             presenter.stage("preflight", "opening the job and validating the source")
             manager.open()
             source_path = manager.materialize_source()
-            validate_supported_source_fonts(source_path)
+            if config["pipeline"] == PIPELINE_UNICODE_DOCX_INGEST:
+                validate_unicode_source_fonts(source_path)
+            else:
+                validate_supported_source_fonts(source_path)
             outcome = manager.begin(sha256_file(source_path))
         except BaseException as exc:
             failure_audited = True

@@ -111,6 +111,12 @@ overwrite archives, and canonical publication.
 
 ## Source handling and migration
 
-Unicode DOCX sources are read directly. Supported APS and Shri-Lipi sources are converted only in a transient workspace; canonical output is always UTF-8 Unicode text. See [Legacy DOCX conversion](../reference/legacy-docx-conversion.md).
+Unicode DOCX sources are read directly only after every text-bearing run
+resolves to a centrally approved Unicode font family. The Unicode route rejects
+APS, unsupported or unapproved legacy fonts, and unresolved effective fonts; it
+does not switch pipelines or convert them. Supported APS sources selected by an
+APS manifest edition are converted only in a transient workspace. Shri-Lipi
+sources remain unsupported. Canonical output is always UTF-8 Unicode text. See
+[Legacy DOCX conversion](../reference/legacy-docx-conversion.md).
 
 Older Hindi artifacts directly below `cms_library/<subject-group>/` are legacy locations. The CLI does not move or delete them automatically. Regenerate and verify the language-qualified release, then deliberately archive or delete the legacy artifacts as an operator action.

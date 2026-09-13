@@ -247,8 +247,12 @@ class MaintainedJobMigrationTests(unittest.TestCase):
         else:
             title = "प्रबोधन जनवरी 2026"
         texts = [f"{title} {n}\nपाठ सही है।" for n in (1, 2)]
-        paragraphs = "".join(f"<w:p><w:r><w:t>{line}</w:t></w:r></w:p>"
-                             for text in texts for line in text.splitlines())
+        paragraphs = "".join(
+            '<w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr>'
+            f"<w:t>{line}</w:t></w:r></w:p>"
+            for text in texts
+            for line in text.splitlines()
+        )
         xml = ('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
                f'<w:body>{paragraphs}</w:body></w:document>')
         path = self.root / "synthetic.docx"
