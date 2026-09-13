@@ -9,7 +9,7 @@ from xml.etree import ElementTree as ET
 
 from gurubodh.docx.namespaces import NS, W
 from gurubodh.docx.text import iter_docx_text_parts
-from gurubodh.errors import ConfigurationError
+from gurubodh.errors import ConfigurationError, SourceValidationError
 from gurubodh.resource_discovery import BundledResourceError, bundled_resource_path
 from gurubodh.schema_validation import validate_policy
 
@@ -40,7 +40,7 @@ _THEME_VALUE_NAMES = ("asciiTheme", "hAnsiTheme", "csTheme", "eastAsiaTheme")
 _A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 
 
-class UnsupportedSourceFontError(ValueError):
+class UnsupportedSourceFontError(SourceValidationError, ValueError):
     """Raised before processing an unsupported source font."""
 
 
@@ -48,6 +48,22 @@ class UnsupportedSourceFontError(ValueError):
 class SourceFont:
     family: str
     part_name: str
+
+
+@dataclass(frozen=True)
+class _TextRunFonts:
+    families: tuple[str, ...]
+    part_name: str
+    paragraph_number: int
+    run_number: int
+    unresolved_theme_references: tuple[str, ...]
+
+    @property
+    def location(self) -> str:
+        return (
+            f'DOCX part "{self.part_name}", paragraph '
+            f"{self.paragraph_number}, run {self.run_number}"
+        )
 
 
 def _normalized(font_name: str) -> str:
@@ -218,6 +234,16 @@ def _families(attributes, theme_fonts) -> list[str]:
     return list(dict.fromkeys(value for value in values if value))
 
 
+def _unresolved_theme_references(attributes, theme_fonts) -> list[str]:
+    return list(
+        dict.fromkeys(
+            attributes[name]
+            for name in _THEME_VALUE_NAMES
+            if attributes.get(name) and not theme_fonts.get(attributes[name])
+        )
+    )
+
+
 def effective_run_converter(run, paragraph, styles, defaults, theme_fonts):
     """Return the APS converter selected by the run's effective font."""
     attributes = _effective_font_attributes(run, paragraph, styles, defaults)
@@ -228,21 +254,49 @@ def effective_run_converter(run, paragraph, styles, defaults, theme_fonts):
     return None
 
 
-def source_fonts(path) -> list[SourceFont]:
-    """Return effective font families for every text-bearing DOCX run."""
-    found = []
+def _text_run_fonts(path) -> list[_TextRunFonts]:
+    runs = []
     with zipfile.ZipFile(path) as package:
         styles, defaults = _styles(package)
         theme_fonts = _theme_fonts(package)
         for part_name in iter_docx_text_parts(package):
             root = ET.fromstring(package.read(part_name))
-            for paragraph in root.findall(".//w:p", NS):
-                for run in paragraph.findall(".//w:r", NS):
-                    if not run.findall(".//w:t", NS):
+            for paragraph_number, paragraph in enumerate(
+                root.findall(".//w:p", NS), start=1
+            ):
+                for run_number, run in enumerate(
+                    paragraph.findall(".//w:r", NS), start=1
+                ):
+                    if not any(
+                        node.text for node in run.findall(".//w:t", NS)
+                    ):
                         continue
-                    attributes = _effective_font_attributes(run, paragraph, styles, defaults)
-                    found.extend(SourceFont(family, part_name) for family in _families(attributes, theme_fonts))
-    return found
+                    attributes = _effective_font_attributes(
+                        run, paragraph, styles, defaults
+                    )
+                    runs.append(
+                        _TextRunFonts(
+                            tuple(_families(attributes, theme_fonts)),
+                            part_name,
+                            paragraph_number,
+                            run_number,
+                            tuple(
+                                _unresolved_theme_references(
+                                    attributes, theme_fonts
+                                )
+                            ),
+                        )
+                    )
+    return runs
+
+
+def source_fonts(path) -> list[SourceFont]:
+    """Return effective font families for every text-bearing DOCX run."""
+    return [
+        SourceFont(family, run.part_name)
+        for run in _text_run_fonts(path)
+        for family in run.families
+    ]
 
 
 def validate_supported_source_fonts(path) -> list[SourceFont]:
@@ -264,3 +318,41 @@ def validate_supported_source_fonts(path) -> list[SourceFont]:
                 "This document was not processed; no canonical artifacts were created or published."
             )
     return fonts
+
+
+def validate_unicode_source_fonts(path) -> list[SourceFont]:
+    """Require resolved, centrally approved Unicode fonts for Unicode ingest."""
+    approved_unicode = load_approved_unicode_font_families()
+    runs = _text_run_fonts(path)
+    for run in runs:
+        if not run.families and run.unresolved_theme_references:
+            references = ", ".join(
+                f'"{reference}"'
+                for reference in run.unresolved_theme_references
+            )
+            raise UnsupportedSourceFontError(
+                "Unicode-only source-font requirement failed: effective font "
+                f"could not be resolved at {run.location}; theme font "
+                f"reference(s) {references} are not defined by the DOCX theme. "
+                "The document was not processed."
+            )
+        if not run.families:
+            raise UnsupportedSourceFontError(
+                "Unicode-only source-font requirement failed: effective font "
+                f"could not be resolved at {run.location}. The document was "
+                "not processed."
+            )
+        for family in run.families:
+            if _normalized(family) not in approved_unicode:
+                raise UnsupportedSourceFontError(
+                    "Unicode-only source-font requirement failed: font family "
+                    f'"{family}" at {run.location} is not an approved Unicode '
+                    "font family. APS, unsupported legacy, and other unapproved "
+                    "fonts are rejected on unicode-docx-ingest; the document "
+                    "was not processed."
+                )
+    return [
+        SourceFont(family, run.part_name)
+        for run in runs
+        for family in run.families
+    ]

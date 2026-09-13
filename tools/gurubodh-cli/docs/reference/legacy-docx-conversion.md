@@ -6,7 +6,9 @@
 
 The job's top-level `pipeline` and `source.font_encoding` select one route:
 
-- `unicode-docx-ingest` requires `source.font_encoding: unicode` and reads the DOCX directly.
+- `unicode-docx-ingest` requires `source.font_encoding: unicode`, verifies that
+  every text-bearing run resolves only to centrally approved Unicode font
+  families, and then reads the DOCX directly.
 - `legacy-docx-to-unicode` requires `source.font_encoding: aps`. It converts APS legacy Devanagari font runs to Unicode only in a transient workspace.
 
 Canonical output is always UTF-8 Unicode text. Preparation does not publish a converted full-subject DOCX or chapter DOCX. It retains the extracted input as a source-text snapshot and publishes proofread canonical text only after the entire subject succeeds.
@@ -20,10 +22,21 @@ Configured sources must be `.docx`. A preparation job declares source and destin
 ## Source-font safety boundary
 
 The CLI accepts only centrally approved Unicode font families and APS font
-families. It preflights the actual effective font used by each text run before
-conversion, proofreading, checkpoint creation, or canonical publication. This
-includes direct formatting, inherited paragraph and character styles, document
-defaults, headers, footers, footnotes, endnotes, and comments.
+families. It preflights the actual effective font used by each text-bearing run
+before extraction, conversion, proofreading, checkpoint creation or reuse, or
+canonical publication, including resumed jobs. This includes direct
+formatting, inherited paragraph and character styles, document defaults, theme
+fonts, headers, footers, footnotes, endnotes, and comments.
+
+The selected pipeline determines the allowed subset. `unicode-docx-ingest` is
+strictly Unicode-only: every resolved effective family must appear in
+`approved_unicode_font_families`. APS, unsupported legacy, and otherwise
+unapproved families reject the whole document; a text-bearing run with no
+resolvable effective font is also rejected. The error names the DOCX part and
+run location. The CLI does not switch pipelines or convert APS text when the
+manifest selects Unicode ingestion. `legacy-docx-to-unicode` continues to
+convert supported APS runs while preserving approved Unicode runs, and
+`lab proofread` continues to detect and convert supported APS automatically.
 
 `source.font_encoding` remains either `unicode` or `aps`; it cannot approve a
 new font family. There is intentionally no job-level bypass. An unapproved
@@ -53,12 +66,12 @@ malformed policy data stops processing with a configuration error; there is no
 fallback allowlist. Reinstall from a complete package or checkout if a bundled
 policy or schema is missing or damaged.
 
-For example:
+For example, Unicode ingestion can fail with:
 
 ```text
-Unsupported source font family detected: "SHREE-DEV7-0708".
-ShreeLipi/Sri-Lipi conversion is disabled because verified font-specific mappings are unavailable.
-This document was not processed; no canonical artifacts were created or published.
+Unicode-only source-font requirement failed: font family "APS-DV-Prakash" at
+DOCX part "word/document.xml", paragraph 2, run 1 is not an approved Unicode
+font family.
 ```
 
 ```json

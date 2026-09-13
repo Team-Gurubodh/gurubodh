@@ -33,6 +33,14 @@ execution profiles cannot override it. Approvals match complete names after
 case and whitespace normalization, and cannot conflict with legacy-font
 classifications. Missing or invalid policy data fails closed.
 
+The manifest-selected pipeline narrows those shared approvals. Following
+[#318](https://github.com/Team-Gurubodh/gurubodh/issues/318),
+`unicode-docx-ingest` requires every text-bearing run to resolve exclusively to
+approved Unicode families and rejects APS, unsupported, unapproved, or
+unresolved fonts before extraction or checkpoint reuse. It never converts or
+switches pipelines. `legacy-docx-to-unicode` and `lab proofread` retain their
+mixed approved-Unicode/APS conversion behavior.
+
 ## Impact
 
 Operators continue to use `source.font_encoding: "unicode"` or `"aps"`.

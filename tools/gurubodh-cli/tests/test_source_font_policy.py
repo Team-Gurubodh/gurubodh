@@ -203,8 +203,7 @@ class SourceFontPolicyTests(unittest.TestCase):
                     self.write_policy()
                     for command in commands:
                         if command[0] == "prep-subject":
-                            with self.assertRaises(UnsupportedSourceFontError):
-                                invoke(command)
+                            invoke(command, error="Unicode-only source-font requirement")
                         else:
                             invoke(command, error="Unsupported source font family")
                     gemini.assert_not_called()
