@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import zipfile
 from dataclasses import dataclass
 from xml.etree import ElementTree as ET
 
 from gurubodh.docx.namespaces import NS, W
 from gurubodh.docx.text import iter_docx_text_parts
+from gurubodh.errors import ConfigurationError
+from gurubodh.resource_discovery import BundledResourceError, bundled_resource_path
+from gurubodh.schema_validation import validate_policy
 
 
 APS_FONT_PATTERNS = (
@@ -29,32 +33,7 @@ UNSUPPORTED_SHREELIPI_FONT_PATTERNS = (
     "shreedev",
 )
 
-# This is deliberately a centrally reviewed allowlist. Job configuration must
-# never grant an unreviewed source font permission.
-APPROVED_UNICODE_FONT_FAMILIES = frozenset(
-    {
-        "aparajita",
-        "aptos",
-        "arial",
-        "arial unicode ms",
-        "calibri",
-        "cambria",
-        "hind",
-        "kohinoor devanagari",
-        "kokila",
-        "lohit devanagari",
-        "mangal",
-        "mukta",
-        "nirmala ui",
-        "noto sans devanagari",
-        "noto serif devanagari",
-        "sanskrit 2003",
-        "shobhika",
-        "times new roman",
-        "tiro devanagari hindi",
-        "utsaah",
-    }
-)
+_SOURCE_FONT_POLICY = "config/policies/source-fonts.json"
 
 _FONT_VALUE_NAMES = ("ascii", "hAnsi", "cs", "eastAsia")
 _THEME_VALUE_NAMES = ("asciiTheme", "hAnsiTheme", "csTheme", "eastAsiaTheme")
@@ -75,20 +54,62 @@ def _normalized(font_name: str) -> str:
     return " ".join(font_name.casefold().split())
 
 
-def _font_kind(font_name: str) -> str | None:
+def _legacy_font_kind(font_name: str) -> str | None:
     normalized = _normalized(font_name)
     if any(pattern in normalized for pattern in UNSUPPORTED_SHREELIPI_FONT_PATTERNS):
         return "shreelipi"
     if any(pattern in normalized for pattern in APS_FONT_PATTERNS):
         return "aps"
-    if normalized in APPROVED_UNICODE_FONT_FAMILIES:
-        return "unicode"
     return None
+
+
+def _unique_policy_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON property: {key}")
+        result[key] = value
+    return result
+
+
+def load_approved_unicode_font_families() -> frozenset[str]:
+    """Load shared approvals from this CLI distribution, never a job catalog.
+
+    Read once per source preflight, so a previous successful load cannot mask
+    subsequently missing or invalid policy data in a long-lived process.
+    """
+    try:
+        path = bundled_resource_path(_SOURCE_FONT_POLICY)
+        policy = json.loads(
+            path.read_text(encoding="utf-8"), object_pairs_hook=_unique_policy_keys,
+        )
+    except (BundledResourceError, OSError, ValueError) as exc:
+        raise ConfigurationError(
+            f"Source-font policy {_SOURCE_FONT_POLICY} is missing, unreadable, or malformed: {exc}"
+        ) from exc
+    validate_policy(policy, "source-fonts", path)
+    approved = set()
+    for index, family in enumerate(policy["approved_unicode_font_families"]):
+        normalized = _normalized(family)
+        location = f"$.approved_unicode_font_families[{index}]"
+        legacy_kind = _legacy_font_kind(normalized)
+        if legacy_kind:
+            raise ConfigurationError(
+                f"Source-font policy {path}: {location} ({family!r}) conflicts with "
+                f"the known {legacy_kind} legacy-font classification."
+            )
+        if normalized in approved:
+            raise ConfigurationError(
+                f"Source-font policy {path}: {location} duplicates a family after "
+                "case and whitespace normalization."
+            )
+        approved.add(normalized)
+    return frozenset(approved)
 
 
 def detect_converter_for_font(font_name):
     """Return the only supported legacy converter for a font family."""
-    return "aps" if _font_kind(font_name or "") == "aps" else None
+    return "aps" if _legacy_font_kind(font_name or "") == "aps" else None
 
 
 def is_legacy_font(font_name):
@@ -226,16 +247,17 @@ def source_fonts(path) -> list[SourceFont]:
 
 def validate_supported_source_fonts(path) -> list[SourceFont]:
     """Reject a DOCX before any conversion, proofreading, or publication."""
+    approved_unicode = load_approved_unicode_font_families()
     fonts = source_fonts(path)
     for source_font in fonts:
-        kind = _font_kind(source_font.family)
+        kind = _legacy_font_kind(source_font.family)
         if kind == "shreelipi":
             raise UnsupportedSourceFontError(
                 f'Unsupported source font family detected: "{source_font.family}". '
                 "ShreeLipi/Sri-Lipi conversion is disabled because verified font-specific mappings are unavailable. "
                 "This document was not processed; no canonical artifacts were created or published."
             )
-        if kind is None:
+        if kind is None and _normalized(source_font.family) not in approved_unicode:
             raise UnsupportedSourceFontError(
                 f'Unsupported source font family detected: "{source_font.family}". '
                 "Gurubodh accepts only approved Unicode and APS font families. "

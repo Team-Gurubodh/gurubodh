@@ -10,6 +10,7 @@ import tempfile
 from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job, resolve_lab_proofreading
+from gurubodh.legacy.font_detection import load_approved_unicode_font_families
 from gurubodh.project import resolve_project_context
 from gurubodh.resource_discovery import bundled_resource_path
 
@@ -36,6 +37,24 @@ def main():
         return flattened.resolve()
 
     assert module == recorded("gurubodh/__init__.py"), module
+
+    font_policy = bundled_resource_path("config/policies/source-fonts.json")
+    assert font_policy == recorded("config/policies/source-fonts.json")
+    assert bundled_resource_path("config/policies/source-fonts.schema.json") == recorded(
+        "config/policies/source-fonts.schema.json"
+    )
+    assert "mangal" in load_approved_unicode_font_families()
+    hidden_font_policy = font_policy.with_name(font_policy.name + ".hidden")
+    font_policy.rename(hidden_font_policy)
+    try:
+        try:
+            load_approved_unicode_font_families()
+        except ConfigurationError as exc:
+            assert "Source-font policy" in str(exc)
+        else:
+            raise AssertionError("missing packaged source-font policy did not fail")
+    finally:
+        hidden_font_policy.rename(font_policy)
 
     context = resolve_project_context(project)
     assert context.root == project

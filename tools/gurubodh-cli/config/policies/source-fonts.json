@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "approved_unicode_font_families": [
+    "aparajita",
+    "aptos",
+    "arial",
+    "arial unicode ms",
+    "calibri",
+    "cambria",
+    "hind",
+    "kohinoor devanagari",
+    "kokila",
+    "lohit devanagari",
+    "mangal",
+    "mukta",
+    "nirmala ui",
+    "noto sans devanagari",
+    "noto serif devanagari",
+    "sanskrit 2003",
+    "shobhika",
+    "times new roman",
+    "tiro devanagari hindi",
+    "utsaah"
+  ]
+}
