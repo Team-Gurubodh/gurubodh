@@ -3,6 +3,7 @@ import json
 import shutil
 import tempfile
 import unittest
+import zipfile
 from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
@@ -236,6 +237,46 @@ class LabProofreadTests(unittest.TestCase):
 
         convert.assert_not_called()
         self.assertEqual(proofreader.calls, [])
+
+    def test_unresolved_font_fails_before_conversion_extraction_or_proofreading(self):
+        source = self.root / "unresolved.docx"
+        document_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:r><w:t>अनिर्धारित पाठ</w:t></w:r></w:p></w:body>
+</w:document>'''
+        with zipfile.ZipFile(source, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr("word/document.xml", document_xml)
+        proofreader = FakeProofreader()
+
+        with (
+            patch("gurubodh.lab_proofread.convert_docx") as convert,
+            patch("gurubodh.lab_proofread.extract_docx_text") as extract,
+            self.assertRaisesRegex(
+                UnsupportedSourceFontError,
+                r'Lab proofread source-font validation failed.*word/document\.xml',
+            ),
+        ):
+            run_lab_proofread(
+                self.context,
+                source,
+                "hi-IN",
+                self.root / "lab",
+                proofreader=proofreader,
+            )
+
+        convert.assert_not_called()
+        extract.assert_not_called()
+        self.assertEqual(proofreader.calls, [])
+        runs = self.root / "lab" / "proofread" / "runs"
+        failed_manifests = list((runs / "failed").glob("*/run_manifest.json"))
+        self.assertEqual(len(failed_manifests), 1)
+        failed_dir = failed_manifests[0].parent
+        self.assertFalse((failed_dir / "output").exists())
+        self.assertFalse((failed_dir / "report" / "extracted_source.txt").exists())
+        self.assertFalse(list((runs / "succeeded").glob("*/run_manifest.json")))
+        report = json.loads(failed_manifests[0].read_text(encoding="utf-8"))
+        self.assertEqual(report["failure"]["stage"], "source_validation")
+        self.assertIn("resolvable supported fonts", report["failure"]["message"])
 
     def test_over_limit_fails_before_a_proofreading_request_and_preserves_the_source(self):
         source = self.source_docx(text="बहुत लंबा पाठ")

@@ -38,6 +38,14 @@ manifest selects Unicode ingestion. `legacy-docx-to-unicode` continues to
 convert supported APS runs while preserving approved Unicode runs, and
 `lab proofread` continues to detect and convert supported APS automatically.
 
+Before making that choice, `lab proofread` applies the same fail-closed font
+resolution requirement to every text-bearing run. An approved family on one
+run cannot hide another run with missing font declarations or an unresolved
+style or theme reference. On rejection, its error names the DOCX part and run
+location, explains the unresolved metadata, and asks for a source with
+resolvable supported fonts. A normal failed-run report can be written, but no
+successful lab output is produced.
+
 `source.font_encoding` remains either `unicode` or `aps`; it cannot approve a
 new font family. There is intentionally no job-level bypass. An unapproved
 font, including every ShreeLipi/Sri-Lipi/Shree Dev variant, stops the run. Use
@@ -72,6 +80,16 @@ For example, Unicode ingestion can fail with:
 Unicode-only source-font requirement failed: font family "APS-DV-Prakash" at
 DOCX part "word/document.xml", paragraph 2, run 1 is not an approved Unicode
 font family.
+```
+
+Lab proofreading can fail before extraction or conversion with:
+
+```text
+Lab proofread source-font validation failed: effective font could not be
+resolved at DOCX part "word/comments.xml", paragraph 1, run 1; character style
+"LegacyText" is based on undefined style "LegacyBase". Supply a DOCX whose
+text-bearing runs use resolvable supported fonts (approved Unicode or supported
+APS).
 ```
 
 ```json
