@@ -36,7 +36,8 @@ UNSUPPORTED_SHREELIPI_FONT_PATTERNS = (
 _SOURCE_FONT_POLICY = "config/policies/source-fonts.json"
 
 _FONT_VALUE_NAMES = ("ascii", "hAnsi", "cs", "eastAsia")
-_THEME_VALUE_NAMES = ("asciiTheme", "hAnsiTheme", "csTheme", "eastAsiaTheme")
+_THEME_VALUE_NAMES = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
+_FONT_ATTRIBUTE_PAIRS = tuple(zip(_FONT_VALUE_NAMES, _THEME_VALUE_NAMES))
 _A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 
 
@@ -51,12 +52,26 @@ class SourceFont:
 
 
 @dataclass(frozen=True)
+class _StyleDefinition:
+    style_type: str | None
+    based_on: str | None
+    font_attributes: dict[str, str]
+
+
+@dataclass(frozen=True)
+class _StyleCatalog:
+    definitions: dict[str, _StyleDefinition]
+    defaults: dict[str, str]
+
+
+@dataclass(frozen=True)
 class _TextRunFonts:
     families: tuple[str, ...]
     part_name: str
     paragraph_number: int
     run_number: int
     unresolved_theme_references: tuple[str, ...]
+    unresolved_style_references: tuple[str, ...]
 
     @property
     def location(self) -> str:
@@ -146,9 +161,14 @@ def _font_attributes(rfonts) -> dict[str, str]:
     if rfonts is None:
         return {}
     return {
-        key.rsplit("}", 1)[-1]: value
+        (
+            "cstheme"
+            if key.rsplit("}", 1)[-1] == "csTheme"
+            else key.rsplit("}", 1)[-1]
+        ): value
         for key, value in rfonts.attrib.items()
-        if key.rsplit("}", 1)[-1] in (*_FONT_VALUE_NAMES, *_THEME_VALUE_NAMES)
+        if key.rsplit("}", 1)[-1]
+        in (*_FONT_VALUE_NAMES, *_THEME_VALUE_NAMES, "csTheme")
     }
 
 
@@ -156,6 +176,22 @@ def _rpr_font_attributes(element) -> dict[str, str]:
     if element is None:
         return {}
     return _font_attributes(element.find("w:rFonts", NS))
+
+
+def _merge_font_attributes(
+    inherited: dict[str, str], overriding: dict[str, str]
+) -> dict[str, str]:
+    """Apply rFonts hierarchy rules to one more-specific formatting level."""
+    merged = dict(inherited)
+    for family_name, theme_name in _FONT_ATTRIBUTE_PAIRS:
+        if family_name in overriding or theme_name in overriding:
+            merged.pop(family_name, None)
+            merged.pop(theme_name, None)
+            if family_name in overriding:
+                merged[family_name] = overriding[family_name]
+            if theme_name in overriding:
+                merged[theme_name] = overriding[theme_name]
+    return merged
 
 
 def _theme_fonts(package: zipfile.ZipFile) -> dict[str, str]:
@@ -171,75 +207,167 @@ def _theme_fonts(package: zipfile.ZipFile) -> dict[str, str]:
         group = scheme.find(f"{{{_A_NS}}}{group_name}")
         if group is None:
             continue
-        for element_name, suffix in (("latin", "HAnsi"), ("ea", "EastAsia"), ("cs", "Bidi")):
+        devanagari = next(
+            (
+                element.get("typeface")
+                for element in group.findall(f"{{{_A_NS}}}font")
+                if element.get("script") == "Deva" and element.get("typeface")
+            ),
+            None,
+        )
+        for element_name, suffix in (
+            ("latin", "HAnsi"),
+            ("ea", "EastAsia"),
+            ("cs", "Bidi"),
+        ):
             element = group.find(f"{{{_A_NS}}}{element_name}")
-            if element is not None and element.get("typeface"):
-                values[f"{prefix}{suffix}"] = element.get("typeface")
+            typeface = element.get("typeface") if element is not None else None
+            if not typeface and suffix in {"EastAsia", "Bidi"}:
+                typeface = devanagari
+            if typeface:
+                values[f"{prefix}{suffix}"] = typeface
                 if suffix == "HAnsi":
-                    values[f"{prefix}Ascii"] = element.get("typeface")
+                    values[f"{prefix}Ascii"] = typeface
     return values
 
 
-def _styles(package: zipfile.ZipFile) -> tuple[dict[str, tuple[str | None, dict[str, str]]], dict[str, str]]:
+def _styles(package: zipfile.ZipFile) -> tuple[_StyleCatalog, dict[str, str]]:
     try:
         root = ET.fromstring(package.read("word/styles.xml"))
     except KeyError:
-        return {}, {}
+        return _StyleCatalog({}, {}), {}
     defaults = _rpr_font_attributes(root.find("w:docDefaults/w:rPrDefault/w:rPr", NS))
-    styles = {}
+    definitions = {}
+    default_styles = {}
     for style in root.findall("w:style", NS):
         style_id = style.get(W + "styleId")
         if not style_id:
             continue
+        style_type = style.get(W + "type")
         attributes = _rpr_font_attributes(style.find("w:rPr", NS))
-        attributes.update(_rpr_font_attributes(style.find("w:pPr/w:rPr", NS)))
+        attributes = _merge_font_attributes(
+            attributes, _rpr_font_attributes(style.find("w:pPr/w:rPr", NS))
+        )
         based_on = style.find("w:basedOn", NS)
-        styles[style_id] = (based_on.get(W + "val") if based_on is not None else None, attributes)
-    return styles, defaults
+        definitions[style_id] = _StyleDefinition(
+            style_type,
+            based_on.get(W + "val") if based_on is not None else None,
+            attributes,
+        )
+        if style.get(W + "default") in {"1", "true", "on"} and style_type:
+            default_styles.setdefault(style_type, style_id)
+    return _StyleCatalog(definitions, default_styles), defaults
 
 
-def _style_font_attributes(style_id, styles, seen=None) -> dict[str, str]:
-    if not style_id or style_id not in styles:
-        return {}
-    seen = seen or set()
+def _style_font_resolution(
+    style_id: str | None,
+    styles: _StyleCatalog,
+    expected_type: str,
+    seen: tuple[str, ...] = (),
+) -> tuple[dict[str, str], list[str]]:
+    if not style_id:
+        return {}, []
+    definition = styles.definitions.get(style_id)
+    if definition is None:
+        return {}, [
+            f'{expected_type} style "{style_id}" is not defined in word/styles.xml'
+        ]
+    if definition.style_type != expected_type:
+        return {}, [
+            f'{expected_type} style reference "{style_id}" names a '
+            f'{definition.style_type or "typeless"} style'
+        ]
     if style_id in seen:
-        return {}
-    based_on, attributes = styles[style_id]
-    resolved = _style_font_attributes(based_on, styles, seen | {style_id})
-    resolved.update(attributes)
-    return resolved
+        chain = " -> ".join((*seen, style_id))
+        return {}, [f"{expected_type} style inheritance cycle: {chain}"]
+
+    inherited = {}
+    unresolved = []
+    if definition.based_on:
+        parent = styles.definitions.get(definition.based_on)
+        # OOXML ignores a basedOn reference to a different style type.
+        if parent is not None and parent.style_type != expected_type:
+            parent = None
+        if parent is None:
+            if definition.based_on not in styles.definitions:
+                unresolved.append(
+                    f'{expected_type} style "{style_id}" is based on undefined '
+                    f'style "{definition.based_on}"'
+                )
+        else:
+            inherited, parent_unresolved = _style_font_resolution(
+                definition.based_on, styles, expected_type, (*seen, style_id)
+            )
+            unresolved.extend(parent_unresolved)
+    return (
+        _merge_font_attributes(inherited, definition.font_attributes),
+        unresolved,
+    )
+
+
+def _effective_font_resolution(
+    run, paragraph, styles: _StyleCatalog, defaults
+) -> tuple[dict[str, str], list[str]]:
+    attributes = dict(defaults)
+    paragraph_style = paragraph.find("w:pPr/w:pStyle", NS)
+    paragraph_style_id = (
+        paragraph_style.get(W + "val")
+        if paragraph_style is not None
+        else styles.defaults.get("paragraph")
+    )
+    paragraph_attributes, unresolved = _style_font_resolution(
+        paragraph_style_id, styles, "paragraph"
+    )
+    attributes = _merge_font_attributes(attributes, paragraph_attributes)
+    attributes = _merge_font_attributes(
+        attributes, _rpr_font_attributes(paragraph.find("w:pPr/w:rPr", NS))
+    )
+    run_style = run.find("w:rPr/w:rStyle", NS)
+    run_style_id = (
+        run_style.get(W + "val")
+        if run_style is not None
+        else styles.defaults.get("character")
+    )
+    run_attributes, run_unresolved = _style_font_resolution(
+        run_style_id, styles, "character"
+    )
+    unresolved.extend(run_unresolved)
+    attributes = _merge_font_attributes(attributes, run_attributes)
+    attributes = _merge_font_attributes(
+        attributes, _rpr_font_attributes(run.find("w:rPr", NS))
+    )
+    return attributes, unresolved
 
 
 def _effective_font_attributes(run, paragraph, styles, defaults) -> dict[str, str]:
-    attributes = dict(defaults)
-    paragraph_style = paragraph.find("w:pPr/w:pStyle", NS)
-    if paragraph_style is not None:
-        attributes.update(_style_font_attributes(paragraph_style.get(W + "val"), styles))
-    attributes.update(_rpr_font_attributes(paragraph.find("w:pPr/w:rPr", NS)))
-    run_style = run.find("w:rPr/w:rStyle", NS)
-    if run_style is not None:
-        attributes.update(_style_font_attributes(run_style.get(W + "val"), styles))
-    attributes.update(_rpr_font_attributes(run.find("w:rPr", NS)))
+    attributes, _unresolved = _effective_font_resolution(
+        run, paragraph, styles, defaults
+    )
     return attributes
 
 
 def _families(attributes, theme_fonts) -> list[str]:
     values = []
-    for name in _FONT_VALUE_NAMES:
-        if attributes.get(name):
-            values.append(attributes[name])
-    for name in _THEME_VALUE_NAMES:
-        if attributes.get(name) and theme_fonts.get(attributes[name]):
-            values.append(theme_fonts[attributes[name]])
+    for family_name, theme_name in _FONT_ATTRIBUTE_PAIRS:
+        if theme_name in attributes:
+            reference = attributes[theme_name]
+            if reference and theme_fonts.get(reference):
+                values.append(theme_fonts[reference])
+        elif attributes.get(family_name):
+            values.append(attributes[family_name])
     return list(dict.fromkeys(value for value in values if value))
 
 
 def _unresolved_theme_references(attributes, theme_fonts) -> list[str]:
     return list(
         dict.fromkeys(
-            attributes[name]
-            for name in _THEME_VALUE_NAMES
-            if attributes.get(name) and not theme_fonts.get(attributes[name])
+            attributes[theme_name]
+            for _family_name, theme_name in _FONT_ATTRIBUTE_PAIRS
+            if theme_name in attributes
+            and (
+                not attributes[theme_name]
+                or not theme_fonts.get(attributes[theme_name])
+            )
         )
     )
 
@@ -271,7 +399,7 @@ def _text_run_fonts(path) -> list[_TextRunFonts]:
                         node.text for node in run.findall(".//w:t", NS)
                     ):
                         continue
-                    attributes = _effective_font_attributes(
+                    attributes, unresolved_styles = _effective_font_resolution(
                         run, paragraph, styles, defaults
                     )
                     runs.append(
@@ -285,6 +413,7 @@ def _text_run_fonts(path) -> list[_TextRunFonts]:
                                     attributes, theme_fonts
                                 )
                             ),
+                            tuple(unresolved_styles),
                         )
                     )
     return runs
@@ -320,11 +449,69 @@ def validate_supported_source_fonts(path) -> list[SourceFont]:
     return fonts
 
 
+def validate_lab_source_fonts(path) -> list[SourceFont]:
+    """Require resolvable approved-Unicode or APS fonts for lab proofreading."""
+    approved_unicode = load_approved_unicode_font_families()
+    runs = _text_run_fonts(path)
+    for run in runs:
+        unresolved = []
+        unresolved.extend(run.unresolved_style_references)
+        unresolved.extend(
+            f'theme font reference "{reference}" is not defined by the DOCX theme'
+            for reference in run.unresolved_theme_references
+        )
+        if not run.families and not unresolved:
+            unresolved.append(
+                "no direct, inherited style, document-default, or theme font "
+                "declaration resolves this text-bearing run"
+            )
+        if unresolved:
+            raise UnsupportedSourceFontError(
+                "Lab proofread source-font validation failed: effective font "
+                f"could not be resolved at {run.location}; "
+                f"{'; '.join(unresolved)}. Supply a DOCX whose text-bearing "
+                "runs use resolvable supported fonts (approved Unicode or "
+                "supported APS). The document was not converted, extracted, "
+                "or proofread."
+            )
+
+    fonts = [
+        SourceFont(family, run.part_name)
+        for run in runs
+        for family in run.families
+    ]
+    for run in runs:
+        for family in run.families:
+            kind = _legacy_font_kind(family)
+            if kind == "shreelipi":
+                raise UnsupportedSourceFontError(
+                    f'Unsupported source font family detected: "{family}" at '
+                    f"{run.location}. ShreeLipi/Sri-Lipi conversion is disabled "
+                    "because verified font-specific mappings are unavailable. "
+                    "The document was not converted, extracted, or proofread."
+                )
+            if kind is None and _normalized(family) not in approved_unicode:
+                raise UnsupportedSourceFontError(
+                    f'Unsupported source font family detected: "{family}" at '
+                    f"{run.location}. Gurubodh accepts only approved Unicode and "
+                    "APS font families. The document was not converted, "
+                    "extracted, or proofread."
+                )
+    return fonts
+
+
 def validate_unicode_source_fonts(path) -> list[SourceFont]:
     """Require resolved, centrally approved Unicode fonts for Unicode ingest."""
     approved_unicode = load_approved_unicode_font_families()
     runs = _text_run_fonts(path)
     for run in runs:
+        if run.unresolved_style_references:
+            raise UnsupportedSourceFontError(
+                "Unicode-only source-font requirement failed: effective font "
+                f"could not be resolved at {run.location}; "
+                f"{'; '.join(run.unresolved_style_references)}. The document "
+                "was not processed."
+            )
         if not run.families and run.unresolved_theme_references:
             references = ", ".join(
                 f'"{reference}"'

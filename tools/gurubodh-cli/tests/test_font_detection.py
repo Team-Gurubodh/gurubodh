@@ -8,6 +8,7 @@ from docx import Document
 from gurubodh.legacy.font_detection import (
     UnsupportedSourceFontError,
     source_fonts,
+    validate_lab_source_fonts,
     validate_supported_source_fonts,
     validate_unicode_source_fonts,
 )
@@ -169,6 +170,156 @@ class SourceFontPolicyTests(unittest.TestCase):
         self.assertIn("Unicode-only source-font requirement", message)
         self.assertIn("could not be resolved", message)
         self.assertIn('DOCX part "word/document.xml", paragraph 1, run 1', message)
+
+    def test_lab_rejects_unresolved_fonts_alone_or_mixed_with_supported_fonts(self):
+        supported_runs = (
+            '<w:p><w:r><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr>'
+            '<w:t>यूनिकोड</w:t></w:r></w:p>'
+            '<w:p><w:r><w:rPr><w:rFonts w:ascii="APS-DV-Prakash" /></w:rPr>'
+            '<w:t>legacy</w:t></w:r></w:p>'
+        )
+        unresolved_run = '<w:p><w:r><w:t>अनिर्धारित</w:t></w:r></w:p>'
+        for name, prefix in (
+            ("only-unresolved.docx", ""),
+            ("mixed-unicode.docx", supported_runs.split("</w:p>", 1)[0] + "</w:p>"),
+            ("mixed-supported.docx", supported_runs),
+        ):
+            with self.subTest(name=name):
+                path = self.root / name
+                document_xml = (
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/'
+                    'wordprocessingml/2006/main"><w:body>'
+                    f"{prefix}{unresolved_run}</w:body></w:document>"
+                )
+                with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as package:
+                    package.writestr("word/document.xml", document_xml)
+
+                with self.assertRaises(UnsupportedSourceFontError) as raised:
+                    validate_lab_source_fonts(path)
+
+                message = str(raised.exception)
+                self.assertIn("Lab proofread source-font validation failed", message)
+                self.assertIn("could not be resolved", message)
+                self.assertIn('DOCX part "word/document.xml"', message)
+                self.assertIn("resolvable supported fonts", message)
+
+    def test_lab_rejects_unresolved_style_and_theme_references(self):
+        missing_style = self.root / "missing-style.docx"
+        document_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:pStyle w:val="MissingStyle" /></w:pPr>
+    <w:r><w:t>परीक्षण</w:t></w:r>
+  </w:p></w:body>
+</w:document>'''
+        with zipfile.ZipFile(missing_style, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr("word/document.xml", document_xml)
+        with self.assertRaisesRegex(
+            UnsupportedSourceFontError,
+            r'paragraph style "MissingStyle" is not defined.*word/styles\.xml',
+        ):
+            validate_lab_source_fonts(missing_style)
+
+        missing_parent = self.root / "missing-parent-style.docx"
+        styles_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="character" w:styleId="Child">
+    <w:basedOn w:val="MissingParent" /><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr>
+  </w:style>
+</w:styles>'''
+        run_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:r><w:rPr><w:rStyle w:val="Child" /></w:rPr><w:t>परीक्षण</w:t></w:r></w:p></w:body>
+</w:document>'''
+        with zipfile.ZipFile(missing_parent, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr("word/document.xml", run_xml)
+            package.writestr("word/styles.xml", styles_xml)
+        with self.assertRaisesRegex(
+            UnsupportedSourceFontError,
+            r'character style "Child" is based on undefined style "MissingParent"',
+        ):
+            validate_lab_source_fonts(missing_parent)
+
+        missing_theme = self.root / "missing-lab-theme.docx"
+        with zipfile.ZipFile(missing_theme, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "word/document.xml",
+                _run_xml("परीक्षण", 'w:hAnsiTheme="missingTheme"'),
+            )
+        with self.assertRaisesRegex(
+            UnsupportedSourceFontError,
+            r'theme font reference "missingTheme".*not defined',
+        ):
+            validate_lab_source_fonts(missing_theme)
+
+    def test_lab_accepts_fonts_from_styles_defaults_and_themes_without_direct_formatting(self):
+        inherited = self.root / "lab-inherited.docx"
+        document_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:pPr><w:pStyle w:val="ParagraphChild" /></w:pPr>
+    <w:r><w:rPr><w:rStyle w:val="CharacterChild" /></w:rPr><w:t>परीक्षण</w:t></w:r>
+  </w:p></w:body>
+</w:document>'''
+        styles_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr></w:rPrDefault></w:docDefaults>
+  <w:style w:type="paragraph" w:styleId="ParagraphBase"><w:rPr><w:rFonts w:hAnsi="Nirmala UI" /></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="ParagraphChild"><w:basedOn w:val="ParagraphBase" /></w:style>
+  <w:style w:type="character" w:styleId="CharacterBase"><w:rPr><w:rFonts w:eastAsia="Mangal" /></w:rPr></w:style>
+  <w:style w:type="character" w:styleId="CharacterChild"><w:basedOn w:val="CharacterBase" /></w:style>
+</w:styles>'''
+        with zipfile.ZipFile(inherited, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr("word/document.xml", document_xml)
+            package.writestr("word/styles.xml", styles_xml)
+        self.assertEqual(
+            {font.family for font in validate_lab_source_fonts(inherited)},
+            {"Mangal", "Nirmala UI"},
+        )
+
+        default_style = self.root / "lab-default-style.docx"
+        default_styles_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:asciiTheme="missingTheme" /></w:rPr></w:rPrDefault></w:docDefaults>
+  <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:rPr><w:rFonts w:ascii="Mangal" /></w:rPr></w:style>
+</w:styles>'''
+        with zipfile.ZipFile(default_style, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr("word/document.xml", _run_xml("परीक्षण"))
+            package.writestr("word/styles.xml", default_styles_xml)
+        self.assertEqual(
+            [font.family for font in validate_lab_source_fonts(default_style)],
+            ["Mangal"],
+        )
+
+        theme = self.root / "lab-theme.docx"
+        theme_xml = '''<?xml version="1.0" encoding="UTF-8"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <a:themeElements><a:fontScheme name="Test">
+    <a:majorFont><a:latin typeface="Mangal" /><a:ea typeface="" /><a:cs typeface="" /></a:majorFont>
+    <a:minorFont><a:latin typeface="Nirmala UI" /><a:ea typeface="" /><a:cs typeface="" /></a:minorFont>
+  </a:fontScheme></a:themeElements>
+</a:theme>'''
+        with zipfile.ZipFile(theme, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "word/document.xml",
+                _run_xml("परीक्षण", 'w:hAnsiTheme="majorHAnsi"'),
+            )
+            package.writestr("word/theme/theme1.xml", theme_xml)
+        self.assertEqual(
+            [font.family for font in validate_lab_source_fonts(theme)],
+            ["Mangal"],
+        )
+
+    def test_lab_rejects_unresolved_font_in_non_body_part(self):
+        path = self.root / "unresolved-comment.docx"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr("word/document.xml", _part_xml("परीक्षण", "Mangal"))
+            package.writestr("word/comments.xml", _run_xml("अनिर्धारित"))
+
+        with self.assertRaisesRegex(
+            UnsupportedSourceFontError,
+            r'word/comments\.xml.*paragraph 1, run 1',
+        ):
+            validate_lab_source_fonts(path)
 
     def test_unicode_route_resolves_inherited_character_and_paragraph_styles(self):
         path = self.root / "inherited.docx"

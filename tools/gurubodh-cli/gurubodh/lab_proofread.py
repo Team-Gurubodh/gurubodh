@@ -30,8 +30,7 @@ from gurubodh.job_composition import resolve_lab_proofreading
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
 from gurubodh.legacy.font_detection import (
     detect_converter_for_font,
-    source_fonts,
-    validate_supported_source_fonts,
+    validate_lab_source_fonts,
 )
 from gurubodh.locales import locale_spec
 from gurubodh.proofreading.errors import ProofreadingError
@@ -100,11 +99,11 @@ def _artifact_checksums(run_dir: Path) -> dict[str, str]:
     }
 
 
-def _detect_font_encodings(source: Path) -> list[str]:
+def _detect_font_encodings(source_fonts) -> list[str]:
     return sorted(
         {
             converter
-            for source_font in source_fonts(source)
+            for source_font in source_fonts
             if (converter := detect_converter_for_font(source_font.family))
         }
     )
@@ -308,8 +307,8 @@ def run_lab_proofread(
             raise FileNotFoundError(f"Source DOCX does not exist: {source_path}")
         validate_docx(source_path)
         details["source"]["sha256"] = _sha256(source_path)
-        validate_supported_source_fonts(source_path)
-        encodings = _detect_font_encodings(source_path)
+        fonts = validate_lab_source_fonts(source_path)
+        encodings = _detect_font_encodings(fonts)
         details["source"]["font_encoding"] = (
             "+".join(encodings) if encodings else "unicode"
         )
