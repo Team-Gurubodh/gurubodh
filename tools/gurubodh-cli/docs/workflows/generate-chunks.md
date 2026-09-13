@@ -12,7 +12,17 @@ Configure and, when necessary, deliberately bootstrap that cache through [Enviro
 
 ## Run a local job
 
-After setting `GURUBODH_MODEL_CACHE_DIR` through [Environment setup](../environment-setup.md), run:
+After setting the local CMS root and `GURUBODH_MODEL_CACHE_DIR` through
+[Environment setup](../environment-setup.md), inspect then execute:
+
+```bash
+gurubodh config resolve --command generate-chunks \
+  --subject sub123_spand_rahasya --language hi-IN \
+  --environment development --storage-profile local --provenance
+```
+
+Require successful inspection and review the canonical source, destination, and
+pinned chunking profile. This does not load the model or inspect source chapters.
 
 ```bash
 gurubodh generate-chunks \
@@ -32,6 +42,35 @@ The command validates the candidate manifest and its selected metadata/text pair
 ```
 
 Chunk artifacts bind back to canonical content through checksums and content identity. The model may be used to find boundaries, but finalized embedding vectors are not persisted.
+
+## Select chapters and a complete profile
+
+Prerequisites: a ready canonical release containing chapters `001` and `002`,
+and the selected profile's pinned cache. Inspect the same selection you execute:
+
+```bash
+gurubodh config resolve --command generate-chunks \
+  --subject sub123_spand_rahasya --language hi-IN \
+  --environment development --storage-profile local --provenance \
+  --chunking-profile bge-m3-semantic-window-v1 --chapters 001 002
+gurubodh generate-chunks \
+  --subject sub123_spand_rahasya --language hi-IN \
+  --environment development --storage-profile local \
+  --chunking-profile bge-m3-semantic-window-v1 --chapters 001 002
+```
+
+Inspect the canonical manifest first to choose real chapter numbers; resolution
+checks selector syntax, while execution checks existence. The profile is a
+[whole-profile replacement](../reference/configuration.md#selectors-and-ownership).
+Require a succeeded outcome, inspect the printed audit, and verify the published
+chunk manifest contains exactly the requested chapters and matching source bindings.
+
+If chunks already exist, the execution above fails preflight. Add `--overwrite`
+only to deliberately replace the **entire chunk set** with this subset; unselected
+old chunks are not retained. Omitting `--chapters` on a later overwrite rebuilds
+the full set. There is no incremental append or chunk resume. For failure
+recovery, inspect the audit and use the replacement rules below and
+[recovery decisions](../operations/recovery.md).
 
 ## Replacement behavior
 

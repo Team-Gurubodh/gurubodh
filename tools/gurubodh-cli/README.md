@@ -4,19 +4,10 @@ Gurubodh CLI prepares Gurubodh subject content from DOCX files and produces the 
 
 ## Start here
 
-If you are new to the tool, use a maintained subject with local storage first. Set `GURUBODH_SOURCE_LIBRARY_ROOT` and `GURUBODH_CMS_LIBRARY_ROOT` to your absolute local library paths. From the monorepo root:
-
-```bash
-make cli-venv
-. tools/gurubodh-cli/.venv/bin/activate
-make cli-install
-cd tools/gurubodh-cli
-export GEMINI_API_KEY=...
-gurubodh prep-subject \
-  --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
-```
-
-This prepares canonical, proofread chapter artifacts locally. It needs an environment-only Gemini API key. Do not add credentials to a job file, command history, image, or repository configuration. See [Environment setup](docs/environment-setup.md) for the runtime and variables, and [Getting started](docs/getting-started.md) before using `--overwrite`, R2, or an unfamiliar job.
+Start with [Getting started](docs/getting-started.md): install the CLI, place
+supplied source material, inspect configuration, prepare locally, derive matching
+chunks/DOCX, and verify readiness. [Environment setup](docs/environment-setup.md)
+owns runtime, credentials, library roots, and cache prerequisites.
 
 ## What you can do today
 
@@ -26,8 +17,8 @@ This prepares canonical, proofread chapter artifacts locally. It needs an enviro
 | Generate semantic chunks from prepared canonical text | `generate-chunks` | [Generate chunks](docs/workflows/generate-chunks.md) |
 | Generate one reviewable DOCX per canonical chapter | `generate-docx` | [Generate DOCX exports](docs/workflows/generate-docx.md) |
 | Validate and inspect a composed job | `config resolve` | [Command reference](docs/reference/command-reference.md#config-resolve) |
-| Experiment with a local DOCX without publishing canonical artifacts | `lab` | [Command reference](docs/reference/command-reference.md) |
-| Estimate BGE-M3 tokens (and optionally Sarvam prompt tokens) | `compare-tokenizers` | [Command reference](docs/reference/command-reference.md) |
+| Experiment with a local DOCX without publishing canonical artifacts | `lab` | [Local tool recipes](docs/workflows/local-tools.md) |
+| Estimate BGE-M3 tokens (and optionally Sarvam prompt tokens) | `compare-tokenizers` | [Local tool recipes](docs/workflows/local-tools.md) |
 
 The supported production flow is:
 
@@ -46,10 +37,12 @@ afterward.
 
 - New contributor or first local run: [Getting started](docs/getting-started.md)
 - Runtime, credentials, model cache, or Docker setup: [Environment setup](docs/environment-setup.md)
+- Add a subject or language edition: [Subject setup](docs/workflows/add-a-subject.md)
+- Failed/incomplete outcomes and reruns: [Recovery decisions](docs/operations/recovery.md)
 - Normal content preparation: [Prepare a subject](docs/workflows/prepare-a-subject.md)
 - Chunk generation and the pinned local model cache: [Generate chunks](docs/workflows/generate-chunks.md)
 - Rebuildable chapter Word exports: [Generate DOCX exports](docs/workflows/generate-docx.md)
-- Docker and Cloudflare R2 operations: [R2 production runs](docs/operations/r2-production-runs.md)
+- Docker and Cloudflare R2 operations: [Docker and R2 operations](docs/operations/r2-production-runs.md)
 - Artifact ownership, invalidation, canonical-content, and audit records: [Artifact lifecycle](docs/concepts/artifact-lifecycle.md)
 - Composed configuration, storage routing, locales, and command options: [Reference](docs/reference/README.md)
 

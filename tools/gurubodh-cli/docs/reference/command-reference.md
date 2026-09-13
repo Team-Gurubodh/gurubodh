@@ -103,6 +103,9 @@ Tokenizer comparison supports `--format text|json`, `--model-name`,
 selects its model. These tokenizer options are separate from canonical chunking
 profiles. See installed help for defaults.
 
+See [local tool recipes](../workflows/local-tools.md) for inspection, invocation,
+output verification, and recovery for all four local commands.
+
 ## Optional larger-input proofreading
 
 `prep-subject` and `lab proofread` accept

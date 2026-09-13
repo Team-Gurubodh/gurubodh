@@ -4,7 +4,9 @@
 
 ## Run a maintained job
 
-After configuring `GEMINI_API_KEY` as described in [Environment setup](../environment-setup.md), run:
+Complete the [first local workflow prerequisites and inspection](../getting-started.md#prerequisites),
+including source placement, library roots, and Gemini credentials. After successful
+inspection, execute with the same selectors:
 
 ```bash
 gurubodh prep-subject \
@@ -12,6 +14,30 @@ gurubodh prep-subject \
 ```
 
 The job must declare `hi-IN` or `mr-IN`, `Devanagari`, and UTF-8 output. `subject_dir` is a safe POSIX-relative nested path ending in that language, such as `123_spand_rahasya/hi-IN`. The two supported locales use their own proofreading instructions but share the structured response contract.
+
+## Select a complete proofreading profile
+
+With the same source and credential prerequisites, inspect then run the optional
+[larger-input profile](../reference/command-reference.md#optional-larger-input-proofreading):
+
+```bash
+gurubodh config resolve --command prep-subject \
+  --subject sub123_spand_rahasya --language hi-IN \
+  --environment development --storage-profile local --provenance \
+  --proofreading-profile gemini-3.6-flash-large-input-v1
+gurubodh prep-subject \
+  --subject sub123_spand_rahasya --language hi-IN \
+  --environment development --storage-profile local \
+  --proofreading-profile gemini-3.6-flash-large-input-v1
+```
+
+Require successful inspection; verify provenance selects the invocation profile
+and review the complete settings. Selection replaces a whole profile, not one
+field, and does not raise provider quota. For an existing destination, review
+[resume/replacement](#resume-and-replacement) before execution. Afterward verify
+the succeeded state, manifest binding, and audit as in
+[the first local workflow](../getting-started.md#prepare-and-verify).
+For failed/incomplete results, use [recovery decisions](../operations/recovery.md).
 
 ## What is published
 

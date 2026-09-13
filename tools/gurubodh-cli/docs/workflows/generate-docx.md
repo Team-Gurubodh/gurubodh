@@ -4,7 +4,14 @@
 
 ## Run a local job
 
+Prerequisites: the completed local preparation release and CMS library root from
+[Getting started](../getting-started.md). No provider key or model cache is needed.
+Inspect source/destination paths successfully before execution:
+
 ```bash
+gurubodh config resolve --command generate-docx \
+  --subject sub123_spand_rahasya --language hi-IN \
+  --environment development --storage-profile local --provenance
 gurubodh generate-docx \
   --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
@@ -20,6 +27,12 @@ The command requires the current `prep-subject` state to be `succeeded` and boun
 
 `docx_manifest.json` is the readiness marker. It binds each output to its source manifest, canonical content identity, text checksum, title/formatting contract, and DOCX checksum.
 
+Require a `succeeded` outcome and publication readiness, inspect the printed audit
+and `docx_manifest.json` for chapter coverage/source binding, and open a sample
+export. If source validation fails, repair the canonical release first; for an
+existing output or publication failure follow the replacement rules below and
+[recovery guide](../operations/recovery.md).
+
 ## Replacement behavior
 
 Without `--overwrite`, an existing `chapters/msword/` directory fails preflight without modification. A local overwrite preserves the prior ready set through generation, staged validation, and source revalidation, then uses a same-directory incoming/backup swap with recovery if the swap fails. Only `chapters/msword/` is replaced.
@@ -30,4 +43,4 @@ For R2, the old readiness manifest is removed first, validated DOCX objects uplo
 
 ## Controlled local assembly
 
-Use the non-canonical lab tools only to combine controlled exports. They do not replace this workflow or make a combined document canonical.
+Use the [lab assembly and append recipes](local-tools.md#assemble-controlled-chapter-exports) to combine controlled exports into a separate local review copy.
