@@ -6,13 +6,16 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 
 - [Environment setup](environment-setup.md) — runtimes, credentials, model cache, Docker variables, and setup failures.
 - [Getting started](getting-started.md) — install the CLI, understand job locations, and perform a safe local preparation run.
+- [Add a subject or edition](workflows/add-a-subject.md) — adapt a manifest and inspect before execution.
+- [Local tools](workflows/local-tools.md) — lab proofreading, DOCX assembly/append, and tokenizer comparison.
 - [Prepare a subject](workflows/prepare-a-subject.md) — canonical preparation, proofreading, resume, and replacement behavior.
 - [Generate chunks](workflows/generate-chunks.md) — derive semantic chunks from a prepared release.
 - [Generate DOCX exports](workflows/generate-docx.md) — create rebuildable, human-readable chapter exports.
 
 ## Operations and concepts
 
-- [R2 production runs](operations/r2-production-runs.md) — immutable Docker images, R2 credentials, and the BGE-M3 cache volume.
+- [Recovery decisions](operations/recovery.md) — outcomes, readiness, reports, resume, and reruns.
+- [Docker and R2 operations](operations/r2-production-runs.md) — immutable Docker images, R2 credentials, and the BGE-M3 cache volume.
 - [Artifact lifecycle](concepts/artifact-lifecycle.md) — ownership, invalidation, readiness markers, locales, and audit reports.
 
 ## Reference

@@ -77,7 +77,20 @@ export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
 
 Maintained jobs use a full immutable Hugging Face revision and `local_files_only: true`. That combination makes runs reproducible: they use the already-downloaded snapshot and fail instead of quietly fetching different model files. Inspect the job's `chunking` block for the required revision; current maintained jobs use `5617a9f61b028005a4858fdac845db406aefb181`.
 
-Bootstrap or repair a cache deliberately, not during a maintained production run. For the exact file list and Docker volume command, use [R2 production runs](operations/r2-production-runs.md). The local workflow uses the same pinned snapshot.
+Bootstrap or repair a cache deliberately, not during a maintained run. For a
+local hub cache, download the selected snapshot explicitly (requires network
+access and enough disk space for model weights):
+
+```bash
+hf download BAAI/bge-m3 \
+  --revision 5617a9f61b028005a4858fdac845db406aefb181 \
+  --cache-dir "$GURUBODH_MODEL_CACHE_DIR"
+```
+
+Require successful download before running cached-only chunk generation; a
+cache directory's existence alone is insufficient. For the minimal runtime file
+list and Docker volume command, use [Docker and R2 operations](operations/r2-production-runs.md#bootstrap-the-model-cache).
+The local workflow uses the same pinned snapshot.
 
 ### `HF_HUB_OFFLINE=1`
 
@@ -99,7 +112,7 @@ For container chunk jobs, mount the BGE-M3 cache at `/var/cache/gurubodh/models`
 docker volume create gurubodh-bge-m3-cache
 ```
 
-`PYTHONUNBUFFERED=1` is optional but recommended for long-running containers: it makes Python logs appear immediately rather than waiting for an output buffer to fill. Full image build, cache bootstrap, and R2 command examples are in [R2 production runs](operations/r2-production-runs.md).
+`PYTHONUNBUFFERED=1` is optional but recommended for long-running containers: it makes Python logs appear immediately rather than waiting for an output buffer to fill. Full image build, cache bootstrap, and R2 command examples are in [Docker and R2 operations](operations/r2-production-runs.md).
 
 Do not mount a working checkout over `/opt/gurubodh-cli` in production. The image's baked source revision is part of the audit provenance.
 
