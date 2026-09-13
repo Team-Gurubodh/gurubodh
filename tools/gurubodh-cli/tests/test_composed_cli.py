@@ -265,8 +265,26 @@ class ComposedCliTests(unittest.TestCase):
             for alias in ("legacy-convert", "unicode-ingest"):
                 self.error([alias, "--config", "missing.json"], "invalid choice")
 
+    def test_large_input_profile_selection_by_invocation_and_manifest(self):
+        profile_id = "gemini-3.6-flash-large-input-v1"
+        default, _ = self.resolve("prep-subject")
+        self.assertEqual(default["proofreading"]["max_estimated_input_tokens_per_minute"], 20000)
+        expected = dict(default["proofreading"], max_estimated_input_tokens_per_minute=40000)
+        for selection in ("invocation", "manifest"):
+            with self.subTest(selection=selection):
+                extra = ["--proofreading-profile", profile_id]
+                if selection == "manifest":
+                    relative = "jobs/subjects/sub001_aps_example/manifest.json"
+                    manifest = json.loads((self.root / relative).read_text())
+                    manifest["profile_overrides"] = {"proofreading": profile_id}
+                    self.write(relative, manifest)
+                    extra = []
+                with patch(RUNNERS["prep-subject"], return_value={"processed_chapter_count": 1}) as runner:
+                    self.invoke(["prep-subject", *self.selectors(), *extra])
+                self.assertEqual(runner.call_args.args[1]["proofreading"], expected)
+
     def test_lab_profile_selector_preserves_manifest_free_interface(self):
-        for profile in (None, "gemini-3.6-flash-v1"):
+        for profile in (None, "gemini-3.6-flash-v1", "gemini-3.6-flash-large-input-v1"):
             extra = [] if profile is None else ["--proofreading-profile", profile]
             with patch("gurubodh.cli.run_lab_proofread", return_value={"run_directory": "lab-run"}) as runner:
                 self.invoke(["lab", "proofread", "--source", "source.docx", "--locale", "mr-IN",

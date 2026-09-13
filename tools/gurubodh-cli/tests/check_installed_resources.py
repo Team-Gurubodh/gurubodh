@@ -94,6 +94,20 @@ def main():
     assert lab.settings.model == "gemini-3.6-flash"
     assert lab.settings.max_output_tokens == 16384
 
+    large_id = "gemini-3.6-flash-large-input-v1"
+    large_relative = f"config/job-components/profiles/proofreading/{large_id}.json"
+    assert bundled_resource_path(large_relative) == recorded(large_relative)
+    large = resolve_job(
+        catalog, command="prep-subject", manifest_id="sub001_aps_example",
+        locale="hi-IN", environment_id="development", storage_profile_id="r2",
+        proofreading_profile_id=large_id, environ={},
+    ).job["proofreading"]
+    assert proofreading["max_estimated_input_tokens_per_minute"] == 20000
+    assert large == dict(proofreading, max_estimated_input_tokens_per_minute=40000)
+    large_lab = resolve_lab_proofreading(catalog, proofreading_profile_id=large_id)
+    assert large_lab.settings.max_estimated_input_tokens_per_minute == 40000
+    assert lab.settings.max_estimated_input_tokens_per_minute == 20000
+
     profile = context.resource_root / (
         "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"
     )

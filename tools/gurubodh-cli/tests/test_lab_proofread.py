@@ -13,6 +13,7 @@ from docx import Document
 
 from policy_fixtures import proofreading_settings
 
+from gurubodh.config import proofreading_config
 from gurubodh.docx.export import validate_chapter_docx
 from gurubodh.legacy.font_detection import UnsupportedSourceFontError
 from gurubodh.lab_proofread import LAB_HEADING_2_PARAGRAPHS, run_lab_proofread
@@ -57,6 +58,18 @@ class LabProofreadTests(unittest.TestCase):
         document.add_paragraph(text)
         document.save(path)
         return path
+
+    def test_large_input_profile_reaches_lab_configuration(self):
+        result = run_lab_proofread(
+            self.context, self.source_docx(), "hi-IN", self.root / "lab",
+            proofreading_profile_id="gemini-3.6-flash-large-input-v1",
+            proofreader=FakeProofreader(),
+        )
+        manifest = json.loads(result["manifest_path"].read_text(encoding="utf-8"))
+        default = json.loads((self.root / "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json").read_text())
+        expected = dict(default["proofreading"], max_estimated_input_tokens_per_minute=40000)
+        self.assertEqual(manifest["configuration_snapshot"]["proofreading"],
+                         proofreading_config({"proofreading": expected}).public_dict())
 
     def test_unicode_run_is_confined_immutable_and_has_validated_artifacts(self):
         source = self.source_docx()
