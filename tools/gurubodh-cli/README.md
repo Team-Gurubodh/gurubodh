@@ -25,6 +25,7 @@ This prepares canonical, proofread chapter artifacts locally. It needs an enviro
 | Prepare canonical chapter artifacts from a DOCX source | `prep-subject` | [Prepare a subject](docs/workflows/prepare-a-subject.md) |
 | Generate semantic chunks from prepared canonical text | `generate-chunks` | [Generate chunks](docs/workflows/generate-chunks.md) |
 | Generate one reviewable DOCX per canonical chapter | `generate-docx` | [Generate DOCX exports](docs/workflows/generate-docx.md) |
+| Validate and inspect a composed job | `config resolve` | [Command reference](docs/reference/command-reference.md#config-resolve) |
 | Experiment with a local DOCX without publishing canonical artifacts | `lab` | [Command reference](docs/reference/command-reference.md) |
 | Estimate BGE-M3 tokens (and optionally Sarvam prompt tokens) | `compare-tokenizers` | [Command reference](docs/reference/command-reference.md) |
 
@@ -50,14 +51,14 @@ afterward.
 - Rebuildable chapter Word exports: [Generate DOCX exports](docs/workflows/generate-docx.md)
 - Docker and Cloudflare R2 operations: [R2 production runs](docs/operations/r2-production-runs.md)
 - Artifact ownership, invalidation, canonical-content, and audit records: [Artifact lifecycle](docs/concepts/artifact-lifecycle.md)
-- Job files, storage backends, locales, and command options: [Reference](docs/reference/README.md)
+- Composed configuration, storage routing, locales, and command options: [Reference](docs/reference/README.md)
 
 ## Safety essentials
 
 - Start with a maintained subject and the `local` storage profile. R2 jobs and Docker are for operators who have read the production runbook.
 - Treat `--overwrite` as a deliberate replacement operation. It is scoped to the invoking command's artifacts, but it is not an atomic, versioned R2 release.
 - `prep-subject` is a single-writer operation per destination. The local advisory lock and R2 advisory lease are guardrails only, not reliable distributed mutual exclusion; concurrent runs can duplicate Gemini calls and overwrite checkpoint/workspace artifacts.
-- Run `gurubodh <command> --help` for the exact installed command interface; job schemas under `config/jobs/` define the machine-validated configuration.
+- Run `gurubodh <command> --help` for the exact installed command interface; [schema navigation](docs/reference/README.md#schema-boundaries) distinguishes configuration inputs from assembled jobs and output artifacts.
 
 ## Terminal progress and outcomes
 

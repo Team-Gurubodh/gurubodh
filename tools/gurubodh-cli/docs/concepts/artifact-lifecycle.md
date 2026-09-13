@@ -48,13 +48,17 @@ R2 publication is readiness-based and is not atomic. On overwrite, the command r
 
 ## Audits and recovery
 
-Each maintained command writes JSON and Markdown audit reports below `run_reports/<command>/`. JSON is the tooling source of truth; Markdown is the operator summary. Reports capture run identity, lifecycle transitions, safe configuration/provenance, artifact summaries, publication deletes/uploads/readiness status, and outcomes, but exclude credentials, environment values, request bodies, and full content.
+Each maintained command writes JSON and Markdown audit reports below `run_reports/<command>/`. JSON is the tooling source of truth; Markdown is the operator summary. Reports capture run identity, lifecycle transitions, safe configuration/provenance, artifact summaries, publication deletes/uploads/readiness status, and outcomes, but exclude credentials, request bodies, and full content. Configuration snapshots include resolved local library paths; provenance records library variable names rather than their environment values.
 
 `prep-subject`, `generate-chunks`, `generate-docx`, and lab proofreading all
-use the executable `gurubodh.audit-report` envelope at schema version `2.0.0`.
+use the executable `gurubodh.audit-report` envelope at schema version `2.1.0`.
 Its common fields are `run_identity`, `job_identity`,
 `configuration_snapshot`, `processing_summary`, `lifecycle`, `publication`,
-`failure`, `report_artifacts`, and `command_details`. JSON serialization and
+`failure`, `report_artifacts`, `command_details`, and `configuration_provenance`.
+The latter records selectors, component origins/digests, and profile selection;
+see [configuration inspection](../reference/command-reference.md#config-resolve).
+Historical v2.0 reports remain readable but lack this provenance field.
+JSON serialization and
 local JSON/Markdown writes are deterministic and centralized; command modules
 provide only their identities, summaries, details, and Markdown renderers. R2
 upload remains a workflow-boundary action after the local write result exists.

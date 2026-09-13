@@ -28,8 +28,10 @@ run_reports/prep-subject/
 
 The versioned text in `chapters/text_and_metadata/` is the canonical proofread text. Metadata is calculated from that exact text. Extracted source snapshots, diffs, and proofreading provenance are supporting records—not chunking inputs. Details of ownership, derived outputs, and readiness are in [Artifact lifecycle](../concepts/artifact-lifecycle.md).
 
-`prep-subject` requires a fully explicit 18-property `proofreading` object and
-`GEMINI_API_KEY`. It fails before publication for missing credentials, invalid
+`prep-subject` obtains its complete proofreading contract from the selected
+[execution profile](../reference/configuration.md#selectors-and-ownership) and requires
+`GEMINI_API_KEY`. See the [optional larger-input profile](../reference/command-reference.md#optional-larger-input-proofreading)
+for its supported alternative. It fails before publication for missing credentials, invalid
 configuration, oversized input, invalid or blocked model responses, and
 exhausted retry attempts. It does not publish chapter DOCX files or a
 `full_subject/` artifact.

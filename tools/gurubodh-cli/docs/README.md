@@ -17,6 +17,8 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 
 ## Reference
 
+- [Command reference](reference/command-reference.md) — all maintained commands, selectors, and inspection.
+- [Composed configuration](reference/configuration.md) — where settings live, profile precedence, storage routing, and discovery.
 - [Reference index](reference/README.md) — schemas and command-reference links.
 - [Legacy DOCX conversion](reference/legacy-docx-conversion.md) — source conversion details.
 - [Semantic chunking](reference/semantic-chunking.md) — local model and supported command boundary.

@@ -2,6 +2,10 @@
 
 Docker is the supported runner for production R2-to-R2 batch jobs. Native Python is for development and debugging. Use the published CPU-only image `ghcr.io/team-gurubodh/gurubodh-cli` pinned to an immutable digest or `sha-<full-git-sha>` tag—never a mutable reference.
 
+The examples below explicitly select `development`. See [environment and storage
+routing](../reference/configuration.md#storage-and-library-roots) for its bucket
+and why Docker/R2 does not select a production environment.
+
 ## Build and inspect locally
 
 From the monorepo root:
@@ -63,9 +67,7 @@ Complete [Environment setup](../environment-setup.md) for R2 credentials, Gemini
 
 ## Bootstrap the model cache
 
-Only R2 chunk generation needs the BGE-M3 cache. After creating `gurubodh-bge-m3-cache` as described in [Environment setup](../environment-setup.md), prepare or repair it explicitly using the exact snapshot required by maintained jobs:
-
-Prepare or repair the named volume explicitly using the exact snapshot required by maintained jobs:
+Among the canonical commands, only chunk generation needs the BGE-M3 cache, for both local and R2 routes. After creating `gurubodh-bge-m3-cache` as described in [Environment setup](../environment-setup.md), prepare or repair it explicitly using the exact snapshot required by maintained jobs:
 
 ```bash
 docker run --rm \

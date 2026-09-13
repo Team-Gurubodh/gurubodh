@@ -18,7 +18,7 @@ The editable install exposes `gurubodh` while keeping it linked to this checkout
 
 ## Your first run
 
-Choose a maintained subject and the `local` storage profile. Review its manifest and selected components before execution. Bind `GURUBODH_SOURCE_LIBRARY_ROOT` and `GURUBODH_CMS_LIBRARY_ROOT` to your absolute local library paths; these variables are required for local preparation.
+Choose a maintained subject and the `local` storage profile. Review its manifest and selected components using [configuration inspection](reference/command-reference.md#config-resolve) before execution. Bind `GURUBODH_SOURCE_LIBRARY_ROOT` and `GURUBODH_CMS_LIBRARY_ROOT` to your absolute local library paths; these variables are required for local preparation.
 
 ```bash
 gurubodh prep-subject \
@@ -37,7 +37,7 @@ gurubodh prep-subject \
   --subject sub123_spand_rahasya --language hi-IN --environment development --storage-profile local
 ```
 
-The CLI otherwise uses `GURUBODH_CLI_ROOT`, then walks upward to find `jobs/subjects/`.
+See [project and resource discovery](reference/configuration.md#project-and-resource-discovery) for root precedence and component lookup.
 
 ## Next steps
 

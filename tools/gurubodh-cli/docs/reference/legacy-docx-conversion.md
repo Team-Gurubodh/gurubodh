@@ -17,7 +17,7 @@ Canonical output is always UTF-8 Unicode text. Preparation does not publish a co
 
 ## Configuration
 
-Configured sources must be `.docx`. A preparation job declares source and destination, pipeline, supported source-font encoding, chapter split, naming, metadata defaults, locale, and a mandatory proofreading contract. Review the current job schema before editing a maintained job.
+Configured sources must be `.docx`. A preparation job declares source and destination, pipeline, supported source-font encoding, chapter split, naming, metadata defaults, locale, and a mandatory proofreading contract. Use the [configuration reference](configuration.md#selectors-and-ownership) to locate each setting in its manifest or component.
 
 ## Source-font safety boundary
 
@@ -109,4 +109,4 @@ The `subject_dir` is language-qualified. Legacy artifacts in an unqualified subj
 
 ## Project-root resolution
 
-Run jobs from `tools/gurubodh-cli`, or pass `--project-root` when elsewhere. The CLI otherwise uses `GURUBODH_CLI_ROOT` and then searches upward for both `config/jobs/prep_subject_job.schema.json` and `jobs/subjects/`. See [Getting started](../getting-started.md) for examples.
+See [project and resource discovery](configuration.md#project-and-resource-discovery) for root precedence, the `jobs/subjects/` discovery marker, and bundled resources.

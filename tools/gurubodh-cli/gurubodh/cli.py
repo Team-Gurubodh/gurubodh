@@ -111,7 +111,7 @@ def build_parser():
     add_project_option(resolve_parser)
     resolve_parser.add_argument(
         "--provenance", action="store_true",
-        help="Emit separate provenance JSON to stderr; stdout remains executable job JSON only.",
+        help="Emit separate provenance JSON to stderr; stdout remains assembled job JSON for inspection only.",
     )
 
     lab_parser = subparsers.add_parser(

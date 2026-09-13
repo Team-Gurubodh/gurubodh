@@ -5,6 +5,11 @@
 <date>2026-08-29</date>
 <owners>Gurubodh maintainers</owners>
 
+For current composed inputs and retained assembled-job schemas, see the
+[CLI schema reference](../../tools/gurubodh-cli/docs/reference/README.md#schema-boundaries).
+The raw-job and version details below record the original decision; complete-job
+file execution was subsequently retired under [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288).
+
 ## Context
 
 Gurubodh CLI job and artifact structures were defined in Draft 2020-12 JSON
