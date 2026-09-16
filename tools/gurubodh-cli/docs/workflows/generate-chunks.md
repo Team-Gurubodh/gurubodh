@@ -8,7 +8,9 @@
 - A maintained job whose source and destination use the same language-qualified `subject_dir` and whose `naming.language` matches the manifest.
 - The exact pinned BGE-M3 model snapshot in the configured local cache.
 
-Configure and, when necessary, deliberately bootstrap that cache through [Environment setup](../environment-setup.md). Maintained jobs use cached-only loading, so a normal job never silently repairs or replaces its model files.
+Configure and, when necessary, deliberately prepare and verify that cache through
+[Manage the model cache](manage-model-cache.md). Maintained jobs use cached-only
+loading, so a normal job never silently repairs or replaces its model files.
 
 ## Run a local job
 

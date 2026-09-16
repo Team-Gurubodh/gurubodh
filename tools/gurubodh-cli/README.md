@@ -16,6 +16,7 @@ owns runtime, credentials, library roots, and cache prerequisites.
 | Prepare canonical chapter artifacts from a DOCX source | `prep-subject` | [Prepare a subject](docs/workflows/prepare-a-subject.md) |
 | Generate semantic chunks from prepared canonical text | `generate-chunks` | [Generate chunks](docs/workflows/generate-chunks.md) |
 | Generate one reviewable DOCX per canonical chapter | `generate-docx` | [Generate DOCX exports](docs/workflows/generate-docx.md) |
+| Prepare or verify the pinned BGE-M3 runtime cache | `models prepare`, `models verify` | [Manage the model cache](docs/workflows/manage-model-cache.md) |
 | Validate and inspect a composed job | `config resolve` | [Command reference](docs/reference/command-reference.md#config-resolve) |
 | Experiment with a local DOCX without publishing canonical artifacts | `lab` | [Local tool recipes](docs/workflows/local-tools.md) |
 | Estimate BGE-M3 tokens (and optionally Sarvam prompt tokens) | `compare-tokenizers` | [Local tool recipes](docs/workflows/local-tools.md) |

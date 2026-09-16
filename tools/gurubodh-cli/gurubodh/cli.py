@@ -9,6 +9,7 @@ from gurubodh.job_composition import resolve_job
 from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
+from gurubodh.model_cache import prepare_model_cache, verify_model_cache
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
 from gurubodh.pipelines.generate_docx import run_generate_docx_job
 from gurubodh.pipelines.dispatcher import run_prepared_job
@@ -114,6 +115,22 @@ def build_parser():
         help="Emit separate provenance JSON to stderr; stdout remains assembled job JSON for inspection only.",
     )
 
+    models_parser = subparsers.add_parser(
+        "models",
+        help="Prepare or verify the pinned local embedding-model cache.",
+        description="Manage only the explicitly supported artifacts for a validated chunking profile.",
+    )
+    models_subparsers = models_parser.add_subparsers(dest="models_command", required=True)
+    for command, help_text in (
+        ("prepare", "Download or repair required pinned model files, then verify them offline."),
+        ("verify", "Verify required pinned model files and run an offline embedding smoke check."),
+    ):
+        models_command_parser = models_subparsers.add_parser(command, help=help_text, description=help_text)
+        models_command_parser.add_argument(
+            "--profile", required=True, help="Validated chunking profile ID, e.g. bge-m3-semantic-window-v1."
+        )
+        add_project_option(models_command_parser)
+
     lab_parser = subparsers.add_parser(
         "lab",
         help="Run explicitly non-canonical local experimentation commands.",
@@ -181,6 +198,13 @@ def main(argv=None):
 
 
 def _run_command(parser, args):
+
+    if args.command == "models":
+        context = resolve_project_context(args.project_root)
+        catalog = ComponentCatalog(context.root, context.resource_root)
+        runner = prepare_model_cache if args.models_command == "prepare" else verify_model_cache
+        runner(catalog, args.profile)
+        return
 
     if args.command in COMPOSED_COMMANDS or args.command == "config":
         command = args.resolved_command if args.command == "config" else args.command

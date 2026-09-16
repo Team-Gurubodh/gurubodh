@@ -75,22 +75,25 @@ Pass them into a container by name with Docker `--env`, not by placing values in
 export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
 ```
 
-Maintained jobs use a full immutable Hugging Face revision and `local_files_only: true`. That combination makes runs reproducible: they use the already-downloaded snapshot and fail instead of quietly fetching different model files. Inspect the job's `chunking` block for the required revision; current maintained jobs use `5617a9f61b028005a4858fdac845db406aefb181`.
+Maintained jobs use a full immutable Hugging Face revision and `local_files_only: true`. That combination makes runs reproducible: they use the already-downloaded snapshot and fail instead of quietly fetching different model files. The model-cache commands resolve that pin from the selected validated chunking profile; current maintained jobs use `bge-m3-semantic-window-v1`.
 
-Bootstrap or repair a cache deliberately, not during a maintained run. For a
-local hub cache, download the selected snapshot explicitly (requires network
-access and enough disk space for model weights):
+Prepare or repair the exact allowlisted runtime files deliberately, not during a
+maintained run. Preparation requires network access and enough disk space for
+the selected weights. It reports the revision-derived artifact size and remaining
+download bytes before downloading content, reuses valid cache entries, and finishes
+only after offline verification succeeds:
 
 ```bash
-hf download BAAI/bge-m3 \
-  --revision 5617a9f61b028005a4858fdac845db406aefb181 \
-  --cache-dir "$GURUBODH_MODEL_CACHE_DIR"
+gurubodh models prepare --profile bge-m3-semantic-window-v1
+gurubodh models verify --profile bge-m3-semantic-window-v1
 ```
 
-Require successful download before running cached-only chunk generation; a
-cache directory's existence alone is insufficient. For the minimal runtime file
-list and Docker volume command, use [Docker and R2 operations](operations/r2-production-runs.md#bootstrap-the-model-cache).
-The local workflow uses the same pinned snapshot.
+`models verify` performs no downloads or repairs: it checks the prepared integrity
+contract and required files, then loads the pinned model through the production
+embedding path for a small offline encoding check. A cache directory's existence
+alone is insufficient. See [Manage the model cache](workflows/manage-model-cache.md)
+for command behavior and recovery, and [Docker and R2 operations](operations/r2-production-runs.md#bootstrap-the-model-cache)
+for the mounted-volume form. Local and container workflows use the same pinned snapshot.
 
 ### `HF_HUB_OFFLINE=1`
 
@@ -100,7 +103,7 @@ Set this only for an R2 container chunk-generation run after its mounted cache i
 --env HF_HUB_OFFLINE=1
 ```
 
-It instructs the Hugging Face Hub client not to make network requests. It is a defence-in-depth safeguard alongside the job's `local_files_only: true`: a chunk job either uses the pinned cache volume or fails clearly. It does not download, populate, or repair the cache, and it is unnecessary for preparation and DOCX export.
+It instructs the Hugging Face Hub client not to make network requests. It is a defence-in-depth safeguard alongside the job's `local_files_only: true`: a chunk job or `models verify` invocation either uses the pinned cache volume or fails clearly. It does not download, populate, or repair the cache. Do not set it for `models prepare`, which must retrieve pinned-revision metadata and any missing or damaged required files.
 
 ## Docker execution environment
 
@@ -123,8 +126,8 @@ Do not mount a working checkout over `/opt/gurubodh-cli` in production. The imag
 | `gurubodh` is missing or points at an old checkout | Virtual environment not activated or was moved | Activate it; recreate it or rerun `make cli-install` |
 | Preparation stops before publishing | Missing/invalid `GEMINI_API_KEY`, or an invalid proofreading response | Verify the environment variable and inspect the run report; use `--resume` only for a compatible incomplete run |
 | Legacy conversion cannot start | `node` is unavailable locally | Install Node, or use the supported container runner for R2 operations |
-| Chunk generation cannot find model files | Cache variable is unset, incomplete, or does not contain the job's pinned revision | Set `GURUBODH_MODEL_CACHE_DIR`; deliberately bootstrap or repair that exact snapshot |
-| Offline container chunk run fails | The mounted cache is missing the pinned snapshot | Repair the cache without `HF_HUB_OFFLINE=1`, then retry the maintained job |
+| Chunk generation cannot find model files | Cache variable is unset, incomplete, or does not contain the profile's pinned revision | Set `GURUBODH_MODEL_CACHE_DIR`; run `gurubodh models prepare --profile bge-m3-semantic-window-v1` |
+| Offline verification or container chunk run fails | Required files are missing, damaged, or unloadable | Repair with `models prepare` without `HF_HUB_OFFLINE=1`, rerun `models verify`, then retry the maintained job |
 | R2 access fails | One or more R2 variables are absent or invalid | Re-export all three R2 variables in the calling environment; do not place them in the job |
 
 Once the environment is ready, continue with [Getting started](getting-started.md) for the first safe local run, or select the relevant workflow from the [documentation index](README.md).

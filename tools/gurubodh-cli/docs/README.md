@@ -10,6 +10,7 @@ Use this directory by intent. The CLI README is the short orientation; these pag
 - [Local tools](workflows/local-tools.md) — lab proofreading, DOCX assembly/append, and tokenizer comparison.
 - [Prepare a subject](workflows/prepare-a-subject.md) — canonical preparation, proofreading, resume, and replacement behavior.
 - [Generate chunks](workflows/generate-chunks.md) — derive semantic chunks from a prepared release.
+- [Manage the model cache](workflows/manage-model-cache.md) — explicitly prepare, repair, and verify the pinned BGE-M3 runtime.
 - [Generate DOCX exports](workflows/generate-docx.md) — create rebuildable, human-readable chapter exports.
 
 ## Operations and concepts
