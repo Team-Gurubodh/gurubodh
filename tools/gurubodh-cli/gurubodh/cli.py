@@ -74,7 +74,7 @@ def build_parser():
 
     prep_subject_parser = subparsers.add_parser(
         "prep-subject",
-        help="Prepare subject artifacts using the pipeline declared by the job config.",
+        help="Split Subject DOCX into chapters, proofread & store chapter text in unicode font.",
         description="Compose a job from explicit selectors, then dispatch its declared pipeline.",
     )
     add_common_options(prep_subject_parser, "prep-subject")
@@ -86,19 +86,19 @@ def build_parser():
 
     generate_chunks_parser = subparsers.add_parser(
         "generate-chunks",
-        help="Generate candidate-manifest-bound semantic chunks from prepared chapter text.",
+        help="Generate semantic chunks from prepared chapter text for RAG implementation.",
         description="Generate semantic chunk artifacts from an authoritative candidate manifest.",
     )
     add_common_options(generate_chunks_parser, "generate-chunks")
 
     generate_docx_parser = subparsers.add_parser(
         "generate-docx",
-        help="Generate validated DOCX exports from canonical proofread chapter text.",
+        help="Generate DOCX exports from canonical proofread chapter text.",
         description="Generate one candidate-manifest-bound DOCX export per canonical chapter.",
     )
     add_common_options(generate_docx_parser, "generate-docx")
 
-    config_parser = subparsers.add_parser("config", help="Validate and inspect composed job configurations.")
+    config_parser = subparsers.add_parser("config", help="Validate and inspect job configurations.")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
     resolve_parser = config_subparsers.add_parser(
         "resolve", help="Emit a validated assembled job as JSON without executing a workflow.",
@@ -119,7 +119,7 @@ def build_parser():
 
     models_parser = subparsers.add_parser(
         "models",
-        help="Prepare or verify the pinned model cache, or check upstream revision metadata.",
+        help="Prepare or verify required embedding model, or check for model revision updates.",
         description=(
             "Manage only explicitly supported artifacts and perform advisory upstream checks "
             "for a validated chunking profile."
