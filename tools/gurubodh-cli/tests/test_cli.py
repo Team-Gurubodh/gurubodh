@@ -14,6 +14,8 @@ class CliTests(unittest.TestCase):
             "generate-chunks",
             "generate-docx",
             "config",
+            "models",
+            "legacy-font",
             "lab",
             "compare-tokenizers",
         ]
@@ -21,6 +23,25 @@ class CliTests(unittest.TestCase):
         positions = [help_text.index(f"    {command}") for command in expected_order]
 
         self.assertEqual(positions, sorted(positions))
+
+    def test_top_level_help_describes_commands(self):
+        parser = build_parser()
+        commands = next(action.choices for action in parser._actions if getattr(action, "choices", None))
+        expected_help = {
+            "prep-subject": "Split Subject DOCX into chapters, proofread & store chapter text in unicode font.",
+            "generate-chunks": "Generate semantic chunks from prepared chapter text for RAG implementation.",
+            "generate-docx": "Generate DOCX exports from canonical proofread chapter text.",
+            "config": "Validate and inspect job configurations.",
+            "models": "Prepare or verify required embedding model, or check for model revision updates.",
+            "legacy-font": "Check prerequisites for legacy-font to Unicode conversion.",
+            "lab": "Run explicitly non-canonical local experimentation commands.",
+            "compare-tokenizers": "Compare BGE-M3 and optional Sarvam token counts for chapter text.",
+        }
+
+        self.assertEqual(list(commands), list(expected_help))
+        normalized_help = " ".join(parser.format_help().split())
+        for command, description in expected_help.items():
+            self.assertIn(f"{command} {description}", normalized_help)
 
     def test_help_omits_retired_and_planned_commands(self):
         parser = build_parser()
