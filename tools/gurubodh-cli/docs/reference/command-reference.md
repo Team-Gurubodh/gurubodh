@@ -7,6 +7,8 @@ gurubodh --help
 gurubodh prep-subject --help
 gurubodh generate-chunks --help
 gurubodh generate-docx --help
+gurubodh models prepare --help
+gurubodh models verify --help
 gurubodh config resolve --help
 gurubodh lab --help
 gurubodh lab proofread --help
@@ -20,11 +22,31 @@ gurubodh compare-tokenizers --help
 - `prep-subject` reads a declared preparation pipeline and publishes canonical artifacts. See [Prepare a subject](../workflows/prepare-a-subject.md).
 - `generate-chunks` derives manifest-bound semantic chunks. See [Generate chunks](../workflows/generate-chunks.md).
 - `generate-docx` derives manifest-bound DOCX exports. See [Generate DOCX exports](../workflows/generate-docx.md).
+- `models prepare` downloads or repairs only the required files for a validated pinned chunking profile and then verifies the result offline; `models verify` checks the same contract without network access or repair. See [Manage the model cache](../workflows/manage-model-cache.md).
 - `config resolve` validates and prints composed configuration without executing a workflow; see below.
 - `lab proofread`, `lab assemble-docx`, and `lab append-docx` are local, non-canonical tools.
 - `compare-tokenizers` estimates BGE-M3 tokens for chapter text. It can call Sarvam only when both its API key and explicit external-API approval flags are supplied. Its progress is written to stderr; JSON output is available with `--format json`.
 
 The former preparation aliases are retired; use `prep-subject` with explicit selectors. The accepted migration map and retirement decision are tracked in [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288).
+
+## Model-cache commands
+
+Both commands require `--profile ID` and accept `--project-root` for the normal
+[project and packaged-resource discovery](configuration.md#project-and-resource-discovery).
+They use `GURUBODH_MODEL_CACHE_DIR`, including the container's mounted
+`/var/cache/gurubodh/models` contract. Initial support is limited to the validated,
+immutable BGE-M3 SentenceTransformer profile. Unknown profiles, unsupported settings,
+and non-commit revisions fail before artifact content is downloaded.
+
+`models prepare` is the only command in this pair that uses the network. It resolves
+file metadata at the exact profile revision, reports the selected allowlist and byte
+plan, reuses valid content, downloads or repairs only required entries, and then runs
+offline verification. It never falls back to a whole-repository snapshot.
+
+`models verify` reads the locally prepared integrity contract, hashes every required
+file, and performs a small encoding through the production embedding helper with
+cached-only loading. It neither requests network metadata nor changes the cache.
+Missing, damaged, or unloadable files fail with the matching `models prepare` command.
 
 ## Canonical command options
 

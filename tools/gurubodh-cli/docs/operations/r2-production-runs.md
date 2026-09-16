@@ -137,22 +137,28 @@ Complete [Environment setup](../environment-setup.md) for R2 credentials, Gemini
 
 ## Bootstrap the model cache
 
-Among the canonical commands, only chunk generation needs the BGE-M3 cache, for both local and R2 routes. After creating `gurubodh-bge-m3-cache` as described in [Environment setup](../environment-setup.md), prepare or repair it explicitly using the exact snapshot required by maintained jobs:
+Among the canonical commands, only chunk generation needs the BGE-M3 cache, for both local and R2 routes. After creating `gurubodh-bge-m3-cache` as described in [Environment setup](../environment-setup.md), prepare or repair the exact allowlisted files selected by the maintained profile. Do not set `HF_HUB_OFFLINE=1` on this networked preparation invocation:
 
 ```bash
 docker run --rm \
   --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
-  --entrypoint hf \
   "$GURUBODH_CLI_IMAGE" \
-  download BAAI/bge-m3 1_Pooling/config.json config.json \
-  config_sentence_transformers.json modules.json pytorch_model.bin \
-  sentence_bert_config.json sentencepiece.bpe.model special_tokens_map.json \
-  tokenizer.json tokenizer_config.json \
-  --revision 5617a9f61b028005a4858fdac845db406aefb181 \
-  --cache-dir /var/cache/gurubodh/models
+  models prepare --profile bge-m3-semantic-window-v1
+
+docker run --rm \
+  --mount type=volume,src=gurubodh-bge-m3-cache,dst=/var/cache/gurubodh/models \
+  --env HF_HUB_OFFLINE=1 \
+  "$GURUBODH_CLI_IMAGE" \
+  models verify --profile bge-m3-semantic-window-v1
 ```
 
-Maintained chunk jobs use `local_files_only: true`. Supply the same volume and `HF_HUB_OFFLINE=1` to `generate-chunks`; they do not download or repair the cache. A bind mount may be used for an existing compatible host cache, but do not bind-mount a checkout over `/opt/gurubodh-cli` in production because that defeats baked-image audit identity.
+Preparation prints the exact model, immutable revision, selected files, revision-derived
+artifact bytes, and remaining download bytes before it transfers artifact content.
+It downloads or repairs only those files and succeeds only after the same offline
+runtime check used by `models verify`. Repeating successful preparation performs no
+artifact download, although it still reads upstream metadata to validate the pinned contract.
+
+Maintained chunk jobs use `local_files_only: true`. Supply the same volume and `HF_HUB_OFFLINE=1` to `generate-chunks`; they do not download or repair the cache. A bind mount may be used for an existing compatible host cache, but do not bind-mount a checkout over `/opt/gurubodh-cli` in production because that defeats baked-image audit identity. See [Manage the model cache](../workflows/manage-model-cache.md) for integrity failures and repair behavior.
 
 ## Mount guidance
 
