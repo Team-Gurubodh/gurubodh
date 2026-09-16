@@ -37,7 +37,14 @@ If a command reports a missing or invalid bundled policy or schema, reinstall
 the package from a complete checkout or image; do not copy individual resource
 files into the environment by hand.
 
-Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`, so install Node locally before running an APS job. The production image already includes Node.
+Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`. Install Node.js 22 or 24 from [nodejs.org](https://nodejs.org/en/download), ensure `node` is on `PATH`, then run:
+
+```bash
+node --version
+gurubodh legacy-font check
+```
+
+The CLI accepts Node.js 22.x and 24.x. The APS golden mapping cases were run with Node.js 22.23.2 in the local CLI image and Node.js 24.16.0 locally; these are the tested patch versions, not a claim that every patch release was tested. The diagnostic labels the legacy-font sample `efkeâ&` and its converted Unicode text so operators know what each line shows. It succeeds only when the result is exactly `र्कि`. It needs no source DOCX, project configuration, or credentials. An APS job checks Node before conversion; a missing executable reports installation and `PATH` guidance, and an unsupported version reports its detected version. The production image already includes Node 22.
 
 Run maintained subjects from `tools/gurubodh-cli`. From another directory, pass `--project-root /path/to/gurubodh/tools/gurubodh-cli`; [Configuration](reference/configuration.md#project-and-resource-discovery) explains project and resource discovery.
 
@@ -125,7 +132,7 @@ Do not mount a working checkout over `/opt/gurubodh-cli` in production. The imag
 | --- | --- | --- |
 | `gurubodh` is missing or points at an old checkout | Virtual environment not activated or was moved | Activate it; recreate it or rerun `make cli-install` |
 | Preparation stops before publishing | Missing/invalid `GEMINI_API_KEY`, or an invalid proofreading response | Verify the environment variable and inspect the run report; use `--resume` only for a compatible incomplete run |
-| Legacy conversion cannot start | `node` is unavailable locally | Install Node, or use the supported container runner for R2 operations |
+| Legacy conversion cannot start | `node` is missing from `PATH` or has an incompatible version | Install Node.js 22 or 24, ensure `node` is on `PATH`, then run `gurubodh legacy-font check` |
 | Chunk generation cannot find model files | Cache variable is unset, incomplete, or does not contain the profile's pinned revision | Set `GURUBODH_MODEL_CACHE_DIR`; run `gurubodh models prepare --profile bge-m3-semantic-window-v1` |
 | Offline verification or container chunk run fails | Required files are missing, damaged, or unloadable | Repair with `models prepare` without `HF_HUB_OFFLINE=1`, rerun `models verify`, then retry the maintained job |
 | R2 access fails | One or more R2 variables are absent or invalid | Re-export all three R2 variables in the calling environment; do not place them in the job |

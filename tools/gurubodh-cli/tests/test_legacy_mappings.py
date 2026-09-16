@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 import shutil
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -11,9 +11,9 @@ from unittest.mock import patch
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 
-from gurubodh.legacy.converter import convert_texts
+from gurubodh.legacy.converter import check_aps_conversion, check_node, convert_texts
 from gurubodh.legacy.docx_converter import convert_docx, target_devanagari_font
-from gurubodh.errors import ProcessingError
+from gurubodh.errors import ConfigurationError, ProcessingError
 from gurubodh.cli import main
 
 
@@ -110,6 +110,52 @@ class ApsDocxConversionTests(unittest.TestCase):
 
 
 class ConverterFailureTests(unittest.TestCase):
+    def test_missing_node_explains_installation_and_path(self):
+        with patch("gurubodh.legacy.converter.shutil.which", return_value=None):
+            with self.assertRaises(ConfigurationError) as caught:
+                check_node()
+        self.assertIn("https://nodejs.org/en/download", str(caught.exception))
+        self.assertIn("PATH", str(caught.exception))
+
+    def test_incompatible_and_unrecognized_node_versions_fail(self):
+        for version, reason in (("v20.19.0", "Incompatible"), ("v23.11.0", "Incompatible"),
+                                ("unexpected", "Unrecognized")):
+            with self.subTest(version=version), \
+                    patch("gurubodh.legacy.converter.shutil.which", return_value="/bin/node"), \
+                    patch("gurubodh.legacy.converter.subprocess.run") as run:
+                run.return_value.stdout = version + "\n"
+                with self.assertRaisesRegex(ConfigurationError, reason):
+                    check_node()
+
+    def test_diagnostic_reports_mismatch_as_failure(self):
+        with patch("gurubodh.legacy.converter.convert_texts", return_value=["wrong"]):
+            with self.assertRaisesRegex(ProcessingError, "APS diagnostic failed"):
+                check_aps_conversion()
+
+    def test_missing_node_stops_docx_conversion_before_creating_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "created" / "converted.docx"
+            with patch("gurubodh.legacy.converter.shutil.which", return_value=None):
+                with self.assertRaisesRegex(ConfigurationError, "Node.js is required"):
+                    convert_docx(Path(directory) / "source.docx", "Mangal", LEGACY_CONVERTER, output)
+            self.assertFalse(output.parent.exists())
+
+    def test_legacy_font_check_explains_output_and_succeeds_only_on_match(self):
+        with redirect_stdout(StringIO()) as stdout:
+            main(["legacy-font", "check"])
+        lines = stdout.getvalue().splitlines()
+        self.assertEqual(lines[0], "gurubodh supports APS family of legacy fonts in source Word documents.")
+        self.assertEqual(lines[1], "Testing sample text in APS encoding and its unicode conversion:")
+        self.assertEqual(lines[2], "Legacy-font sample text (input): efkeâ&")
+        self.assertEqual(lines[3], "Unicode text (converted result): र्कि")
+        self.assertIn("Legacy-font diagnostic succeeded", lines[4])
+        with patch("gurubodh.cli.check_aps_conversion", side_effect=ProcessingError("mismatch")), \
+                redirect_stdout(StringIO()), redirect_stderr(StringIO()) as stderr, \
+                self.assertRaises(SystemExit) as caught:
+            main(["legacy-font", "check"])
+        self.assertEqual(caught.exception.code, 2)
+        self.assertIn("mismatch", stderr.getvalue())
+
     def test_missing_vendor_exposes_node_error_at_cli_boundary(self):
         with tempfile.TemporaryDirectory() as directory:
             wrapper = Path(directory) / LEGACY_CONVERTER.name

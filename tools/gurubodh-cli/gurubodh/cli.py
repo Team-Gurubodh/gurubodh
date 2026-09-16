@@ -8,6 +8,7 @@ from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job
 from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
+from gurubodh.legacy.converter import check_aps_conversion, check_node
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.model_cache import prepare_model_cache, verify_model_cache
 from gurubodh.model_updates import check_model_updates
@@ -139,6 +140,16 @@ def build_parser():
         )
         add_project_option(models_command_parser)
 
+    legacy_font_parser = subparsers.add_parser(
+        "legacy-font", help="Check prerequisites for legacy-font to Unicode conversion."
+    )
+    legacy_font_subparsers = legacy_font_parser.add_subparsers(dest="legacy_font_command", required=True)
+    legacy_font_subparsers.add_parser(
+        "check",
+        help="Check Node.js and verify a known APS legacy-font sample converts to Unicode.",
+        description="Check Node.js and verify a known APS legacy-font sample converts to Unicode.",
+    )
+
     lab_parser = subparsers.add_parser(
         "lab",
         help="Run explicitly non-canonical local experimentation commands.",
@@ -206,6 +217,16 @@ def main(argv=None):
 
 
 def _run_command(parser, args):
+
+    if args.command == "legacy-font":
+        _, version = check_node()
+        print("gurubodh supports APS family of legacy fonts in source Word documents.")
+        print("Testing sample text in APS encoding and its unicode conversion:")
+        converted = check_aps_conversion()
+        print("Legacy-font sample text (input): efkeâ&")
+        print(f"Unicode text (converted result): {converted}")
+        print(f"Legacy-font diagnostic succeeded with Node.js {version}.")
+        return
 
     if args.command == "models":
         context = resolve_project_context(args.project_root)
