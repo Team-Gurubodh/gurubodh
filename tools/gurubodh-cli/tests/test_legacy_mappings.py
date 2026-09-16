@@ -144,9 +144,9 @@ class ConverterFailureTests(unittest.TestCase):
         with redirect_stdout(StringIO()) as stdout:
             main(["legacy-font", "check"])
         lines = stdout.getvalue().splitlines()
-        self.assertIn("APS identifies a supported family of legacy fonts", lines[0])
-        self.assertIn("sample in that encoding and its Unicode conversion", lines[1])
-        self.assertEqual(lines[2], "Legacy-font text (input): efkeâ&")
+        self.assertEqual(lines[0], "gurubodh supports APS family of legacy fonts in source Word documents.")
+        self.assertEqual(lines[1], "Testing sample text in APS encoding and its unicode conversion:")
+        self.assertEqual(lines[2], "Legacy-font sample text (input): efkeâ&")
         self.assertEqual(lines[3], "Unicode text (converted result): र्कि")
         self.assertIn("Legacy-font diagnostic succeeded", lines[4])
         with patch("gurubodh.cli.check_aps_conversion", side_effect=ProcessingError("mismatch")), \

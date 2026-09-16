@@ -220,10 +220,10 @@ def _run_command(parser, args):
 
     if args.command == "legacy-font":
         _, version = check_node()
-        print("APS identifies a supported family of legacy fonts in source Word documents.")
-        print("The next lines show a sample in that encoding and its Unicode conversion:")
+        print("gurubodh supports APS family of legacy fonts in source Word documents.")
+        print("Testing sample text in APS encoding and its unicode conversion:")
         converted = check_aps_conversion()
-        print("Legacy-font text (input): efkeâ&")
+        print("Legacy-font sample text (input): efkeâ&")
         print(f"Unicode text (converted result): {converted}")
         print(f"Legacy-font diagnostic succeeded with Node.js {version}.")
         return
