@@ -54,7 +54,7 @@ class ResolvedModelProfile:
 
     profile_id: str
     config: SemanticChunkConfig
-    cache_dir: Path
+    cache_dir: Path | None
 
     @property
     def model(self) -> str:
@@ -83,14 +83,19 @@ class RequiredArtifact:
         }
 
 
-def resolve_model_profile(catalog: ComponentCatalog, profile_id: str) -> ResolvedModelProfile:
+def resolve_model_profile(
+    catalog: ComponentCatalog,
+    profile_id: str,
+    *,
+    require_cache: bool = True,
+) -> ResolvedModelProfile:
     """Resolve a chunking profile through the normal component catalog."""
     snapshot = catalog.load("chunking-profile", profile_id)
     settings = dict(snapshot.to_payload()["chunking"])
     settings["model_name"] = settings.pop("model")
     try:
         config = SemanticChunkConfig.from_env(**settings)
-        cache_dir = config.resolved_cache_dir()
+        cache_dir = config.resolved_cache_dir() if require_cache else None
     except (SemanticChunkConfigError, ModelCacheConfigError) as exc:
         raise ConfigurationError(f"Model-cache profile {profile_id!r} is invalid: {exc}") from exc
 
@@ -169,16 +174,46 @@ def _fetch_required_artifacts(profile: ResolvedModelProfile) -> tuple[RequiredAr
             "while running `gurubodh models prepare`."
         ) from exc
 
-    if getattr(info, "sha", None) != profile.revision:
+    return required_artifacts_from_info(
+        info,
+        expected_revision=profile.revision,
+        revision_label="Pinned revision",
+    )
+
+
+def required_artifacts_from_info(
+    info,
+    *,
+    expected_revision: str,
+    revision_label: str,
+) -> tuple[RequiredArtifact, ...]:
+    """Apply the maintained runtime-artifact contract to Hub file metadata."""
+    if getattr(info, "sha", None) != expected_revision:
         raise ModelCacheError(
-            f"Upstream metadata did not resolve to the requested immutable revision {profile.revision}; "
+            f"Upstream metadata did not resolve to the requested immutable revision {expected_revision}; "
             "no artifact content was downloaded."
         )
-    siblings = {sibling.rfilename: sibling for sibling in getattr(info, "siblings", ())}
+    sibling_values = getattr(info, "siblings", None)
+    if sibling_values is None:
+        raise ModelCacheError(
+            f"{revision_label} metadata does not provide a repository file inventory; "
+            "no artifact content was downloaded."
+        )
+    try:
+        siblings = {
+            sibling.rfilename: sibling
+            for sibling in sibling_values
+            if isinstance(getattr(sibling, "rfilename", None), str)
+        }
+    except TypeError:
+        raise ModelCacheError(
+            f"{revision_label} metadata does not provide a valid repository file inventory; "
+            "no artifact content was downloaded."
+        ) from None
     missing = [path for path in REQUIRED_RUNTIME_FILES if path not in siblings]
     if missing:
         raise ModelCacheError(
-            f"Pinned revision {profile.revision} is missing required runtime files: "
+            f"{revision_label} {expected_revision} is missing required runtime files: "
             f"{', '.join(missing)}. No artifact content was downloaded and no whole-repository "
             "fallback was attempted."
         )
@@ -192,7 +227,7 @@ def _fetch_required_artifacts(profile: ResolvedModelProfile) -> tuple[RequiredAr
         lfs_sha256 = getattr(lfs, "sha256", None) if lfs is not None else None
         if not isinstance(size, int) or isinstance(size, bool) or size < 0:
             raise ModelCacheError(
-                f"Pinned revision metadata does not provide a valid size for required file {path}; "
+                f"{revision_label} metadata does not provide a valid size for required file {path}; "
                 "no artifact content was downloaded."
             )
         if lfs is not None:
@@ -203,7 +238,7 @@ def _fetch_required_artifacts(profile: ResolvedModelProfile) -> tuple[RequiredAr
             valid_digest = isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{40}", digest)
         if not valid_digest:
             raise ModelCacheError(
-                f"Pinned revision metadata does not provide a valid content digest for required file {path}; "
+                f"{revision_label} metadata does not provide a valid content digest for required file {path}; "
                 "no artifact content was downloaded."
             )
         artifacts.append(RequiredArtifact(path, size, algorithm, digest))
@@ -447,6 +482,8 @@ def _snapshot_dir(profile: ResolvedModelProfile) -> Path:
 
 def _model_cache_dir(profile: ResolvedModelProfile) -> Path:
     repo_dir = f"models--{'--'.join(profile.model.split('/'))}"
+    if profile.cache_dir is None:
+        raise ModelCacheError("The selected operation requires a configured model cache directory.")
     return profile.cache_dir / repo_dir
 
 
