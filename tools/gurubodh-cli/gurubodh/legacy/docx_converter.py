@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 
 from gurubodh.docx.namespaces import NS, W, XML_SPACE
 from gurubodh.docx.text import iter_docx_text_parts
-from gurubodh.legacy.converter import convert_text_groups
+from gurubodh.legacy.converter import check_node, convert_text_groups
 from gurubodh.legacy.font_detection import (
     _styles,
     _theme_fonts,
@@ -149,6 +149,7 @@ def ensure_font_table(xml_bytes, font_name):
 
 
 def convert_docx(path, font_name, legacy_converter, output_path, text_path=None, progress=None):
+    check_node()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if text_path is not None:
         text_path.parent.mkdir(parents=True, exist_ok=True)

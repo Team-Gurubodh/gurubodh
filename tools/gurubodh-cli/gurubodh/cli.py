@@ -8,6 +8,7 @@ from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job
 from gurubodh.lab_docx import run_lab_append_docx, run_lab_assemble_docx
 from gurubodh.lab_proofread import run_lab_proofread
+from gurubodh.legacy.converter import check_aps_conversion, check_node
 from gurubodh.ml.tokenization.cli import add_compare_tokenizers_options, format_json, format_text, run_compare_tokenizers
 from gurubodh.model_cache import prepare_model_cache, verify_model_cache
 from gurubodh.model_updates import check_model_updates
@@ -139,6 +140,12 @@ def build_parser():
         )
         add_project_option(models_command_parser)
 
+    aps_parser = subparsers.add_parser("aps", help="Check the local APS conversion runtime.")
+    aps_subparsers = aps_parser.add_subparsers(dest="aps_command", required=True)
+    aps_subparsers.add_parser(
+        "check", help="Verify Node.js and one known APS-to-Unicode conversion."
+    )
+
     lab_parser = subparsers.add_parser(
         "lab",
         help="Run explicitly non-canonical local experimentation commands.",
@@ -206,6 +213,12 @@ def main(argv=None):
 
 
 def _run_command(parser, args):
+
+    if args.command == "aps":
+        _, version = check_node()
+        converted = check_aps_conversion()
+        print(f"APS diagnostic succeeded: Node.js {version}; efkeâ& -> {converted}")
+        return
 
     if args.command == "models":
         context = resolve_project_context(args.project_root)

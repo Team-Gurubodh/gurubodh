@@ -14,6 +14,7 @@ owns runtime, credentials, library roots, and cache prerequisites.
 | Goal | Command | Guide |
 | --- | --- | --- |
 | Prepare canonical chapter artifacts from a DOCX source | `prep-subject` | [Prepare a subject](docs/workflows/prepare-a-subject.md) |
+| Check the Node prerequisite and bundled APS converter | `aps check` | [Environment setup](docs/environment-setup.md#local-development-runtime) |
 | Generate semantic chunks from prepared canonical text | `generate-chunks` | [Generate chunks](docs/workflows/generate-chunks.md) |
 | Generate one reviewable DOCX per canonical chapter | `generate-docx` | [Generate DOCX exports](docs/workflows/generate-docx.md) |
 | Prepare or verify the pinned BGE-M3 runtime cache, or check upstream revisions | `models prepare`, `models verify`, `models check-updates` | [Manage the model](docs/workflows/manage-model-cache.md) |
