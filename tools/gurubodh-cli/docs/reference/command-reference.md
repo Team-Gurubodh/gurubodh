@@ -10,7 +10,7 @@ gurubodh generate-docx --help
 gurubodh models prepare --help
 gurubodh models verify --help
 gurubodh models check-updates --help
-gurubodh aps check --help
+gurubodh legacy-font check --help
 gurubodh config resolve --help
 gurubodh lab --help
 gurubodh lab proofread --help
@@ -25,7 +25,7 @@ gurubodh compare-tokenizers --help
 - `generate-chunks` derives manifest-bound semantic chunks. See [Generate chunks](../workflows/generate-chunks.md).
 - `generate-docx` derives manifest-bound DOCX exports. See [Generate DOCX exports](../workflows/generate-docx.md).
 - `models prepare` downloads or repairs only the required files for a validated pinned chunking profile and then verifies the result offline; `models verify` checks the same contract without network access or repair; `models check-updates` performs an advisory comparison of the pin with upstream repository history and file metadata. See [Manage the pinned model](../workflows/manage-model-cache.md).
-- `aps check` verifies the Node.js prerequisite and a known APS-to-Unicode conversion without source content or credentials. See [Environment setup](../environment-setup.md#local-development-runtime).
+- `legacy-font check` verifies the Node.js prerequisite and a known APS legacy-font to Unicode conversion without source content or credentials. See [Environment setup](../environment-setup.md#local-development-runtime).
 - `config resolve` validates and prints composed configuration without executing a workflow; see below.
 - `lab proofread`, `lab assemble-docx`, and `lab append-docx` are local, non-canonical tools.
 - `compare-tokenizers` estimates BGE-M3 tokens for chapter text. It can call Sarvam only when both its API key and explicit external-API approval flags are supplied. Its progress is written to stderr; JSON output is available with `--format json`.

@@ -37,6 +37,23 @@ class CliTests(unittest.TestCase):
         for command in omitted_commands:
             self.assertNotIn(command, normalized_help)
 
+    def test_legacy_font_check_help_explains_its_purpose(self):
+        parser = build_parser()
+        help_text = parser.format_help()
+        self.assertIn("legacy-font", help_text)
+        self.assertIn("legacy-font to Unicode conversion", " ".join(help_text.split()))
+        legacy_font = next(
+            action.choices["legacy-font"]
+            for action in parser._actions
+            if getattr(action, "choices", None) and "legacy-font" in action.choices
+        )
+        self.assertIn("APS legacy-font sample converts to Unicode", " ".join(legacy_font.format_help().split()))
+        check = next(action.choices["check"] for action in legacy_font._actions if getattr(action, "choices", None))
+        self.assertIn("APS legacy-font sample converts to Unicode", " ".join(check.format_help().split()))
+        with redirect_stderr(StringIO()) as stderr, self.assertRaises(SystemExit):
+            parser.parse_args(["aps", "check"])
+        self.assertIn("invalid choice", stderr.getvalue())
+
     def test_generate_docx_has_overwrite_but_no_resume(self):
         parser = build_parser()
         generate_docx = next(

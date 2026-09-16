@@ -140,10 +140,14 @@ def build_parser():
         )
         add_project_option(models_command_parser)
 
-    aps_parser = subparsers.add_parser("aps", help="Check the local APS conversion runtime.")
-    aps_subparsers = aps_parser.add_subparsers(dest="aps_command", required=True)
-    aps_subparsers.add_parser(
-        "check", help="Verify Node.js and one known APS-to-Unicode conversion."
+    legacy_font_parser = subparsers.add_parser(
+        "legacy-font", help="Check prerequisites for legacy-font to Unicode conversion."
+    )
+    legacy_font_subparsers = legacy_font_parser.add_subparsers(dest="legacy_font_command", required=True)
+    legacy_font_subparsers.add_parser(
+        "check",
+        help="Check Node.js and verify a known APS legacy-font sample converts to Unicode.",
+        description="Check Node.js and verify a known APS legacy-font sample converts to Unicode.",
     )
 
     lab_parser = subparsers.add_parser(
@@ -214,10 +218,14 @@ def main(argv=None):
 
 def _run_command(parser, args):
 
-    if args.command == "aps":
+    if args.command == "legacy-font":
         _, version = check_node()
+        print("APS identifies a supported family of legacy fonts in source Word documents.")
+        print("The next lines show a sample in that encoding and its Unicode conversion:")
         converted = check_aps_conversion()
-        print(f"APS diagnostic succeeded: Node.js {version}; efkeâ& -> {converted}")
+        print("Legacy-font text (input): efkeâ&")
+        print(f"Unicode text (converted result): {converted}")
+        print(f"Legacy-font diagnostic succeeded with Node.js {version}.")
         return
 
     if args.command == "models":

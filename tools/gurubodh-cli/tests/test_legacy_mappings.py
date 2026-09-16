@@ -140,13 +140,19 @@ class ConverterFailureTests(unittest.TestCase):
                     convert_docx(Path(directory) / "source.docx", "Mangal", LEGACY_CONVERTER, output)
             self.assertFalse(output.parent.exists())
 
-    def test_aps_check_cli_succeeds_only_with_expected_conversion(self):
+    def test_legacy_font_check_explains_output_and_succeeds_only_on_match(self):
         with redirect_stdout(StringIO()) as stdout:
-            main(["aps", "check"])
-        self.assertIn("APS diagnostic succeeded", stdout.getvalue())
+            main(["legacy-font", "check"])
+        lines = stdout.getvalue().splitlines()
+        self.assertIn("APS identifies a supported family of legacy fonts", lines[0])
+        self.assertIn("sample in that encoding and its Unicode conversion", lines[1])
+        self.assertEqual(lines[2], "Legacy-font text (input): efkeâ&")
+        self.assertEqual(lines[3], "Unicode text (converted result): र्कि")
+        self.assertIn("Legacy-font diagnostic succeeded", lines[4])
         with patch("gurubodh.cli.check_aps_conversion", side_effect=ProcessingError("mismatch")), \
-                redirect_stderr(StringIO()) as stderr, self.assertRaises(SystemExit) as caught:
-            main(["aps", "check"])
+                redirect_stdout(StringIO()), redirect_stderr(StringIO()) as stderr, \
+                self.assertRaises(SystemExit) as caught:
+            main(["legacy-font", "check"])
         self.assertEqual(caught.exception.code, 2)
         self.assertIn("mismatch", stderr.getvalue())
 

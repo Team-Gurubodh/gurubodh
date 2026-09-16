@@ -10,7 +10,7 @@ from gurubodh.resource_discovery import bundled_resource_path
 SUPPORTED_NODE_MAJORS = (22, 24)
 NODE_GUIDANCE = (
     "Install Node.js 22 or 24 from https://nodejs.org/en/download and ensure "
-    "the 'node' executable is on PATH. Then run 'gurubodh aps check'."
+    "the 'node' executable is on PATH. Then run 'gurubodh legacy-font check'."
 )
 
 
