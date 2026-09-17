@@ -220,9 +220,10 @@ def _run_command(parser, args):
 
     if args.command == "legacy-font":
         print(
-            "The APS converter is third-party code with unresolved licensing provenance. "
+            "Notice: The APS converter is third-party code with unresolved licensing provenance. "
             "Gurubodh does not claim ownership or grant redistribution rights to that component."
         )
+        print()
         _, version = check_node()
         print("gurubodh supports APS family of legacy fonts in source Word documents.")
         print("Testing sample text in APS encoding and its unicode conversion:")

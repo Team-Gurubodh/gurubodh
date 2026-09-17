@@ -148,7 +148,8 @@ class ConverterFailureTests(unittest.TestCase):
         with redirect_stdout(StringIO()) as stdout:
             main(["legacy-font", "check"])
         lines = stdout.getvalue().splitlines()
-        self.assertEqual(lines.pop(0), APS_NOTICE)
+        self.assertEqual(lines.pop(0), f"Notice: {APS_NOTICE}")
+        self.assertEqual(lines.pop(0), "")
         self.assertIn(APS_NOTICE, (CLI_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8"))
         self.assertEqual(lines[0], "gurubodh supports APS family of legacy fonts in source Word documents.")
         self.assertEqual(lines[1], "Testing sample text in APS encoding and its unicode conversion:")
@@ -169,7 +170,7 @@ class ConverterFailureTests(unittest.TestCase):
                 self.assertRaises(SystemExit) as caught:
             main(["legacy-font", "check"])
         self.assertEqual(caught.exception.code, 2)
-        self.assertEqual(stdout.getvalue().strip(), APS_NOTICE)
+        self.assertEqual(stdout.getvalue(), f"Notice: {APS_NOTICE}\n\n")
         self.assertIn("Node.js is required", stderr.getvalue())
 
     def test_missing_vendor_exposes_node_error_at_cli_boundary(self):
