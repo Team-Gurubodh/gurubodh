@@ -75,6 +75,18 @@ def verify_install(fixtures):
     assert Path.cwd() != module.parent
     assert os.getuid() != 0, "Run as the image's normal non-root user"
 
+    notice = bundled_resource_path("THIRD_PARTY_NOTICES.md")
+    notice_text = notice.read_text(encoding="utf-8")
+    expected_notice = (
+        "The APS converter is third-party code with unresolved licensing provenance. "
+        "Gurubodh does not claim ownership or grant redistribution rights to that component."
+    )
+    assert expected_notice in notice_text
+    assert "scripts/vendor/hindietools_aps_prakash_to_unicode.js" in notice_text
+    assert "5801b4e8425843992d43391627f21d1ae4fed96f" in notice_text
+    assert "**Licensing status:** unresolved provenance" in notice_text
+    assert expected_notice in invoke(["legacy-font", "check"])
+
     golden = json.loads((fixtures / "aps_prakash_golden.json").read_text())
     wrapper = bundled_resource_path("scripts/legacy_font_convert.js")
     vendor = bundled_resource_path(golden["mapping"]["vendor_file"])
@@ -119,7 +131,8 @@ def exercise_commands(root, fixtures, encoding, language):
             resolved = json.loads(invoke(["config", "resolve", "--command", command, *selectors]))
             assert resolved["source"]["backend"] == resolved["destination"]["backend"] == "local"
 
-        invoke(["prep-subject", *selectors])
+        preparation_output = invoke(["prep-subject", *selectors])
+        assert "unresolved licensing provenance" not in preparation_output
         subject = root / "artifacts" / manifest["artifact_root"] / language
         canonical = list((subject / "chapters/text_and_metadata").glob("*.txt"))
         assert len(canonical) == 1, list(subject.rglob("*"))

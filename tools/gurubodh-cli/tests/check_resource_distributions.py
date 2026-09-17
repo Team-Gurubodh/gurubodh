@@ -1,4 +1,4 @@
-"""Verify that every runtime-owned JSON/script resource ships unchanged."""
+"""Verify that runtime resources and third-party notices ship unchanged."""
 
 from pathlib import Path, PurePosixPath
 import sys
@@ -8,6 +8,7 @@ import zipfile
 
 def expected_resources(cli_root: Path) -> dict[str, bytes]:
     paths = [
+        cli_root / "THIRD_PARTY_NOTICES.md",
         *sorted((cli_root / "config/jobs").glob("*.schema.json")),
         *sorted((cli_root / "config/artifacts").glob("*.schema.json")),
         *sorted((cli_root / "config/policies").glob("*.json")),

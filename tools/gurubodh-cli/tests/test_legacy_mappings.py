@@ -20,6 +20,10 @@ from gurubodh.cli import main
 CLI_ROOT = Path(__file__).parents[1]
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "aps_prakash_golden.json"
 LEGACY_CONVERTER = CLI_ROOT / "scripts" / "legacy_font_convert.js"
+APS_NOTICE = (
+    "The APS converter is third-party code with unresolved licensing provenance. "
+    "Gurubodh does not claim ownership or grant redistribution rights to that component."
+)
 
 
 class ApsGoldenMappingTests(unittest.TestCase):
@@ -144,17 +148,30 @@ class ConverterFailureTests(unittest.TestCase):
         with redirect_stdout(StringIO()) as stdout:
             main(["legacy-font", "check"])
         lines = stdout.getvalue().splitlines()
+        self.assertEqual(lines.pop(0), f"Notice: {APS_NOTICE}")
+        self.assertEqual(lines.pop(0), "")
+        self.assertIn(APS_NOTICE, (CLI_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8"))
         self.assertEqual(lines[0], "gurubodh supports APS family of legacy fonts in source Word documents.")
         self.assertEqual(lines[1], "Testing sample text in APS encoding and its unicode conversion:")
         self.assertEqual(lines[2], "Legacy-font sample text (input): efkeâ&")
         self.assertEqual(lines[3], "Unicode text (converted result): र्कि")
         self.assertIn("Legacy-font diagnostic succeeded", lines[4])
         with patch("gurubodh.cli.check_aps_conversion", side_effect=ProcessingError("mismatch")), \
-                redirect_stdout(StringIO()), redirect_stderr(StringIO()) as stderr, \
+                redirect_stdout(StringIO()) as stdout, redirect_stderr(StringIO()) as stderr, \
                 self.assertRaises(SystemExit) as caught:
             main(["legacy-font", "check"])
         self.assertEqual(caught.exception.code, 2)
         self.assertIn("mismatch", stderr.getvalue())
+        self.assertIn(APS_NOTICE, stdout.getvalue())
+
+    def test_legacy_font_check_displays_notice_when_node_check_fails(self):
+        with patch("gurubodh.legacy.converter.shutil.which", return_value=None), \
+                redirect_stdout(StringIO()) as stdout, redirect_stderr(StringIO()) as stderr, \
+                self.assertRaises(SystemExit) as caught:
+            main(["legacy-font", "check"])
+        self.assertEqual(caught.exception.code, 2)
+        self.assertEqual(stdout.getvalue(), f"Notice: {APS_NOTICE}\n\n")
+        self.assertIn("Node.js is required", stderr.getvalue())
 
     def test_missing_vendor_exposes_node_error_at_cli_boundary(self):
         with tempfile.TemporaryDirectory() as directory:
