@@ -91,6 +91,11 @@ docker run --rm --entrypoint node gurubodh-cli:local --version
 
 The image runs as a non-root user and contains Python 3.12, Node for the APS converter, no credentials, no content artifacts, and no BGE-M3 weights. `/work` is temporary; `/var/cache/gurubodh/models` is the model cache path.
 
+For future releases containing the APS converter, include a short reference to
+[THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) in the release notes, for example:
+"Includes the third-party APS converter with unresolved licensing provenance;
+see THIRD_PARTY_NOTICES.md."
+
 ## Automated image verification
 
 The container workflow checks wheels and source distributions, then builds and

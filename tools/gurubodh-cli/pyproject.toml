@@ -27,6 +27,7 @@ gurubodh = "gurubodh.cli:main"
 include = ["gurubodh*"]
 
 [tool.setuptools.data-files]
+"." = ["THIRD_PARTY_NOTICES.md"]
 "config/jobs" = ["config/jobs/*.schema.json"]
 "config/artifacts" = ["config/artifacts/*.schema.json"]
 "config/policies" = ["config/policies/*.json"]

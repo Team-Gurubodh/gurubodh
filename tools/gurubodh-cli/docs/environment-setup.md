@@ -19,6 +19,14 @@ The [configuration reference](reference/configuration.md#storage-and-library-roo
 
 ## Local development runtime
 
+Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`.
+
+> The APS converter is third-party code with unresolved licensing provenance. Gurubodh does not claim ownership or grant redistribution rights to that component.
+
+See [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) for the converter filename,
+known source reference, and licensing status. This file ships with the installed
+Python package and Docker image. `gurubodh legacy-font check` also displays the notice.
+
 The CLI supports Python `>=3.12,<3.13`. From the monorepo root, create and install the editable local package:
 
 ```bash
@@ -37,7 +45,7 @@ If a command reports a missing or invalid bundled policy or schema, reinstall
 the package from a complete checkout or image; do not copy individual resource
 files into the environment by hand.
 
-Unicode-only preparation needs no local Node installation. APS conversion runs the bundled JavaScript converter through `node`. Install Node.js 22 or 24 from [nodejs.org](https://nodejs.org/en/download), ensure `node` is on `PATH`, then run:
+Install Node.js 22 or 24 from [nodejs.org](https://nodejs.org/en/download), ensure `node` is on `PATH`, then run:
 
 ```bash
 node --version
