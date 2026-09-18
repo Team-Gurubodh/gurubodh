@@ -1,16 +1,5 @@
-# ADR-0000: Title
+# ADR Template
 
-<record_type>architecture_decision</record_type>
-<status>proposed</status>
-<date>YYYY-MM-DD</date>
-<owners>TODO</owners>
-
-## Context
-
-## Decision
-
-## Options Considered
-
-## Consequences
-
-## Links
+Use the [authoritative ADR template](../adr/0000-template.md)
+when creating a new record. This existing entry path is retained for links and
+bookmarks; maintain the template in the record directory.

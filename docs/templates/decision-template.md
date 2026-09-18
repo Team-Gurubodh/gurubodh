@@ -1,16 +1,5 @@
-# Decision-0000: Title
+# Decision Template
 
-<record_type>decision</record_type>
-<status>proposed</status>
-<date>YYYY-MM-DD</date>
-<owners>TODO</owners>
-
-## Context
-
-## Decision
-
-## Rationale
-
-## Impact
-
-## Review Trigger
+Use the [authoritative decision template](../decisions/0000-template.md)
+when creating a new record. This existing entry path is retained for links and
+bookmarks; maintain the template in the record directory.
