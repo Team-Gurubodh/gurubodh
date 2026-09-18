@@ -5,6 +5,15 @@
 
 ## Applicability
 
+Status checked on 2026-09-18: [#283](https://github.com/Team-Gurubodh/gurubodh/issues/283)
+and [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288) are closed; the
+contract completion and later comparison/retirement gates have passed.
+[#289](https://github.com/Team-Gurubodh/gurubodh/issues/289) remains open for the
+maintainer's repository-wide adoption decision. Completed technical work does
+not adopt this process repository-wide. The applicability and gate rules below
+are retained as the rules that governed the pilot, not outstanding implementation
+prerequisites or a broader process mandate.
+
 [Issue #289](https://github.com/Team-Gurubodh/gurubodh/issues/289) owns this
 process pilot. The full phase workflow is mandatory only for the proofreading
 and chunking profile-contract slice of

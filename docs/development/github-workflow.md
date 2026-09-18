@@ -18,17 +18,17 @@ For a beginner-oriented command walkthrough, see
 
 ## First-Time Setup
 
-Clone the repository with the project-specific SSH host alias:
+Clone the repository with standard GitHub SSH access:
 
 ```bash
-git clone git@github.com-gurubodh:<OWNER>/gurubodh.git
+git clone git@github.com:Team-Gurubodh/gurubodh.git
 cd gurubodh
 ```
 
 If SSH is not available, use HTTPS:
 
 ```bash
-git clone https://github.com/<OWNER>/gurubodh.git
+git clone https://github.com/Team-Gurubodh/gurubodh.git
 cd gurubodh
 ```
 
@@ -36,7 +36,8 @@ Install the toolchain needed for the area you are changing. Common commands are 
 
 ## Issue-First Workflow
 
-Create or select a GitHub issue before starting work.
+Create or select a GitHub issue before starting work. Read its complete description
+and available discussion before planning or changing files; the issue defines scope.
 
 Choose the issue template that matches the work type:
 
@@ -78,18 +79,19 @@ git switch -c issue-21-document-ssh-setup
 
 ## Commits
 
-Use Conventional Commits:
+Use Conventional Commits and reference the issue in every commit message, as
+required by [AGENTS.md](../../AGENTS.md):
 
 ```text
-<type>(optional-scope): <summary>
+<type>(optional-scope): <summary> (#<issue-number>)
 ```
 
 Examples:
 
 ```text
-docs(github): add pull request workflow
-ci(commitlint): enforce conventional commit messages
-fix(cms): correct subject relation config
+docs(github): add pull request workflow (#12)
+ci(commitlint): enforce conventional commit messages (#18)
+fix(cms): correct subject relation config (#25)
 ```
 
 See `docs/development/conventional-commits.md` for details.
@@ -100,7 +102,9 @@ Open a pull request when the branch is ready for review.
 
 Each pull request should:
 
-- Link one issue with `Closes #<issue-number>` or `Refs #<issue-number>`.
+- Include the issue reference in its Conventional Commit title, for example
+  `docs(github): add pull request workflow (#12)`.
+- Link the issue in its description with `Closes #<issue-number>` or `Refs #<issue-number>`.
 - Explain the change in plain language.
 - List verification performed.
 - State whether documentation changed.
@@ -123,6 +127,9 @@ Authors should respond to review comments in the pull request and push follow-up
 ## Merge
 
 Merge only after required checks pass and the required approval has been granted.
+Agents must also have explicit maintainer instruction before merging, squashing,
+rebasing, or otherwise integrating changes into the target branch; passing checks
+and review do not supply that authorization.
 
 Prefer squash merge for small pull requests unless the maintainers choose a different policy for a specific change.
 

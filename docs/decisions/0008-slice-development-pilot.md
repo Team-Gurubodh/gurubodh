@@ -5,6 +5,15 @@
 <date>2026-09-06</date>
 <owners>Gurubodh maintainers</owners>
 
+## Current Context
+
+As checked on 2026-09-18, [#283](https://github.com/Team-Gurubodh/gurubodh/issues/283)
+and [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288) are closed, with
+implementation gates passed. [#289](https://github.com/Team-Gurubodh/gurubodh/issues/289)
+remains open pending maintainer agreement on repository-wide adoption. This
+record still accepts only the pilot. The decision and gate rules below describe
+the original pilot scope.
+
 ## Context
 
 The composable CLI jobs series spans contracts, composition, provenance, CLI

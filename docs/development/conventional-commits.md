@@ -8,10 +8,15 @@ Gurubodh uses Conventional Commits to make history readable and to prepare for f
 ## Format
 
 ```text
-<type>(optional-scope): <summary>
+<type>(optional-scope): <summary> (#<issue-number>)
 ```
 
 The summary should be short, imperative, and lowercase unless it contains a proper noun.
+
+Commit messages and pull request titles must reference the issue under
+[AGENTS.md](../../AGENTS.md). The examples use illustrative issue numbers; use the
+issue that owns your change. In the PR description, use `Refs #<issue-number>`
+for partial delivery and `Closes #<issue-number>` only for completed issues.
 
 ## Common Types
 
@@ -42,11 +47,11 @@ Recommended scopes include:
 ## Examples
 
 ```text
-docs(github): add issue-first workflow
-ci(commitlint): validate pull request titles
-feat(content): add metadata validation command
-fix(cms): correct category route config
-chore(deps): update strapi dependencies
+docs(github): add issue-first workflow (#25)
+ci(commitlint): validate pull request titles (#18)
+feat(content): add metadata validation command (#26)
+fix(cms): correct category route config (#27)
+chore(deps): update strapi dependencies (#28)
 ```
 
 ## Breaking Changes
@@ -54,7 +59,7 @@ chore(deps): update strapi dependencies
 Use `!` when a commit introduces a breaking change:
 
 ```text
-feat(cms)!: rename public subject identifier
+feat(cms)!: rename public subject identifier (#29)
 ```
 
 Include details in the commit body:
