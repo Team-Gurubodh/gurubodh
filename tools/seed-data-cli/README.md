@@ -84,6 +84,25 @@ python -m pip install -e .
 gurubodh-seed-data --help
 ```
 
+## Local inputs and reviewed artifacts
+
+For a running local CMS, start with the [connected CMS recipe](../../apps/gurubodh-cms/README.md#setup).
+Ask the maintainer for approved CSV exports or reviewed artifacts; spreadsheet
+access is not supplied by the checkout. The checked-in
+[source configuration](config/seed_data_sources.json) contains a maintainer-local
+absolute `source_root`, not a portable prerequisite. For CSV generation, set it
+to your own approved CSV directory in your local checkout, retaining each
+source's relative `csv_path`. Keep that machine-specific edit out of commits.
+The CLI currently has no source-root environment or command-line override.
+
+From `tools/seed-data-cli`, use the `category paths`, `subject paths`, or
+`glossary paths` commands below to confirm resolution, then follow the
+[validation](#validation) and generation commands for the selected source.
+If reviewed JSON artifacts already exist at the configured `artifact_root`
+paths, ingestion can use them directly without regenerating or accessing CSVs.
+Review the selected artifact before any apply; availability is not approval to
+write it into an arbitrary CMS.
+
 ## Refreshing an Existing Virtual Environment
 
 If this workspace was previously installed from `tools/seed-data`, recreate the

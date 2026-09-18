@@ -9,8 +9,14 @@ These scripts are separate from Strapi application migrations.
 
 Do not place these raw PostgreSQL scripts in `apps/gurubodh-cms/database/migrations`. That directory is reserved for Strapi JS/TS migrations that Strapi runs during application startup.
 
-Also, these scripts are intentionally not automated. Rather they are present to guide the DBA to create appropriate roles before Strapi Application creates tables and objects in the database created for the application.
-- Scripts in the ```init``` directory can be used at the time of creating the Strapi application database.
-- Scripts in the ```migrations``` directory can be used after Strapi is installed.
-- Script  ```migrations/004-lock-down-databse.sql``` is deliberately commented.
+These scripts are intentionally manual DBA references. For the ordered local
+application path, use the [CMS setup recipe](../../../apps/gurubodh-cms/README.md#setup).
+The DBA provisions roles and a database before the existing Strapi application
+starts and creates its tables; no new application scaffolding is needed.
+
+- `localhost/init/` contains role and optional extension references.
+- `localhost/migrations/` contains post-creation privilege guidance.
+- `localhost/migrations/004-lock-down-databse.sql` contains active revocations;
+  only its function revocations are deliberately commented. Lockdown is optional
+  DBA work, not a prerequisite for local onboarding.
 
