@@ -39,7 +39,8 @@
 - Keep `AGENTS.md` short and route agents to the right durable docs.
 - Record durable architecture decisions as ADRs.
 - Record operational decisions separately from ADRs to avoid overloading architecture records.
-- Keep task-history documents under `docs/tasks/` so they are discoverable through the main docs tree.
+- Retain existing task history under `docs/tasks/`; use relevant GitHub issue
+  comments for current session handoffs under the mandatory slice workflow.
 
 ## Update Rules
 

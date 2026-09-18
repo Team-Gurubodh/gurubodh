@@ -23,7 +23,8 @@ The root `AGENTS.md` remains the canonical instruction entry point.
 - Known limitations: `docs/limitations.md`
 - ADRs: `docs/adr/`
 - Operational decisions: `docs/decisions/`
-- Task history: `docs/tasks/`
+- Mandatory issue execution: `docs/development/slice-workflow.md`, read before planning or implementation
+- Current execution context and session handoffs: relevant GitHub issue and its comments
 - PostgreSQL infrastructure scripts: `database/postgres/gurubodh-cms/`
 </routing>
 
@@ -43,6 +44,7 @@ Do not create skills for single decisions, ordinary documentation, or one-off ta
 <documentation_responsibilities>
 - Update ADRs for durable architecture decisions.
 - Update `docs/decisions/` for operational, process, or product decisions.
-- Update `docs/tasks/` when a task brief or execution history changes.
+- Record current designs, acceptance, execution evidence, slice completion, and
+  session handoffs in the relevant GitHub issue under the slice workflow.
 - Update root `README.md` only for high-level project navigation and common commands.
 </documentation_responsibilities>

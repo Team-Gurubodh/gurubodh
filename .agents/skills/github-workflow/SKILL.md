@@ -1,3 +1,8 @@
+---
+name: github-workflow
+description: Follow Gurubodh's issue-first and mandatory slice workflow when planning or implementing GitHub issue work, changing tracked files, or preparing commits and pull requests. Not needed for unrelated read-only analysis.
+---
+
 # GitHub Workflow
 
 ## Purpose
@@ -44,7 +49,18 @@ Load this Skill whenever work may:
 - prepare commits;
 - prepare Pull Requests.
 
-This Skill is unnecessary for read-only analysis.
+Also load this skill when planning GitHub issue work, including an investigation
+whose deliverable is analysis. Unrelated read-only questions do not need it.
+
+Before planning or implementation, read and follow
+[the slice workflow](../../../docs/development/slice-workflow.md). It is mandatory
+for all GitHub issue work until the maintainer changes or withdraws it. Use its
+phase outcomes, requirement coverage, reconciliation, and issue-comment handoffs.
+Design review and explicit maintainer acceptance are required before implementation;
+that phase cannot be bypassed or marked not applicable. Prompt for approval before
+making individual review items optional. Other phases may be brief or marked not
+applicable with a reason. Record scoped maintainer exceptions in the issue,
+preserving the workflow's design-review protections.
 
 ---
 
@@ -137,6 +153,15 @@ Before modifying any tracked file, verify all of the following.
 
 ✓ Planned work stays within Issue scope.
 
+✓ The slice workflow has been read, the latest issue handoff consulted, and the
+active slice, phase, and intended session outcome identified.
+
+✓ Parent requirements are assigned and the active slice's acceptance criteria,
+relevant contracts, and verification approach are settled before implementation.
+
+✓ The maintainer explicitly accepted the design for the affected work; blocking
+questions and approved optional review items are recorded in its execution issue.
+
 ✓ The current branch is not:
 
 - main
@@ -169,17 +194,19 @@ Every implementation follows this sequence.
 
 7. Create a dedicated working branch.
 
-8. Plan implementation.
+8. Maintain the parent issue's requirement coverage and plan the active slice.
 
-9. Implement.
+9. Obtain explicit design acceptance, establish test-preparation outcomes, then implement.
 
-10. Verify.
+10. Verify integration, reconcile parent requirements, and post the slice-completion record.
 
 11. Update documentation.
 
-12. Prepare Pull Request.
+12. Prepare Pull Request; perform whole-issue review before requesting issue completion.
 
-13. Wait for user approval.
+13. Record the session handoff as an issue comment when pausing or transferring work.
+
+14. Obtain explicit maintainer authorization before merging or integrating changes.
 
 Complete each applicable step, and explicitly note any step that is already satisfied or not applicable.
 
@@ -298,9 +325,10 @@ Populate every applicable section.
 
 Never remove template sections.
 
-Reference the GitHub Issue using:
-
-Closes #<issue-number>
+Reference the GitHub Issue using `Refs #<issue-number>` until whole-issue review
+passes and the maintainer confirms "implementation verified" and explicitly
+instructs issue completion and closure. Only then may a closing reference be used.
+Include the issue number in the Conventional Commit PR title.
 
 Checklist items must only be marked complete when they were actually completed.
 
@@ -315,13 +343,18 @@ The Pull Request should summarize:
 
 # Completion Gate
 
-Work is complete only when all of the following are true.
+Implementation is ready for review only when all of the following are true.
 
 ✓ Issue scope satisfied
 
 ✓ No out-of-scope implementation
 
 ✓ Verification completed or explained
+
+✓ Slice evidence reconciled against parent requirements; whole-issue review
+passed before requesting that the entire issue be marked complete
+
+✓ Session handoff posted in the relevant GitHub issue when ending the session
 
 ✓ Documentation updated
 
@@ -331,7 +364,11 @@ Work is complete only when all of the following are true.
 
 ✓ Ready for review
 
-Repository work is not complete merely because code compiles.
+Track implementation verified, published for review, and delivered separately.
+Mark an issue complete and close it only after the maintainer confirms
+"implementation verified" and explicitly instructs completion and closure.
+Record that instruction; readiness for review or successful checks do not
+provide it. Follow the slice workflow for pending delivery and closure records.
 
 ---
 

@@ -59,6 +59,24 @@ The issue should describe:
 
 Use GitHub Projects to track issue status.
 
+## Execute Issues With the Slice Workflow
+
+Read and follow the [slice workflow](./slice-workflow.md) before planning or
+implementation. It is mandatory for all GitHub issue work until the maintainer
+changes or withdraws it. Design review and explicit maintainer acceptance are
+mandatory before implementation. Individual review items may become optional
+only with approval. Other phases may be brief or marked not applicable with a
+reason; scoped exceptions must preserve the workflow's design protections.
+
+Identify the active slice, phase, and intended outcome at session entry. Keep
+requirement coverage in the parent issue, establish phase outcomes, and link
+verification and reconciliation evidence in a slice-completion record after
+each slice. Perform whole-issue review before requesting completion; mark an
+issue complete and close it only when the maintainer confirms "implementation
+verified" and explicitly instructs completion and closure. At session
+exit, post a handoff comment in the parent issue or the slice's sub-issue as
+specified by the workflow.
+
 ## Branches
 
 Create a branch from the latest `main`:
@@ -110,7 +128,10 @@ Each pull request should:
 - State whether documentation changed.
 - Stay focused on one issue.
 
-Use `Closes` only when merging the pull request should close the issue. Use `Refs` when the pull request is partial progress.
+Use `Refs` until whole-issue review passes and the maintainer confirms
+"implementation verified" and explicitly instructs completion and closure.
+Only then may `Closes` be used to close the issue on merge. Verification,
+publication, delivery, and closure are separate milestones under the slice workflow.
 
 ## Review
 
@@ -120,6 +141,10 @@ Reviewers should check:
 - The scope is understandable and reviewable.
 - Behavior, documentation, and tests match the stated goal.
 - Required checks pass.
+- The issue contains requirement coverage, slice verification and reconciliation
+  evidence, and session handoffs; any workflow exceptions are explicit.
+- A closing reference is supported by whole-issue review and explicit maintainer
+  verification confirmation and instruction to complete and close the issue.
 - No secrets or local-only files are included.
 
 Authors should respond to review comments in the pull request and push follow-up commits to the same branch.

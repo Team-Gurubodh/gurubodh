@@ -2,7 +2,7 @@
 
 ## Linked Issue
 
-Closes #
+Refs #
 
 ## Scope
 
@@ -13,4 +13,3 @@ Closes #
 - [ ] I checked that no secrets or local-only files are included.
 
 ## Notes For Reviewers
-

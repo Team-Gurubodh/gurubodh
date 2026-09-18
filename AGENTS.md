@@ -20,7 +20,7 @@ housed in the Gurubodh CLI.
 - Read `docs/limitations.md` before changing behavior near known constraints.
 - Read `docs/adr/` before changing previously decided architecture.
 - Read `docs/decisions/` before changing operational or process decisions.
-- Read `docs/tasks/` for task briefs, execution history, and recent context.
+- Read the relevant GitHub issue and latest handoff comment for current execution context.
 </routing>
 
 <working_rules>
@@ -70,16 +70,27 @@ Before making any change to tracked files:
 This workflow is mandatory unless the user explicitly instructs otherwise.
 </github_workflow>
 
-<development_pilot>
-For the proofreading/chunking profile-contract pilot in GitHub Issue #283,
-follow `docs/development/slice-workflow.md` before planning or implementation.
-Its requirement coverage, reconciliation, and whole-issue completion rules
-apply to all of #283; #284 implementation waits for #283's completion review.
-The full phase workflow is mandatory only for the selected pilot until the
-maintainer approves wider adoption under #289. Read the current handoff linked
-from the workflow. Existing issue, branch, verification, and merge rules remain
-applicable; explicit user exceptions are handled as documented there.
-</development_pilot>
+<slice_workflow>
+For all GitHub issue work, read and follow `docs/development/slice-workflow.md`
+before planning or implementation. This workflow is mandatory until the
+maintainer changes or withdraws it; do not skip it based on task size or type.
+At session entry, read the issue and latest handoff comment, identify the active
+slice and phase, and state the intended session outcome. Maintain requirement
+coverage in the parent issue, establish phase outcomes before advancing, and
+reconcile evidence after each slice and across the whole issue before claiming
+completion. Design review and explicit maintainer acceptance are mandatory
+before implementation; do not bypass that phase. Obtain approval before making
+individual review items optional. Other phases may be brief or marked not
+applicable with a recorded reason. Record slice completion after reconciliation.
+At session exit, post the handoff in the relevant GitHub issue as the workflow
+specifies. Track verification, publication, and delivery separately. Mark an
+issue complete and close it only after the maintainer confirms "implementation
+verified" and explicitly instructs completion and closure; passing checks alone
+does not authorize closure or an automatic closing reference in a PR.
+Scoped exceptions require explicit maintainer instruction and must preserve
+the workflow's design-review protections. Existing issue, branch, verification,
+and merge rules remain applicable unless explicitly overridden.
+</slice_workflow>
 
 
 <verification>
