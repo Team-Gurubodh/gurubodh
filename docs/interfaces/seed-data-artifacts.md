@@ -8,12 +8,12 @@
 ## Purpose
 
 This document defines the lightweight interface between externally maintained
-seed-data CSV files, `tools/seed-data-cli`, generated JSON artifacts, and future
+seed-data CSV files, `tools/seed-data-cli`, generated JSON artifacts, and
 Strapi 5 ingestion.
 
 The contract exists so source data can evolve without losing the fields and
 relationships required for correct CMS behavior. It is intentionally practical:
-the implementation tasks may refine details as each seed-data type is built.
+the checked-in schemas and adapters implement the supported seed-data types.
 
 ## Boundary
 
@@ -80,23 +80,23 @@ internal identifiers.
   code.
 - Glossary records use a stable term code within the target glossary
   collection. Sanatan Glossary and Prabodhan Glossary are separate glossary
-  sources that are intended to become separate Strapi Collection Types, so term
+  sources backed by separate Strapi Collection Types, so term
   codes are not required to be globally unique across glossary sources.
 
 ## Glossary Artifact Contract
 
-Task 008 finalizes the first glossary artifact contract for:
+The glossary artifact contract covers:
 
 ```text
 artifacts/glossary/sanatan-glossary.json
 artifacts/glossary/prabodhan-glossary.json
 ```
 
-Each glossary artifact represents one source glossary and one intended Strapi
+Each glossary artifact represents one source glossary and one Strapi
 Collection Type target. The artifact is not itself a Strapi content-type schema;
-it is reviewable seed data prepared for a later ingestion tool.
+it is reviewable seed data consumed by the seed-data CLI ingestion workflow.
 
-The initial glossary artifact shape should use this envelope:
+The glossary artifact shape uses this envelope:
 
 ```json
 {
@@ -130,27 +130,18 @@ The generator must not include Strapi internal identifiers such as `id`,
 `documentId`, internal timestamps, or created/updated user fields. Those values
 belong to Strapi and are assigned or managed during ingestion.
 
-Sanatan Glossary and Prabodhan Glossary may diverge over time. The initial
-artifact schema should validate the common envelope and required common fields,
-while allowing the implementation to introduce collection-specific fields in a
-future schema version or collection-specific schema if Prabodhan Glossary needs
-additional properties.
+The glossary artifact schema validates the common envelope and required common
+fields and rejects additional properties. Collection-specific fields would
+require a future schema change.
 
 ## Glossary Strapi Collection Type Contract
 
-Sanatan Glossary and Prabodhan Glossary should be modeled as separate Strapi 5
-Collection Types. Task 008 records this contract but does not create the CMS
-schema files.
+Sanatan Glossary and Prabodhan Glossary are separate Strapi 5 Collection Types
+with Draft & Publish enabled and non-localized fields. Their checked-in schemas
+are [Sanatan Glossary](../../apps/gurubodh-cms/src/api/sanatan-glossary/content-types/sanatan-glossary/schema.json)
+and [Prabodhan Glossary](../../apps/gurubodh-cms/src/api/prabodhan-glossary/content-types/prabodhan-glossary/schema.json).
 
-The future CMS task should create Strapi schema files under the CMS app using
-the standard Strapi content-type location:
-
-```text
-apps/gurubodh-cms/src/api/sanatan-glossary/content-types/sanatan-glossary/schema.json
-apps/gurubodh-cms/src/api/prabodhan-glossary/content-types/prabodhan-glossary/schema.json
-```
-
-The initial shared Strapi-facing fields should be:
+The shared Strapi-facing fields are:
 
 - `code` - unique and required within the collection. Ingestion maps artifact
   `term_code` to this Strapi field.
@@ -161,21 +152,21 @@ There are no glossary relationships in the initial contract. Later work may add
 collection-specific fields, especially for Prabodhan Glossary, without requiring
 Sanatan Glossary to adopt the same fields.
 
-The later Strapi ingestion task should assume these Collection Types already
-exist. It should focus on dry-run reporting, idempotent create/update behavior,
-API authentication, payload construction, and conflict handling.
+The implemented [glossary ingestion workflow](../../tools/seed-data-cli/README.md#glossary-strapi-ingestion-workflow)
+requires these Collection Types in the target CMS and provides preflight checks,
+dry-run reporting, and repeatable create/update operations through the Strapi API.
 
 ## Category Artifact Contract
 
-Task 009 finalizes the category artifact contract for:
+The category artifact contract covers:
 
 ```text
 artifacts/category/categories.json
 ```
 
 The category artifact represents the configured Category CSV source and the
-future Strapi Category Collection Type target. The artifact is reviewable seed
-data prepared for a later ingestion tool; it is not a Strapi content-type
+Strapi Category Collection Type target. The artifact is reviewable seed
+data consumed by the ingestion workflow; it is not a Strapi content-type
 schema.
 
 The category artifact shape uses this envelope:
@@ -215,8 +206,8 @@ The required common record fields are:
   blank in CSV.
 - `is_active` - parsed boolean activity flag.
 - `sort_order` - parsed integer ordering value.
-- `desired_status` - intended publish lifecycle value, currently `draft` or
-  `published`.
+- `desired_status` - retained source lifecycle value, `draft` or `published`;
+  current ingestion ignores it and publishes all created or updated records.
 - `name_en` and `description_en` - English display text.
 - `name_hi_IN` and `description_hi_IN` - Hindi display text from CSV columns
   named `name_hi-IN` and `description_hi-IN`.
@@ -226,14 +217,14 @@ The generated artifact must not include Strapi internal identifiers such as
 
 ## Subject Artifact Contract
 
-Task 010 finalizes the subject artifact contract for:
+The subject artifact contract covers:
 
 ```text
 artifacts/subject/subjects.json
 ```
 
 The subject artifact represents the configured Subject CSV source and the
-future Strapi Subject Collection Type target. Subject records reference
+Strapi Subject Collection Type target. Subject records reference
 categories by stable `category_code`; the artifact must not include Strapi
 relation IDs.
 
@@ -279,8 +270,8 @@ The required common record fields are:
 - `is_active` - parsed boolean activity flag.
 - `sort_order` - parsed integer ordering value.
 - `category_code` - stable category business key used for the relationship.
-- `desired_status` - intended publish lifecycle value, currently `draft` or
-  `published`.
+- `desired_status` - retained source lifecycle value, `draft` or `published`;
+  current ingestion ignores it and publishes all created or updated records.
 - `name_en` and `description_en` - English display text.
 - `name_hi_IN` and `description_hi_IN` - Hindi display text from CSV columns
   named `name_hi-IN` and `description_hi-IN`.
@@ -295,21 +286,14 @@ fields.
 
 ## Artifact Schema Location
 
-Formal JSON Schemas for seed-data artifacts belong under:
+Formal JSON Schemas for seed-data artifacts are checked in under
+`tools/seed-data-cli/config/`:
 
-```text
-tools/seed-data-cli/config/
-```
+- [Category artifact schema](../../tools/seed-data-cli/config/category_artifact.schema.json)
+- [Glossary artifact schema](../../tools/seed-data-cli/config/glossary_artifact.schema.json)
+- [Subject artifact schema](../../tools/seed-data-cli/config/subject_artifact.schema.json)
 
-The glossary artifact schema should be introduced as:
-
-```text
-tools/seed-data-cli/config/category_artifact.schema.json
-tools/seed-data-cli/config/glossary_artifact.schema.json
-tools/seed-data-cli/config/subject_artifact.schema.json
-```
-
-That schema validates generated seed-data artifact files before ingestion. It is
+These schemas validate generated seed-data artifact files before ingestion and are
 separate from the Strapi Collection Type schemas stored under
 `apps/gurubodh-cms/src/api/`.
 
@@ -329,8 +313,7 @@ Common validation responsibilities include:
 - generated artifacts are not written when validation reports errors;
 - validation messages identify the source row and field wherever practical.
 
-Subject validation must also verify category references once category artifacts
-or source records are available.
+Subject validation also verifies category references against the Category source.
 
 ## Strapi Compatibility
 
@@ -338,16 +321,19 @@ CSV-to-JSON artifact generation targets this repo-owned interface contract.
 It should not depend on a live Strapi instance, Strapi MCP server, or Strapi API
 connection.
 
-Future Strapi ingestion or dry-run compatibility checks should compare generated
-artifacts with Strapi expectations:
+The CLI provides target-specific `ingest preflight`, `ingest plan`, and
+`ingest apply` commands for Category, Subject, Sanatan Glossary, and Prabodhan
+Glossary. It validates artifact schemas and target identity, checks CMS endpoint
+access, and plans creates, updates, conflicts, and blocked records using stable
+business keys. Adapters explicitly map artifact fields to CMS fields.
 
-- missing required Strapi field: error;
-- unresolved relationship: error;
-- target Strapi content type missing: error;
-- artifact field missing in Strapi: warning or blocked change, depending on
-  whether the field is intentionally new;
-- optional Strapi field missing in artifact: warning;
-- existing record with changed updateable field: planned update in dry-run.
+Category and Subject use separate apply invocations. Required Categories must
+exist before dependent Subjects can be applied; applying Categories does not
+automatically apply Subjects. Subject ingestion resolves `category_code` to a
+Category `documentId` and blocks missing or ambiguous relations. Both adapters
+report `desired_status` as skipped and publish records regardless of its value.
+See the [Category and Subject ingestion guide](../../tools/seed-data-cli/README.md#strapi-ingestion-workflow)
+for commands, locale requirements, and recovery guidance.
 
 Strapi remains responsible for generating native `id` and Strapi 5
 `documentId` values during API-based ingestion.
