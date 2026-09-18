@@ -13,7 +13,7 @@ Keep `AGENTS.md` short and route durable project knowledge here.
 - `interfaces/` - lightweight interface contracts for subsystem boundaries.
 - `agents/agent-contract.md` - expanded guidance for AI agents.
 - `development/` - contributor workflow guides for GitHub, pull requests, and Conventional Commits.
-- [Development pilot](./development/slice-workflow.md) - provisional slice workflow and current handoff for #283/#289.
+- [Development pilot](./development/slice-workflow.md) - provisional slice workflow and historical handoffs for the completed #283 pilot; repository-wide adoption remains pending under #289 (status checked 2026-09-18).
 - `tasks/` - task briefs and execution history.
 
 ## Records

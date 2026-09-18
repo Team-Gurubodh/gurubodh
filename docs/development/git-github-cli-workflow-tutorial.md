@@ -36,7 +36,14 @@ belong to the current issue before continuing.
 
 ## Start From An Issue
 
-Create or select a GitHub issue before starting work.
+Create or select a GitHub issue before starting work. Read its full description
+and available discussion before planning or changing files:
+
+```bash
+gh issue view 25 --comments
+```
+
+Replace `25` with the issue number that owns your work.
 
 Use the issue template that matches the work:
 
@@ -138,19 +145,20 @@ git status --short
 git diff --cached
 ```
 
-Commit using Conventional Commits:
+Commit using Conventional Commits with the issue reference required by
+[AGENTS.md](../../AGENTS.md):
 
 ```bash
-git commit -m "docs(github): add git and github cli workflow tutorial"
+git commit -m "docs(github): add git and github cli workflow tutorial (#25)"
 ```
 
 Common examples:
 
 ```bash
-git commit -m "feat(seed-data): add google sheets validation scripts"
-git commit -m "fix(cms): correct subject relation config"
-git commit -m "docs(github): add pull request workflow"
-git commit -m "chore(cms): enable strapi mcp setup"
+git commit -m "feat(seed-data): add google sheets validation scripts (#22)"
+git commit -m "fix(cms): correct subject relation config (#25)"
+git commit -m "docs(github): add pull request workflow (#25)"
+git commit -m "chore(cms): enable strapi mcp setup (#19)"
 ```
 
 ## Push
@@ -165,13 +173,14 @@ After this command, GitHub can create a pull request from the branch.
 
 ## Open A Pull Request
 
-Create a pull request with a Conventional Commit title:
+Create a pull request with a Conventional Commit title that includes the issue
+reference, and link the issue in the description:
 
 ```bash
 gh pr create \
   --base main \
   --head issue-25-git-github-cli-workflow-tutorial \
-  --title "docs(github): add git and github cli workflow tutorial" \
+  --title "docs(github): add git and github cli workflow tutorial (#25)" \
   --body "## Summary
 
 Adds a beginner-oriented tutorial for the Gurubodh issue-first workflow using git and the GitHub CLI.
@@ -226,7 +235,7 @@ If review asks for changes, edit the files, then commit and push again:
 git status --short
 git diff
 git add <files>
-git commit -m "docs(github): clarify workflow cleanup steps"
+git commit -m "docs(github): clarify workflow cleanup steps (#25)"
 git push
 ```
 
@@ -234,7 +243,9 @@ The pull request updates automatically after the push.
 
 ## Merge
 
-Merge only after required checks pass and required review is complete.
+Merge only after required checks pass and required review is complete. Agents
+also need explicit maintainer instruction before merging, squashing, rebasing,
+or otherwise integrating changes into the target branch.
 
 You can merge in the GitHub UI. Prefer the repository's normal merge method for
 the pull request.
@@ -279,7 +290,7 @@ put it on a temporary branch and make a checkpoint commit:
 ```bash
 git switch -c strapi-mcp-setup-and-seed-data-scripts
 git add <files>
-git commit -m "chore: checkpoint strapi mcp setup and seed data scripts - WIP"
+git commit -m "chore: checkpoint strapi mcp setup and seed data scripts - WIP (#19, #22)"
 ```
 
 Then switch back to `main` for the new issue:
