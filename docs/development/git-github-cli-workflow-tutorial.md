@@ -187,7 +187,7 @@ Adds a beginner-oriented tutorial for the Gurubodh issue-first workflow using gi
 
 ## Linked Issue
 
-Closes #25
+Refs #25
 
 ## Scope
 
@@ -200,8 +200,11 @@ Closes #25
 - [x] Reviewed the tutorial commands locally."
 ```
 
-Use `Closes #<issue-number>` when merging the pull request should close the
-issue. Use `Refs #<issue-number>` when the pull request is partial progress.
+Use `Refs #<issue-number>` until whole-issue review passes and the maintainer
+confirms "implementation verified" and explicitly instructs completion and
+closure. Only then may `Closes #<issue-number>` be used. Follow the
+[slice workflow](./slice-workflow.md) before planning or implementation,
+including its mandatory design-acceptance gate.
 
 ## Check Pull Request Status
 

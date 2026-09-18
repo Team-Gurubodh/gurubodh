@@ -16,7 +16,10 @@ The summary should be short, imperative, and lowercase unless it contains a prop
 Commit messages and pull request titles must reference the issue under
 [AGENTS.md](../../AGENTS.md). The examples use illustrative issue numbers; use the
 issue that owns your change. In the PR description, use `Refs #<issue-number>`
-for partial delivery and `Closes #<issue-number>` only for completed issues.
+until the maintainer confirms "implementation verified" and explicitly instructs
+issue completion and closure after whole-issue review. Only then may a
+`Closes #<issue-number>` reference be used, as defined by the
+[slice workflow](./slice-workflow.md#whole-issue-completion).
 
 ## Common Types
 

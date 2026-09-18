@@ -1,18 +1,19 @@
 # Decision-0008: Slice Development Pilot
 
 <record_type>decision</record_type>
-<status>accepted_for_pilot</status>
+<status>superseded</status>
 <date>2026-09-06</date>
 <owners>Gurubodh maintainers</owners>
 
 ## Current Context
 
-As checked on 2026-09-18, [#283](https://github.com/Team-Gurubodh/gurubodh/issues/283)
-and [#288](https://github.com/Team-Gurubodh/gurubodh/issues/288) are closed, with
-implementation gates passed. [#289](https://github.com/Team-Gurubodh/gurubodh/issues/289)
-remains open pending maintainer agreement on repository-wide adoption. This
-record still accepts only the pilot. The decision and gate rules below describe
-the original pilot scope.
+Superseded on 2026-09-18 by
+[Decision-0011: Mandatory Slice Workflow](./0011-mandatory-slice-workflow.md),
+following the maintainer's adoption instruction under
+[#355](https://github.com/Team-Gurubodh/gurubodh/issues/355). The pilot's technical
+work under #283–#288 is complete. The remaining sections preserve the original
+pilot decision and its historical gates; current policy is the
+[slice workflow](../development/slice-workflow.md).
 
 ## Context
 

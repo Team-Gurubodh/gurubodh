@@ -25,7 +25,8 @@ Use numbered filenames:
 | 0005 | [Language-Scoped Prepared Content Release Roots](./0005-language-scoped-prepared-content-release-roots.md) | Accepted |
 | 0006 | [Source Font Safety Boundary](./0006-source-font-safety-boundary.md) | Accepted |
 | 0007 | [Executable Gurubodh CLI JSON Schema Boundaries](./0007-executable-cli-json-schema-boundaries.md) | Accepted |
-| 0008 | [Slice Development Pilot](./0008-slice-development-pilot.md) | Accepted for pilot only |
+| 0008 | [Slice Development Pilot](./0008-slice-development-pilot.md) | Superseded by Decision-0011; retained as pilot history |
+| 0011 | [Mandatory Slice Workflow](./0011-mandatory-slice-workflow.md) | Accepted |
 
 The two Decision-0003 records retain their historical numbers and paths.
 Number-only references to Decision-0003 are ambiguous: cite the full title and
