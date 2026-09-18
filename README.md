@@ -21,6 +21,9 @@ their documented workflows; they are not end-user applications.
 
 ## Find the right guide
 
+New here? Start with the [short onboarding routes](docs/README.md#start-here)
+for project orientation, component setup, or your first contribution.
+
 - **Work on the CMS:** start with the [CMS README](apps/gurubodh-cms/README.md)
   for setup, local development, content types, and its PostgreSQL boundary.
 - **Prepare subject content:** use the [Gurubodh CLI README](tools/gurubodh-cli/README.md).

@@ -8,8 +8,8 @@
 - AWS RDS PostgreSQL scripts have placeholder directories, but local PostgreSQL scripts have not yet been adapted or verified for AWS RDS.
 - Local PostgreSQL scripts are not automated because proper working of the database involves the following:
   - Creation of starting roles, including DB owner, creation of the database itself
-  - Allowing Strapi app scaffolding command to populate Schema in the database created in previous step
-  - Granting privileges on objects created by the app scaffolding command to roles created in the first step
+  - Starting the existing Strapi application to create its schema in the provisioned database
+  - Granting privileges on Strapi-created objects to applicable roles created in the first step
   - Possible locking of the Public schema for better security
 - Several monorepo areas are placeholders for future work: content ingestion,
   metadata generation, metadata ingestion, `apps/gurubodh-web`, and

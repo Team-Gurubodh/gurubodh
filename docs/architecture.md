@@ -5,15 +5,10 @@
 
 ## 1. Purpose & Scope
 
-This document describes the **stable structure** of the system: the high-level
-components, what each one is responsible for, how they interact, and where the
-boundaries between them lie. It intentionally avoids justifying *why* a specific
-technology was chosen — that reasoning, along with tradeoffs and alternatives, is
-recorded separately in [Architecture Decision Records (ADRs)](./adr/README.md).
-This document should change rarely; ADRs are expected to accumulate over time.
-
-Where a component's current implementation is relevant, it is named with a
-reference to the ADR that explains the choice.
+This overview describes current components and their planned connections.
+Implementation labels below describe the checked-in system; accepted
+[ADRs](adr/README.md) explain choices but do not establish deployment status.
+Component guides and linked contracts own detailed procedures and fields.
 
 ---
 
@@ -42,50 +37,74 @@ component, and should guide future decisions:
 
 ## 3. System Context
 
+Solid arrows show implemented handoffs; dotted arrows and **Planned** labels
+show future work. “Implemented” means supported by the repository, not that a
+service is deployed. AWS hosting remains a direction, not a deployment claim.
+
 ```mermaid
 flowchart LR
-    subgraph External
-        SRC[External Content Sources]
-    end
-
-    subgraph Preparation & Ingestion
-        PRE[Content Preparation Layer]
-        ING[Content Ingestion Layer]
-        METAGEN[Metadata Generation Layer]
-        METAING[Metadata Ingestion Layer]
-    end
-
-    subgraph Core Platform
-        CMS[(Headless CMS<br/>System of Record)]
-        MEDIA[(Media/Asset Storage)]
-    end
-
-    subgraph Consumption
-        WEB[Web Consumption Layer]
-        CHAT[Chat Consumption Layer]
-        MOBILE[Mobile Consumption Layer]
-    end
-
-    subgraph RAG Layer
-        EMBED[Embedding Pipeline]
-        VDB[(Vector Store)]
-        RAGAPI[RAG Query Service]
-    end
-
-    SRC --> PRE
-    PRE --> ING --> CMS
-    PRE --> METAGEN --> METAING --> CMS
-    CMS --> MEDIA
-    CMS --> WEB
-    CMS --> CHAT
-    CMS --> MOBILE
-    MEDIA --> WEB
-    MEDIA --> MOBILE
-    CMS --> EMBED --> VDB --> RAGAPI
-    RAGAPI --> WEB
-    RAGAPI --> CHAT
-    RAGAPI --> MOBILE
+    CSV["External seed-data CSVs"] --> SEED["Implemented: seed-data CLI"]
+    SEED --> JSON["Validated JSON artifacts"]
+    JSON --> API["Implemented: Strapi API seed ingestion<br/>Categories, Subjects, both glossaries"]
+    API --> CMS["Implemented: Strapi + PostgreSQL<br/>Published content and metadata"]
+    DOCX["Source DOCX"] --> PREP["Implemented: content preparation"]
+    PREP --> STORE["Implemented: local / Cloudflare R2 artifacts<br/>Canonical chapter text, metadata, provenance"]
+    STORE --> DERIVED["Implemented: derived semantic chunks<br/>and DOCX exports"]
+    STORE -.-> ING["Planned: chapter-content ingestion"]
+    ING -.-> CMS
+    STORE -.-> META["Planned: metadata generation + ingestion"]
+    META -.-> CMS
+    CMS -.-> CLIENT["Planned: web, chat, mobile"]
+    CMS -.-> RAG["Planned: embeddings, vector store, RAG service"]
+    RAG -.-> CLIENT
+    CMS -.-> MEDIA["Planned: CMS cloud media storage"]
 ```
+
+[Seed artifacts](interfaces/seed-data-artifacts.md) reach the CMS today.
+[Prepared artifacts](interfaces/prepared-content-artifacts.md) have their own
+local/R2 storage boundary; chapter ingestion into the CMS is missing. Prepared
+chunks are derived files, not a deployed retrieval service. R2 prepared storage
+is separate from both PostgreSQL and the planned CMS media provider.
+
+### Domain vocabulary
+
+A **Category** groups **Subjects**; each Subject references one Category.
+A subject's source DOCX commonly contains several lectures. Preparation splits
+it at editorial chapter headings into **Chapters**. The repository uses
+**Prabodhan** for these numbered divisions in
+[DOCX export titles](interfaces/prepared-content-artifacts.md#derived-docx-exports)
+and stores an optional subject-level `prabodhan_count`; this does not establish
+that every audio lecture, chapter, and source file has a one-to-one identity.
+A **Chunk** is a generated semantic segment of prepared chapter text, not an
+editorial chapter. Chapter and Chunk CMS collections are not implemented.
+
+Hindi (`hi-IN`) and Marathi (`mr-IN`) are separate prepared editions of a
+subject, with independent release roots, provenance, checkpoints, and derived
+outputs; see [locale scope](decisions/0005-language-scoped-prepared-content-release-roots.md).
+This is distinct from Category/Subject CMS display localizations: seed ingestion
+writes English (`en`) and Hindi (`hi-IN`). It does not ingest Marathi chapters.
+
+**Sanatan Glossary** and **Prabodhan Glossary** hold separately maintained term
+and definition reference data, intended to support future tagging/content
+descriptors. Today they are independent, non-localized collections with no
+chapter relationships or automatic tagging. Their [shared contract](interfaces/seed-data-artifacts.md#glossary-strapi-collection-type-contract)
+does not define an editorial rule for assigning a term to one versus the other;
+the maintainer explicitly left that narrow distinction open under
+[#353](https://github.com/Team-Gurubodh/gurubodh/issues/353).
+
+| Identifier | What it identifies and whether text edits change it |
+| --- | --- |
+| Category / Subject business `code` | `CATnnn` / `SUBnnn`, unique in its own collection and shared across localizations. Name/description edits retain the code; Subject artifacts reference Category by code. |
+| Glossary `term_code` → CMS `code` | Stable term identity within one glossary collection. Term/definition edits retain it; the same code can occur in the other glossary. |
+| `content_key` | Normalized chapter content state scoped by Category code, Subject code, and language. A normalized text change changes the key; chapter reordering or normalization-only whitespace changes do not. It is not permanent editorial chapter identity. |
+| Strapi `documentId` | CMS-generated document identity used for API updates, localizations, and relations within the target CMS. Text updates retain it; external artifacts omit it and recreation in another database need not preserve it. |
+
+For precision, use the [seed schemas and mappings](interfaces/seed-data-artifacts.md),
+[prepared contract](interfaces/prepared-content-artifacts.md), and
+[content identity implementation](../tools/gurubodh-cli/gurubodh/content_identity.py).
+The [chapter/revision/chunk/snapshot identity proposal](tasks/017-cms-led-chapter-identity-registry.md)
+is exploratory, not accepted runtime behavior; its proposed registry identities
+must not be confused with implemented `content_key` or Strapi `documentId`.
 
 ---
 
@@ -118,7 +137,7 @@ flowchart LR
   Sri-Lipi/Shree Dev and other unapproved families remain unsupported; see the
   [source font safety boundary](./decisions/0006-source-font-safety-boundary.md).
 
-### 4.2 Content Ingestion Layer
+### 4.2 Content Ingestion Layer — planned
 
 - **Responsibility**: Import prepared content and basic metadata artifacts into the
   CMS. Guarantee idempotent delivery so re-running an ingestion job does not
@@ -140,7 +159,7 @@ flowchart LR
 - **Planned/recommended direction**: AWS-based ingestion workers or adapters may
   be introduced later, but no ingestion ADR has been accepted yet.
 
-### 4.3 Metadata Generation Layer
+### 4.3 Metadata Generation Layer — planned
 
 - **Responsibility**: Generates content specific metadata such as 'tags' or 'content descriptors' for Subject content already split into chapters. The objective is to keep refining and updating 'tags' as well as 'content-descriptors' so that search function and the AI chatbot to be introduced later will be able to find relevant information quickly and correctly.
 - **Collaborates with**: Consumes artifacts produced by the Content Preparation
@@ -158,7 +177,7 @@ flowchart LR
   `gurubodh` command structure.
 - **Planned/recommended direction**: No metadata generation ADR has been accepted yet.
 
-### 4.4 Metadata Ingestion Layer
+### 4.4 Metadata Ingestion Layer — planned
 
 - **Responsibility**: Updates prepared content-specific metadata such as 'tags' or 'content descriptors' for content already split into chapters into the CMS.  
 - **Collaborates with**: Consumes artifacts produced by the Metadata Generation Layer
@@ -181,9 +200,9 @@ flowchart LR
 - **Responsibility**: Store structured content and metadata, manage the
   publishing lifecycle (draft/published/archived), expose content via API, and
   reference media assets.
-- **Collaborates with**: receives writes from Content Ingestion, Metadata Ingestion; serves reads to Web, Chat, and Mobile consumption layers; serves content to the Embedding Pipeline
-  (RAG layer); fires webhooks on publish/update/delete that other components
-  react to.
+- **Collaborates with**: receives implemented seed-data API writes. Chapter and
+  metadata ingestion, consumption clients, and embedding/webhook integrations
+  remain planned.
 - **Boundaries — does NOT**:
   - Perform source-specific ingestion logic.
   - Render UI or own presentation concerns.
@@ -292,13 +311,18 @@ flowchart LR
 
 ## 5. Component Boundary Map
 
+This table includes intended dependencies; planned integrations are not runtime
+prerequisites for the implemented CMS or preparation CLI.
+
 | Component | Depends On | Depended On By | Must Not Do |
 |---|---|---|---|
+| Seed-data CLI (implemented) | External CSVs, reviewed artifacts | CMS through Strapi API | Write directly to PostgreSQL |
+| Prepared storage (implemented) | Content Preparation | Derived exports/chunks; future chapter ingestion | Own CMS publication state |
 | Content Preparation Layer | Source DOCX files, job configuration, CMS seed-code references | Content Ingestion Layer, Metadata Generation Layer | Write finalized entries directly to CMS |
 | Content Ingestion Layer | Prepared content artifacts | CMS | Convert DOCX; split chapters; bypass CMS API |
 | Metadata Generation Layer | Prepared chapter-level artifacts | Metadata Ingestion Layer, future search/RAG workflows | Generate metadata for unsplit single-file subjects; update CMS directly; convert DOCX |
 | Metadata Ingestion Layer | Generated metadata artifacts, existing CMS entries | CMS | Generate metadata; create new CMS content entries; bypass CMS API |
-| Headless CMS | Content Ingestion Layer and Metadata Ingestion Layer writes | Web, Chat, Mobile, Embedding Pipeline | Render UI; perform vector search |
+| Headless CMS | PostgreSQL; seed API writes (implemented), chapter/metadata ingestion (planned) | Web, Chat, Mobile, Embedding Pipeline | Render UI; perform vector search |
 | Media Storage | CMS / storage-provider integration | Web, Chat, Mobile (via CDN) | Own asset metadata |
 | Web Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Own content data; implement content validation |
 | Chat Consumption Layer | CMS, RAG Query Service (Phase 3) | End users | Own content data; maintain vectors; orchestrate retrieval outside the RAG Query Service |
@@ -313,11 +337,11 @@ flowchart LR
 
 | Phase | Components Active |
 |---|---|
-| **Current implemented foundation** | Content Preparation with local and container/R2 workflows, Strapi CMS with Category/Subject/glossary schemas and seed-data ingestion, local PostgreSQL scripts, planned web/chat app roots |
+| **Current implemented foundation** | Content Preparation with local and container/R2 workflows, Strapi CMS with Category/Subject/glossary schemas and seed-data ingestion, local PostgreSQL scripts |
 | **Phase 1 target** | Content Ingestion, Content Preparation, Headless CMS, Media Storage |
-| **Phase 2** | + Web Consumption Layer (production-hardened) |
-| **Phase 3** | + Chat Consumption Layer, Embedding Pipeline, Vector Store, RAG Query Service |
-| **Phase 4** | + Mobile Consumption Layer |
+| **Phase 2 target** | + Web Consumption Layer (production-hardened) |
+| **Phase 3 target** | + Chat Consumption Layer, Embedding Pipeline, Vector Store, RAG Query Service |
+| **Phase 4 target** | + Mobile Consumption Layer |
 
 The component boundaries defined in Section 4 are designed to hold across all
 four phases — later phases add components, they should not require redrawing
