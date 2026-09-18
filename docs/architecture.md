@@ -113,7 +113,10 @@ flowchart LR
   in the CPU-only `gurubodh-cli` container; native Python remains the
   development and debugging path. See
   [ADR-0013](./adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md).
-- **Planned/recommended direction**: Shri-Lipi font conversion was unsuccessful. As such newly created documents cannot be used by our system. We need to find a solution to this problem.
+- **Source font support**: Approved Unicode and APS-family sources are supported,
+  including newly created documents using approved Unicode fonts. Shri-Lipi/
+  Sri-Lipi/Shree Dev and other unapproved families remain unsupported; see the
+  [source font safety boundary](./decisions/0006-source-font-safety-boundary.md).
 
 ### 4.2 Content Ingestion Layer
 
@@ -128,8 +131,10 @@ flowchart LR
   - Perform DOCX Unicode conversion, chapter splitting, or artifact generation.
   - Bypass the CMS's own validation/hooks by writing to its database directly.
   - Know anything about how content is rendered or consumed downstream.
-- **Current implementation**: not implemented yet. Future CMS ingestion
-  commands are expected to be added under the existing
+- **Current implementation**: chapter-content ingestion is not implemented yet.
+  Category, Subject, and glossary seed-data ingestion is implemented separately
+  in the [seed-data CLI](../tools/seed-data-cli/README.md). Future chapter-content
+  ingestion commands are expected to be added under the existing
   `tools/gurubodh-cli/` Python package and exposed through the
   `gurubodh` command structure.
 - **Planned/recommended direction**: AWS-based ingestion workers or adapters may
@@ -308,7 +313,7 @@ flowchart LR
 
 | Phase | Components Active |
 |---|---|
-| **Current implemented foundation** | Local Content Preparation utility, Headless CMS scaffold, local PostgreSQL scripts, planned web/chat app roots |
+| **Current implemented foundation** | Content Preparation with local and container/R2 workflows, Strapi CMS with Category/Subject/glossary schemas and seed-data ingestion, local PostgreSQL scripts, planned web/chat app roots |
 | **Phase 1 target** | Content Ingestion, Content Preparation, Headless CMS, Media Storage |
 | **Phase 2** | + Web Consumption Layer (production-hardened) |
 | **Phase 3** | + Chat Consumption Layer, Embedding Pipeline, Vector Store, RAG Query Service |

@@ -8,7 +8,7 @@ CMS. The tool is evolving into the canonical workflow for externally maintained
 
 Seed data is maintained outside Strapi so domain experts and volunteers can
 contribute through familiar spreadsheet workflows. CSV exports are validated and
-converted into reviewable JSON artifacts before later Strapi 5 ingestion. After
+converted into reviewable JSON artifacts before Strapi 5 ingestion. After
 successful ingestion, the CMS remains the system of record.
 
 The current seed-data source types are:
@@ -68,8 +68,8 @@ The current Subject CSV columns are:
 - `prabodhan_count`
 
 The lightweight interface contract for source CSV files, generated artifacts,
-and future Strapi ingestion is documented in
-`docs/interfaces/seed-data-artifacts.md`.
+and Strapi ingestion is documented in the
+[seed-data artifact interface](../../docs/interfaces/seed-data-artifacts.md).
 
 ## Setup
 
@@ -426,9 +426,11 @@ Each artifact includes:
 - `strapi`
 - `records`
 
-The `strapi` object records the intended future Strapi Collection Type target.
-The artifact is not itself a Strapi content-type schema. The actual Strapi
-Collection Type schema files will be created by a later CMS task.
+The `strapi` object records the Strapi Collection Type target. The artifact is
+not itself a Strapi content-type schema. The checked-in
+[Sanatan Glossary schema](../../apps/gurubodh-cms/src/api/sanatan-glossary/content-types/sanatan-glossary/schema.json)
+and [Prabodhan Glossary schema](../../apps/gurubodh-cms/src/api/prabodhan-glossary/content-types/prabodhan-glossary/schema.json)
+define the CMS targets used by [glossary ingestion](#glossary-strapi-ingestion-workflow).
 
 Generated artifacts must not include Strapi internal `id` or `documentId`
 values. Strapi is responsible for generating those identifiers during API-based
@@ -452,7 +454,7 @@ generated artifact against `config/subject_artifact.schema.json`, and writes:
 artifacts/subject/subjects.json
 ```
 
-Both workflows include source identity and intended future Strapi target
+Both workflows include source identity and Strapi target
 metadata. Subject artifacts keep `category_code` as a stable relationship key
 and do not include Strapi relation IDs.
 
@@ -462,8 +464,8 @@ The seed-data tool validates downloaded CSV files before generating artifacts,
 even when spreadsheet validation and conditional formatting are also configured
 for human data entry.
 
-Strapi ingestion remains a separate workflow. It should read generated artifacts
-after the relevant Strapi Collection Types already exist.
+Strapi ingestion is a separate workflow that reads generated artifacts. The
+relevant checked-in Strapi Collection Types must be available in the target CMS.
 
 Category and Subject ingestion use the Strapi REST API and never write directly
 to the PostgreSQL database. Both adapters reconcile records by stable `code`,
@@ -472,12 +474,12 @@ publish all created or updated records, and ignore artifact `desired_status`.
 Subject ingestion resolves the `category` relation from the artifact
 `category_code` to the target Category `documentId`.
 
-The current ingestion command plans and applies Category and Subject records
-together. In apply mode, it writes Categories first, replans both workflows, and
-then writes Subjects only if the Category plan is conflict-free and all Subject
-Category relations resolve. This preserves the Category-before-Subject
-dependency without exposing separate Category-only and Subject-only maintainer
-commands.
+Category and Subject ingestion use separate targets: run
+`gurubodh-seed-data ingest apply category`, then
+`gurubodh-seed-data ingest apply subject` once the required Categories are
+available in Strapi. Applying Categories does not apply Subjects automatically.
+Each invocation plans and applies only its selected target; Subject ingestion
+is blocked when a Category relation is missing or ambiguous.
 
 ### Strapi Requirements
 

@@ -15,6 +15,12 @@ billing, and operational knowledge across the team.
 
 Use **AWS** as the hosting platform for all infrastructure.
 
+Accepted [ADR-0013](./0013-use-cloudflare-r2-for-prepared-content-artifacts.md)
+qualifies this decision: prepared content artifacts use Cloudflare R2, with
+local filesystem storage retained for development and compatibility. AWS
+remains the hosting platform for the rest of the infrastructure; the original
+single-provider rationale below records the basis for this earlier decision.
+
 ## Consequences
 
 **Positive**
