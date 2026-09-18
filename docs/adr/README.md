@@ -4,9 +4,9 @@
 
 Use this directory for durable architectural decisions that affect system boundaries, data ownership, runtime dependencies, deployment shape, or long-term technical direction.
 
-Each ADR captures a single decision, the context that motivated it, and its consequences (including tradeoffs and alternatives considered) — using the standard Nygard format: **Title / Status / Context / Decision / Consequences**.
+Each ADR captures a single decision, the context that motivated it, and its consequences (including tradeoffs and alternatives considered). Use the [authoritative ADR template](./0000-template.md) for its structure and metadata.
 
-The companion [architecture.md](../architecture.md) describes the stable component structure these decisions implement. ADRs explain *why*; ```architecture.md``` explains *what* and *how things fit together*.
+The companion [architecture.md](../architecture.md) describes the stable component structure these decisions implement. ADRs explain *why*; the architecture overview explains *what* and *how things fit together*.
 
 ## Status Legend
 
@@ -32,18 +32,19 @@ The companion [architecture.md](../architecture.md) describes the stable compone
 | [0010](./0010-mobile-app-framework.md) | Mobile App Framework (Phase 4) | Proposed |
 | [0011](./0011-infrastructure-as-code-tool.md) | Infrastructure as Code Tool | Proposed |
 | [0012](./0012-cicd-pipeline-tool.md) | CI/CD Pipeline Tool | Proposed |
+| [0013](./0013-use-cloudflare-r2-for-prepared-content-artifacts.md) | Use Cloudflare R2 for Prepared Content Artifacts | Accepted |
 
 
 ## Adding a New ADR
 
-1. Copy the next sequential number.
+1. Copy the [authoritative ADR template](./0000-template.md) and choose the next sequential number.
 2. Use the format: `NNNN-short-kebab-case-title.md`.
-3. Follow the Title / Status / Context / Decision / Consequences structure.
+3. Fill in the template's metadata and sections.
 4. Add a row to the Index table above.
 5. If an ADR replaces an earlier one, mark the old one **Superseded** and link
    forward to the new ADR.
 
-Keep `0000-template.md` as the local starter template.
+The existing [templates/adr-template.md](../templates/adr-template.md) entry point links to the same authoritative template.
 
 
 ## When To Create An ADR

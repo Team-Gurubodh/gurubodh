@@ -13,7 +13,7 @@ Current records:
 
 - [Assembled job field mapping](https://github.com/Team-Gurubodh/gurubodh/issues/298#issuecomment-5571636607) - S4's exhaustive
   component-to-job ownership, compatibility, and downstream obligations for #283.
-- `prepared-content-artifacts.md` - content outputs in local
+- [prepared-content-artifacts.md](./prepared-content-artifacts.md) - content outputs in local
   storage and Cloudflare R2 for future ingestion and metadata workflows.
-- `seed-data-artifacts.md` - external seed-data CSV files, generated JSON
+- [seed-data-artifacts.md](./seed-data-artifacts.md) - external seed-data CSV files, generated JSON
   artifacts, and future Strapi 5 ingestion.
