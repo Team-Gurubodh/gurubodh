@@ -39,10 +39,9 @@ skill discovery. Read only the technical references relevant to the task:
 | --- | --- |
 | Project map and commands | [README.md](README.md) |
 | Documentation or component guide | [docs/README.md](docs/README.md) |
-| Architecture change | [Architecture](docs/architecture.md) and applicable [ADRs](docs/adr/README.md) |
+| Targeted architecture and decision context | Start from the issue, accepted design, latest handoff, and relevant implementation. Do not routinely read [Architecture](docs/architecture.md) or browse [ADRs](docs/adr/README.md) and [decision records](docs/decisions/README.md). Consult a specific section or record when the issue or accepted design identifies it as applicable, or when a concrete unresolved question requires it. |
 | Scope, roadmap, or priority decision | [Goals](docs/goals.md) |
 | Behavior near a known constraint | [Limitations](docs/limitations.md) |
-| Operational or process decision | Applicable [decision records](docs/decisions/README.md) |
 
 ## Essential Rules
 
