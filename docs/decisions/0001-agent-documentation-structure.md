@@ -5,6 +5,22 @@
 <date>2026-06-22</date>
 <owners>Gurubodh maintainers</owners>
 
+## Current Applicability
+
+The historical decision below is retained. Under
+[#357](https://github.com/Team-Gurubodh/gurubodh/issues/357),
+[AGENTS.md](../../AGENTS.md) remains the universal entry point and now defines
+instruction ownership and direct reading routes. The separate `docs/agents/`
+expansion is retired, and repeatable [repo skills](../../.agents/skills/README.md)
+are active. These replace the earlier scaffold and reserved-skills guidance.
+
+New execution records and handoffs belong in GitHub issues under the
+[slice workflow](../development/slice-workflow.md#authoritative-records),
+adopted by [Decision-0011](0011-mandatory-slice-workflow.md); the instruction
+below to create task execution records in `docs/tasks/` is superseded.
+Existing task records remain historical. Formatting guidance lives in the
+[documentation index](../README.md#documentation-maintenance).
+
 ## Context
 
 Gurubodh will be worked on by multiple AI agents, with Codex used most often and Antigravity / GLM 5.2 also expected for code generation, refactoring, and planning.

@@ -17,8 +17,8 @@ Use numbered filenames:
 
 | # | Title | Status |
 | --- | --- | --- |
-| 0001 | [Agent Documentation Structure](./0001-agent-documentation-structure.md) | Accepted |
-| 0002 | [GitHub Contribution Workflow](./0002-github-contribution-workflow.md) | Accepted |
+| 0001 | [Agent Documentation Structure](./0001-agent-documentation-structure.md) | Accepted; scaffold and execution-record guidance partly superseded (see record) |
+| 0002 | [GitHub Contribution Workflow](./0002-github-contribution-workflow.md) | Accepted; Projects tracking revised under #357 (see record) |
 | 0003 | [GitHub Issue Taxonomy](./0003-github-issue-taxonomy.md) | Accepted |
 | 0003 | [Prepared Artifact Ownership and Lifecycle](./0003-prepared-artifact-ownership-and-lifecycle.md) | Accepted |
 | 0004 | [Gurubodh CLI Container Publication and Runtime](./0004-gurubodh-cli-container-publication-and-runtime.md) | Accepted |

@@ -3,6 +3,32 @@
 <record_type>workflow_guide</record_type>
 <status>active</status>
 
+This is the authoritative issue-execution process delegated by
+[AGENTS.md](../../AGENTS.md). Supporting skills explain how to carry out its
+activities; they introduce no policy or additional approval gates.
+
+## Reading Route
+
+After reading this workflow, read
+[slice-session](../../.agents/skills/slice-session/SKILL.md), restore the issue
+context, and select the resources for the active phase below. Agents without
+automatic skill discovery must open the linked `SKILL.md` files directly.
+Read technical and historical references only when they apply to the work.
+
+| Activity | Skill and references |
+| --- | --- |
+| Start, resume, or pause | [slice-session](../../.agents/skills/slice-session/SKILL.md); complete issue/discussion, accepted decisions, latest handoff; [session requirements](#session-entry-and-exit) |
+| Plan and maintain coverage | slice-session; [coverage](#requirement-coverage), [slice checklist](#lightweight-slice-checklist), applicable goals/contracts |
+| Review initial or materially changed design | [slice-design-review](../../.agents/skills/slice-design-review/SKILL.md); [design contract](#interface-design-review), existing implementation and applicable technical references |
+| Prepare tests and implement | [phase outcomes](#phase-outcomes), accepted design and questions; component README and relevant contracts/tests |
+| Verify and reconcile | [verification](#verification-and-delivery-status), [reconciliation](#slice-reconciliation); component verification commands and real integration boundaries |
+| Operate on issues, branches, commits, Projects, or PRs | [github-workflow](../../.agents/skills/github-workflow/SKILL.md), [GitHub conventions](github-workflow.md); optional [command tutorial](git-github-cli-workflow-tutorial.md) |
+| Publish, integrate, or close | github-workflow; [publication and integration](#publication-and-integration), [whole-issue completion](#whole-issue-completion) |
+
+Use the [record formats](templates/slice-records.md) when recording coverage,
+design acceptance, slice completion, or a handoff. The sections below define
+required content; formats are reusable aids, not additional gates.
+
 ## Core Terms and Their Relationship
 
 A GitHub issue defines the overall scope. That scope is divided into slices,
@@ -14,31 +40,10 @@ each slice is advanced through phases, and sessions are used to carry out the wo
 | Phase | A named stage of work within a slice, with a required outcome that enables further work on that slice. Examples: Planning, Interface Design. | Complete when its required outcome and any acceptance gate are met. Interface design always requires maintainer acceptance; other phases may be marked not applicable with a recorded reason. New findings may require revisiting a phase. |
 | Session | A work period by a contributor or agent that starts with context restoration and a stated intended outcome, and ends with a handoff when work is paused or responsibility transfers. | Ends at the recorded stopping or handoff point, even if the active phase or slice is incomplete. |
 
-Work proceeds in small, verifiable slices. Each slice passes through planning,
-interface design, test preparation, implementation, and integration
-verification phases. Phases may be brief. Interface design is always required;
-other phases may be marked not applicable with a recorded reason. Making an
-individual design-review item optional requires explicit maintainer approval.
-
-Slices divide scope; phases organize the work within that scope; sessions
-provide continuity across periods of work. One session may cover several phases
-or slices, and one phase or slice may span several sessions. Ending a session
-does not establish phase, slice, or issue completion.
-
-For agent-assisted work, a session is not defined by a single prompt, response,
-or chat thread. Several exchanges can belong to one session, and the same thread
-can host later sessions. State when work begins or resumes and record a handoff
-when pausing it. When resuming in a new thread or with another contributor,
-start a new session from the latest handoff. See
-[Authoritative Records](#authoritative-records) for where to record it.
-
-For example, a documentation issue might contain a slice to clarify workflow
-terminology. In the first session, the user and agent agree on the slice's
-acceptance criteria during planning and the maintainer accepts the definitions
-during interface design, then they pause with a handoff. In the second session,
-they prepare review checks, edit the guide, verify its consistency, and reconcile
-the slice against the issue. The same slice could also pass through all five
-phases in one session.
+A session may span several phases or slices, and a slice may span several
+sessions. A chat exchange or phase transition alone does not end a session;
+record a handoff when pausing or transferring work. Ending a session does not
+establish phase, slice, or issue completion.
 
 ## Applicability
 
@@ -53,17 +58,16 @@ Only an explicit maintainer instruction may grant a scoped workflow exception,
 subject to the design-review protections under [Exceptions](#exceptions).
 Record the exception in the relevant GitHub issue.
 
-Use this guide alongside the [GitHub workflow](./github-workflow.md) and
-[AGENTS.md](../../AGENTS.md). Adoption is recorded in
+Adoption is recorded in
 [Decision-0011](../decisions/0011-mandatory-slice-workflow.md); the earlier pilot
 and its history are linked there.
 
 ## Authoritative Records
 
-The parent GitHub Issue and its discussion define technical scope. Maintain
-one coverage checklist there, using stable requirement references, assigned
-slices, status, and completion evidence. Include requirements and constraints
-throughout the description, not just its acceptance-criteria checkboxes.
+The parent GitHub issue and its discussion own scope, progress, and verification
+records. Maintain the [coverage checklist](#requirement-coverage) there.
+Project-board status is a view of that progress; see
+[Projects tracking](github-workflow.md#projects-tracking).
 
 From the first session using this workflow, record every session handoff as a
 comment in the relevant GitHub issue. Use the parent issue unless the slice has
@@ -143,23 +147,22 @@ blocking question. The acceptance record must identify that boundary. Future
 slices need their own concrete design records; linking this workflow alone is
 insufficient.
 
-The sequence is: inspect existing code, present the design, discuss and refine
-it, obtain and record maintainer acceptance, then proceed to test preparation and
-implementation. If implementation reveals a material change to reviewed
+If implementation reveals a material change to reviewed
 interfaces, responsibilities, or collaboration, return to design discussion
 and obtain acceptance of the revised design. Update the issue record before
 proceeding with that change.
 
 ### Advancing Through Phases
 
-Implementation begins only after the maintainer has explicitly accepted its
-design, acceptance criteria and relevant contracts are settled, and the
-verification approach is established, within the user's authorization.
-Interface changes discovered during implementation return to design and test
-preparation as needed. Ask about unresolved product choices, scope changes, or
-decisions reserved for the maintainer; ordinary technical choices and progress
-within the accepted design do not require repeated permission. This does not
-waive the initial design-acceptance gate or acceptance of material design changes.
+Advance when the current phase's outcome is established. Implementation needs
+settled acceptance criteria/contracts, the recorded design acceptance above,
+and a verification approach, within the user's authorization. Honor dependency
+gates recorded in the relevant issues before beginning dependent work.
+
+Ask about unresolved product choices, scope changes, or decisions reserved for
+the maintainer. Ordinary technical choices and progress within an accepted
+design do not require repeated permission. Other phases may be brief or marked
+not applicable with a recorded reason under [Exceptions](#exceptions).
 
 For refactoring, characterize behavior that must survive the change. Use mocks
 or fakes to isolate dependencies and exercise failures where helpful. Use real
@@ -199,9 +202,11 @@ mapping. Multiple sessions alone do not require a sub-issue. After promotion:
 ## Requirement Coverage
 
 Before implementing the first slice, read the full parent issue and available
-discussion and assign every requirement to a slice or explicitly identified
-subsequent work. No requirement may remain unassigned. Proposed later slices
-may be refined; preserve traceability when splitting or regrouping them.
+discussion, including requirements, constraints, and exclusions outside the
+acceptance-criteria checkboxes. Assign stable requirement references, slices,
+statuses, and evidence in one parent checklist. Assign every requirement to a
+slice or explicitly identified subsequent work. No requirement may remain
+unassigned. Proposed later slices may be refined; preserve traceability when splitting or regrouping them.
 
 Tracking a requirement in another slice or issue does not remove it from the
 parent's completion obligations. It remains outstanding until evidence satisfies
@@ -233,10 +238,6 @@ If the session ends at the same point, one comment may serve as both the
 slice-completion record and session handoff, provided it includes both sets of
 information and explicitly says that the session is ending.
 
-PRs use `Refs #<issue-number>` until the maintainer authorizes issue completion
-and closure under [Whole-Issue Completion](#whole-issue-completion). Do not add
-an automatic closing reference merely because slice verification passed.
-
 ## Verification and Delivery Status
 
 Record these milestones separately for each slice and the issue, with evidence
@@ -248,10 +249,38 @@ and any pending milestone made explicit:
 | Published for review | The reviewable changes are available to reviewers, normally in a pushed branch and linked PR. Posting a status comment alone does not publish repository changes. |
 | Delivered | The result has reached the destination required by the issue, with evidence: for example, merged into the target branch or deployed where the issue requires deployment. Define that destination in the issue; do not infer delivery from verification, PR creation, or issue closure. |
 
+Use the applicable component's documented checks: start with
+[repository commands](../../README.md#repository-commands), the
+[CMS README](../../apps/gurubodh-cms/README.md),
+[content CLI README](../../tools/gurubodh-cli/README.md), or the relevant guide.
+Record commands, results, verifier, and evidence. For any skipped check, report
+exactly what was skipped, why, and the remaining uncertainty. A skip is not a
+pass; resolve required verification gaps or obtain an explicit maintainer
+decision before issue completion.
+
 These milestones need not occur in a fixed order: a draft PR may be published
 before verification is finished. Always distinguish technical verification,
 maintainer confirmation, publication, delivery, and issue closure. None of these
 statuses grants permission to merge or deploy.
+
+## Publication and Integration
+
+A slice may be ready for review while other issue requirements remain open.
+Prepare a linked PR describing the slice's scope, verification, documentation,
+and remaining work using the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md)
+and [GitHub conventions](github-workflow.md#pull-requests). A draft PR may expose
+unfinished work with its status stated accurately. Report the changes and any
+verification skips to the maintainer.
+
+Use `Refs #<issue-number>` until the whole-issue review and maintainer
+confirmation/instruction under [Whole-Issue Completion](#whole-issue-completion)
+authorize closure. Only then may a closing reference be used.
+
+Merge only after required checks and review pass. Agents need explicit maintainer
+instruction before merging, squashing, rebasing, or otherwise integrating into
+the target branch. Review approval, design acceptance, verification, publication,
+and issue closure do not supply that instruction. After authorized integration,
+record delivery evidence and follow [branch cleanup](github-workflow.md#branch-cleanup).
 
 ## Whole-Issue Completion
 
@@ -273,19 +302,12 @@ If the maintainer authorizes closure while publication or delivery is still
 pending, record those pending milestones and remaining actions explicitly.
 Closure does not mean delivery has occurred and does not authorize a merge.
 
-Account for all required checks. Record skipped verification and its reason;
-a skipped check is not a pass. If required behavior remains unverified,
-resolve the gap or obtain an explicit maintainer decision before completion.
-
-Honor dependency gates recorded in the relevant issues before beginning
-dependent implementation. A completion review does not authorize merging;
-the existing explicit merge-authorization requirement still applies.
-
 ## Session Entry and Exit
 
-At entry, read the authoritative issue and latest handoff comment in the relevant
-issue, identify the active slice and phase, and state the intended session
-outcome. Reuse accepted decisions instead of reopening them without new evidence.
+At entry, read the complete authoritative issue and available discussion, accepted
+decisions, and latest handoff comment in the relevant issue. Identify the active
+slice and phase, and state the intended session outcome. Reuse accepted decisions
+instead of reopening them without new evidence.
 
 At exit, post a session handoff comment in the issue selected under
 [Authoritative Records](#authoritative-records). Record decisions, completed

@@ -5,6 +5,14 @@
 <date>2026-09-18</date>
 <owners>Gurubodh maintainers</owners>
 
+## Current Applicability
+
+This decision remains accepted. The restructuring under
+[#357](https://github.com/Team-Gurubodh/gurubodh/issues/357) makes the
+[slice workflow](../development/slice-workflow.md) the sole maintained lifecycle
+policy and routes supporting skills and guides to it. The text below records
+adoption and rationale; consult that workflow for current operational rules.
+
 ## Context
 
 [Decision-0008](./0008-slice-development-pilot.md) limited the slice workflow to

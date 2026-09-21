@@ -1,161 +1,105 @@
-# GitHub Workflow
+# GitHub Conventions
 
-<record_type>workflow_guide</record_type>
-<status>active</status>
+This guide owns GitHub mechanics. Use the [slice workflow](slice-workflow.md)
+for phases, collaboration, authorization, verification, and completion.
+The optional [CLI tutorial](git-github-cli-workflow-tutorial.md) shows commands.
 
-This guide defines the default contribution workflow for Gurubodh.
+## Setup
 
-For a beginner-oriented command walkthrough, see
-`docs/development/git-github-cli-workflow-tutorial.md`.
-
-## Principles
-
-- Start from a GitHub issue.
-- Keep each pull request scoped to one issue.
-- Keep pull requests small enough to review carefully.
-- Use `main` as the protected integration branch.
-- Prefer SSH for GitHub access. Use HTTPS only as a fallback.
-
-## First-Time Setup
-
-Clone the repository with standard GitHub SSH access:
+Prefer SSH; use HTTPS when SSH is unavailable:
 
 ```bash
 git clone git@github.com:Team-Gurubodh/gurubodh.git
+# HTTPS alternative:
+# git clone https://github.com/Team-Gurubodh/gurubodh.git
 cd gurubodh
 ```
 
-If SSH is not available, use HTTPS:
+Use [repository commands](../../README.md#repository-commands) to install the
+relevant toolchain.
 
-```bash
-git clone https://github.com/Team-Gurubodh/gurubodh.git
-cd gurubodh
-```
+## Issues
 
-Install the toolchain needed for the area you are changing. Common commands are documented in the root `README.md`.
+Select the template matching the work:
 
-## Issue-First Workflow
+| Type | Use |
+| --- | --- |
+| Feature | New functionality; start the title with `feat: ` |
+| Bug Report | Reproducible behavior problems |
+| Documentation | Documentation-only changes |
+| Decision | Architecture, process, product, or workflow choices |
+| Task | Scoped maintenance, migration, investigation, or enablement |
 
-Create or select a GitHub issue before starting work. Read its complete description
-and available discussion before planning or changing files; the issue defines scope.
+Describe the problem, intended outcome, affected area, acceptance criteria,
+and verification. Templates help describe work; scope includes the entire
+issue and its discussion under the [coverage rules](slice-workflow.md#requirement-coverage).
+For bug work, reproduce the problem where practical before changing behavior.
 
-Choose the issue template that matches the work type:
+## Projects Tracking
 
-- **Feature** - new functionality or a meaningful capability. Feature issue
-  titles should start with `feat: ` so they align with Conventional Commits.
-- **Bug Report** - reproducible problems in existing behavior.
-- **Documentation** - documentation-only changes.
-- **Decision** - workflow, process, product, or architecture choices that need
-  an explicit decision before implementation.
-- **Task** - scoped non-feature work such as cleanup, maintenance, migration,
-  investigation, or project enablement.
+Using a GitHub Projects board is optional. The issue holds authoritative scope,
+progress, and verification records under the
+[slice workflow](slice-workflow.md#authoritative-records).
 
-The issue should describe:
-
-- The problem or goal.
-- The expected outcome.
-- The relevant project area.
-- Any acceptance criteria or verification steps.
-
-Use GitHub Projects to track issue status.
-
-## Execute Issues With the Slice Workflow
-
-Read and follow the [slice workflow](./slice-workflow.md) before planning or
-implementation. It is mandatory for all GitHub issue work until the maintainer
-changes or withdraws it. Design review and explicit maintainer acceptance are
-mandatory before implementation. Individual review items may become optional
-only with approval. Other phases may be brief or marked not applicable with a
-reason; scoped exceptions must preserve the workflow's design protections.
-
-Identify the active slice, phase, and intended outcome at session entry. Keep
-requirement coverage in the parent issue, establish phase outcomes, and link
-verification and reconciliation evidence in a slice-completion record after
-each slice. Perform whole-issue review before requesting completion; mark an
-issue complete and close it only when the maintainer confirms "implementation
-verified" and explicitly instructs completion and closure. At session
-exit, post a handoff comment in the parent issue or the slice's sub-issue as
-specified by the workflow.
+If an issue belongs to a board, keep its status aligned with actual progress
+and that project's completion conditions. Use configured automation or update
+it directly as part of the work; no separate maintainer request is needed for
+each update. Verify the resulting status rather than assuming automation ran.
+Move an issue to Done when those completion conditions are satisfied. Board
+status does not replace the workflow's delivery and closure conditions.
 
 ## Branches
 
-Create a branch from the latest `main`:
+Create `issue-<number>-<short-description>` from the latest `main`. Inspect the
+checkout first and preserve existing work. A freshly fetched `origin/main`
+can be used as the branch base without changing the local `main` branch.
+Use one branch per issue in normal work; keep PRs small and scoped to one issue.
 
-```bash
-git switch main
-git pull --ff-only
-git switch -c issue-<number>-short-description
-```
-
-Examples:
-
-```bash
-git switch -c issue-12-add-pr-template
-git switch -c issue-18-configure-commitlint
-git switch -c issue-21-document-ssh-setup
-```
+See [AGENTS.md](../../AGENTS.md#essential-rules) for the dedicated-branch rule.
+For an existing issue branch, resume it rather than creating a duplicate.
 
 ## Commits
 
-Use Conventional Commits and reference the issue in every commit message, as
-required by [AGENTS.md](../../AGENTS.md):
+Use [Conventional Commits](conventional-commits.md). Every commit message and
+PR title must reference its issue:
 
 ```text
 <type>(optional-scope): <summary> (#<issue-number>)
+docs(agents): clarify instruction routing (#357)
 ```
 
-Examples:
-
-```text
-docs(github): add pull request workflow (#12)
-ci(commitlint): enforce conventional commit messages (#18)
-fix(cms): correct subject relation config (#25)
-```
-
-See `docs/development/conventional-commits.md` for details.
+Stage only intended files and inspect the staged diff before committing.
 
 ## Pull Requests
 
-Open a pull request when the branch is ready for review.
+Use the full [PR template](../../.github/PULL_REQUEST_TEMPLATE.md), keeping all
+sections and completing applicable content. Include the issue reference,
+change and scope, verification results/skips, documentation changes, reviewer
+guidance, and links to issue evidence. Check boxes only for work actually done.
+Use the reference permitted by
+[publication and integration](slice-workflow.md#publication-and-integration).
 
-Each pull request should:
+A PR can advance a slice without satisfying the whole issue. State remaining
+requirements and whether the PR is a draft. Keep follow-up commits on its branch.
 
-- Include the issue reference in its Conventional Commit title, for example
-  `docs(github): add pull request workflow (#12)`.
-- Link the issue in its description with `Closes #<issue-number>` or `Refs #<issue-number>`.
-- Explain the change in plain language.
-- List verification performed.
-- State whether documentation changed.
-- Stay focused on one issue.
+Reviewers check scope, behavior/documentation/tests, required checks, issue
+coverage and evidence, recorded exceptions, authorization for closing references,
+and absence of secrets or local-only files.
 
-Use `Refs` until whole-issue review passes and the maintainer confirms
-"implementation verified" and explicitly instructs completion and closure.
-Only then may `Closes` be used to close the issue on merge. Verification,
-publication, delivery, and closure are separate milestones under the slice workflow.
+Inspect current GitHub rules for required checks and review; workflow files
+alone do not establish branch protection. See [automation](automation.md).
+Prefer squash merge for small PRs unless maintainers choose otherwise, subject
+to the workflow's [integration authorization](slice-workflow.md#publication-and-integration).
 
-## Review
+## Branch Cleanup
 
-Reviewers should check:
+After merge, delete the remote issue branch and then the local branch once all
+intended work is confirmed preserved. Check for uncommitted work and additional
+commits, and confirm the PR's merged state and content in the target branch.
+Switch off the issue branch before deleting it.
 
-- The pull request is linked to one issue.
-- The scope is understandable and reviewable.
-- Behavior, documentation, and tests match the stated goal.
-- Required checks pass.
-- The issue contains requirement coverage, slice verification and reconciliation
-  evidence, and session handoffs; any workflow exceptions are explicit.
-- A closing reference is supported by whole-issue review and explicit maintainer
-  verification confirmation and instruction to complete and close the issue.
-- No secrets or local-only files are included.
-
-Authors should respond to review comments in the pull request and push follow-up commits to the same branch.
-
-## Merge
-
-Merge only after required checks pass and the required approval has been granted.
-Agents must also have explicit maintainer instruction before merging, squashing,
-rebasing, or otherwise integrating changes into the target branch; passing checks
-and review do not supply that authorization.
-
-Prefer squash merge for small pull requests unless the maintainers choose a different policy for a specific change.
-
-Delete the branch after merge.
+Prefer `git branch -d`. A squash merge may cause Git to reject that deletion
+because commit ancestry differs. Use `git branch -D` only after verifying that
+all intended work is preserved in the target branch; do not discard later or
+unmerged work. The [tutorial](git-github-cli-workflow-tutorial.md#integrate-and-clean-up)
+shows the command sequence.
