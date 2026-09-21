@@ -58,10 +58,6 @@ Only an explicit maintainer instruction may grant a scoped workflow exception,
 subject to the design-review protections under [Exceptions](#exceptions).
 Record the exception in the relevant GitHub issue.
 
-Adoption is recorded in
-[Decision-0011](../decisions/0011-mandatory-slice-workflow.md); the earlier pilot
-and its history are linked there.
-
 ## Authoritative Records
 
 The parent GitHub issue and its discussion own scope, progress, and verification
