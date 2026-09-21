@@ -1,17 +1,15 @@
 # Development Guides
 
-<doc_index>
-This directory contains practical workflow guides for contributors.
-</doc_index>
+For issue work, start with the [slice workflow](slice-workflow.md) and its
+[activity route](slice-workflow.md#reading-route). Agents enter through
+[AGENTS.md](../../AGENTS.md).
 
-## Guides
-
-- [github-workflow.md](./github-workflow.md) - issue-first GitHub workflow, branches, pull requests, and review.
-- [slice-workflow.md](./slice-workflow.md) - mandatory workflow for all GitHub issue work: slices, phase outcomes, requirement coverage, and issue-comment session handoffs.
-- [git-github-cli-workflow-tutorial.md](./git-github-cli-workflow-tutorial.md) - beginner-oriented command walkthrough for the issue-first workflow using Git and the GitHub CLI.
-- [conventional-commits.md](./conventional-commits.md) - commit message and pull request title standards.
-- [automation.md](./automation.md) - local hooks and GitHub Actions that support the contribution workflow.
-
-## Maintenance
-
-Update these guides when repository workflow, automation, branch protection, or release policy changes.
+| Need | Guide |
+| --- | --- |
+| Phases, collaboration, acceptance, coverage, verification, handoffs, completion | [Slice workflow](slice-workflow.md) |
+| Reusable issue records | [Coverage, design acceptance, slice completion, handoff](templates/slice-records.md) |
+| Operational skills by activity | [Skill catalogue](../../.agents/skills/README.md) |
+| Issues, branches, commits, PRs, Projects, cleanup | [GitHub conventions](github-workflow.md) |
+| Optional command examples | [Git and GitHub CLI tutorial](git-github-cli-workflow-tutorial.md) |
+| Commit message and PR title syntax | [Conventional Commits](conventional-commits.md) |
+| Hooks, CI, and branch-protection inspection | [Automation](automation.md) |

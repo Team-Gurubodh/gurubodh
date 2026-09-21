@@ -5,6 +5,16 @@
 <date>2026-06-25</date>
 <owners>Gurubodh maintainers</owners>
 
+## Current Applicability
+
+The historical decision below is retained. Under
+[#357](https://github.com/Team-Gurubodh/gurubodh/issues/357), Projects usage is
+optional; existing board statuses are maintained as part of issue work under
+[Projects tracking](../development/github-workflow.md#projects-tracking).
+This supersedes mandatory Projects tracking implied below. Current lifecycle
+and authorization rules belong to the [slice workflow](../development/slice-workflow.md);
+mechanics belong to [GitHub conventions](../development/github-workflow.md).
+
 ## Context
 
 Gurubodh is moving from a local-only repository to a private GitHub repository so multiple contributors can collaborate before the project is made open source.

@@ -5,6 +5,12 @@
 <date>2026-06-22</date>
 <owners>Gurubodh maintainers</owners>
 
+This is retained scaffold history. Some paths below were retired under
+[#357](https://github.com/Team-Gurubodh/gurubodh/issues/357). For current agent
+instructions start at [AGENTS.md](../../AGENTS.md); new execution records follow
+the [slice workflow](../development/slice-workflow.md#authoritative-records),
+not the historical follow-up instructions below.
+
 ## Goal
 
 Create a professional documentation structure and scaffold standardized templates for:

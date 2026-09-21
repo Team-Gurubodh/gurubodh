@@ -1,403 +1,175 @@
-# Git And GitHub CLI Workflow Tutorial
+# Git and GitHub CLI Workflow Tutorial
 
-<record_type>workflow_tutorial</record_type>
-<status>active</status>
+Optional command examples for the [GitHub conventions](github-workflow.md).
+The [slice workflow](slice-workflow.md) owns lifecycle and authorization.
+Read it before starting issue work. Examples use issue #25; substitute your
+issue, branch, filenames, and actual evidence.
 
-This tutorial walks through the Gurubodh issue-first workflow using `git` and
-the GitHub CLI, `gh`.
-
-Use this document when you want the exact commands to follow. Use
-`docs/development/github-workflow.md` when you want the shorter policy
-reference.
-
-## Prerequisites
-
-Install and authenticate the GitHub CLI:
+## Restore Context
 
 ```bash
 gh --version
 gh auth status
-```
-
-If `gh auth status` says you are not logged in, run:
-
-```bash
-gh auth login
-```
-
-Confirm your local checkout is clean before starting new work:
-
-```bash
 git status --short --branch
+gh issue view 25 --json title,body,comments,projectItems
 ```
 
-If the output shows modified or untracked files, decide whether those changes
-belong to the current issue before continuing.
+If authentication is missing, use `gh auth login`. Preserve unrelated work in
+the checkout. Follow [slice-session](../../.agents/skills/slice-session/SKILL.md)
+to identify the active phase and intended outcome from the issue and handoff.
 
-## Start From An Issue
-
-Create or select a GitHub issue before starting work. Read its full description
-and available discussion before planning or changing files:
+When creating an authorized new issue, select the appropriate issue template
+in GitHub or prepare its content in a file:
 
 ```bash
-gh issue view 25 --comments
+gh issue create --title "[Docs]: clarify contributor commands" \
+  --label "type: docs" --body-file /tmp/new-issue.md
 ```
 
-Replace `25` with the issue number that owns your work.
+## Create or Resume a Branch
 
-Use the issue template that matches the work:
-
-- Feature: new functionality or a meaningful capability.
-- Bug Report: reproducible problem in existing behavior.
-- Documentation: documentation-only work.
-- Decision: process, product, workflow, or architecture choice.
-- Task: scoped non-feature work such as cleanup, maintenance, migration,
-  investigation, or enablement.
-
-You can create issues in the GitHub UI, the GitHub VS Code extension, or with
-`gh`.
-
-Example documentation issue:
+For new work, fetch the base and create the issue branch:
 
 ```bash
-gh issue create \
-  --title "[Docs]: add Git and GitHub CLI workflow tutorial" \
-  --label "type: docs" \
-  --body "Add a beginner-oriented tutorial for the issue-first workflow."
+git fetch origin main
+git switch -c issue-25-contributor-commands origin/main
 ```
 
-Example feature issue:
+For existing work, use its recorded branch instead:
 
 ```bash
-gh issue create \
-  --title "feat: add seed-data import preview" \
-  --label "type: feature" \
-  --body "Add a preview step before importing seed data into the CMS."
+git switch issue-25-contributor-commands
 ```
 
-After the issue is created, note its issue number. The examples below use issue
-`#25`.
+## Plan and Review the Design
 
-## Create A Branch
+Follow [phase outcomes](slice-workflow.md#phase-outcomes) and
+[slice-design-review](../../.agents/skills/slice-design-review/SKILL.md).
+Prepare coverage and a concrete design for discussion. Record acceptance under
+the workflow's [design gate](slice-workflow.md#interface-design-review) before
+implementation. Use the [record formats](templates/slice-records.md).
 
-Start from the latest `main`:
+After preparing and reviewing the appropriate record, post it:
 
 ```bash
-git switch main
-git pull --ff-only
+gh issue comment 25 --body-file /tmp/slice-design.md
 ```
 
-Create a branch that includes the issue number and a short description:
+Use a proposal status until acceptance is obtained; posting a proposal does not
+accept it. On resumption, use the already recorded acceptance for unchanged work.
+
+## Prepare Checks, Implement, and Reconcile
+
+Establish success/failure cases and verification commands, then implement the
+accepted design. Inspect changes and run the relevant component checks:
 
 ```bash
-git switch -c issue-25-git-github-cli-workflow-tutorial
-```
-
-Useful branch examples:
-
-```bash
-git switch -c issue-19-strapi-mcp-setup
-git switch -c issue-22-seed-data-google-sheets-validation-scripts
-git switch -c issue-25-git-github-cli-workflow-tutorial
-```
-
-## Make Changes
-
-Work in the files that belong to the issue.
-
-Check what changed:
-
-```bash
-git status --short --branch
 git diff
-```
-
-For a docs-only issue, review Markdown and run the basic whitespace check:
-
-```bash
 git diff --check
 ```
 
-For application or tooling changes, also run the commands documented for that
-area. Examples:
+For example, CMS changes use the [CMS guide](../../apps/gurubodh-cms/README.md);
+these documentation commands alone do not verify application behavior.
+
+Record actual evidence and skips, reconcile requirements, and post a completion
+record when the [slice criteria](slice-workflow.md#slice-reconciliation) are met:
 
 ```bash
-make cms-build
-gurubodh-seed-data --help
+gh issue comment 25 --body-file /tmp/slice-completion.md
 ```
 
-If a command cannot run, write down exactly what was skipped and why so the pull
-request can include that note.
+Update the existing parent coverage checklist, preserving the rest of the issue.
+For a reviewed full issue body saved locally:
 
-## Commit
+```bash
+gh issue edit 25 --body-file /tmp/issue-body.md
+```
 
-Stage only the files that belong to the issue:
+## Commit and Publish
+
+Stage only files belonging to the change, review, and commit:
 
 ```bash
 git add docs/development/git-github-cli-workflow-tutorial.md
-git add docs/development/README.md CONTRIBUTING.md
-```
-
-Review staged changes:
-
-```bash
-git status --short
 git diff --cached
+git commit -m "docs(github): clarify contributor commands (#25)"
+git push -u origin issue-25-contributor-commands
 ```
 
-Commit using Conventional Commits with the issue reference required by
-[AGENTS.md](../../AGENTS.md):
+Prepare the complete PR template, replacing `Refs #` with `Refs #25`, filling
+all applicable sections, and checking only verified items:
 
 ```bash
-git commit -m "docs(github): add git and github cli workflow tutorial (#25)"
+cp .github/PULL_REQUEST_TEMPLATE.md /tmp/pr-body.md
 ```
 
-Common examples:
+After editing and reviewing that file:
 
 ```bash
-git commit -m "feat(seed-data): add google sheets validation scripts (#22)"
-git commit -m "fix(cms): correct subject relation config (#25)"
-git commit -m "docs(github): add pull request workflow (#25)"
-git commit -m "chore(cms): enable strapi mcp setup (#19)"
-```
-
-## Push
-
-Push the branch and set upstream tracking:
-
-```bash
-git push -u origin issue-25-git-github-cli-workflow-tutorial
-```
-
-After this command, GitHub can create a pull request from the branch.
-
-## Open A Pull Request
-
-Create a pull request with a Conventional Commit title that includes the issue
-reference, and link the issue in the description:
-
-```bash
-gh pr create \
-  --base main \
-  --head issue-25-git-github-cli-workflow-tutorial \
-  --title "docs(github): add git and github cli workflow tutorial (#25)" \
-  --body "## Summary
-
-Adds a beginner-oriented tutorial for the Gurubodh issue-first workflow using git and the GitHub CLI.
-
-## Linked Issue
-
-Refs #25
-
-## Scope
-
-- Adds docs/development/git-github-cli-workflow-tutorial.md.
-- Links the tutorial from contributor documentation.
-
-## Verification
-
-- [x] Ran git diff --check.
-- [x] Reviewed the tutorial commands locally."
-```
-
-Use `Refs #<issue-number>` until whole-issue review passes and the maintainer
-confirms "implementation verified" and explicitly instructs completion and
-closure. Only then may `Closes #<issue-number>` be used. Follow the
-[slice workflow](./slice-workflow.md) before planning or implementation,
-including its mandatory design-acceptance gate.
-
-## Check Pull Request Status
-
-View the current pull request:
-
-```bash
-gh pr view --web
-```
-
-View important fields in the terminal:
-
-```bash
-gh pr view \
-  --json number,title,state,isDraft,mergeable,reviewDecision,statusCheckRollup,url
-```
-
-Check CI status:
-
-```bash
+gh pr create --base main --head issue-25-contributor-commands \
+  --title "docs(github): clarify contributor commands (#25)" \
+  --body-file /tmp/pr-body.md
+gh pr view --json number,title,state,isDraft,reviewDecision,statusCheckRollup,url
 gh pr checks
 ```
 
-The repository currently expects pull requests to pass the configured checks and
-receive required review before merge.
+Use `--draft` for unfinished work. Follow
+[publication and integration](slice-workflow.md#publication-and-integration)
+for readiness and closing references. Review feedback is handled on the same
+branch; material design changes return to the design phase.
 
-## Update A Pull Request
+## Pause or Transfer Work
 
-If review asks for changes, edit the files, then commit and push again:
+Prepare a handoff with the real phase, branch/commit, results, pending decisions,
+and next action using [slice-session](../../.agents/skills/slice-session/SKILL.md).
+This applies at any stopping point, even before implementation or publication:
 
 ```bash
-git status --short
-git diff
-git add <files>
-git commit -m "docs(github): clarify workflow cleanup steps (#25)"
-git push
+gh issue comment 25 --body-file /tmp/session-handoff.md
 ```
 
-The pull request updates automatically after the push.
+If the issue belongs to Projects, follow
+[Projects tracking](github-workflow.md#projects-tracking) and verify its status.
 
-## Merge
+## Integrate and Clean Up
 
-Merge only after required checks pass and required review is complete. Agents
-also need explicit maintainer instruction before merging, squashing, rebasing,
-or otherwise integrating changes into the target branch.
-
-You can merge in the GitHub UI. Prefer the repository's normal merge method for
-the pull request.
-
-If maintainers allow CLI merges, use:
+Apply the workflow's [integration conditions](slice-workflow.md#publication-and-integration)
+before running a merge command. After explicit authorization and required checks
+and review, an example squash merge is:
 
 ```bash
-gh pr merge --squash --delete-branch
+gh pr merge 123 --squash
 ```
 
-If branch protection prevents the merge, do not bypass it. Wait for the required
-review or checks.
-
-## Clean Up After Merge
-
-After the pull request is merged and the remote branch is deleted, clean up your
-local checkout:
+Verify merge and inspect the checkout before cleanup:
 
 ```bash
-git switch main
-git fetch --prune
-git pull --ff-only
-```
-
-Delete the local branch:
-
-```bash
-git branch -D issue-25-git-github-cli-workflow-tutorial
-```
-
-Confirm the repo is clean:
-
-```bash
+gh pr view 123 --json state,mergedAt,mergeCommit,url
 git status --short --branch
+git fetch origin
+git log --oneline origin/main..issue-25-contributor-commands
 ```
 
-## Protect Work In Progress
-
-If you have uncommitted work and need to pause it before starting another issue,
-put it on a temporary branch and make a checkpoint commit:
+Replace PR #123 with the real PR. Compare intended work, including any commits
+added after merge, with the merged PR and target content. Squashed commits may
+appear in the log even when their changes landed. Preserve any unmatched work.
+Delete the remote branch if GitHub has not already removed it, after confirming
+that it contains no additional work beyond the merged PR:
 
 ```bash
-git switch -c strapi-mcp-setup-and-seed-data-scripts
-git add <files>
-git commit -m "chore: checkpoint strapi mcp setup and seed data scripts - WIP (#19, #22)"
+git push origin --delete issue-25-contributor-commands
 ```
 
-Then switch back to `main` for the new issue:
-
-```bash
-git switch main
-git pull --ff-only
-```
-
-Delete the checkpoint branch only after all intended work has landed on `main`.
-
-## Split Work Across Multiple Issues
-
-Sometimes one working branch contains changes for more than one issue. Do not
-open one mixed pull request. Instead, use the WIP branch as a source and create
-clean issue branches from `main`.
-
-Example:
+Then update the local target and delete the local issue branch:
 
 ```bash
 git switch main
 git pull --ff-only
-git switch -c issue-19-strapi-mcp-setup
+git branch -d issue-25-contributor-commands
 ```
 
-Restore only the files for issue `#19`:
-
-```bash
-git restore --source strapi-mcp-setup-and-seed-data-scripts -- \
-  apps/gurubodh-cms/config/server.ts \
-  apps/gurubodh-cms/package.json \
-  apps/gurubodh-cms/package-lock.json \
-  apps/gurubodh-cms/types/generated/contentTypes.d.ts
-```
-
-Review, verify, commit, push, and open the pull request for issue `#19`.
-
-Then create the second branch from current `main`:
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c issue-22-seed-data-google-sheets-validation-scripts
-```
-
-Restore only the files for issue `#22`:
-
-```bash
-git restore --source strapi-mcp-setup-and-seed-data-scripts -- \
-  tools/seed-data-cli/README.md \
-  tools/seed-data-cli/scripts
-```
-
-Review, verify, commit, push, and open the pull request for issue `#22`.
-
-Before deleting the checkpoint branch, confirm all intended work is represented
-on `main`.
-
-## Useful Commands
-
-Show current branch and file state:
-
-```bash
-git status --short --branch
-```
-
-Show local branches:
-
-```bash
-git branch --list
-```
-
-Show recent commits:
-
-```bash
-git log --oneline --decorate -5
-```
-
-Show changed files:
-
-```bash
-git diff --name-status
-```
-
-Show staged changes:
-
-```bash
-git diff --cached
-```
-
-List open pull requests:
-
-```bash
-gh pr list
-```
-
-Open the current pull request in the browser:
-
-```bash
-gh pr view --web
-```
-
-List issues:
-
-```bash
-gh issue list
-```
+If `-d` fails after a squash merge, follow the preservation checks in
+[branch cleanup](github-workflow.md#branch-cleanup) before substituting `-D`.
+Record delivery and any board update. Issue closure follows
+[whole-issue completion](slice-workflow.md#whole-issue-completion); do not infer
+it from merge or branch deletion.

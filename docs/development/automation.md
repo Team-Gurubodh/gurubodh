@@ -45,7 +45,7 @@ The `Commitlint` workflow checks pull requests by validating:
 - The commits included in the pull request.
 
 Use a Conventional Commit pull request title with an issue reference, as required
-by [AGENTS.md](../../AGENTS.md), especially when squash merging.
+by [GitHub conventions](github-workflow.md#commits), especially when squash merging.
 
 Example:
 

@@ -1,17 +1,15 @@
-# Repo Skills
+# Repository Skills
 
-<skills_index>
-This directory is reserved for repo-local Codex skills.
+Start at [AGENTS.md](../../AGENTS.md). The
+[slice workflow](../../docs/development/slice-workflow.md#reading-route) selects
+skills by activity and owns the process; these files provide operational help.
+Read each applicable `SKILL.md` directly when automatic discovery is unavailable.
 
-Load the Skill whose purpose matches the current task before planning or implementation.
+| Skill | Read when |
+| --- | --- |
+| [slice-session](slice-session/SKILL.md) | Starting, resuming, planning, or pausing GitHub issue work |
+| [slice-design-review](slice-design-review/SKILL.md) | Preparing or revising a concrete design review and recording acceptance |
+| [github-workflow](github-workflow/SKILL.md) | Operating on issues, branches, commits, PRs, Projects, or execution evidence |
 
-- github-workflow
-  Mandatory for any task that modifies tracked files, changes branch or commit state,
-  or prepares Pull Requests. Defines the repository's Issue-first GitHub workflow.
-
-</skills_index>
-
-
-Create a skill here only when Gurubodh develops a repeatable workflow that benefits from dedicated instructions, references, or helper scripts. Good future candidates may include Strapi content type work, PostgreSQL RDS migration review, content preparation workflows, or agent documentation maintenance.
-
-Each skill should live in its own directory with a `SKILL.md` file.
+Unrelated read-only questions use relevant sources directly. Skill placement
+and creation follow [AGENTS.md](../../AGENTS.md#essential-rules).
