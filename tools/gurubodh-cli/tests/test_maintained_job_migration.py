@@ -3,6 +3,7 @@
 from collections import Counter
 from contextlib import redirect_stderr, redirect_stdout
 import copy
+from dataclasses import replace
 import io
 import json
 from pathlib import Path
@@ -208,6 +209,10 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                 expected = {"$.source.url_base": {
                     "legacy": {"present": False}, "composed": {"present": True, "value": None},
                 }} if case["legacy_path"] in R2_SOURCE_URL_DIFFERENCES else {}
+                if case["selectors"]["command"] == "generate-chunks":
+                    # #361 changes the maintained runtime policy; preserve the
+                    # historical snapshot and assert the exact approved delta.
+                    expected["$.chunking.device"] = {"legacy": None, "composed": "cpu"}
                 self.assertEqual(differences, expected)
                 self.assertEqual(old.locale, new.locale)
                 self.assertEqual(destination_artifact_reference(old, Path("example.txt")),
@@ -221,7 +226,8 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                     self.assertEqual(source_reference(old), source_reference(new))
                     self.assertEqual(compatibility_record(old, "a" * 64), compatibility_record(new, "a" * 64))
                 elif case["selectors"]["command"] == "generate-chunks":
-                    self.assertEqual(old.semantic_chunk_config, new.semantic_chunk_config)
+                    self.assertIsNone(old.semantic_chunk_config.device)
+                    self.assertEqual(replace(old.semantic_chunk_config, device="cpu"), new.semantic_chunk_config)
 
     def test_all_26_maintained_selectors_inspect_via_cli(self):
         for case in CASES:
@@ -378,7 +384,17 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                     **s, "command": "prep-subject",
                     "storage_profile": "r2" if s["storage_profile"] == "r2" else "local"})
                 outputs, summaries = [], []
-                for job in self.pair(case):
+                old, new = self.pair(case)
+                if command == "generate-chunks":
+                    # Compare artifacts under the same explicit CPU policy.
+                    # The configuration-difference test above independently
+                    # checks null -> cpu against the untouched legacy snapshot.
+                    self.assertIsNone(old.semantic_chunk_config.device)
+                    self.assertEqual(new.semantic_chunk_config.device, "cpu")
+                    cpu_baseline = old.to_payload()
+                    cpu_baseline["chunking"]["device"] = "cpu"
+                    old = prepare_generate_chunks_job(cpu_baseline)
+                for job in (old, new):
                     shutil.rmtree(self.environ["GURUBODH_CMS_LIBRARY_ROOT"], ignore_errors=True)
                     client = FakeR2Client()
                     seed = self.pair(prep_case)[0]
