@@ -114,6 +114,9 @@ class ComposedCliTests(unittest.TestCase):
                         self.assertEqual(job.provenance.manifest_id, subject)
                         self.assertEqual(job.provenance.edition, language)
                         self.assertNotIn("provenance", job.to_payload())
+                        if command == "generate-chunks":
+                            self.assertEqual(job["chunking"]["device"], "cpu")
+                            self.assertEqual(job.semantic_chunk_config.device, "cpu")
                         self.assertEqual(job["source"]["backend"], "r2" if route == "r2" else "local")
                         self.assertEqual(job["destination"]["backend"], "local" if route == "local" else "r2")
                         if command == "prep-subject":

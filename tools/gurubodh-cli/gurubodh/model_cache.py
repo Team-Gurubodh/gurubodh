@@ -248,6 +248,7 @@ def required_artifacts_from_info(
 def _report_plan(profile, artifacts, total_bytes, remaining_bytes, progress) -> None:
     progress(f"Model: {profile.model}")
     progress(f"Revision: {profile.revision}")
+    progress(f"Embedding device: {profile.config.device or 'auto'}")
     progress(f"Selected runtime files ({len(artifacts)}):")
     for artifact in artifacts:
         progress(f"- {artifact.path} ({artifact.size} bytes)")
@@ -308,6 +309,7 @@ def _verify_resolved_model_cache(
         f"Verified {len(artifacts)} required files ({total_bytes} bytes) for "
         f"{profile.model} at {profile.revision}."
     )
+    progress(f"Embedding device: {profile.config.device or 'auto'}")
     try:
         _run_embedding_smoke(profile)
     except Exception as exc:

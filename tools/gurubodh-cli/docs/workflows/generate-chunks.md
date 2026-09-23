@@ -11,6 +11,9 @@
 Configure and, when necessary, deliberately prepare and verify that cache through
 [Manage the model cache](manage-model-cache.md). Maintained jobs use cached-only
 loading, so a normal job never silently repairs or replaces its model files.
+The maintained profile intentionally runs on CPU; see
+[CPU execution](../environment-setup.md#intentional-cpu-execution) for runtime
+requirements and GPU support status.
 
 ## Run a local job
 
@@ -81,5 +84,9 @@ Without `--overwrite`, an existing chunk output fails preflight without modifyin
 For R2 overwrite, the old readiness manifest is removed before replacement objects upload, validated chunk artifacts upload next, and `semantic_chunks_manifest.json` publishes last. A failed upload leaves no readiness manifest for the partial replacement. This is a readiness protocol, not an atomic multi-object replacement; do not run another writer for that subject and locale at the same time.
 
 Every success or failure writes JSON and Markdown audit reports. Failure reports include the active lifecycle state, bounded error information, the known prior/publication state, upload and deletion progress, and per-chapter progress. R2 failure reports are uploaded when the reporting path remains available.
+
+The JSON audit's `job_identity.chunking_model.device` and the Markdown audit's
+`Embedding device` line identify the selected device (`cpu` for the maintained
+profile). Chunk artifacts and the chunk manifest also record `chunking.device`.
 
 There is no supported standalone folder writer or module CLI. See [Semantic chunking](../reference/semantic-chunking.md) for the maintained model boundary.

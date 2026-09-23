@@ -6,6 +6,10 @@ Semantic chunking groups Hindi and Marathi chapter text into coherent chunks. Ma
 
 Semantic chunking is installed with the `gurubodh` package and requires Python `>=3.12,<3.13`. The BGE-M3 model loads lazily only when contextual similarity or tokenization is required; reuse a chunker instance across documents. Model-cache location, immutable revision, cached-only behavior, and Docker safeguards are defined in [Environment setup](../environment-setup.md).
 
+The maintained profile explicitly selects CPU for both contextual similarity and
+tokenization model loading. See [Intentional CPU execution](../environment-setup.md#intentional-cpu-execution)
+for the execution policy and GPU support status.
+
 ## Supported interface
 
 The selector-driven `gurubodh generate-chunks` command is the only supported folder-level semantic-chunk workflow. The former unregistered module CLI and generic folder writer are retired; they produced a separate, non-canonical output shape with ambiguous ownership. Internal chunking classes remain implementation details of the maintained command and do not define another artifact contract.

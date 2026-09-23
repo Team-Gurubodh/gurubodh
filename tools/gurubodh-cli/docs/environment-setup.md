@@ -92,6 +92,27 @@ export GURUBODH_MODEL_CACHE_DIR="$HOME/.cache/huggingface/hub"
 
 Maintained jobs use a full immutable Hugging Face revision and `local_files_only: true`. That combination makes runs reproducible: they use the already-downloaded snapshot and fail instead of quietly fetching different model files. The model-cache commands resolve that pin from the selected validated chunking profile; current maintained jobs use `bge-m3-semantic-window-v1`.
 
+### Intentional CPU execution
+
+The maintained `bge-m3-semantic-window-v1` profile explicitly sets `device: "cpu"`.
+`models prepare`, `models verify`, and `generate-chunks` pass that selection to
+the embedding runtime, even when CUDA is visible. GPU acceleration is currently
+unsupported. You do not need to set `CUDA_VISIBLE_DEVICES` or hide a GPU; allow
+sufficient system RAM for the model and the selected batch size.
+
+This is an execution setting. The model, pinned revision, and PyTorch packaging
+are unchanged; installing a CPU-only PyTorch distribution is a separate follow-up.
+An older project-local copy of the profile can override the bundled profile, so
+ensure its `chunking.device` is also `"cpu"`. Inspect the resolved job with
+`gurubodh config resolve --command generate-chunks` and the same selectors you
+will use for execution.
+
+Model-cache commands print `Embedding device: cpu`; chunk JSON and Markdown audit
+reports record the selected device. A custom profile with `device: null` retains
+automatic selection and is displayed as `auto`, not as a confirmed runtime device.
+
+### Prepare and verify the cache
+
 Prepare or repair the exact allowlisted runtime files deliberately, not during a
 maintained run. Preparation requires network access and enough disk space for
 the selected weights. It reports the revision-derived artifact size and remaining

@@ -1,15 +1,17 @@
 """Issue #329: explicit pinned-model cache preparation and offline verification."""
 
 from contextlib import redirect_stdout
+from dataclasses import replace
 import hashlib
 from io import StringIO
 import json
 import os
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from gurubodh.cli import main
 from gurubodh.errors import ConfigurationError
@@ -99,6 +101,7 @@ class ModelCacheTests(unittest.TestCase):
         report = "\n".join(events[:first_download])
         self.assertIn(f"Model: {MODEL}", report)
         self.assertIn(f"Revision: {REVISION}", report)
+        self.assertIn("Embedding device: cpu", report)
         self.assertIn(f"Total required artifact bytes: {total}", report)
         self.assertIn(f"Remaining download bytes: {total}", report)
         self.assertEqual(
@@ -112,6 +115,31 @@ class ModelCacheTests(unittest.TestCase):
         self.assertEqual([item["path"] for item in contract["artifacts"]], list(REQUIRED_RUNTIME_FILES))
         self.assertEqual(contract["total_artifact_bytes"], total)
         self.assertIn("Model cache is ready", "\n".join(messages))
+
+    def test_maintained_profile_uses_cpu_for_prepare_and_verify_without_cuda_masking(self):
+        profile = resolve_model_profile(self.catalog, PROFILE_ID)
+        self.assertEqual(profile.config.device, "cpu")
+        model = SimpleNamespace(encode=lambda texts, **kwargs: [[0.5, 0.5] for _ in texts])
+        constructor = Mock(return_value=model)
+        with patch.dict(sys.modules, {"sentence_transformers": SimpleNamespace(SentenceTransformer=constructor)}), \
+             patch("huggingface_hub.HfApi") as api, \
+             patch("huggingface_hub.hf_hub_download", side_effect=self.fake_download):
+            api.return_value.model_info.return_value = self.info
+            for command in ("prepare", "verify"):
+                with self.subTest(command=command):
+                    constructor.reset_mock()
+                    stdout = StringIO()
+                    with redirect_stdout(stdout):
+                        main(["models", command, "--profile", PROFILE_ID, "--project-root", str(CLI_ROOT)])
+                    constructor.assert_called_once_with(
+                        MODEL, cache_folder=str(self.cache.resolve()), local_files_only=True,
+                        device="cpu", revision=REVISION,
+                    )
+                    output = stdout.getvalue()
+                    self.assertIn("Embedding device: cpu", output)
+                    self.assertLess(output.index("Embedding device: cpu"),
+                                    output.index("Offline embedding smoke check succeeded."))
+                    self.assertNotIn("CUDA_VISIBLE_DEVICES", os.environ)
 
     def test_prepare_reuses_complete_cache_and_repairs_only_damaged_content(self):
         self.prepare()
@@ -129,6 +157,19 @@ class ModelCacheTests(unittest.TestCase):
         self.assertTrue(calls.call_args.kwargs["force_download"])
         self.assertIn(f"Remaining download bytes: {len(self.contents[damaged])}", "\n".join(messages))
         self.assertEqual(unrelated.read_text(), "unrelated")
+
+    def test_custom_null_device_is_reported_as_auto(self):
+        profile = resolve_model_profile(self.catalog, PROFILE_ID)
+        profile = replace(profile, config=replace(profile.config, device=None))
+        with patch("gurubodh.model_cache.resolve_model_profile", return_value=profile):
+            messages, _, _ = self.prepare()
+            self.assertIn("Embedding device: auto", messages)
+            self.assertNotIn("Embedding device: cpu", messages)
+            messages = []
+            with patch("gurubodh.model_cache._run_embedding_smoke"):
+                verify_model_cache(self.catalog, PROFILE_ID, progress=messages.append)
+            self.assertIn("Embedding device: auto", messages)
+            self.assertNotIn("Embedding device: cpu", messages)
 
     def test_prepare_relinks_valid_blob_without_counting_or_downloading_its_content(self):
         artifact = self.siblings[0]
@@ -187,6 +228,7 @@ class ModelCacheTests(unittest.TestCase):
             verify_model_cache(self.catalog, PROFILE_ID, progress=messages.append)
         self.assertTrue(embedding.call_args.kwargs["local_files_only"])
         self.assertEqual(embedding.call_args.kwargs["model_revision"], REVISION)
+        self.assertEqual(embedding.call_args.kwargs["device"], "cpu")
         self.assertIn("Offline embedding smoke check succeeded", "\n".join(messages))
         self.assertIn("Model cache is ready", "\n".join(messages))
 

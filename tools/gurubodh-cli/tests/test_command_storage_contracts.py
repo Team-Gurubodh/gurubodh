@@ -383,7 +383,7 @@ class CommandStorageContractTests(unittest.TestCase):
                     at(payload, parts)["unexpected"] = "secret-value"
                     self.assert_invalid(payload, kind, (*parts, "unexpected"))
 
-    def test_shared_profile_binding_and_unchanged_bge_settings(self):
+    def test_shared_profile_binding_and_bge_cpu_policy(self):
         for name in ("prep-subject", "lab-proofread"):
             command = fixture(f"commands/{name}.json")
             self.assert_valid(command, "command-definition")
@@ -397,7 +397,10 @@ class CommandStorageContractTests(unittest.TestCase):
         profile = fixture("chunking/bge-m3-semantic-window-v1.json")
         validation.validate_component(profile, "chunking-profile",
                                       expected_id=command["default_profiles"]["chunking"])
-        self.assertEqual(profile["chunking"], fixture("chunking/bge-m3-v1.json")["chunking"])
+        legacy_settings = fixture("chunking/bge-m3-v1.json")["chunking"]
+        self.assertIsNone(legacy_settings["device"])
+        # #361 intentionally changes only device selection in the BGE profile.
+        self.assertEqual(profile["chunking"], {**legacy_settings, "device": "cpu"})
 
 
 if __name__ == "__main__":
