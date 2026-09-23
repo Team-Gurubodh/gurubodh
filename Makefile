@@ -15,7 +15,12 @@ cli-venv:
 	perl -0pi -e 's/    PS1=.*\$$\{PS1:-\}.*\n/    PS1="\$$\{VIRTUAL_ENV_PROMPT\}\$$\{PS1:-\}"\n/' tools/gurubodh-cli/.venv/bin/activate
 
 cli-install:
+	@torch_version="$$(tools/gurubodh-cli/.venv/bin/python tools/gurubodh-cli/tests/check_cpu_torch.py --expected-version)" && \
+		tools/gurubodh-cli/.venv/bin/python -m pip install --only-binary=:all: \
+		--index-url https://download.pytorch.org/whl/cpu "torch==$$torch_version"
 	tools/gurubodh-cli/.venv/bin/python -m pip install -e tools/gurubodh-cli
+	tools/gurubodh-cli/.venv/bin/python tools/gurubodh-cli/tests/check_cpu_torch.py
+	tools/gurubodh-cli/.venv/bin/python -m pip check
 
 cli-help:
 	tools/gurubodh-cli/.venv/bin/gurubodh --help

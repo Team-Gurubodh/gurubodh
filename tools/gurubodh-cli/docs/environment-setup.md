@@ -39,6 +39,15 @@ gurubodh --help
 
 The editable install keeps the `gurubodh` command linked to the checked-out source. If the virtual environment was copied or moved, recreate it or run `make cli-install` again so its generated wrappers use the current path.
 
+`make cli-install` installs a pinned PyTorch wheel from PyTorch's CPU wheel
+index before installing the CLI. On Python 3.12, Linux x86_64/aarch64 and
+Apple Silicon use PyTorch 2.5.1; Intel macOS uses 2.2.2 because PyTorch does
+not publish a 2.5.1 wheel for that platform. The install checks the selected
+version, confirms that PyTorch has no CUDA runtime, and runs `pip check`. It
+fails if the CPU wheel is unavailable or dependency resolution is inconsistent.
+Use the `make` target for the maintained local installation: a direct `pip
+install -e tools/gurubodh-cli` does not select PyTorch's CPU index.
+
 Installation also provides the Draft 2020-12 `jsonschema` runtime and bundles
 the component catalog, component/job/artifact schemas, and shared source-font policy with its schema.
 If a command reports a missing or invalid bundled policy or schema, reinstall
@@ -100,8 +109,10 @@ the embedding runtime, even when CUDA is visible. GPU acceleration is currently
 unsupported. You do not need to set `CUDA_VISIBLE_DEVICES` or hide a GPU; allow
 sufficient system RAM for the model and the selected batch size.
 
-This is an execution setting. The model, pinned revision, and PyTorch packaging
-are unchanged; installing a CPU-only PyTorch distribution is a separate follow-up.
+The default local installation uses a CPU-only PyTorch distribution. The model,
+pinned revision, and semantic chunking behavior are unchanged. On Apple Silicon,
+the upstream macOS wheel may contain Apple acceleration support, but the maintained
+profile still selects CPU and GPU execution remains unsupported.
 An older project-local copy of the profile can override the bundled profile, so
 ensure its `chunking.device` is also `"cpu"`. Inspect the resolved job with
 `gurubodh config resolve --command generate-chunks` and the same selectors you

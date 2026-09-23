@@ -3,12 +3,14 @@ name: gurubodh-cli container
 on:
   pull_request:
     paths:
+      - "Makefile"
       - "tools/gurubodh-cli/**"
       - ".github/workflows/gurubodh-cli-container.yml"
   push:
     branches: [main]
     tags: ["cli-v*"]
     paths:
+      - "Makefile"
       - "tools/gurubodh-cli/**"
       - ".github/workflows/gurubodh-cli-container.yml"
 
@@ -19,6 +21,32 @@ env:
   IMAGE_NAME: ghcr.io/team-gurubodh/gurubodh-cli
 
 jobs:
+  native-cpu-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+          - arch: macos-arm64
+            runner: macos-15
+          - arch: macos-x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install CLI in a clean Python 3.12 environment
+        run: make cli-venv cli-install
+      - name: Check the installed CPU runtime
+        run: |
+          tools/gurubodh-cli/.venv/bin/python tools/gurubodh-cli/tests/check_cpu_torch.py
+          tools/gurubodh-cli/.venv/bin/python -m pip check
+
   distributions:
     runs-on: ubuntu-latest
     steps:
@@ -69,6 +97,7 @@ jobs:
         run: |
           docker run --rm gurubodh-cli:smoke --help
           docker run --rm --entrypoint node gurubodh-cli:smoke --version
+          docker run --rm --entrypoint python gurubodh-cli:smoke /opt/gurubodh-cli/tests/check_cpu_torch.py
           docker run --rm --entrypoint python gurubodh-cli:smoke -c "from gurubodh.audit import resolved_build_provenance; from pathlib import Path; assert resolved_build_provenance(Path('/opt/gurubodh-cli'))['source_revision'] == '${{ github.sha }}'"
       - name: Execute installed command workflows offline as the runtime user
         run: |
