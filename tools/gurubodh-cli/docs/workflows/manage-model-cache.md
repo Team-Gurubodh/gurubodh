@@ -5,6 +5,11 @@ an explicit operation. They resolve the normal validated chunking profile and it
 full immutable model revision; they do not accept a model name or revision override.
 Initial support is limited to the maintained BGE-M3 SentenceTransformer runtime.
 
+With the maintained profile, both commands use its explicit CPU selection and report
+`Embedding device: cpu` before the offline embedding check. See
+[Intentional CPU execution](../environment-setup.md#intentional-cpu-execution)
+for GPU support status, system RAM requirements, and existing project-local profiles.
+
 `gurubodh models check-updates` resolves that same profile and compares its pin with
 upstream repository metadata. It is advisory only: it does not change the profile,
 prepare or alter the runtime cache, certify compatibility, or upgrade the model.
@@ -53,8 +58,8 @@ gurubodh models prepare --profile bge-m3-semantic-window-v1
 ```
 
 Before artifact content is downloaded, the command reports the model, exact commit
-revision, selected runtime files, total required artifact bytes, and remaining bytes
-after valid cached content is counted. Sizes and digests come from that selected
+revision, embedding device, selected runtime files, total required artifact bytes,
+and remaining bytes after valid cached content is counted. Sizes and digests come from that selected
 revision. The allowlist contains one compatible PyTorch weights file plus the required
 SentenceTransformer pooling, configuration, and tokenizer files; alternate weights,
 ONNX/OpenVINO exports, and unrelated repository content are excluded.

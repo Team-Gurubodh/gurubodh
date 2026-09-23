@@ -94,6 +94,7 @@ class SemanticChunkingTests(unittest.TestCase):
         self.assertEqual(calls[0][0], "BAAI/bge-m3")
         self.assertEqual(calls[0][1]["revision"], "5617a9f61b028005a4858fdac845db406aefb181")
         self.assertTrue(calls[0][1]["local_files_only"])
+        self.assertEqual(calls[0][1]["device"], "cpu")
         self.assertEqual(helper.metadata["provider"], "sentence-transformers")
         self.assertEqual(calls[1][1]["batch_size"], 2)
 

@@ -1,15 +1,19 @@
 import hashlib
 import json
+import os
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from gurubodh.config import prepare_generate_chunks_job
 from gurubodh.content_identity import build_content_identity
 from gurubodh.errors import GurubodhError
+from gurubodh.job_components import ComponentCatalog
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
@@ -304,6 +308,8 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertEqual(segmenter.calls, 1)
         self.assertEqual(audit["schema_name"], "gurubodh.audit-report")
         self.assertEqual(audit["schema_version"], "2.1.0")
+        self.assertIsNone(audit["job_identity"]["chunking_model"]["device"])
+        self.assertIn("Embedding device: `auto`", audit_path.with_suffix(".md").read_text())
         self.assertEqual(result["source_chapter_count"], 1)
         self.assertNotIn("dense_embedding", rendered)
         self.assertNotIn('"embedding"', rendered)
@@ -323,6 +329,41 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertIn("chunking_config_key", semantic_manifest["chunking"])
         self.assertEqual(payload["chunking"]["chunking_config_key"], semantic_manifest["chunking"]["chunking_config_key"])
         self.assertEqual(payload["chunks"][0]["estimated_token_count"], 2)
+
+    def test_maintained_profile_uses_cpu_through_runtime_artifacts_and_reports(self):
+        config = base_config(self.temp_dir.name)
+        catalog = ComponentCatalog(Path(__file__).parents[1])
+        config["chunking"] = catalog.load("chunking-profile", "bge-m3-semantic-window-v1").to_payload()["chunking"]
+        metadata = write_prepared_chapter(self.temp_dir.name, config, 1, "पहला वाक्य। दूसरा वाक्य।\n")
+        write_candidate_manifest(self.temp_dir.name, config, [metadata])
+        cache = Path(self.temp_dir.name) / "model-cache"
+        model = SimpleNamespace(
+            tokenizer=SimpleNamespace(encode=lambda text, **kwargs: text.split()),
+            encode=lambda texts, **kwargs: [[0.5, 0.5] for _ in texts],
+        )
+        constructor = Mock(return_value=model)
+        with patch.dict(os.environ, {"GURUBODH_MODEL_CACHE_DIR": str(cache)}, clear=True), \
+             patch.dict(sys.modules, {"sentence_transformers": SimpleNamespace(SentenceTransformer=constructor)}), \
+             redirect_stdout(StringIO()):
+            loaded = prepare_generate_chunks_job(config)
+            result = run_generate_chunks_job(self.context, loaded, progress=lambda _: None)
+            self.assertNotIn("CUDA_VISIBLE_DEVICES", os.environ)
+
+        constructor.assert_called_once_with(
+            "BAAI/bge-m3", cache_folder=str(cache.resolve()), local_files_only=True,
+            device="cpu", revision="5617a9f61b028005a4858fdac845db406aefb181",
+        )
+        self.assertEqual(result["processed_chapter_count"], 1)
+        subject = Path(self.temp_dir.name) / config["source"]["subject_dir"]
+        output_dir = subject / "chapters" / "semantic_chunks"
+        chunk = json.loads(next(output_dir.glob("*.chunks.json")).read_text())
+        manifest = json.loads((output_dir / "semantic_chunks_manifest.json").read_text())
+        audit_path = next((subject / "run_reports" / "generate-chunks").glob("*.json"))
+        audit = json.loads(audit_path.read_text())
+        self.assertEqual(chunk["chunking"]["device"], "cpu")
+        self.assertEqual(manifest["chunking"]["device"], "cpu")
+        self.assertEqual(audit["job_identity"]["chunking_model"]["device"], "cpu")
+        self.assertIn("Embedding device: `cpu`", audit_path.with_suffix(".md").read_text())
 
     def test_succeeded_old_contract_release_with_legacy_metadata_remains_consumable(self):
         config = base_config(self.temp_dir.name)

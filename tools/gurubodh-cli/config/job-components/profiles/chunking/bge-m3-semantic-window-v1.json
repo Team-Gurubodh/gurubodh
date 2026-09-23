@@ -10,7 +10,7 @@
     "window_size": 3,
     "batch_size": 16,
     "normalize_contextual_vectors": true,
-    "device": null,
+    "device": "cpu",
     "local_files_only": true,
     "strategy_version": "semantic-window-v1"
   }

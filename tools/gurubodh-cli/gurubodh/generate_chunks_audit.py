@@ -40,6 +40,7 @@ def job_identity(config, candidate_manifest, destination_subject):
             "provider": config["chunking"]["provider"],
             "model": config["chunking"]["model"],
             "model_revision": config["chunking"]["model_revision"],
+            "device": config["chunking"]["device"],
         },
         "source_candidate_manifest": {
             "reference": (candidate_manifest or {}).get("reference"),
@@ -131,6 +132,7 @@ def render_markdown(report):
         f"- Provenance source: `{run['build_provenance']['source']}`",
         f"- Image revision: `{run['build_provenance']['image_revision'] or 'not an image run'}`",
         f"- Model revision: `{identity['chunking_model']['model_revision']}`",
+        f"- Embedding device: `{identity['chunking_model']['device'] or 'auto'}`",
         f"- Language: `{identity['language']}`",
         f"- Candidate manifest SHA-256: `{identity['source_candidate_manifest']['sha256'] or 'unavailable'}`",
         "",
