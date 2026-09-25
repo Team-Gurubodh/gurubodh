@@ -43,11 +43,16 @@ git switch issue-25-contributor-commands
 
 ## Plan and Review the Design
 
-Follow [phase outcomes](slice-workflow.md#phase-outcomes) and
-[slice-design-review](../../.agents/skills/slice-design-review/SKILL.md).
-Prepare coverage and a concrete design for discussion. Record acceptance under
-the workflow's [design gate](slice-workflow.md#interface-design-review) before
-implementation. Use the [record formats](templates/slice-records.md).
+Use [slice-session](../../.agents/skills/slice-session/SKILL.md) for requirements
+discovery and coverage. Obtain acceptance of an identified specification, then
+publish and verify it. Use
+[slice-design-review](../../.agents/skills/slice-design-review/SKILL.md) to prepare
+the active slice's plan and concrete design for acceptance. Name both subjects
+and versions when accepted together, then publish and verify that acceptance
+before implementation. Follow the workflow's
+[approval sequence](slice-workflow.md#requirements-and-approval) and
+[record formats](templates/slice-records.md); reuse valid recorded acceptance
+on resumption.
 
 After preparing and reviewing the appropriate record, post it:
 

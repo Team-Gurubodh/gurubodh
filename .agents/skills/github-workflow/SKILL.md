@@ -30,6 +30,34 @@ using the board's actual status options and completion conditions. Check whether
 automation already applied the transition before updating it. Report access
 failures and pending updates rather than claiming synchronization.
 
+## Publish Specifications and Decisions
+
+Publish the synthesis prepared by the discovery skill under the workflow's
+[approval rules](../../../docs/development/slice-workflow.md#requirements-and-approval).
+This skill records requirements and design decisions; it does not decide them.
+
+1. Retrieve current remote content. Update the parent's existing requirements/
+   coverage record and the owning issue's execution records; preserve unrelated
+   content and stable requirement IDs. Link detailed records instead of copying
+   them between parent and sub-issue.
+2. Identify the record's version and actual status. A draft lists unanswered
+   questions. An accepted record includes the explicit confirmation/source and
+   precisely which specification, plan, or design versions and scope it covers.
+   Reuse valid acceptance and publication authorization on resumption.
+3. For a material revision, identify changed requirements/decisions, rationale,
+   affected dependencies, and superseded records. Preserve earlier confirmation
+   as history; do not imply it accepted the revision.
+4. Publish the prepared text, then read it back. Compare content, acceptance
+   scope, links, and preserved unrelated text. A returned URL alone does not
+   establish that the intended record was saved correctly.
+
+If a write fails, report the record as unsaved. If readback fails, report its
+publication as unverified. Preserve the exact text and status locally, distinguish
+accepted-but-unsaved discussion from recorded acceptance, and retrieve current
+remote state before retrying within existing authorization. Check whether the
+record already exists before retrying an uncertain write. Follow the workflow's
+implementation gate while required acceptance publication remains unresolved.
+
 ## Locate and Preserve Work
 
 Inspect `git status --short --branch`, the branch history, and any recorded PR
