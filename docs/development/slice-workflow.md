@@ -18,15 +18,15 @@ Read technical and historical references only when they apply to the work.
 | Activity | Skill and references |
 | --- | --- |
 | Start, resume, or pause | [slice-session](../../.agents/skills/slice-session/SKILL.md); complete issue/discussion, accepted decisions, latest handoff; [session requirements](#session-entry-and-exit) |
-| Plan and maintain coverage | slice-session; [coverage](#requirement-coverage), [slice checklist](#lightweight-slice-checklist), applicable goals/contracts |
+| Discover requirements and plan coverage | slice-session; [requirements and approval](#requirements-and-approval), [interview protocol](interview-protocol.md), [coverage](#requirement-coverage), applicable goals/contracts |
 | Review initial or materially changed design | [slice-design-review](../../.agents/skills/slice-design-review/SKILL.md); [design contract](#interface-design-review), existing implementation and applicable technical references |
 | Prepare tests and implement | [phase outcomes](#phase-outcomes), accepted design and questions; component README and relevant contracts/tests |
 | Verify and reconcile | [verification](#verification-and-delivery-status), [reconciliation](#slice-reconciliation); component verification commands and real integration boundaries |
 | Operate on issues, branches, commits, Projects, or PRs | [github-workflow](../../.agents/skills/github-workflow/SKILL.md), [GitHub conventions](github-workflow.md); optional [command tutorial](git-github-cli-workflow-tutorial.md) |
 | Publish, integrate, or close | github-workflow; [publication and integration](#publication-and-integration), [whole-issue completion](#whole-issue-completion) |
 
-Use the [record formats](templates/slice-records.md) when recording coverage,
-design acceptance, slice completion, or a handoff. The sections below define
+Use the [record formats](templates/slice-records.md) for specifications, coverage,
+plan/design acceptance, slice completion, and handoffs. The sections below define
 required content; formats are reusable aids, not additional gates.
 
 ## Core Terms and Their Relationship
@@ -76,16 +76,84 @@ GitHub issues. When a slice has its own sub-issue, use the ownership split under
 [Lightweight Slice Checklist](#lightweight-slice-checklist) rather than keeping
 duplicate execution records in the parent and sub-issue.
 
-Keep tentative proposals distinct from accepted decisions. Promote lasting
-technical decisions into the appropriate interface, schema, or decision
+Keep tentative proposals distinct from accepted decisions. Maintain one current
+requirements/coverage record in the parent; link compact acceptance and revision
+comments instead of copying interview transcripts or detailed checklists.
+Promote lasting technical decisions into interface, schema, or decision
 documentation when implemented. Do not create competing copies of the scope.
+
+## Requirements and Approval
+
+Before proposing new or materially revised scope, the agent restores the issue
+discussion, accepted decisions, relevant documentation, and implementation facts.
+Requirements discovery accounts for problem/users, user journey, observable
+success, boundaries, inputs/outputs, failure behavior, constraints, and acceptance
+examples. Reuse established answers, ask about material gaps or contradictions,
+and explain any dimension's inapplicability in the specification. Use
+[slice-session](../../.agents/skills/slice-session/SKILL.md) and the shared
+[interview protocol](interview-protocol.md) to conduct discovery.
+
+The agent presents a versioned specification with stable requirement IDs,
+constraints, exclusions, acceptance criteria/examples, and classified questions.
+The maintainer must explicitly accept that identified specification before the
+agent records it as accepted scope. A saved proposal remains a draft until
+accepted; silence, elapsed time, and draft publication do not establish acceptance.
+
+The specification states **what** must be delivered. The implementation plan
+states **how** the accepted requirements will be delivered through slices,
+design, and verification. The maintainer accepts the active slice's plan and
+concrete design, normally in one confirmation naming both subjects and versions.
+Specification acceptance is separate. A separately accepted, unchanged plan needs
+no repeated approval; concrete-design acceptance is still required. A roadmap
+assigns requirements to slices but does not approve future slices' undisclosed
+designs.
+
+The normal sequence is specification acceptance and verified publication, then
+active-slice plan/design acceptance and verified publication, then test
+preparation and implementation. On resumption, reuse valid recorded acceptance
+and authorization at their stated scope; resume at the missing decision or phase.
+
+If design discovery exposes a product question, pause affected design work,
+return to the affected requirement, and obtain acceptance of its revised
+specification before settling dependent design decisions. Preserve unrelated
+accepted decisions. Each material revision identifies the changed requirement
+IDs or decisions, its reason, the record it supersedes, and the acceptance needed.
+Earlier confirmation applies only to its original version and scope.
+
+For each publication, the agent reads back the saved record and compares it with
+the intended text, including acceptance scope and preserved unrelated content.
+A failed write is **unsaved**; a failed readback leaves publication **unverified**.
+Preserve the exact text and its status locally, restore current remote content,
+and retry within existing authorization. Distinguish accepted-but-unsaved
+discussion from recorded acceptance. Implementation must wait until its required
+acceptance records are published and verified.
+
+### Discovery Questions
+
+For both requirements and design, distinguish inspected facts, explicit
+maintainer decisions, agent recommendations, and unresolved assumptions.
+Classify each open question, identify affected work and dependencies, and state
+what may proceed:
+
+- A **blocking** question can change the behavior, contract, or verification of
+  affected work. It prevents dependent design and implementation. Resolve it
+  and obtain acceptance of the resulting specification or design before
+  proceeding with that work.
+- A **nonblocking** question does not affect the contract or verification of
+  work proceeding now. Record why that work is independent and when the answer
+  is due; reclassify the question if its impact changes.
+
+An optional preference may have a proposed default; silence does not turn that
+recommendation into a maintainer decision. Discovery ends when the behavior or
+design can be stated, verified, and approved, and every remaining question has a
+classification, affected scope, and resolution point.
 
 ## Phase Outcomes
 
 | Phase | Outcome needed to advance |
 | --- | --- |
-| Planning | Bounded outcome, exclusions, mapped parent requirements, acceptance criteria, and known uncertainties |
-| Interface design | Contracts and proposed code structure presented through the [Interface Design Review](#interface-design-review) and explicitly accepted by the maintainer; accepted scope, approved optional items, and classified open questions recorded in the relevant issue before implementation |
+| Planning | Accepted specification; proposed slice outcome, exclusions, mapped requirements, acceptance criteria, uncertainties, and verification approach |
+| Interface design | Active-slice plan and concrete design explicitly accepted under [Interface Design Review](#interface-design-review); acceptance scope, approved optional items, and classified questions published and verified before implementation |
 | Test preparation | Reviewable success/failure cases, independent expectations, fixtures, and verification commands; executable tests where appropriate |
 | Implementation | Small reviewable changes satisfying the agreed contract, with relevant checks passing |
 | Integration verification | Evidence using real applicable boundaries, reconciliation against parent requirements, and a slice-completion record; a session handoff only if the session also ends |
@@ -97,11 +165,20 @@ proposed design in chat for maintainer review and discussion. Show the contract
 and the code structure that will realize it, distinguishing existing behavior,
 proposed changes, and unresolved questions.
 
-Wait for the maintainer's explicit acceptance of the design before coding or
-other implementation begins. Record that acceptance and the design version or
-scope it covers in the relevant issue. Presenting a proposal, receiving no
-response, or having general authorization to implement does not constitute
-design acceptance. This review phase cannot be skipped or marked not applicable.
+Before finalizing that proposal, investigate compatibility, abstractions and
+ownership, interfaces and collaboration, failure semantics, persistence,
+operational behavior, and tradeoffs. Use
+[slice-design-review](../../.agents/skills/slice-design-review/SKILL.md) and the
+shared [interview protocol](interview-protocol.md) to resolve consequential choices.
+Reuse settled answers and explain inapplicable topics. Resolve routine technical
+details through existing conventions and the accepted design.
+
+Wait for explicit acceptance of the active slice's plan and concrete design
+before implementation. Record the confirmation and source, subjects, versions,
+and scope under [requirements and approval](#requirements-and-approval).
+Specification acceptance or general implementation authorization does not
+constitute design acceptance. This review phase cannot be skipped or marked
+not applicable.
 
 | Review area | Details to present |
 | --- | --- |
@@ -126,16 +203,7 @@ implementation, record the accepted design and any unresolved questions in a
 comment on the parent issue or the slice's execution sub-issue, following
 [Authoritative Records](#authoritative-records). Include the applicable review
 details above and link existing specifications instead of duplicating them.
-Keep proposals distinct from accepted decisions. Classify each open question
-as blocking or nonblocking, identify the work and dependencies it affects, and
-state what may proceed:
-
-- A blocking question prevents implementation of the affected work and anything
-  that depends on its answer. Resolve it and obtain acceptance of the resulting
-  design before proceeding with that work.
-- A nonblocking question does not affect the accepted contract or verification
-  of the work proceeding now. Record why it is nonblocking and when it must be
-  resolved; reclassify it if its impact changes.
+Classify remaining questions under [discovery questions](#discovery-questions).
 
 Independent work within the same slice may proceed only when it is explicitly
 covered by the maintainer's accepted design and does not depend on an unresolved
@@ -313,7 +381,9 @@ Include the branch and whether changes are local, committed, or published so
 the next session can locate the actual work. State the active slice, its current
 phase, whether that phase and slice execution are complete or still in progress,
 the separate verification/publication/delivery milestones, and any pending
-maintainer design acceptance or issue-closure decision.
+maintainer specification/plan/design acceptance or issue-closure decision.
+Distinguish recorded acceptance from draft proposals, accepted-but-unsaved
+discussion, and unverified publication; identify the exact next action.
 This handoff marks the session's end; it is needed even when work pauses partway
 through a phase. A brief exchange or a phase transition alone does not require
 ending the session.

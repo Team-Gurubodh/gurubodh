@@ -7,9 +7,13 @@ Read each applicable `SKILL.md` directly when automatic discovery is unavailable
 
 | Skill | Read when |
 | --- | --- |
-| [slice-session](slice-session/SKILL.md) | Starting, resuming, planning, or pausing GitHub issue work |
-| [slice-design-review](slice-design-review/SKILL.md) | Preparing or revising a concrete design review and recording acceptance |
+| [slice-session](slice-session/SKILL.md) | Restoring issue work, discovering requirements, preparing specifications/coverage, or handing off |
+| [slice-design-review](slice-design-review/SKILL.md) | Investigating design choices, preparing slice plan/design reviews, and recording acceptance |
 | [github-workflow](github-workflow/SKILL.md) | Operating on issues, branches, commits, PRs, Projects, or execution evidence |
 
 Unrelated read-only questions use relevant sources directly. Skill placement
 and creation follow [AGENTS.md](../../AGENTS.md#essential-rules).
+
+Both discovery skills read the shared
+[interview protocol](../../docs/development/interview-protocol.md) when discovering
+or revising requirements/design. Routine resumption reuses accepted decisions.

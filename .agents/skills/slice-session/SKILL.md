@@ -1,6 +1,6 @@
 ---
 name: slice-session
-description: Restore, plan, and hand off Gurubodh GitHub issue work using its issue records and current slice phase. Use at session entry, resumption, or pause; unrelated read-only questions do not need this skill.
+description: Restore Gurubodh issue work, discover requirements, prepare specifications and slice coverage, and hand off sessions. Use at entry, resumption, requirements planning, or pause; unrelated read-only questions do not need this skill.
 ---
 
 # Slice Session
@@ -23,10 +23,44 @@ process authority. This skill helps restore and record context.
    for the current phase. Resume accepted work without requesting the same
    acceptance again; changed designs follow the design-review route.
 
-If no slice exists, prepare its outcome, exclusions, mapped requirements,
-acceptance criteria, uncertainties, and verification approach using the
+## Discover Requirements and Plan Coverage
+
+For new or materially revised scope, read the shared
+[interview protocol](../../../docs/development/interview-protocol.md). Inspect
+issue discussion, accepted decisions, relevant documentation, and implementation
+facts. For an already specified issue, ask only about material gaps or
+contradictions; do not ask the maintainer to repeat established answers.
+
+Account for these dimensions in the synthesis, linking established answers and
+explaining inapplicability:
+
+| Dimension | What to establish |
+| --- | --- |
+| Problem and users | Affected users and the problem they need solved. |
+| User journey | Trigger, user actions, and expected sequence of outcomes. |
+| Success criteria | Observable conditions that establish success. |
+| Boundaries | Included work, exclusions, and proposed deferrals. |
+| Inputs and outputs | Data, its source, and resulting data or behavior. |
+| Failure behavior | Outcomes for invalid input, dependency failure, interruption, and partial success. |
+| Constraints | Compatibility, performance, operations, privacy, and cost limits. |
+| Acceptance examples | Representative success, failure, and boundary cases. |
+
+Prepare a versioned [specification](../../../docs/development/templates/slice-records.md#requirements-specification)
+with stable requirement IDs, constraints, exclusions, acceptance criteria,
+examples, and classified questions. Follow the workflow's
+[approval sequence](../../../docs/development/slice-workflow.md#requirements-and-approval),
+then use [github-workflow](../github-workflow/SKILL.md) to publish and verify the
+accepted record. A proposal saved before acceptance remains a draft. If design
+exposes a product question, revise only affected requirements and preserve
+unrelated accepted decisions.
+
+From the accepted scope, prepare each proposed slice's outcome, exclusions,
+mapped requirements, acceptance criteria, uncertainties, and verification approach using
 [parent coverage format](../../../docs/development/templates/slice-records.md#parent-coverage-and-slice-plan).
 Include constraints from the full issue, not just its acceptance checkboxes.
+Use [slice-design-review](../slice-design-review/SKILL.md) to develop the active
+slice's plan and concrete design for acceptance; the roadmap does not approve
+future designs.
 
 ## Keep Execution Records Useful
 

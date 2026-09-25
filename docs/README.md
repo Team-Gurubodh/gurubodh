@@ -36,7 +36,8 @@ task history, or pilot handoffs to get started.
 - [limitations.md](./limitations.md) - known limitations, risks, and constraints.
 - [AGENTS.md](../AGENTS.md) - universal agent entry point, instruction authority, and reading route.
 - [Skill catalogue](../.agents/skills/README.md) - operational assistance by issue activity.
-- [Slice record formats](development/templates/slice-records.md) - reusable issue records.
+- [Discovery interviews](development/interview-protocol.md) - shared requirements and design questioning procedure.
+- [Slice record formats](development/templates/slice-records.md) - specifications, coverage, plan/design acceptance, revisions, and execution records.
 - [development/](./development/README.md) - contributor workflow guides for GitHub, pull requests, and Conventional Commits.
 - [Slice workflow](./development/slice-workflow.md) - mandatory execution workflow for all GitHub issues, including phase outcomes, coverage, and session handoffs.
 
