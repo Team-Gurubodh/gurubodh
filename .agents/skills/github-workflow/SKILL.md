@@ -79,6 +79,15 @@ under [publication and integration](../../../docs/development/slice-workflow.md#
 Publish within the user's authorization, marking unfinished work as draft.
 Verify the branch, PR URL, title/body, and check results after publication.
 
+When closure is not authorized, use `Refs #<number>` and keep closing keywords
+away from issue references in PR descriptions and commit messages. Negating a
+closing phrase does not prevent GitHub from interpreting it as a closing link.
+After publication and before merge, inspect `gh pr view <number> --json
+closingIssuesReferences`; verify that the listed issues match the authorized
+closure scope. Remove unintended closing links and verify the result before
+merging. If an issue was closed unintentionally, restore its intended state and
+record the correction; do not report whole-issue completion.
+
 A failed command is not evidence of a completed action. Preserve useful local
 artifacts and report any blocked publication or verification accurately.
 
