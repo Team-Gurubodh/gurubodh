@@ -5,15 +5,14 @@ content and seed-data tools, PostgreSQL infrastructure, and planned web/chat app
 
 ## Authority
 
-Within your platform's instruction hierarchy, follow explicit maintainer
-instructions. This file defines repository instruction ownership:
+Follow maintainer instructions when they apply. For each kind of work, this file identifies the repository document the agent must follow.
 
 | Source | Owns |
 | --- | --- |
 | This file | Entry route, authority, and essential repository rules |
-| [Slice workflow](docs/development/slice-workflow.md) | Issue lifecycle, collaboration, approval gates, coverage, verification, handoffs, and completion |
+| [Slice workflow](docs/development/slice-workflow.md) | Github Issue lifecycle, collaboration, approval gates, coverage, verification, handoffs, and completion |
 | Relevant GitHub issue and discussion | Complete task scope, accepted designs, execution decisions, and evidence |
-| Applicable technical references | Architecture, schemas, interfaces, and component commands |
+| Applicable technical references | Architecture, schemas, interfaces, and component command . Seek permission from the maintainer before reading these documents.|
 | [GitHub conventions](docs/development/github-workflow.md) | Issue, branch, commit, PR, and cleanup mechanics |
 
 Skills, templates, tutorials, and indexes support these sources; they do not
@@ -39,7 +38,7 @@ skill discovery. Read only the technical references relevant to the task:
 | --- | --- |
 | Project map and commands | [README.md](README.md) |
 | Documentation or component guide | [docs/README.md](docs/README.md) |
-| Targeted architecture and decision context | Start from the issue, accepted design, latest handoff, and relevant implementation. Do not routinely read [Architecture](docs/architecture.md) or browse [ADRs](docs/adr/README.md) and [decision records](docs/decisions/README.md). Consult a specific section or record when the issue or accepted design identifies it as applicable, or when a concrete unresolved question requires it. |
+| Targeted architecture and decision context | Start from the issue, accepted design, latest handoff, and relevant implementation. Do not routinely read [Architecture](docs/architecture.md) or browse [ADRs](docs/adr/README.md) and [decision records](docs/decisions/README.md). Consult a specific section or record when the issue or accepted design identifies it as applicable, or when a concrete unresolved question requires it.Ask maintainer if in doubt. |
 | Scope, roadmap, or priority decision | [Goals](docs/goals.md) |
 | Behavior near a known constraint | [Limitations](docs/limitations.md) |
 
@@ -53,15 +52,8 @@ skill discovery. Read only the technical references relevant to the task:
   user changes unless explicitly instructed otherwise.
 - Keep secrets, credentials, real `.env` values, and local runtime data out of
   commits, documentation, and tool output.
-- Update documentation when setup, architecture, decisions, workflows, schemas,
-  or behavior changes. Follow the exception below when applicable.
+- Suggest documentation updates to maintainer when setup, architecture, decisions, workflows, schemas, or behavior changes. But seek permission to change the documenation before making changes. 
 - Add repo-local skills under `.agents/skills/` only for repeatable workflows
   that benefit from dedicated instructions, references, or helpers.
 
-## Composable Jobs Documentation Exception
 
-For GitHub Issues #283–#288, do not add repository implementation documentation.
-Keep technical contracts and execution evidence in the GitHub issues and tests.
-Operator-facing documentation belongs to a follow-up issue after #288 is
-implemented and the complete composable-jobs implementation has been tested.
-This scoped exception overrides documentation-update requirements for the series.

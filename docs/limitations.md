@@ -31,7 +31,7 @@
   proofreading, or canonical publication. Their character mappings are not
   verified, so they remain unsupported until exact font-specific mappings and
   golden fixtures are available.
-- Source content is usually stored as one document per subject, with about 50 lectures per document. Before ingesting the content into the CMS, each subject document must be split into chapters. Chapter-level chunking may be sufficient for initial phases, but the later chatbot/RAG service may require more granular chunks and richer metadata.
+- Source content is usually stored as one document per subject, with about 50 lectures per document. Before ingesting the content into the CMS, each subject document must be split into chapters. Chapter-level chunking is not sufficient for the chatbot/RAG application to be developed later. Gurubodh uses BAAI/bge-m3 embedding model for more granular chunks and richer metadata.
 - We will have to rely on AI and external vocabulary, glossary, or concept lists based on the Indian Knowledge System to help AI systems understand the content and apply appropriate content-descriptor metadata to content chunks. This remains an exploration area, and the project does not yet have enough technical expertise to define the final approach.
 
 ## Risk Mitigations
