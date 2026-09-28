@@ -6,7 +6,9 @@
 ## Purpose
 
 Gurubodh is a monorepo for building and operating the Gurubodh CMS, planned user-facing web and chat applications, content preparation workflows, future ingestion and metadata tooling, database infrastructure scripts, and ML/RAG preparation utilities housed in the Gurubodh CLI.
-The project exists in order to bring over 7000 legacy audio files containing knowledge about "Sanatan Dharma", which is the central concept in the Indian Knowledge System. The project will progress in phases, with the initial phases displaying content that has already been converted from audio into Hindi-language transcripts. In the final phase, all knowledge lives within the Gurubodh CMS and is ready to be queried using AI prompts.
+The project exists in order to bring over 7000 legacy audio files containing knowledge about "Sanatan Dharma", which is the central concept in the Indian Knowledge System. These files are generated using the [संचार प्रबोधने](https://www.youtube.com/@SwamiVaani) published on you tube. 
+
+The project will progress in phases, with the initial phases displaying content that has already been converted from audio into Hindi-language transcripts. In the final phase, all knowledge lives within the Gurubodh CMS and will be ready to be viewed and queried using AI prompts.
 
 ## Current Goals
 
@@ -16,11 +18,13 @@ The project exists in order to bring over 7000 legacy audio files containing kno
   placeholders.
 - Maintain reliable content preparation tooling for DOCX and metadata workflows. 
   - Each subject is typically available as a single MS Word 2007 file. We need to divide that content into chapters, typically about 50 per subject. 
-  - While splitting the original file into chapters, also capture relevant metadata that describes the content.
+  - While splitting the original file into chapters, also proofread the text in Hindi and Marathi and where avaialble, capture relevant metadata that describes the content.
   - Subjects are grouped in Categories. We need to maintain strict mapping between the Subject and Category codes stored in the PostgreSQL ```gurubodh_db``` and the respective codes used while generating names for the subject files available in chapters as well as the entire subject. This mapping is important because it will be repeatedly used to update metadata for a chapter or the entire subject with the help of AI and ML. The metadata updates will come in later phases, as we may adopt more efficient content-chunking strategies and techniques but it is important to know this dependency from the starting phase. 
 
 ## Ultimate Goal
-Ingest all content from all subjects in all categories, along with other unstructured data and metadata, into the CMS. Use a vector database to store, index, and query embeddings, then build chatbots on top using RAG (retrieval-augmented generation). 
+Ingest all content from all subjects in all categories, along with other unstructured data and metadata, into the CMS. Use a vector database to store, index, and query embeddings, then build chatbots on top using RAG (retrieval-augmented generation).
+
+In addition, provide rich reading and self-study experience for the published subjects 
 
 ## Global Launch Requirements
 
