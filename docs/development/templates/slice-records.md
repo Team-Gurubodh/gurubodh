@@ -67,38 +67,56 @@ execution records to the sub-issue.
 
 Use for proposals and accepted designs under
 [interface design review](../slice-workflow.md#interface-design-review).
+Publish one complete identified design before implementation. Link accepted
+requirements and unchanged contracts; explain changes in the proposal.
 Do not label a proposal accepted until the maintainer has accepted it.
 
-```markdown
+~~~markdown
 ## S1 — Plan <version> and design <version>; <proposed / accepted>
 
-- Accepted specification and parent coverage links; mapped requirements:
-- Outcome, exclusions, acceptance criteria:
+- Accepted specification and parent coverage links; mapped requirement IDs:
+- Proposed active-slice outcome, exclusions, and acceptance criteria; or link
+  an existing accepted plan and identify proposed changes, if any:
 
-| Module/path | Abstractions, responsibilities, and changes from current behavior |
+| Changed module/path | Abstractions, responsibilities, and change from current behavior |
 | --- | --- |
 | ... | ... |
 
-- Functions/interfaces: before/after signatures, types, errors, side effects;
-  state explicitly when none change.
+- Changed functions/interfaces: before/after contracts, signatures, types,
+  errors, side effects. List mechanically identical internal edits and their
+  shared transformation once; identify exceptions. State when none change.
 - Collaboration: callers/dependencies, data crossing boundaries, ownership.
-- Contract: inputs/outputs, validation, compatibility, success/failure examples.
+- Contract: inputs/outputs, validation, compatibility, representative
+  success/failure examples.
 - Rationale: assumptions, alternatives, tradeoffs, recommendation.
-- Verification: independent expectations, fixtures, commands, integration checks.
+- Verification plan: independent expectations, fixtures, commands,
+  integration checks; link detailed results when available.
 
 | Question and context (fact/decision/recommendation/assumption) | Blocking/nonblocking and reason | Affected work/dependencies | Proposed optional default | Resolution or due point |
 | --- | --- | --- | --- | --- |
 | ... | ... | ... | ... | ... |
+~~~
 
-### Acceptance record
+After explicit acceptance, record all fields below in either publication path.
+If the complete, current proposal is already published, use a compact acceptance
+comment linking it. Otherwise publish the complete accepted design and append
+these acceptance fields or link a separate acceptance record. An accepted label
+alone does not establish confirmation or scope. Material contract changes follow
+[material revision](#material-revision), including version identification and
+explicit acceptance. A consolidated replacement identifies the record it
+supersedes and preserves acceptance history.
 
-- Maintainer confirmation and source (link or exact chat instruction):
-- Accepted subjects, versions, and scope (specification, plan, design as applicable):
-- Revisions and superseded record links, or none:
-- Optional review items explicitly approved, or none:
-- Unresolved questions and permitted independent work, or none:
-- Phase outcome and next action:
-```
+~~~markdown
+## S1 — Plan <version> and design <version> accepted
+
+- Complete design location (this comment or link); accepted subjects, versions, and scope:
+- Maintainer confirmation and source:
+- Exact clarifications/changed sections; material revision version and
+  superseded record link, or none:
+- Approved optional review items, or none:
+- Unresolved questions, affected work, and permitted independent work, or none:
+- Publication readback status, interface-design phase outcome, and next action:
+~~~
 
 The question table also applies to specifications. For a nonblocking question,
 state why current work is independent of the answer. An optional default remains
@@ -127,45 +145,54 @@ second current requirements checklist.
 ## Slice Completion
 
 Use after [integration and reconciliation](../slice-workflow.md#slice-reconciliation).
-This records slice execution, not issue closure.
+This records slice execution, not issue closure. Link detailed evidence already
+recorded, including earlier in the same session, and its exact skips. Include
+details here only where no durable record contains them; a separate verification
+comment is not required. Keep current outcomes and milestones explicit.
 
-```markdown
+~~~markdown
 ## S1 — Slice execution complete
 
-- Accepted design and coverage links:
-- Changes and acceptance-criteria results:
-- Verification: commands/scenarios, results, verifier, evidence:
-- Skipped checks: exact checks, reasons, remaining uncertainty, decisions:
-- Requirement reconciliation: satisfied, partial, outstanding, newly found gaps:
-- Phase outcome and execution status:
-- Work location: branch, commits, PR; local/committed/published:
-- Implementation verified: by whom and evidence; maintainer confirmation status:
-- Published for review: evidence or pending:
-- Delivered: destination, evidence or pending:
-- Remaining parent obligations, dependencies, and next action:
-```
+- Accepted design and current coverage links:
+- Acceptance-criteria results and changes:
+- Verification: concise outcome and durable evidence link; where not already
+  recorded, commands/scenarios, observed results, verifier, exact skips,
+  reasons, remaining uncertainty, and decisions:
+- Requirement reconciliation: satisfied, partial, outstanding, new gaps:
+- Phase and slice outcome; remaining parent obligations:
+- Work location: branch, commit, PR; local/committed/published:
+- Milestones: implementation verifier and maintainer confirmation state;
+  publication and delivery destination/evidence or pending:
+- Next action:
+~~~
 
 ## Session Handoff
 
 Use at [session exit](../slice-workflow.md#session-entry-and-exit), including
 pauses within a phase. If session exit coincides with slice completion, combine
-the records and include both sets of information.
+the records and include both sets of required information. Repeat the minimum
+current-state fields even when unchanged. Link detailed records already posted,
+including earlier in the same session; state when earlier facts are unchanged
+without copying their narratives. Include full evidence details here only where
+no durable record contains them; no separate verification comment is required.
+Keep the status and next action explicit in the handoff itself.
 
-```markdown
-## Session handoff
+~~~markdown
+## Session handoff — <slice>
 
 This session is ending <at the stopping point / for transfer>.
 
-- Active slice and phase; phase and slice complete or in progress:
-- Coverage, accepted design, decisions, and earlier evidence links:
-- Approval state: recorded acceptance / draft / accepted-but-unsaved discussion /
-  unverified publication; subjects/versions, source, recovery file/action if needed:
-- Completed work:
-- Verification results and exact skips/reasons:
-- Unresolved questions and affected work:
-- Outstanding parent requirements:
-- Branch/commit/PR and whether changes are local, committed, or published:
-- Implementation verification (agent and maintainer), publication, delivery:
-- Pending design acceptance, completion/closure decisions, or delivery actions:
+- Current state: slice/phase and completion state; outstanding requirement
+  IDs, blockers, and open questions/affected work; current coverage and design links:
+- Work location: branch/commit/PR; local, committed, or published state:
+- Milestones and gates: agent and maintainer implementation verification, publication, delivery;
+  recorded acceptance or draft/unsaved/unverified state with subject,
+  version, source/recovery action when relevant; pending maintainer decisions:
+- This session: completed work, new decisions, concise verification outcomes,
+  changed questions; link detailed records, including those from this session.
+  Where evidence is not already recorded, include commands/scenarios, observed
+  results, verifier, exact skips/reasons, uncertainty, and related decisions:
+- Unchanged earlier decisions/evidence/skips/questions: link current record,
+  or state none applies:
 - Next action:
-```
+~~~

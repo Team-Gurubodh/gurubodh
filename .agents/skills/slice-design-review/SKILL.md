@@ -42,19 +42,20 @@ accepted decisions.
 
 Use the [design format](../../../docs/development/templates/slice-records.md#design-and-acceptance)
 to distinguish current behavior, proposed changes, and undecided choices.
-Show file paths and responsibilities; sketch changed signatures and errors;
-trace data and ownership between collaborators. Include representative success
-and failure cases and explain compatibility and side effects. If no functions
-or runtime abstractions change, say so explicitly. Existing abstractions may
-suffice; do not invent them to fill a table.
+Link accepted requirements and unchanged contracts. Show changed file paths,
+responsibilities, signatures, errors, data flow, ownership, compatibility,
+and representative success/failure behavior. For a substantial refactor,
+list functions with mechanically identical internal edits and explain their
+shared transformation once; explain distinct contract or failure changes
+separately. If no functions or runtime abstractions change, say so explicitly.
+Existing abstractions may suffice; do not invent them to fill a table.
 
 Identify the active slice's plan and design versions, mapped requirements, and
-verification approach. Walk through concrete behavior examples, module tables,
-changed signatures, failure/boundary cases, alternatives, and verification. Use
-diagrams or pseudocode when they clarify interactions or consequential logic.
-For instruction-only changes, show proposed instruction excerpts and resulting
-records. Each format must help assess the work; all required review areas still
-apply.
+verification approach. Use module tables, signature sketches, examples,
+diagrams, or pseudocode where they clarify consequential changes. For
+instruction-only work, show the proposed wording and resulting records.
+Keep detailed observed test outcomes in verification records. Address every
+required review area; use the workflow's approval rule for optional items.
 
 Explain assumptions, alternatives, and the recommendation. Classify questions
 by their effect on the accepted contract and verification, identify dependencies,
@@ -65,15 +66,25 @@ acceptance. Use the workflow's rules for optional review items.
 
 Present the concrete proposal in chat and incorporate maintainer feedback.
 Discuss affected changes, then present one complete identified version for
-acceptance. For each material revision, link the superseded decisions and name
-affected requirements and dependencies. Follow the workflow's
-acceptance gate before implementation; general implementation authorization
-is not a substitute for a design decision.
+acceptance. For each material revision, identify changed decisions,
+requirements, and dependencies; link the superseded version and preserve
+unaffected acceptance. Follow the workflow's gate before implementation.
 
-Record the accepted plan/design subjects, versions and scope, maintainer
-confirmation, revisions, optional-item approvals, and remaining questions in
-the execution issue. Link existing specifications and parent coverage. Use
-[github-workflow](../github-workflow/SKILL.md) to post and verify the record.
+Ensure the complete accepted design is published in the execution issue. When
+its full, current proposal is already published, a compact acceptance comment
+may link it. Otherwise publish the complete accepted design and append the
+acceptance fields or link a separate acceptance record. In both paths, record
+accepted plan/design subjects, versions, scope, confirmation/source, exact
+clarifications, superseded records, optional-item approvals, remaining
+questions, and permitted independent work.
+
+Material contract changes, including those described as clarifications, require
+an identified revised version and explicit acceptance under the workflow.
+If a link plus clarifications cannot reconstruct the accepted design, publish
+a consolidated identified version with an explicit supersession link and
+preserved acceptance history. Link existing specification and coverage records;
+use [github-workflow](../github-workflow/SKILL.md) to post and verify the complete
+design and its acceptance record.
 
 On resumption, reuse that record. If new findings materially change interfaces,
 responsibilities, or collaboration, identify affected work and return it to the
