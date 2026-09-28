@@ -79,10 +79,18 @@ GitHub issues. When a slice has its own sub-issue, use the ownership split under
 duplicate execution records in the parent and sub-issue.
 
 Keep tentative proposals distinct from accepted decisions. Maintain one current
-requirements/coverage record in the parent; link compact acceptance and revision
-comments instead of copying interview transcripts or detailed checklists.
-Promote lasting technical decisions into interface, schema, or decision
-documentation when implemented. Do not create competing copies of the scope.
+requirements/coverage record in the parent. Record each complete design,
+decision, and verification result once in its owning issue. Later acceptance,
+completion, and handoff records link that source instead of repeating detailed
+narratives or evidence. Repeat the minimum current-state fields required by
+each record even when unchanged; otherwise state only new facts or changed
+status. A link alone cannot establish a new acceptance, verification result,
+or milestone: identify the subject, version or revision, and current status
+next to the link. Recording once does not prohibit a consolidated replacement
+version: identify what it supersedes and preserve acceptance history under
+[requirements and approval](#requirements-and-approval). Promote lasting
+technical decisions into interface, schema, or decision documentation when
+implemented. Do not create competing copies of the scope.
 
 ## Requirements and Approval
 
@@ -186,26 +194,49 @@ not applicable.
 | --- | --- |
 | Modules | Names and paths of modules being added or edited, affected abstractions within them, and why the change belongs there. |
 | Abstractions and responsibilities | Classes, interfaces, data types, or other relevant abstractions being added or edited; their main responsibilities, ownership, and changes from the existing design. |
-| Functions and interfaces | Functions being added or edited, proposed signatures, parameter and return types, relevant errors, and side effects. Show before and after for changed interfaces. |
+| Functions and interfaces | Functions being added or edited, with proposed signatures, parameter and return types, relevant errors, and side effects. Show before and after for changed interfaces and contracts. For mechanically identical internal edits, list the affected functions and describe their shared signature and behavior change once; identify exceptions separately. |
 | Collaboration | Which abstractions call or depend on which others, what data crosses each boundary, and who owns validation, orchestration, persistence, or other relevant responsibilities. |
 | Contract and examples | Inputs, outputs, ownership, validation, errors, compatibility, and relevant cross-component behavior, illustrated by typical success and relevant failure cases. |
 | Rationale and open decisions | Assumptions, alternatives considered, tradeoffs, the recommendation and its reasons, and questions requiring maintainer judgment. |
 
 Use a module/abstraction table and short signature sketches where useful. Add
 a sequence diagram or interaction example when it clarifies collaboration.
-Scale the detail to the slice. If a review item seems inapplicable or unnecessary,
-explain why and prompt the maintainer for approval to make it optional before
-omitting it. Record that approval in the issue. Reporting that no functions
-change in a prose-only slice addresses the functions item; it does not omit it.
-State when existing abstractions suffice instead of introducing new ones to
-fill the review format.
+Present the active slice's changed behavior and code structure against linked
+accepted requirements and existing contracts. State unchanged background by
+reference; describe new or changed contracts, responsibilities, failure
+behavior, compatibility, and consequential tradeoffs in the proposal itself.
+For a substantial refactor, group repeated mechanical edits only when the
+affected functions and shared transformation are identified and any distinct
+contract or failure change is explained. Use representative success and failure
+examples; keep detailed test outcomes in verification records. Scale detail to
+the slice without a word limit. Address every review area above. If an area
+seems inapplicable or unnecessary, explain why and prompt the maintainer for
+approval to make it optional before omitting it; record that approval in the
+issue. Reporting that no functions change in a prose-only slice addresses the
+functions item. State when existing abstractions suffice instead of inventing
+new ones to fill the format.
 
-Incorporate the maintainer's feedback from the chat discussion. Before
-implementation, record the accepted design and any unresolved questions in a
-comment on the parent issue or the slice's execution sub-issue, following
-[Authoritative Records](#authoritative-records). Include the applicable review
-details above and link existing specifications instead of duplicating them.
-Classify remaining questions under [discovery questions](#discovery-questions).
+Incorporate the maintainer's feedback from chat. Before implementation,
+publish one complete, identified version of the accepted design in the parent
+or execution sub-issue under [Authoritative Records](#authoritative-records).
+If that complete proposal is already published and remains current, a compact
+acceptance comment may link it. If the proposal exists only in chat, publish
+the full accepted design and append the acceptance fields below or link a
+separate acceptance record.
+
+Both publication paths must record the maintainer confirmation/source,
+accepted plan and design versions and scope, exact clarifications or changed
+sections, superseded records, approved optional items, and unresolved
+questions with affected work and permitted independent work. Clarifications
+that materially change the accepted contract follow the versioning and explicit
+acceptance rules under [requirements and approval](#requirements-and-approval);
+calling a change a clarification does not bypass those rules. If the linked
+proposal and clarifications cannot reconstruct the accepted design, publish
+a consolidated identified version with an explicit supersession link and
+preserved acceptance history. Link existing specifications instead of copying
+them. Classify remaining questions under
+[discovery questions](#discovery-questions). Publish and verify the complete
+design and its acceptance record before implementation.
 
 Independent work within the same slice may proceed only when it is explicitly
 covered by the maintainer's accepted design and does not depend on an unresolved
@@ -296,9 +327,15 @@ After every slice:
 
 After integration verification and reconciliation, post a slice-completion
 comment in the slice's execution issue. Include its ID, acceptance-criteria
-results, verification evidence and skips, requirement reconciliation, current
-delivery status, remaining parent obligations, and next action. This records
-slice execution completion and does not itself end the session or close an issue.
+results, requirement reconciliation, current delivery status, remaining parent
+obligations, and next action. Link any earlier durable issue record, including
+one from the same session, containing commands or scenarios, observed results,
+verifier, exact skips and reasons, remaining uncertainty, and any decisions.
+Include those details here only where they have not already been recorded;
+a separate verification comment is not required. Identify new evidence or
+changed results with a concise outcome and source link. Do not copy full test
+narratives or logs already recorded. This records slice execution completion
+and does not itself end the session or close an issue.
 
 If the session ends at the same point, one comment may serve as both the
 slice-completion record and session handoff, provided it includes both sets of
@@ -376,19 +413,28 @@ slice and phase, and state the intended session outcome. Reuse accepted decision
 instead of reopening them without new evidence.
 
 At exit, post a session handoff comment in the issue selected under
-[Authoritative Records](#authoritative-records). Record decisions, completed
-work, verification results and skips, unresolved questions, outstanding parent
-requirements, and the next action.
-Include the branch and whether changes are local, committed, or published so
-the next session can locate the actual work. State the active slice, its current
-phase, whether that phase and slice execution are complete or still in progress,
-the separate verification/publication/delivery milestones, and any pending
-maintainer specification/plan/design acceptance or issue-closure decision.
-Distinguish recorded acceptance from draft proposals, accepted-but-unsaved
-discussion, and unverified publication; identify the exact next action.
-This handoff marks the session's end; it is needed even when work pauses partway
-through a phase. A brief exchange or a phase transition alone does not require
-ending the session.
+[Authoritative Records](#authoritative-records). Give a compact current-state
+snapshot, repeating these fields even when unchanged: active slice and phase;
+whether each is complete; outstanding parent requirement IDs, blockers, and
+open questions with affected work; branch, commit, and PR and whether work is
+local, committed, or published; separate implementation verification,
+publication, and delivery milestones; pending specification, plan, design,
+maintainer verification, or closure decisions; and the exact next action.
+Distinguish recorded acceptance from a draft, accepted-but-unsaved discussion,
+or unverified publication.
+
+Then summarize what changed in this session: decisions, completed work,
+verification outcomes, and new or resolved questions. Link detailed decisions
+and evidence already recorded, including earlier in the same session. Include
+commands/scenarios, observed results, verifier, exact skips/reasons, remaining
+uncertainty, and related decisions here only where no durable record contains
+them; a separate verification comment is not required. For unchanged decisions,
+evidence/skips, and requirement details, link the current authoritative records
+and state that they are unchanged instead of restating their narratives.
+A handoff must reveal the current status and next action without requiring
+the reader to infer them from links. This handoff marks the session's end,
+including a pause partway through a phase; a brief exchange or phase transition
+alone does not end a session.
 
 If the session covered several slices, identify each slice and its resulting
 state; post the relevant handoff details in each execution issue. Link shared

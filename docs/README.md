@@ -58,8 +58,7 @@ Use these authoritative templates when creating new records:
 
 ## Documentation Maintenance
 
-Follow [AGENTS.md](../AGENTS.md#essential-rules) for documentation updates and
-its [scoped exception](../AGENTS.md#composable-jobs-documentation-exception).
+Follow [AGENTS.md](../AGENTS.md#essential-rules) for documentation updates.
 Choose the appropriate home:
 
 | Content | Home |
