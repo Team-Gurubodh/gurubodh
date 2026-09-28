@@ -3,9 +3,9 @@
 <record_type>workflow_guide</record_type>
 <status>active</status>
 
-This is the authoritative issue-execution process delegated by
-[AGENTS.md](../../AGENTS.md). Supporting skills explain how to carry out its
-activities; they introduce no policy or additional approval gates.
+This document defines the required process for GitHub issue related work. 
+The [AGENTS.md](../../AGENTS.md) document delegates this reposibility to the current document. 
+Supporting skills only explain how to carry out various activities required for the slice workflow; they do not introduce any policy or additional approval gates.
 
 ## Reading Route
 
@@ -57,6 +57,8 @@ the mandatory design-review and maintainer-acceptance gate.
 Only an explicit maintainer instruction may grant a scoped workflow exception,
 subject to the design-review protections under [Exceptions](#exceptions).
 Record the exception in the relevant GitHub issue.
+
+
 
 ## Authoritative Records
 
