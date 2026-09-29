@@ -3,17 +3,11 @@
 <record_type>workflow_guide</record_type>
 <status>active</status>
 
-This document defines the required process for GitHub issue related work. 
-The [AGENTS.md](../../AGENTS.md) document delegates this reposibility to the current document. 
-Supporting skills only explain how to carry out various activities required for the slice workflow; they do not introduce any policy or additional approval gates.
+This document defines the required process for GitHub issues. The [AGENTS.md](../../AGENTS.md)  file delegates this responsibility here. Supporting skills explain how to carry out activities for the slice workflow. Supporting skills do not introduce policy or approval gates.
 
 ## Reading Route
 
-After reading this workflow, read
-[slice-session](../../.agents/skills/slice-session/SKILL.md), restore the issue
-context, and select the resources for the active phase below. Agents without
-automatic skill discovery must open the linked `SKILL.md` files directly.
-Read technical and historical references only when they apply to the work.
+Read this workflow, then read slice-session [skill](../../.agents/skills/slice-session/SKILL.md). Restore the issue context and select resources for the active phase. If you do not know how to discover skills automatically, open the linked SKILL.md files directly. Read technical and historical references only when needed.
 
 | Activity | Skill and references |
 | --- | --- |
@@ -25,138 +19,92 @@ Read technical and historical references only when they apply to the work.
 | Operate on issues, branches, commits, Projects, or PRs | [github-workflow](../../.agents/skills/github-workflow/SKILL.md), [GitHub conventions](github-workflow.md); optional [command tutorial](git-github-cli-workflow-tutorial.md) |
 | Publish, integrate, or close | github-workflow; [publication and integration](#publication-and-integration), [whole-issue completion](#whole-issue-completion) |
 
-Use the [record formats](templates/slice-records.md) for specifications, coverage,
-plan/design acceptance, slice completion, and handoffs. The sections below define
-required content; formats are reusable aids, not additional gates.
+Use the required [record formats](templates/slice-records.md) for specifications, coverage, plan/design acceptance, slice completion, and handoffs. The sections below outline this content. Formats are simple aids, not extra gates.
 
 ## Core Terms and Their Relationship
 
-A GitHub issue defines the overall scope. That scope is divided into slices,
-each slice is advanced through phases, and sessions are used to carry out the work.
+A GitHub issue defines the overall scope. Break that scope into slices, advance each slice through phases, and use sessions to do the work.
+
 
 | Term | Definition | When it is complete or ends |
 | --- | --- | --- |
-| Slice | A bounded unit of an issue's scope with an identified outcome, explicit exclusions, mapped requirements, and acceptance criteria. | Its execution is complete when its acceptance criteria are met, verification evidence is recorded, and its contribution to parent requirements is reconciled in a slice-completion record. Delivery and issue closure are tracked separately. |
-| Phase | A named stage of work within a slice, with a required outcome that enables further work on that slice. Examples: Planning, Interface Design. | Complete when its required outcome and any acceptance gate are met. Interface design always requires maintainer acceptance; other phases may be marked not applicable with a recorded reason. New findings may require revisiting a phase. |
-| Session | A work period by a contributor or agent that starts with context restoration and a stated intended outcome, and ends with a handoff when work is paused or responsibility transfers. | Ends at the recorded stopping or handoff point, even if the active phase or slice is incomplete. |
+| Slice | A bounded unit of an issue's scope. It has a clear outcome, explicit exclusions, mapped requirements, and acceptance criteria. | Slice-Work is complete when you meet its acceptance criteria, record verification evidence, and reconcile its contribution to parent requirements in a slice-completion record. Delivery and issue closure are tracked separately. |
+| Phase | A named stage of work within a slice. It produces a required outcome that enables further work. Examples include Planning and Interface Design. | A phase ends when you meet its required outcome and any acceptance gate. Interface design always needs maintainer acceptance. You may mark other phases not applicable if you record a reason. New findings may require you to revisit a phase. |
+| Session | A work session by a contributor or agent. It starts when you restore context and state an intended outcome. It ends with a handoff when you pause work or transfer responsibility. | A session ends at the recorded stop or handoff point, even if the active phase or slice remains incomplete. |
 
-A session may span several phases or slices, and a slice may span several
-sessions. A chat exchange or phase transition alone does not end a session;
-record a handoff when pausing or transferring work. Ending a session does not
-establish phase, slice, or issue completion.
+A session can span multiple phases or slices, and a single slice can cover several sessions. A chat exchange or phase transition alone does not end a session. Always record a handoff when pausing or transferring work. Finally, ending a session does not mark a phase, slice, or issue as complete.
 
 ## Applicability
 
-This workflow is mandatory for all GitHub issue work in this repository,
-effective 2026-09-18 and until the maintainer changes or withdraws the requirement.
-Read and apply it before planning or implementation and through verification,
-slice reconciliation, whole-issue review, and session handoff. Task size or type
-does not exempt the work. Scale phase outcomes to the task, while preserving
-the mandatory design-review and maintainer-acceptance gate.
+This workflow is mandatory for all GitHub issue work in this repository, effective September 18, 2026. Apply it through every stage—from planning and implementation to verification, reconciliation, whole-issue review, and handoff. No task size or type makes it optional. You can scale phase outcomes to the task, but you must keep the mandatory design review and maintainer acceptance gate.
 
-Only an explicit maintainer instruction may grant a scoped workflow exception,
-subject to the design-review protections under [Exceptions](#exceptions).
-Record the exception in the relevant GitHub issue.
-
+Only an explicit maintainer instruction can grant a scoped workflow [exception](#exceptions). Even then, design-review protections still apply. Record any [exception](#exceptions) in the relevant GitHub issue.
 
 
 ## Authoritative Records
 
-The parent GitHub issue and its discussion own scope, progress, and verification
-records. Maintain the [coverage checklist](#requirement-coverage) there.
-Project-board status is a view of that progress; see
-[Projects tracking](github-workflow.md#projects-tracking).
+The parent GitHub issue and its discussion track all scope, progress, and verification records. Maintain the [coverage checklist](#requirement-coverage) there. Project board status simply reflects that progress; see [Projects tracking](github-workflow.md#projects-tracking).
 
-From the first session using this workflow, record every session handoff as a
-comment in the relevant GitHub issue. Use the parent issue unless the slice has
-its own sub-issue; in that case, post the handoff in the sub-issue and link to
-the parent's authoritative coverage checklist. Keep the parent's coverage and
-completion evidence current with links to the relevant sub-issue comments.
+From your first session, record every session handoff as a comment in the GitHub issue. Post in the parent issue unless the slice has its own sub-issue. If it has a sub-issue, post the handoff there and link back to the parent's coverage checklist. Keep the parent issue updated with links to all sub-issue comments.
 
-Current slice designs, decisions, execution evidence, and handoffs belong in
-GitHub issues. When a slice has its own sub-issue, use the ownership split under
-[Lightweight Slice Checklist](#lightweight-slice-checklist) rather than keeping
-duplicate execution records in the parent and sub-issue.
+Keep current slice designs, decisions, execution evidence, and handoffs in GitHub issues. When a slice has a sub-issue, follow the ownership split under [Lightweight Slice Checklist](#lightweight-slice-checklist). Do not keep duplicate execution records across the parent and sub-issue.
 
-Keep tentative proposals distinct from accepted decisions. Maintain one current
-requirements/coverage record in the parent. Record each complete design,
-decision, and verification result once in its owning issue. Later acceptance,
-completion, and handoff records link that source instead of repeating detailed
-narratives or evidence. Repeat the minimum current-state fields required by
-each record even when unchanged; otherwise state only new facts or changed
-status. A link alone cannot establish a new acceptance, verification result,
-or milestone: identify the subject, version or revision, and current status
-next to the link. Recording once does not prohibit a consolidated replacement
-version: identify what it supersedes and preserve acceptance history under
-[requirements and approval](#requirements-and-approval). Promote lasting
-technical decisions into interface, schema, or decision documentation when
-implemented. Do not create competing copies of the scope.
+Keep tentative proposals separate from accepted decisions. Maintain one current requirements coverage record in the parent issue. Record each complete design, decision, and verification result once in its owning issue. Future acceptance, completion, and handoff records should link to that source instead of repeating long narratives or evidence. Repeat only the essential current-state fields each record requires, even when unchanged. Otherwise, state only new facts or status updates.
+
+A link alone cannot prove a new acceptance, verification result, or milestone. Always list the subject, version or revision, and current status next to the link.
+
+Recording an item once does not prevent you from replacing it with a consolidated version. Just name what it supersedes and keep the acceptance history under [requirements and approval](#requirements-and-approval). Once implemented, record lasting technical decisions into interface, schema, or decision documentation. Do not create competing copies of the scope.
 
 ## Requirements and Approval
 
-Before proposing new or materially revised scope, the agent restores the issue
-discussion, accepted decisions, relevant documentation, and implementation facts.
-Requirements discovery accounts for problem/users, user journey, observable
-success, boundaries, inputs/outputs, failure behavior, constraints, and acceptance
-examples. Reuse established answers, ask about material gaps or contradictions,
-and explain any dimension's inapplicability in the specification. Use
-[slice-session](../../.agents/skills/slice-session/SKILL.md) and the shared
-[interview protocol](interview-protocol.md) to conduct discovery.
+Before proposing new or modified scope, restore the issue discussion, accepted decisions, relevant docs, and code facts. Requirements discovery must cover the problem, user journey, success metrics, boundaries, inputs, outputs, failure behavior, constraints, and acceptance examples. Reuse known answers, ask about key gaps or contradictions, and explain any dimension that does not apply. Use [slice-session](../../.agents/skills/slice-session/SKILL.md) and the shared [interview protocol](interview-protocol.md) to conduct discovery.
 
-The agent presents a versioned specification with stable requirement IDs,
-constraints, exclusions, acceptance criteria/examples, and classified questions.
-The maintainer must explicitly accept that identified specification before the
-agent records it as accepted scope. A saved proposal remains a draft until
-accepted; silence, elapsed time, and draft publication do not establish acceptance.
+Present a versioned specification with stable requirement IDs, constraints, exclusions, acceptance criteria, examples, and categorized questions. The maintainer must explicitly approve this specification before you record it as accepted scope. A saved proposal remains a draft until approved. Silence, elapsed time, and draft publication do not count as acceptance.
 
-The specification states **what** must be delivered. The implementation plan
-states **how** the accepted requirements will be delivered through slices,
-design, and verification. The maintainer accepts the active slice's plan and
-concrete design, normally in one confirmation naming both subjects and versions.
-Specification acceptance is separate. A separately accepted, unchanged plan needs
-no repeated approval; concrete-design acceptance is still required. A roadmap
-assigns requirements to slices but does not approve future slices' undisclosed
-designs.
+The specification states **what** to deliver. The implementation plan states **how** to deliver those requirements through slices, design, and verification. The maintainer must accept the active slice's plan and design, usually in a single confirmation naming both subjects and versions.
 
-The normal sequence is specification acceptance and verified publication, then
-active-slice plan/design acceptance and verified publication, then test
-preparation and implementation. On resumption, reuse valid recorded acceptance
-and authorization at their stated scope; resume at the missing decision or phase.
+If the plan was already accepted and has not changed, it does not need re-approval. However, you still need separate approval for the design. A roadmap assigns requirements to slices, but it does not approve a slice's design in advance.
 
-If design discovery exposes a product question, pause affected design work,
-return to the affected requirement, and obtain acceptance of its revised
-specification before settling dependent design decisions. Preserve unrelated
-accepted decisions. Each material revision identifies the changed requirement
-IDs or decisions, its reason, the record it supersedes, and the acceptance needed.
-Earlier confirmation applies only to its original version and scope.
+The normal sequence follows these steps:
 
-For each publication, the agent reads back the saved record and compares it with
-the intended text, including acceptance scope and preserved unrelated content.
-A failed write is **unsaved**; a failed readback leaves publication **unverified**.
-Preserve the exact text and its status locally, restore current remote content,
-and retry within existing authorization. Distinguish accepted-but-unsaved
-discussion from recorded acceptance. Implementation must wait until its required
-acceptance records are published and verified.
+1. Accept and publish the specification.
+2. Accept and publish the active-slice plan and design.
+3. Prepare tests and begin implementation.
 
-### Discovery Questions
+When resuming work, reuse any valid recorded approvals for their stated scope. Then, pick up at the missing decision or phase.
 
-For both requirements and design, distinguish inspected facts, explicit
-maintainer decisions, agent recommendations, and unresolved assumptions.
-Classify each open question, identify affected work and dependencies, and state
-what may proceed:
+If design discovery reveals a product question, pause affected design work. Return to the requirement and get approval for its revised spec before making dependent design decisions. Keep unrelated accepted decisions intact.
 
-- A **blocking** question can change the behavior, contract, or verification of
-  affected work. It prevents dependent design and implementation. Resolve it
-  and obtain acceptance of the resulting specification or design before
-  proceeding with that work.
-- A **nonblocking** question does not affect the contract or verification of
-  work proceeding now. Record why that work is independent and when the answer
-  is due; reclassify the question if its impact changes.
+Each key revision must list:
 
-An optional preference may have a proposed default; silence does not turn that
-recommendation into a maintainer decision. Discovery ends when the behavior or
-design can be stated, verified, and approved, and every remaining question has a
-classification, affected scope, and resolution point.
+- The changed requirement IDs or decisions
+- The reason for the change
+- The record it replaces
+- The approval required
+
+Earlier approvals apply only to their original version and scope.
+
+For each publication, read back the saved record and compare it with your intended text. Check both the acceptance scope and any preserved content. A failed write is unsaved. A failed read-back leaves publication unverified.
+
+If a write or read-back fails:
+
+- Save the exact text and its status locally.
+- Restore the current remote content.
+- Retry within your existing authorization.
+
+Keep accepted-but-unsaved discussion distinct from recorded acceptance. Do not start implementation until you publish and verify all required acceptance records.
+
+### Handling Unanswered Questions
+
+Discover requirements with [slice-session](../../.agents/skills/slice-session/SKILL.md) and design with [slice-design-review](../../.agents/skills/slice-design-review/SKILL.md). Both share the [interview protocol](interview-protocol.md). The rules below show how unanswered questions impact dependent work and when discovery is complete enough to present a proposal.
+
+For both requirements and design, separate facts, maintainer decisions, agent recommendations, and unresolved assumptions. Classify each open question, map affected dependencies, and state what can move forward:
+
+- A **blocking** question can alter behavior, contracts, or verification. It stops dependent design and implementation. Resolve it and get approval before starting that work.
+- A **nonblocking** question does not change the contract or verification of current work. Record why the work is independent and when you need the answer. Reclassify the question if its impact changes.
+
+An optional preference may include a proposed default, but silence does not make it an approved decision. Discovery ends once you can state, verify, and approve the design, and every remaining question has a classification, clear scope, and target resolution point.
+
 
 ## Phase Outcomes
 
@@ -165,181 +113,104 @@ classification, affected scope, and resolution point.
 | Planning | Accepted specification; proposed slice outcome, exclusions, mapped requirements, acceptance criteria, uncertainties, and verification approach |
 | Interface design | Active-slice plan and concrete design explicitly accepted under [Interface Design Review](#interface-design-review); acceptance scope, approved optional items, and classified questions published and verified before implementation |
 | Test preparation | Reviewable success/failure cases, independent expectations, fixtures, and verification commands; executable tests where appropriate |
-| Implementation | Small reviewable changes satisfying the agreed contract, with relevant checks passing |
+| Implementation | Reviewable changes satisfying the agreed contract, with relevant checks passing |
 | Integration verification | Evidence using real applicable boundaries, reconciliation against parent requirements, and a slice-completion record; a session handoff only if the session also ends |
 
 ### Interface Design Review
 
-Before coding starts, inspect the existing implementation and present the
-proposed design in chat for maintainer review and discussion. Show the contract
-and the code structure that will realize it, distinguishing existing behavior,
-proposed changes, and unresolved questions.
+Before coding, inspect the current code and present your design in chat for maintainer review. Show the contract and the supporting code structure. Clearly mark existing behavior, proposed changes, and open questions.
 
-Before finalizing that proposal, investigate compatibility, abstractions and
-ownership, interfaces and collaboration, failure semantics, persistence,
-operational behavior, and tradeoffs. Use
-[slice-design-review](../../.agents/skills/slice-design-review/SKILL.md) and the
-shared [interview protocol](interview-protocol.md) to resolve consequential choices.
-Reuse settled answers and explain inapplicable topics. Resolve routine technical
-details through existing conventions and the accepted design.
+Before finalizing the proposal, investigate compatibility, abstractions and their responsibilities, interfaces, failure semantics, persistence, operational behavior, and tradeoffs. Use [slice-design-review](../../.agents/skills/slice-design-review/SKILL.md) and the [interview protocol](interview-protocol.md) to resolve key choices. Reuse settled answers and explain skipped topics. Handle routine technical details using existing conventions and the accepted design.
 
-Wait for explicit acceptance of the active slice's plan and concrete design
-before implementation. Record the confirmation and source, subjects, versions,
-and scope under [requirements and approval](#requirements-and-approval).
-Specification acceptance or general implementation authorization does not
-constitute design acceptance. This review phase cannot be skipped or marked
-not applicable.
+Get explicit maintainer approval for the active slice's plan and design before starting implementation. Record the confirmation along with its source, subjects, versions, and scope under [requirements and approval](#requirements-and-approval). Spec approval does not count as design acceptance. You cannot skip or mark this review phase as not applicable.
 
 | Review area | Details to present |
 | --- | --- |
 | Modules | Names and paths of modules being added or edited, affected abstractions within them, and why the change belongs there. |
-| Abstractions and responsibilities | Classes, interfaces, data types, or other relevant abstractions being added or edited; their main responsibilities, ownership, and changes from the existing design. |
-| Functions and interfaces | Functions being added or edited, with proposed signatures, parameter and return types, relevant errors, and side effects. Show before and after for changed interfaces and contracts. For mechanically identical internal edits, list the affected functions and describe their shared signature and behavior change once; identify exceptions separately. |
+| Abstractions and responsibilities | Classes, interfaces, data types, or other relevant abstractions being added or edited; their main responsibilities, and changes from the existing design. |
+| Functions and interfaces | Functions being added or edited, with proposed signatures, parameter and return types, relevant errors, and side effects. Show before and after for changed interfaces and contracts. If the same change applies to several internal functions, list them and explain the shared change to their signatures and behavior once. Explain any differences separately. |
 | Collaboration | Which abstractions call or depend on which others, what data crosses each boundary, and who owns validation, orchestration, persistence, or other relevant responsibilities. |
 | Contract and examples | Inputs, outputs, ownership, validation, errors, compatibility, and relevant cross-component behavior, illustrated by typical success and relevant failure cases. |
 | Rationale and open decisions | Assumptions, alternatives considered, tradeoffs, the recommendation and its reasons, and questions requiring maintainer judgment. |
 
-Use a module/abstraction table and short signature sketches where useful. Add
-a sequence diagram or interaction example when it clarifies collaboration.
-Present the active slice's changed behavior and code structure against linked
-accepted requirements and existing contracts. State unchanged background by
-reference; describe new or changed contracts, responsibilities, failure
-behavior, compatibility, and consequential tradeoffs in the proposal itself.
-For a substantial refactor, group repeated mechanical edits only when the
-affected functions and shared transformation are identified and any distinct
-contract or failure change is explained. Use representative success and failure
-examples; keep detailed test outcomes in verification records. Scale detail to
-the slice without a word limit. Address every review area above. If an area
-seems inapplicable or unnecessary, explain why and prompt the maintainer for
-approval to make it optional before omitting it; record that approval in the
-issue. Reporting that no functions change in a prose-only slice addresses the
-functions item. State when existing abstractions suffice instead of inventing
-new ones to fill the format.
+Use a module or abstraction table with short signature sketches where helpful. Add a sequence diagram or interaction example to clarify how components collaborate. Show how the active slice changes behavior and code structure, referencing accepted requirements and existing contracts.
 
-Incorporate the maintainer's feedback from chat. Before implementation,
-publish one complete, identified version of the accepted design in the parent
-or execution sub-issue under [Authoritative Records](#authoritative-records).
-If that complete proposal is already published and remains current, a compact
-acceptance comment may link it. If the proposal exists only in chat, publish
-the full accepted design and append the acceptance fields below or link a
-separate acceptance record.
+Reference unchanged background details rather than repeating them. Describe new or changed contracts, responsibilities, failure behavior, compatibility, and key tradeoffs directly in the proposal. For major refactors, group repeated mechanical edits only if you name the affected functions, describe the shared transformation, and explain any changed contracts or failures. Include representative success and failure examples, but keep full test output in verification records.
 
-Both publication paths must record the maintainer confirmation/source,
-accepted plan and design versions and scope, exact clarifications or changed
-sections, superseded records, approved optional items, and unresolved
-questions with affected work and permitted independent work. Clarifications
-that materially change the accepted contract follow the versioning and explicit
-acceptance rules under [requirements and approval](#requirements-and-approval);
-calling a change a clarification does not bypass those rules. If the linked
-proposal and clarifications cannot reconstruct the accepted design, publish
-a consolidated identified version with an explicit supersession link and
-preserved acceptance history. Link existing specifications instead of copying
-them. Classify remaining questions under
-[discovery questions](#discovery-questions). Publish and verify the complete
-design and its acceptance record before implementation.
+Match detail to the slice's needs—there is no fixed word limit. Address every review area listed above. If an area seems unnecessary, explain why and ask the maintainer to approve skipping it. Record that approval in the issue. If prose-only changes require no code updates, state that no functions change. Finally, confirm when existing abstractions suffice instead of creating new ones to fill out the template.
 
-Independent work within the same slice may proceed only when it is explicitly
-covered by the maintainer's accepted design and does not depend on an unresolved
-blocking question. The acceptance record must identify that boundary. Future
-slices need their own concrete design records; linking this workflow alone is
-insufficient.
+Incorporate the maintainer's feedback from chat. Before implementation, publish one complete, identified version of the accepted design in the parent or execution sub-issue under [Authoritative Records](#authoritative-records). If that complete proposal is already published and remains current, a brief acceptance comment can link to it. If the proposal exists only in chat, publish the full accepted design and append the acceptance fields below, or link to a separate acceptance record.
 
-If implementation reveals a material change to reviewed
-interfaces, responsibilities, or collaboration, return to design discussion
-and obtain acceptance of the revised design. Update the issue record before
-proceeding with that change.
+Both publication paths must record:
+- Maintainer confirmation and source
+- Accepted plan, design versions, and scope
+- Exact clarifications or changed sections
+- Superseded records
+- Approved optional items
+- Unresolved questions, affected work, and allowed independent work
+
+Clarifications that materially change the accepted contract must follow the versioning and approval rules under [requirements and approval](#requirements-and-approval). Calling a change a "clarification" does not bypass these rules.
+
+If the linked proposal and clarifications cannot reconstruct the accepted design, publish a single consolidated version. Include an explicit supersession link and preserve the acceptance history. Link existing specifications instead of copying them.
+
+Classify remaining questions under [discovery questions](#discovery-questions). Publish and verify the complete design and its acceptance record before starting implementation.
+
+Independent work within the same slice may proceed only if the maintainer's accepted design explicitly covers it and no unresolved blocking question blocks it. The acceptance record must define that boundary. Future slices require their own concrete design records; linking this workflow alone is not enough.
+
+If implementation reveals a material change to reviewed interfaces, responsibilities, or collaboration, pause to discuss the design and get approval for the updates. Update the issue record before making that change.
 
 ### Advancing Through Phases
 
-Advance when the current phase's outcome is established. Implementation needs
-settled acceptance criteria/contracts, the recorded design acceptance above,
-and a verification approach, within the user's authorization. Honor dependency
-gates recorded in the relevant issues before beginning dependent work.
+Advance only when you establish the current phase's outcome. Implementation requires settled acceptance criteria and contracts, recorded design approval, and a verification plan—all within the user's authorization. Honor dependency gates recorded in relevant issues before starting dependent work.
 
-Ask about unresolved product choices, scope changes, or decisions reserved for
-the maintainer. Ordinary technical choices and progress within an accepted
-design do not require repeated permission. Other phases may be brief or marked
-not applicable with a recorded reason under [Exceptions](#exceptions).
+Ask the maintainer about unresolved product choices, scope changes, or reserved decisions. You do not need repeated permission for routine technical choices or progress within an accepted design. Other phases can be brief or marked not applicable if you record a reason under [Exceptions](#exceptions).
 
-For refactoring, characterize behavior that must survive the change. Use mocks
-or fakes to isolate dependencies and exercise failures where helpful. Use real
-validators, storage adapters, or other applicable integration boundaries early;
-mock agreement alone does not establish integration correctness. Scale checks
-to the change and follow the issue's required verification.
+For refactoring, clearly define the behavior that must remain unchanged. Use mocks or fakes to isolate dependencies and test failures where helpful. Use real validators, storage adapters, or integration boundaries early; mock agreement alone does not prove integration correctness. Scale your checks to the change and follow the issue's verification requirements.
 
 ## Lightweight Slice Checklist
 
-Record these details for each active slice in the parent issue until the slice
-has its own sub-issue:
+Record these details for each active slice in the parent issue (unless the slice has its own sub-issue):
 
 - Slice ID, outcome, and exclusions.
 - Covered requirement references and acceptance criteria.
-- Boundaries, accepted contracts, maintainer acceptance, approved optional review
-  items, and blocking/nonblocking design questions with affected work.
-- Verification plan, including applicable integration checks.
-- Current phase and execution/delivery status.
-- Completion evidence and remaining parent requirements.
+- Boundaries, accepted contracts, maintainer acceptance, approved optional review items, and open design questions with affected work.
+- Verification plan, including integration checks.
+- Current phase and status.
+- Evidence of completion and remaining parent requirements.
 
-Use this checklist within the existing GitHub issue templates. A separate
-template or sub-issue is not required for every slice.
+Use this checklist in the existing GitHub issue templates. You do not need a separate template or sub-issue for every slice.
 
-Start with slices in the parent issue. Promote a slice to a sub-issue when it
-needs independent ownership, substantial separate discussion, or its own
-delivery and dependency tracking. Preserve its slice ID and parent requirement
-mapping. Multiple sessions alone do not require a sub-issue. After promotion:
+Start with slices in the parent issue. Promote a slice to a sub-issue when it needs independent ownership, substantial separate discussion, or its own delivery tracking. Keep its slice ID and parent requirement mapping. Multiple sessions alone do not require a sub-issue.
 
-- The parent retains the slice ID, short outcome/exclusions summary, requirement
-  mapping, current phase and status, remaining parent obligations, and links to
-  the sub-issue and its verification and slice-completion evidence.
-- The sub-issue owns the detailed checklist, design and acceptance record,
-  questions, verification plan/results, execution discussion, slice-completion
-  record, and session handoffs. Link the existing parent discussion when moving
-  ownership; do not maintain competing detailed copies.
+After promotion:
+
+- The parent keeps the slice ID, brief outcome/exclusions summary, requirement mapping, current phase and status, remaining parent obligations, and links to the sub-issue and its verification evidence.
+- The sub-issue owns the detailed checklist, design record, questions, verification plan, execution discussion, and session handoffs. Link the existing parent discussion when moving ownership. Do not keep competing copies.
 
 ## Requirement Coverage
 
-Before implementing the first slice, read the full parent issue and available
-discussion, including requirements, constraints, and exclusions outside the
-acceptance-criteria checkboxes. Assign stable requirement references, slices,
-statuses, and evidence in one parent checklist. Assign every requirement to a
-slice or explicitly identified subsequent work. No requirement may remain
-unassigned. Proposed later slices may be refined; preserve traceability when splitting or regrouping them.
+Before starting the first slice, read the entire parent issue and discussion. Check all requirements, constraints, and exclusions outside the acceptance-criteria boxes.
 
-Tracking a requirement in another slice or issue does not remove it from the
-parent's completion obligations. It remains outstanding until evidence satisfies
-it or the maintainer explicitly approves removing it from the parent's scope.
-Record that scope decision in the parent; a follow-up link alone is insufficient.
+Assign stable requirement references, slices, statuses, and evidence in one parent checklist. Assign every requirement to a slice or explicit follow-up work. Do not leave any requirement unassigned. You may refine later slices, but keep traceability when splitting or regrouping them.
 
-Use explicit statuses such as pending, in progress, partial, and satisfied.
-Mark a requirement satisfied only with implementation/documentation and
-verification evidence appropriate to that requirement. Shared requirements
-need both incremental evidence and a check across the completed issue.
+Tracking a requirement in another slice or issue does not remove it from the parent issue. The requirement stays open until evidence satisfies it or the maintainer explicitly approves removing it from scope. Record this scope decision in the parent. A follow-up link alone is not enough.
+
+Use clear statuses like pending, in progress, partial, and satisfied. Mark a requirement satisfied only with implementation, documentation, and verification evidence. Shared requirements need both incremental evidence and a final check across the completed issue.
 
 ## Slice Reconciliation
 
 After every slice:
 
 1. Link evidence to the requirements it satisfies.
-2. Mark partial satisfaction and remaining work explicitly.
-3. Identify uncovered requirements or new gaps and assign them to subsequent
-   work; seek maintainer agreement for changes to authoritative scope.
-4. Select the next slice from outstanding requirements.
+2. Mark partial progress and remaining work explicitly.
+3. Identify uncovered requirements or new gaps and assign them to follow-up work. Get maintainer agreement before changing official scope.
+4. Pick the next slice from remaining requirements.
 
-After integration verification and reconciliation, post a slice-completion
-comment in the slice's execution issue. Include its ID, acceptance-criteria
-results, requirement reconciliation, current delivery status, remaining parent
-obligations, and next action. Link any earlier durable issue record, including
-one from the same session, containing commands or scenarios, observed results,
-verifier, exact skips and reasons, remaining uncertainty, and any decisions.
-Include those details here only where they have not already been recorded;
-a separate verification comment is not required. Identify new evidence or
-changed results with a concise outcome and source link. Do not copy full test
-narratives or logs already recorded. This records slice execution completion
-and does not itself end the session or close an issue.
+After integration checks and cleanup, post a slice-completion comment in the slice issue. Include the slice ID, acceptance-criteria results, requirement mapping, current status, remaining parent work, and next steps.
 
-If the session ends at the same point, one comment may serve as both the
-slice-completion record and session handoff, provided it includes both sets of
-information and explicitly says that the session is ending.
+Link to any earlier issue record that contains commands, test results, verifier name, skips with reasons, remaining uncertainty, and decisions. Include those details here only if you have not recorded them elsewhere. You do not need a separate verification comment. Briefly summarize new evidence or changed results and link to the source. Do not copy full test logs or long stories that exist elsewhere. This comment records that slice execution is complete. It does not end the session or close the issue.
+
+If your session ends here, one comment can serve as both the slice-completion record and session handoff. Just include both sets of details and state clearly that the session is ending.
 
 ## Verification and Delivery Status
 
@@ -348,120 +219,50 @@ and any pending milestone made explicit:
 
 | Status | Meaning and evidence |
 | --- | --- |
-| Implementation verified | The implementation or documentation satisfies its acceptance criteria and required checks, with reconciliation evidence recorded. Changes may still be local and uncommitted. Identify whose verification is recorded; the agent's evidence does not substitute for the maintainer's confirmation required for issue closure. |
-| Published for review | The reviewable changes are available to reviewers, normally in a pushed branch and linked PR. Posting a status comment alone does not publish repository changes. |
-| Delivered | The result has reached the destination required by the issue, with evidence: for example, merged into the target branch or deployed where the issue requires deployment. Define that destination in the issue; do not infer delivery from verification, PR creation, or issue closure. |
+| Implementation verified | The implementation or documentation satisfies its acceptance criteria and required checks, with evidence recorded. Changes may still be local and uncommitted. Identify who verified the work. The agent's evidence cannot replace the maintainer's final approval needed to close the issue. |
+| Published for review | Reviewers can access the changes, usually in a pushed branch and linked PR. A status comment alone does not publish repository changes. |
+| Delivered | The result reached its required target, with evidence—for example, merged into the main branch or deployed as required. Define that target in the issue. Do not assume delivery just because you completed verification, created a PR, or closed the issue. |
 
-Use the applicable component's documented checks: start with
-[repository commands](../../README.md#repository-commands), the
-[CMS README](../../apps/gurubodh-cms/README.md),
-[content CLI README](../../tools/gurubodh-cli/README.md), or the relevant guide.
-Record commands, results, verifier, and evidence. For any skipped check, report
-exactly what was skipped, why, and the remaining uncertainty. A skip is not a
-pass; resolve required verification gaps or obtain an explicit maintainer
-decision before issue completion.
+Use the component's documented checks: start with [repository commands](../../README.md#repository-commands), the [CMS README](../../apps/gurubodh-cms/README.md), the [content CLI README](../../tools/gurubodh-cli/README.md), or the relevant guide. Record commands, results, who verified them, and evidence.
 
-These milestones need not occur in a fixed order: a draft PR may be published
-before verification is finished. Always distinguish technical verification,
-maintainer confirmation, publication, delivery, and issue closure. None of these
-statuses grants permission to merge or deploy.
+For any skipped check, record exactly what was skipped, why, and the remaining uncertainty. A skip is not a pass. Resolve required verification gaps or get explicit maintainer approval before closing the issue.
+
+These milestones do not need to happen in a fixed order. For example, you can publish a draft PR before finishing verification. Always distinguish between technical verification, maintainer confirmation, publication, delivery, and issue closure. None of these statuses gives you permission to merge or deploy.
 
 ## Publication and Integration
 
-A slice may be ready for review while other issue requirements remain open.
-Prepare a linked PR describing the slice's scope, verification, documentation,
-and remaining work using the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md)
-and [GitHub conventions](github-workflow.md#pull-requests). A draft PR may expose
-unfinished work with its status stated accurately. Report the changes and any
-verification skips to the maintainer.
+A slice may be ready for review while other issue requirements remain open. Prepare a linked PR describing the slice's scope, verification, documentation, and remaining work. Use the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) and [GitHub conventions](github-workflow.md#pull-requests). A draft PR can share unfinished work as long as you state its status accurately. Report the changes and any verification skips to the maintainer.
 
-Use `Refs #<issue-number>` until the whole-issue review and maintainer
-confirmation/instruction under [Whole-Issue Completion](#whole-issue-completion)
-authorize closure. Only then may a closing reference be used.
+Use `Refs #<issue-number>` until whole-issue review and maintainer approval authorize closure under [Whole-Issue Completion](#whole-issue-completion). Only then can you use a closing reference.
 
-Merge only after required checks and review pass. Agents need explicit maintainer
-instruction before merging, squashing, rebasing, or otherwise integrating into
-the target branch. Review approval, design acceptance, verification, publication,
-and issue closure do not supply that instruction. After authorized integration,
-record delivery evidence and follow [branch cleanup](github-workflow.md#branch-cleanup).
+Merge only after required checks and review pass. Agents need explicit maintainer instruction before merging, squashing, rebasing, or integrating into the target branch. Review approval, design acceptance, verification, publication, and issue closure do not count as instruction. After authorized integration, record delivery evidence and follow [branch cleanup](github-workflow.md#branch-cleanup).
 
 ## Whole-Issue Completion
 
-Before requesting that an issue be marked complete, reread its entire description
-and discussion. Compare every requirement against implementation, documentation,
-and verification evidence, including integration across separately completed
-slices. Every requirement must be satisfied with evidence or explicitly
-removed from scope by the maintainer. Nothing may be silently deferred.
+Before asking to mark an issue complete, reread its full description and discussion. Compare every requirement against implementation, documentation, and verification evidence, including integration across separate slices. Every requirement must have evidence or explicit maintainer approval to remove it from scope. Do not silently defer anything.
 
-Passing this review allows the agent to report verification evidence and ask
-for the maintainer's completion decision. Mark an issue complete and close it
-only after the maintainer explicitly confirms "implementation verified" and
-instructs the agent to mark it complete and close it. Record that confirmation
-and instruction in the issue. Neither an agent's successful checks, design
-acceptance, publication, nor delivery supplies this authorization. This rule
-applies to execution sub-issues as well as parent issues.
+Passing this review allows you to report verification evidence and request the maintainer's completion decision. Mark an issue complete and close it only after the maintainer explicitly confirms "implementation verified" and instructs you to close it. Record that confirmation and instruction in the issue. Your successful checks, design approval, publication, or delivery do not give this authorization. This rule applies to both sub-issues and parent issues.
 
-If the maintainer authorizes closure while publication or delivery is still
-pending, record those pending milestones and remaining actions explicitly.
-Closure does not mean delivery has occurred and does not authorize a merge.
+If the maintainer authorizes closure while publication or delivery is pending, record those open steps and actions clearly. Closing an issue does not mean delivery has occurred, nor does it authorize a merge.
 
 ## Session Entry and Exit
 
-At entry, read the complete authoritative issue and available discussion, accepted
-decisions, and latest handoff comment in the relevant issue. Identify the active
-slice and phase, and state the intended session outcome. Reuse accepted decisions
-instead of reopening them without new evidence.
+When you start, read the full primary issue, past discussion, accepted decisions, and latest handoff comment. Identify the current slice and phase, then state your session goal. Use existing decisions rather than re-opening them without new evidence.
 
-At exit, post a session handoff comment in the issue selected under
-[Authoritative Records](#authoritative-records). Give a compact current-state
-snapshot, repeating these fields even when unchanged: active slice and phase;
-whether each is complete; outstanding parent requirement IDs, blockers, and
-open questions with affected work; branch, commit, and PR and whether work is
-local, committed, or published; separate implementation verification,
-publication, and delivery milestones; pending specification, plan, design,
-maintainer verification, or closure decisions; and the exact next action.
-Distinguish recorded acceptance from a draft, accepted-but-unsaved discussion,
-or unverified publication.
+When you finish, post a handoff comment in the issue listed under [Authoritative Records](#authoritative-records). Provide a brief status update, including all of these fields even if they have not changed: active slice and phase; completion status for each; open requirement IDs, blockers, and questions with affected work; branch, commit, and PR status (local, committed, or published); separate verification, publication, and delivery milestones; pending spec, plan, design, verification, or closure decisions; and the exact next step. Clearly separate recorded acceptance from draft ideas, unsaved discussions, or unverified changes.
 
-Then summarize what changed in this session: decisions, completed work,
-verification outcomes, and new or resolved questions. Link detailed decisions
-and evidence already recorded, including earlier in the same session. Include
-commands/scenarios, observed results, verifier, exact skips/reasons, remaining
-uncertainty, and related decisions here only where no durable record contains
-them; a separate verification comment is not required. For unchanged decisions,
-evidence/skips, and requirement details, link the current authoritative records
-and state that they are unchanged instead of restating their narratives.
-A handoff must reveal the current status and next action without requiring
-the reader to infer them from links. This handoff marks the session's end,
-including a pause partway through a phase; a brief exchange or phase transition
-alone does not end a session.
+Next, summarize what changed in this session: decisions, completed work, test results, and new or resolved questions. Link to detailed decisions and evidence recorded earlier, even from the same session. Only include commands, observed results, verifiers, skipped steps, remaining risks, and related decisions here if they are not recorded elsewhere; you do not need a separate verification comment. For unchanged items, link to the official records and note that they are unchanged rather than repeating the details. Your handoff must clearly state the current status and next step so the reader does not have to guess from links. This handoff ends the session, even if you stop halfway through a phase; a short conversation or phase shift alone does not mark the end.
 
-If the session covered several slices, identify each slice and its resulting
-state; post the relevant handoff details in each execution issue. Link shared
-context rather than duplicating it. A slice-completion comment from earlier in
-the session can be linked from the handoff without repeating its evidence.
+If your session covered multiple slices, list each slice and its final state. Post the specific handoff details in each execution issue, and link shared context instead of repeating it. If you posted a slice-completion comment earlier in the session, link to it from the handoff instead of retyping the evidence.
 
 ## Exceptions
 
-The maintainer may grant scoped exceptions to this workflow, but interface
-design review and explicit acceptance remain mandatory under the current
-policy. The agent cannot bypass the review or mark that phase not applicable.
-Individual review items may be made optional only after prompting for and
-receiving explicit maintainer approval. A general instruction to simplify the
-work does not waive this gate.
+The maintainer may grant limited exceptions to this workflow, but interface design review and explicit approval remain mandatory under current policy. The agent cannot skip the review or mark that phase as not applicable. You can make individual review items optional only after asking for and receiving explicit maintainer approval. A general request to simplify the work does not remove this requirement.
 
-For other exceptions, record the scope, any brief reason supplied, and the
-requirements that still apply in the relevant issue. The maintainer need not
-justify an exception. Other phases may be marked not applicable as an ordinary
-judgment with a recorded reason; that does not remove required verification or
-permit unsupported completion claims. Exceptions apply only to the stated work.
+For other exceptions, record the scope, any brief reason given, and the requirements that still apply in the relevant issue. The maintainer does not need to justify an exception. You may mark other phases as not applicable as a normal judgment with a recorded reason; this does not remove required testing or allow unverified claims of completion. Exceptions apply only to the specified work.
 
-Waiving this workflow does not automatically waive Issue-first, branch,
-verification, or merge requirements; overrides of those rules must be explicit.
+Waiving this workflow does not automatically waive Issue-first, branch, testing, or merge rules; any override of those rules must be explicit.
 
 ## Workflow Review
 
-Record proposed process improvements and their evidence in a relevant GitHub
-issue. Distinguish proposals from accepted changes. The current workflow
-remains mandatory until the maintainer explicitly approves a change or withdraws
-the requirement. Completing a slice or issue does not change repository policy.
+Record proposed process improvements and their evidence in a relevant GitHub issue. Separate proposed changes from accepted ones. You must follow the current workflow until the maintainer explicitly approves a change or drops the requirement. Finishing a slice or issue does not change repository policy.
