@@ -3,6 +3,9 @@
 Start with the [project map](README.md) and [documentation routes](docs/README.md)
 to find your component. Agents start at [AGENTS.md](AGENTS.md).
 
+For a human starting point to understand agent-assisted work, use the
+[development activity guide](docs/development/README.md).
+
 For issue work, read the [slice workflow](docs/development/slice-workflow.md),
 then use [GitHub conventions](docs/development/github-workflow.md) for issues,
 branches, commits, PRs, Projects tracking, and cleanup. The optional
