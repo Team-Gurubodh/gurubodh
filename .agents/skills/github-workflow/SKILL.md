@@ -40,23 +40,17 @@ This skill records requirements and design decisions; it does not decide them.
    coverage record and the owning issue's execution records; preserve unrelated
    content and stable requirement IDs. Link detailed records instead of copying
    them between parent and sub-issue.
-2. Identify the record's version and actual status. A draft lists unanswered
-   questions. An accepted record includes the explicit confirmation/source and
-   precisely which specification, plan, or design versions and scope it covers.
-   Reuse valid acceptance and publication authorization on resumption.
-3. For a material revision, identify changed requirements/decisions, rationale,
-   affected dependencies, and superseded records. Preserve earlier confirmation
-   as history; do not imply it accepted the revision.
-4. Publish the prepared text, then read it back. Compare content, acceptance
-   scope, links, and preserved unrelated text. A returned URL alone does not
-   establish that the intended record was saved correctly.
+2. Check the prepared record against
+   [Requirements and Approval](../../../docs/development/slice-workflow.md#requirements-and-approval)
+   for its version, status, acceptance scope, and any material revision.
+   Use the corresponding [record format](../../../docs/development/templates/slice-records.md).
+3. Publish the prepared body file. Retrieve the saved body and compare it with
+   the file, including links and preserved unrelated text. Apply the workflow's
+   [readback and recovery rules](../../../docs/development/slice-workflow.md#requirements-and-approval)
+   to determine publication status and whether implementation may proceed.
 
-If a write fails, report the record as unsaved. If readback fails, report its
-publication as unverified. Preserve the exact text and status locally, distinguish
-accepted-but-unsaved discussion from recorded acceptance, and retrieve current
-remote state before retrying within existing authorization. Check whether the
-record already exists before retrying an uncertain write. Follow the workflow's
-implementation gate while required acceptance publication remains unresolved.
+Before retrying an uncertain write, check whether the record already exists
+to avoid duplicate publication. Reuse valid publication authorization on resumption.
 
 ## Locate and Preserve Work
 

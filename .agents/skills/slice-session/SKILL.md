@@ -77,20 +77,14 @@ after reconciliation; keep the session open if work continues.
 
 ## Pause or Transfer
 
-Prepare the [handoff format](../../../docs/development/templates/slice-records.md#session-handoff)
-from actual checkout and issue state. Follow
-[session exit](../../../docs/development/slice-workflow.md#session-entry-and-exit)
-for required content and record ownership. Give the current slice/phase,
-work location, milestone and approval states, blockers, remaining requirement
-IDs, and exact next action, repeating these current-state fields even when
-unchanged. Summarize what changed this session and link detailed design,
-acceptance, and verification records already posted, including earlier in the
-same session. Include full evidence details only where no durable record
-contains them; a separate verification comment is not required. Mark unchanged
-earlier details with a current link instead of repeating their narratives.
-Include enough
-branch/commit/PR information to find work even when nothing has been committed
-or published.
+Compare the issue's recorded state with the checkout, commits, and PR. Fill the
+[handoff format](../../../docs/development/templates/slice-records.md#session-handoff)
+from that comparison. Follow
+[Session Entry and Exit](../../../docs/development/slice-workflow.md#session-entry-and-exit)
+for required content and evidence links, and
+[Authoritative Records](../../../docs/development/slice-workflow.md#authoritative-records)
+to select the issue that owns the handoff. Include enough branch/commit/PR
+information to locate work even when nothing has been committed or published.
 
 Post the handoff to its execution issue and verify the posted content. If issue
 access fails, preserve the prepared text locally and report the unposted record

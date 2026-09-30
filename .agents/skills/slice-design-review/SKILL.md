@@ -41,52 +41,29 @@ accepted decisions.
 ## Prepare a Concrete Proposal
 
 Use the [design format](../../../docs/development/templates/slice-records.md#design-and-acceptance)
-to distinguish current behavior, proposed changes, and undecided choices.
-Link accepted requirements and unchanged contracts. Show changed file paths,
-responsibilities, signatures, errors, data flow, ownership, compatibility,
-and representative success/failure behavior. For a substantial refactor,
-list functions with mechanically identical internal edits and explain their
-shared transformation once; explain distinct contract or failure changes
-separately. If no functions or runtime abstractions change, say so explicitly.
-Existing abstractions may suffice; do not invent them to fill a table.
+to turn the inspected facts and discovery results into a concrete proposal.
+Follow [Interface Design Review](../../../docs/development/slice-workflow.md#interface-design-review)
+for required content, presentation guidance, and approval to omit review items.
+Use pseudocode when it clarifies consequential changes.
+For instruction-only work, show the proposed wording and resulting records.
 
-Identify the active slice's plan and design versions, mapped requirements, and
-verification approach. Use module tables, signature sketches, examples,
-diagrams, or pseudocode where they clarify consequential changes. For
-instruction-only work, show the proposed wording and resulting records.
-Keep detailed observed test outcomes in verification records. Address every
-required review area; use the workflow's approval rule for optional items.
-
-Explain assumptions, alternatives, and the recommendation. Classify questions
-by their effect on the accepted contract and verification, identify dependencies,
-and describe the independent work, if any, that can proceed under existing
-acceptance. Use the workflow's rules for optional review items.
+Fill the format's question table using
+[Handling Unanswered Questions](../../../docs/development/slice-workflow.md#handling-unanswered-questions).
 
 ## Discuss and Record
 
 Present the concrete proposal in chat and incorporate maintainer feedback.
-Discuss affected changes, then present one complete identified version for
-acceptance. For each material revision, identify changed decisions,
-requirements, and dependencies; link the superseded version and preserve
-unaffected acceptance. Follow the workflow's gate before implementation.
+Use the [interview protocol](../../../docs/development/interview-protocol.md#synthesize-and-resume)
+to synthesize the discussion. For material revisions, follow
+[Requirements and Approval](../../../docs/development/slice-workflow.md#requirements-and-approval)
+and prepare the [revision format](../../../docs/development/templates/slice-records.md#material-revision).
 
-Ensure the complete accepted design is published in the execution issue. When
-its full, current proposal is already published, a compact acceptance comment
-may link it. Otherwise publish the complete accepted design and append the
-acceptance fields or link a separate acceptance record. In both paths, record
-accepted plan/design subjects, versions, scope, confirmation/source, exact
-clarifications, superseded records, optional-item approvals, remaining
-questions, and permitted independent work.
-
-Material contract changes, including those described as clarifications, require
-an identified revised version and explicit acceptance under the workflow.
-If a link plus clarifications cannot reconstruct the accepted design, publish
-a consolidated identified version with an explicit supersession link and
-preserved acceptance history. Link existing specification and coverage records;
-use [github-workflow](../github-workflow/SKILL.md) to post and verify the complete
-design and its acceptance record.
-
-On resumption, reuse that record. If new findings materially change interfaces,
-responsibilities, or collaboration, identify affected work and return it to the
-workflow's design discussion before proceeding. Resolve other routine choices
-within the accepted boundary without reopening acceptance.
+After acceptance, complete the design format's acceptance fields. Follow the
+publication paths in
+[Interface Design Review](../../../docs/development/slice-workflow.md#interface-design-review).
+Use [github-workflow](../github-workflow/SKILL.md#publish-specifications-and-decisions)
+to publish and verify the complete design and acceptance record before implementation.
+On resumption, compare new findings with that record; apply the same review
+section's rules for material changes and
+[Advancing Through Phases](../../../docs/development/slice-workflow.md#advancing-through-phases)
+for routine choices within the accepted design.
