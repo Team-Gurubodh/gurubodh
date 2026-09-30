@@ -67,8 +67,6 @@ execution records to the sub-issue.
 
 Use for proposals and accepted designs under
 [interface design review](../slice-workflow.md#interface-design-review).
-Publish one complete identified design before implementation. Link accepted
-requirements and unchanged contracts; explain changes in the proposal.
 Do not label a proposal accepted until the maintainer has accepted it.
 
 ~~~markdown
@@ -97,14 +95,9 @@ Do not label a proposal accepted until the maintainer has accepted it.
 | ... | ... | ... | ... | ... |
 ~~~
 
-After explicit acceptance, record all fields below in either publication path.
-If the complete, current proposal is already published, use a compact acceptance
-comment linking it. Otherwise publish the complete accepted design and append
-these acceptance fields or link a separate acceptance record. An accepted label
-alone does not establish confirmation or scope. Material contract changes follow
-[material revision](#material-revision), including version identification and
-explicit acceptance. A consolidated replacement identifies the record it
-supersedes and preserves acceptance history.
+After explicit acceptance, fill all fields below. Follow the publication paths
+in [Interface Design Review](../slice-workflow.md#interface-design-review).
+For material contract changes, also use the [revision format](#material-revision).
 
 ~~~markdown
 ## S1 — Plan <version> and design <version> accepted
@@ -118,17 +111,17 @@ supersedes and preserves acceptance history.
 - Publication readback status, interface-design phase outcome, and next action:
 ~~~
 
-The question table also applies to specifications. For a nonblocking question,
-state why current work is independent of the answer. An optional default remains
-an agent recommendation until decided. A combined plan/design acceptance names
-both subjects and versions; specification acceptance is separate. When acceptance
-is pending, leave the confirmation pending instead of inserting example approval.
+Use the question table for specifications too, following
+[Handling Unanswered Questions](../slice-workflow.md#handling-unanswered-questions).
+When acceptance is pending, leave the confirmation pending instead of inserting
+example approval.
 
 ## Material Revision
 
-Use when changing accepted requirements or design. Preserve unrelated accepted
-decisions and earlier confirmations. Link the affected content; do not create a
-second current requirements checklist.
+Use when changing accepted requirements or design under
+[Requirements and Approval](../slice-workflow.md#requirements-and-approval).
+Keep record ownership consistent with
+[Authoritative Records](../slice-workflow.md#authoritative-records).
 
 ```markdown
 ## <Specification / slice plan/design> <new version> — <draft / accepted>
@@ -145,10 +138,8 @@ second current requirements checklist.
 ## Slice Completion
 
 Use after [integration and reconciliation](../slice-workflow.md#slice-reconciliation).
-This records slice execution, not issue closure. Link detailed evidence already
-recorded, including earlier in the same session, and its exact skips. Include
-details here only where no durable record contains them; a separate verification
-comment is not required. Keep current outcomes and milestones explicit.
+That section defines the evidence to include or link. This records slice execution,
+not issue closure.
 
 ~~~markdown
 ## S1 — Slice execution complete
@@ -168,14 +159,10 @@ comment is not required. Keep current outcomes and milestones explicit.
 
 ## Session Handoff
 
-Use at [session exit](../slice-workflow.md#session-entry-and-exit), including
-pauses within a phase. If session exit coincides with slice completion, combine
-the records and include both sets of required information. Repeat the minimum
-current-state fields even when unchanged. Link detailed records already posted,
-including earlier in the same session; state when earlier facts are unchanged
-without copying their narratives. Include full evidence details here only where
-no durable record contains them; no separate verification comment is required.
-Keep the status and next action explicit in the handoff itself.
+Use at [session exit](../slice-workflow.md#session-entry-and-exit); that section
+defines required content and evidence links. If the session ends at slice completion,
+follow [Slice Reconciliation](../slice-workflow.md#slice-reconciliation)
+to combine the records.
 
 ~~~markdown
 ## Session handoff — <slice>
