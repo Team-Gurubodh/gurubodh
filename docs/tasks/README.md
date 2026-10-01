@@ -10,4 +10,3 @@ Task history lives here so it is discoverable through the main documentation tre
 
 - Create one Markdown file per task.
 - Use `docs/templates/task-template.md` for new structured task records.
-
