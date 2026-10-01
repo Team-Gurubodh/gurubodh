@@ -102,7 +102,7 @@ the maintainer explicitly left that narrow distinction open under
 For precision, use the [seed schemas and mappings](interfaces/seed-data-artifacts.md),
 [prepared contract](interfaces/prepared-content-artifacts.md), and
 [content identity implementation](../tools/gurubodh-cli/gurubodh/content_identity.py).
-The [chapter/revision/chunk/snapshot identity proposal](tasks/017-cms-led-chapter-identity-registry.md)
+The [chapter/revision/chunk/snapshot identity proposal](tasks/002-CMS-led-chapter-identity-registry.md)
 is exploratory, not accepted runtime behavior; its proposed registry identities
 must not be confused with implemented `content_key` or Strapi `documentId`.
 
@@ -255,7 +255,7 @@ must not be confused with implemented `content_key` or Strapi `documentId`.
 - **Current implementation**: planned Next.js placeholder root
   `apps/gurubodh-chat/`. The Next.js application has not been scaffolded yet.
   The proposed chat/RAG workflow remains a task note, not accepted stable
-  architecture. See [Task-016](./tasks/016-chat-rag-workflow.md).
+  architecture. See [Task-001](./tasks/001-RAG-architecture.md).
 
 ### 4.9 Embedding Pipeline — *Phase 3*
 

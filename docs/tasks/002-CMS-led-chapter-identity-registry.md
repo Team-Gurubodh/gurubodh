@@ -1,4 +1,4 @@
-# Task-017: CMS-Led Chapter Identity Registry and Manifest Lineage
+# Task-002: CMS-Led Chapter Identity Registry and Manifest Lineage
 
 <record_type>task_history</record_type>
 <status>proposed</status>

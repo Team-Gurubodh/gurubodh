@@ -1,4 +1,4 @@
-# Task-016: Chat RAG Workflow
+# Task-001: RAG Architecture
 
 <record_type>task_history</record_type>
 <status>proposed</status>
@@ -38,6 +38,51 @@ decisions remain proposed in
 - Keep model and provider choices visible in the diagram because they are the
   most important proposed integration points.
 
+## Proposed RAG Data Lifecycle and Retrieval Boundaries
+
+The chapter identity, revision, accepted-chunk, and finalized-snapshot
+model is described in
+[Task 002](002-CMS-led-chapter-identity-registry.md).
+The RAG pipeline derives embeddings from accepted chunks belonging to an
+immutable finalized CMS snapshot. Vector data remains derived and rebuildable.
+
+Chunks and embeddings have separate identities and lifecycles. A change
+to source text or chunking configuration requires a matching chunk set
+and embeddings. A change only to embedding configuration requires new
+embeddings for the existing accepted chunks. These identities remain
+separate even when only one active embedding exists per chunk; CMS-owned
+chunk text is separate from derived vector storage.
+
+An `embedding_config_key` identifies the provider, model and version,
+embedding mode, vector dimensions, normalization, and relevant
+schema/strategy details. Query embeddings must be compatible with the
+configuration selected for retrieval. The detailed implementation plan
+must define this configuration contract.
+
+For each subject/locale in scope, retrieval resolves a fully ready
+snapshot for the selected embedding configuration. Snapshot membership
+and embedding-configuration restrictions apply when selecting the top
+20–25 candidates. Retrieve candidate chunk text and exact revision
+provenance for reranking, then pass the selected top 3–5 chunks to answer
+generation.
+
+CMS publication and RAG readiness advance independently. A newer current
+CMS snapshot may have pending or failed embeddings while chat continues
+using an older fully ready snapshot. Lag reporting and fallback behavior
+remain decisions for the implementation plan.
+
+Embedding jobs record source snapshot and revision identifiers, chunk-set
+and embedding configurations, source checksums, actor/source provenance,
+status, timestamps, errors, and retry information. Retries should reuse
+valid completed derivations rather than duplicate work.
+
+The earlier exploration assumed approximately 10,000–15,000 chapters.
+Validate retrieval latency, chunk volume, indexing, and candidate
+hydration against representative data before accepting this as a
+production design.
+
+Earlier chapter-versioning exploration in [Issue #176](https://github.com/Team-Gurubodh/gurubodh/issues/176) considered rejecting imports that match an older revision and operator-led revision restoration; these remain historical proposals, not adopted requirements of this RAG design.
+
 ## Proposed Architecture Diagram
 
 ```mermaid
@@ -54,7 +99,7 @@ flowchart TB
     end
 
     subgraph Storage
-        V[(PostgreSQL + pgvector<br/>Embedded content chunks)]
+        V[(PostgreSQL + pgvector<br/>Derived embeddings → accepted CMS chunks)]
     end
 
     subgraph External_API
@@ -63,7 +108,7 @@ flowchart TB
 
     U -->|Prompt| C
     C --> E
-    E -->|Vector search| V
+    E -->|Vector search scoped to a ready snapshot<br/>and embedding configuration| V
     V -->|Top 20-25 chunks| R
     R -->|Scored candidates| S
     S -->|Prompt + selected context| A
