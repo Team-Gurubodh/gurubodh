@@ -128,7 +128,7 @@ class MaintainedJobMigrationTests(unittest.TestCase):
 
     def test_manifests_validate_independently(self):
         paths = sorted((CLI_ROOT / "jobs/subjects").glob("*/manifest.json"))
-        self.assertEqual(len(paths), 4)
+        self.assertTrue(paths, "Expected maintained subject manifests")
         with without_job_schemas():
             for path in paths:
                 manifest = self.catalog.load("subject-manifest", path.parent.name).to_payload()
@@ -138,13 +138,71 @@ class MaintainedJobMigrationTests(unittest.TestCase):
                     self.assertNotIn("profile_overrides", edition)
                 target = self.root / path.relative_to(CLI_ROOT)
                 target.parent.mkdir(parents=True, exist_ok=True)
+                locale = next(iter(manifest["editions"]))
                 for mutate in (lambda m: m.pop("artifact_root"), lambda m: m.update(unknown=True),
-                               lambda m: m["editions"]["hi-IN"]["source_document"].update(relative_path="../escape.docx")):
+                               lambda m: m["editions"][locale]["source_document"].update(relative_path="../escape.docx")):
                     invalid = copy.deepcopy(manifest)
                     mutate(invalid)
                     target.write_text(json.dumps(invalid))
                     with self.assertRaises(ConfigurationError):
                         ComponentCatalog(self.root).load("subject-manifest", manifest["manifest_id"])
+
+    def test_sub114_editions_resolve_all_three_commands_with_default_profiles(self):
+        # #381 coverage is independent of the immutable historical baseline.
+        catalog = self.catalog
+        manifest = catalog.load("subject-manifest", "sub114_kartavya").to_payload()
+        self.assertTrue(manifest["editions"])
+        roots = self.environ
+        for locale, edition in manifest["editions"].items():
+            subject_dir = f"{manifest['artifact_root']}/{locale}"
+            for command in ("prep-subject", "generate-chunks", "generate-docx"):
+                with self.subTest(locale=locale, command=command):
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with patch.dict("os.environ", roots, clear=True), \
+                         redirect_stdout(stdout), redirect_stderr(stderr):
+                        self.assertIsNone(main([
+                            "config", "resolve", "--command", command,
+                            "--project-root", str(CLI_ROOT),
+                            "--subject", "sub114_kartavya", "--language", locale,
+                            "--environment", "development", "--storage-profile", "local",
+                            "--provenance",
+                        ]))
+                    payload = json.loads(stdout.getvalue())
+                    provenance = json.loads(stderr.getvalue())
+                    self.assertEqual(payload["naming"]["subject_code"], "SUB114")
+                    self.assertEqual(payload["naming"]["title_slug"], "kartavya")
+                    self.assertEqual(payload["destination"], {
+                        "backend": "local", "root_dir": roots["GURUBODH_CMS_LIBRARY_ROOT"],
+                        "subject_dir": subject_dir,
+                    })
+                    if command == "prep-subject":
+                        self.assertEqual(payload["pipeline"], "unicode-docx-ingest")
+                        relative_path = (
+                            "114_kartavya/unicode_fonts/ms_word/"
+                            f"sub114_kartavya_{locale}.docx"
+                        )
+                        self.assertEqual(edition["source_document"]["relative_path"], relative_path)
+                        self.assertEqual(payload["source"], {
+                            "backend": "local", "root_dir": roots["GURUBODH_SOURCE_LIBRARY_ROOT"],
+                            "relative_path": relative_path, "font_encoding": "unicode",
+                            "file_format": "docx",
+                        })
+                    else:
+                        self.assertEqual(payload["source"], payload["destination"])
+
+                    defaults = catalog.load("command-definition", command).to_payload()["default_profiles"]
+                    self.assertEqual(set(defaults), {
+                        "prep-subject": {"proofreading"},
+                        "generate-chunks": {"chunking"},
+                        "generate-docx": set(),
+                    }[command])
+                    self.assertEqual(provenance["profiles"], [
+                        {"kind": kind, "profile_id": profile_id, "selected_by": "command"}
+                        for kind, profile_id in defaults.items()
+                    ])
+                    for kind, profile_id in defaults.items():
+                        profile = catalog.load(f"{kind}-profile", profile_id).to_payload()
+                        self.assertEqual(payload[kind], profile[kind])
 
     def test_manifests_preserve_every_legacy_edition(self):
         # The immutable baseline owns legacy parity; valid additional editions

@@ -1,0 +1,29 @@
+{
+  "component_schema_version": "1.0.0",
+  "manifest_id": "sub114_kartavya",
+  "identity": {
+    "category_code": "CAT004",
+    "subject_code": "SUB114",
+    "title_slug": "kartavya"
+  },
+  "artifact_root": "114_kartavya",
+  "editions": {
+    "hi-IN": {
+      "release": {
+        "version": "01",
+        "subversion": "01"
+      },
+      "source_document": {
+        "relative_path": "114_kartavya/unicode_fonts/ms_word/sub114_kartavya_hi-IN.docx",
+        "font_encoding": "unicode",
+        "file_format": "docx"
+      },
+      "chapter_split": {
+        "enabled": true,
+        "pattern_type": "regex",
+        "pattern": "प्रबोधन.*?दिनांक.*?2024",
+        "flags": []
+      }
+    }
+  }
+}
