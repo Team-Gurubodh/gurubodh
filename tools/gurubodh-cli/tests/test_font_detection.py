@@ -5,6 +5,8 @@ from pathlib import Path
 
 from docx import Document
 
+from policy_fixtures import synthetic_source_fonts
+
 from gurubodh.legacy.font_detection import (
     UnsupportedSourceFontError,
     source_fonts,
@@ -32,6 +34,7 @@ def _run_xml(text, font_attributes=""):
 
 class SourceFontPolicyTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(synthetic_source_fonts())
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.root = Path(self.temp_dir.name)
@@ -39,6 +42,7 @@ class SourceFontPolicyTests(unittest.TestCase):
     def source_docx(self, font_name="Mangal"):
         path = self.root / "source.docx"
         document = Document()
+        document.styles["Normal"].font.name = "Mangal"
         run = document.add_paragraph("परीक्षण").runs[0]
         run.font.name = font_name
         document.save(path)
@@ -64,6 +68,7 @@ class SourceFontPolicyTests(unittest.TestCase):
     def test_rejects_font_in_an_inherited_paragraph_style(self):
         path = self.root / "styled.docx"
         document = Document()
+        document.styles["Normal"].font.name = "Mangal"
         style = document.styles.add_style("UnsafeLegacy", 1)
         style.font.name = "ShreeLipi"
         document.add_paragraph("परीक्षण", style="UnsafeLegacy")
@@ -147,6 +152,7 @@ class SourceFontPolicyTests(unittest.TestCase):
     def test_unicode_route_rejects_mixed_aps_and_unicode_runs(self):
         path = self.root / "mixed.docx"
         document = Document()
+        document.styles["Normal"].font.name = "Mangal"
         paragraph = document.add_paragraph()
         paragraph.add_run("यूनिकोड").font.name = "Mangal"
         paragraph.add_run("legacy").font.name = "APS-DV-Prakash"

@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 
+from gurubodh.config import proofreading_config
 from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job, resolve_lab_proofreading
@@ -43,7 +44,10 @@ def main():
     assert bundled_resource_path("config/policies/source-fonts.schema.json") == recorded(
         "config/policies/source-fonts.schema.json"
     )
-    assert "mangal" in load_approved_unicode_font_families()
+    policy = json.loads(font_policy.read_text(encoding="utf-8"))
+    assert load_approved_unicode_font_families() == frozenset(
+        " ".join(family.split()).casefold() for family in policy["approved_unicode_font_families"]
+    )
     hidden_font_policy = font_policy.with_name(font_policy.name + ".hidden")
     font_policy.rename(hidden_font_policy)
     try:
@@ -82,35 +86,41 @@ def main():
                 assert resolved["source"]["backend"] == "r2"
                 assert resolved["destination"]["backend"] == "r2"
                 jobs[command] = resolved
-    chunking = jobs["generate-chunks"]["chunking"]
-    assert chunking["model"] == "BAAI/bge-m3"
-    assert chunking["model_revision"] == "5617a9f61b028005a4858fdac845db406aefb181"
-    assert chunking["local_files_only"] is True
-    assert chunking["strategy_version"] == "semantic-window-v1"
-    proofreading = jobs["prep-subject"]["proofreading"]
-    assert proofreading["model"] == "gemini-3.6-flash"
-    assert proofreading["max_output_tokens"] == 16384
+    def selected_policy(command, kind):
+        definition = catalog.load("command-definition", command).to_payload()
+        identity = definition["default_profiles"][kind]
+        return catalog.load(f"{kind}-profile", identity).to_payload()[kind]
+
+    for command, kind in (("prep-subject", "proofreading"), ("generate-chunks", "chunking")):
+        assert jobs[command][kind] == selected_policy(command, kind)
     lab = resolve_lab_proofreading(catalog)
-    assert lab.settings.model == "gemini-3.6-flash"
-    assert lab.settings.max_output_tokens == 16384
+    assert lab.settings.public_dict() == proofreading_config({
+        "proofreading": selected_policy("lab-proofread", "proofreading")
+    }).public_dict()
 
-    large_id = "gemini-3.6-flash-large-input-v1"
-    large_relative = f"config/job-components/profiles/proofreading/{large_id}.json"
-    assert bundled_resource_path(large_relative) == recorded(large_relative)
-    large = resolve_job(
-        catalog, command="prep-subject", manifest_id="sub001_aps_example",
-        locale="hi-IN", environment_id="development", storage_profile_id="r2",
-        proofreading_profile_id=large_id, environ={},
-    ).job["proofreading"]
-    assert proofreading["max_estimated_input_tokens_per_minute"] == 20000
-    assert large == dict(proofreading, max_estimated_input_tokens_per_minute=40000)
-    large_lab = resolve_lab_proofreading(catalog, proofreading_profile_id=large_id)
-    assert large_lab.settings.max_estimated_input_tokens_per_minute == 40000
-    assert lab.settings.max_estimated_input_tokens_per_minute == 20000
+    # Discover every shipped profile; assert ownership and complete invocation
+    # propagation without prescribing current IDs or relationships between them.
+    for kind, command in (("proofreading", "prep-subject"), ("chunking", "generate-chunks")):
+        directory = context.resource_root / f"config/job-components/profiles/{kind}"
+        for path in sorted(directory.glob("*.json")):
+            relative = path.relative_to(context.resource_root).as_posix()
+            assert bundled_resource_path(relative) == recorded(relative)
+            expected = catalog.load(f"{kind}-profile", path.stem).to_payload()[kind]
+            resolved = resolve_job(
+                catalog, command=command, manifest_id="sub001_aps_example",
+                locale="hi-IN", environment_id="development", storage_profile_id="r2",
+                environ={}, **{f"{kind}_profile_id": path.stem},
+            ).job
+            assert resolved[kind] == expected
+            if kind == "proofreading":
+                explicit_lab = resolve_lab_proofreading(catalog, proofreading_profile_id=path.stem)
+                assert explicit_lab.settings.public_dict() == proofreading_config({
+                    "proofreading": expected
+                }).public_dict()
 
-    profile = context.resource_root / (
-        "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"
-    )
+    lab_definition = catalog.load("command-definition", "lab-proofread").to_payload()
+    profile_id = lab_definition["default_profiles"]["proofreading"]
+    profile = context.resource_root / f"config/job-components/profiles/proofreading/{profile_id}.json"
     hidden = profile.with_name(profile.name + ".hidden")
     profile.rename(hidden)
     try:

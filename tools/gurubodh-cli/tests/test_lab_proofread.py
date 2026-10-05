@@ -11,7 +11,8 @@ from unittest.mock import patch
 
 from docx import Document
 
-from policy_fixtures import proofreading_settings
+from policy_fixtures import proofreading_settings, synthetic_source_fonts
+from synthetic_jobs import write_catalog
 
 from gurubodh.config import proofreading_config
 from gurubodh.docx.export import validate_chapter_docx
@@ -45,8 +46,8 @@ class LabProofreadTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.root = Path(self.temp_dir.name)
-        shutil.copytree(Path(__file__).parents[1] / "config/job-components",
-                        self.root / "config/job-components")
+        write_catalog(self.root)
+        self.enterContext(synthetic_source_fonts())
         self.context = ProjectContext(
             root=self.root,
             legacy_converter=Path(__file__).parents[1] / "scripts" / "legacy_font_convert.js",
@@ -55,6 +56,7 @@ class LabProofreadTests(unittest.TestCase):
     def source_docx(self, name="source.docx", text="यह गलत वाक्य है।"):
         path = self.root / name
         document = Document()
+        document.styles["Normal"].font.name = "Mangal"
         document.add_paragraph(text)
         document.save(path)
         return path
@@ -198,6 +200,7 @@ class LabProofreadTests(unittest.TestCase):
     def test_exact_configured_marathi_paragraphs_render_as_heading_2(self):
         source = self.root / "source.docx"
         document = Document()
+        document.styles["Normal"].font.name = "Mangal"
         document.add_paragraph("प्रबोधनातील स्मरणीय मुद्दे")
         document.add_paragraph("स्वामी विश्वसंदेश")
         document.add_paragraph("ही सामान्य ओळ आहे।")

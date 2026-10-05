@@ -13,6 +13,8 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+from synthetic_jobs import fixture_document, write_catalog
+
 from gurubodh.cli import main
 from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
@@ -26,7 +28,6 @@ from gurubodh.model_cache import (
 )
 
 
-CLI_ROOT = Path(__file__).parents[1]
 PROFILE_ID = "bge-m3-semantic-window-v1"
 MODEL = "BAAI/bge-m3"
 REVISION = "5617a9f61b028005a4858fdac845db406aefb181"
@@ -42,7 +43,9 @@ class ModelCacheTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.cache = Path(temporary.name) / "cache"
-        self.catalog = ComponentCatalog(CLI_ROOT)
+        self.root = Path(temporary.name) / "project"
+        write_catalog(self.root)
+        self.catalog = ComponentCatalog(self.root, self.root)
         self.contents = {
             path: f"fixture artifact: {path}\n".encode("utf-8") for path in REQUIRED_RUNTIME_FILES
         }
@@ -116,7 +119,7 @@ class ModelCacheTests(unittest.TestCase):
         self.assertEqual(contract["total_artifact_bytes"], total)
         self.assertIn("Model cache is ready", "\n".join(messages))
 
-    def test_maintained_profile_uses_cpu_for_prepare_and_verify_without_cuda_masking(self):
+    def test_synthetic_profile_uses_cpu_for_prepare_and_verify_without_cuda_masking(self):
         profile = resolve_model_profile(self.catalog, PROFILE_ID)
         self.assertEqual(profile.config.device, "cpu")
         model = SimpleNamespace(encode=lambda texts, **kwargs: [[0.5, 0.5] for _ in texts])
@@ -130,7 +133,7 @@ class ModelCacheTests(unittest.TestCase):
                     constructor.reset_mock()
                     stdout = StringIO()
                     with redirect_stdout(stdout):
-                        main(["models", command, "--profile", PROFILE_ID, "--project-root", str(CLI_ROOT)])
+                        main(["models", command, "--profile", PROFILE_ID, "--project-root", str(self.root)])
                     constructor.assert_called_once_with(
                         MODEL, cache_folder=str(self.cache.resolve()), local_files_only=True,
                         device="cpu", revision=REVISION,
@@ -255,9 +258,7 @@ class ModelCacheTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             resources = Path(directory)
-            source = json.loads(
-                (CLI_ROOT / f"config/job-components/profiles/chunking/{PROFILE_ID}.json").read_text()
-            )
+            source = fixture_document(f"chunking/{PROFILE_ID}.json")
             profile_dir = resources / "config/job-components/profiles/chunking"
             profile_dir.mkdir(parents=True)
 
@@ -288,7 +289,7 @@ class ModelCacheTests(unittest.TestCase):
         ):
             with patch(target) as runner:
                 self.assertIsNone(
-                    main(["models", command, "--profile", PROFILE_ID, "--project-root", str(CLI_ROOT)])
+                    main(["models", command, "--profile", PROFILE_ID, "--project-root", str(self.root)])
                 )
             self.assertEqual(runner.call_args.args[1], PROFILE_ID)
 

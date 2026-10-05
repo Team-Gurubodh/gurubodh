@@ -5,7 +5,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from migration_fixtures import baseline_job
+from synthetic_jobs import job_payload
 
 from gurubodh.canonical_source import safe_relative_path
 from gurubodh.cli import main
@@ -54,7 +54,7 @@ class WorkflowContractTests(unittest.TestCase):
             ("generate-docx", prepare_generate_docx_job, GenerateDocxJob),
         )
         for command, preparer, expected_type in cases:
-            raw = baseline_job(command)
+            raw = job_payload(command, root=Path("/tmp/synthetic-jobs"))
 
             with self.subTest(command=command):
                 prepared = preparer(raw)

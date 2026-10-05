@@ -8,9 +8,7 @@ from pathlib import Path
 
 from botocore.exceptions import ClientError
 
-from migration_fixtures import CASES, baseline_job
-from gurubodh.job_components import ComponentCatalog
-from gurubodh.job_composition import resolve_job
+from synthetic_jobs import job_payload
 
 from gurubodh.config import prepare_generate_chunks_job, prepare_prep_subject_job
 from gurubodh.errors import GurubodhError
@@ -545,27 +543,26 @@ class StorageConfigTests(unittest.TestCase):
             ["समाप्ति-सूत्र"],
         )
 
-    def maintained_jobs(self, command):
-        cases = [c for c in CASES if c["selectors"]["command"] == command
-                 and c["selectors"]["language"] == "hi-IN"]
-        self.assertTrue(cases)
-        for case in cases:
-            s = case["selectors"]
-            yield resolve_job(ComponentCatalog(Path(__file__).parents[1]), command=command,
-                manifest_id=s["subject"], locale=s["language"], environment_id=s["environment"],
-                storage_profile_id=s["storage_profile"], environ={
-                    "GURUBODH_SOURCE_LIBRARY_ROOT": "/tmp/source",
-                    "GURUBODH_CMS_LIBRARY_ROOT": "/tmp/artifacts"}).job
+    def synthetic_jobs(self, command):
+        preparer = {"prep-subject": prepare_prep_subject_job,
+                    "generate-chunks": prepare_generate_chunks_job}[command]
+        for manifest, locale in (("sub001_aps_example", "hi-IN"),
+                                ("sub123_spand_rahasya", "hi-IN"),
+                                ("sub123_spand_rahasya", "mr-IN")):
+            for route in ("local", "r2-output", "r2"):
+                yield preparer(job_payload(command, root=Path("/tmp/synthetic-jobs"),
+                                           manifest_id=manifest, locale=locale,
+                                           storage_profile_id=route))
 
-    def test_sample_jobs_declare_summary_chapter_markers(self):
-        for config in self.maintained_jobs("prep-subject"):
+    def test_synthetic_jobs_declare_locale_summary_chapter_markers(self):
+        for config in self.synthetic_jobs("prep-subject"):
             with self.subTest(subject=config["destination"]["subject_dir"]):
                 self.assertIn("summary_chapter_markers", config["metadata_defaults"])
-                self.assertEqual(config["metadata_defaults"]["language"], "hi-IN")
-                self.assertTrue(config["destination"]["subject_dir"].endswith("/hi-IN"))
+                locale = config["metadata_defaults"]["language"]
+                self.assertTrue(config["destination"]["subject_dir"].endswith(f"/{locale}"))
 
-    def test_maintained_generate_chunks_jobs_use_pinned_cached_model_loading(self):
-        for config in self.maintained_jobs("generate-chunks"):
+    def test_synthetic_generate_chunks_jobs_propagate_model_policy(self):
+        for config in self.synthetic_jobs("generate-chunks"):
             with self.subTest(subject=config["source"]["subject_dir"]):
                 self.assertEqual(config["pipeline"], "generate-chunks")
                 self.assertEqual(config.semantic_chunk_config.model_name, "BAAI/bge-m3")
@@ -575,15 +572,15 @@ class StorageConfigTests(unittest.TestCase):
                 )
                 self.assertTrue(config.semantic_chunk_config.local_files_only)
                 self.assertEqual(config.semantic_chunk_config.strategy_version, "semantic-window-v1")
-                self.assertEqual(config["naming"]["language"], "hi-IN")
-                self.assertTrue(config["source"]["subject_dir"].endswith("/hi-IN"))
+                locale = config["naming"]["language"]
+                self.assertTrue(config["source"]["subject_dir"].endswith(f"/{locale}"))
                 self.assertEqual(config["source"]["subject_dir"], config["destination"]["subject_dir"])
                 self.assertGreaterEqual(config.semantic_chunk_config.threshold_percentile, 0.0)
                 self.assertLessEqual(config.semantic_chunk_config.threshold_percentile, 100.0)
                 self.assertGreaterEqual(config.semantic_chunk_config.min_chars, 0)
 
     def test_generate_chunks_requires_matching_marathi_language_root(self):
-        config = baseline_job("generate-chunks")
+        config = job_payload("generate-chunks", root=Path("/tmp/synthetic-jobs"))
         config["source"]["subject_dir"] = "123_spand_rahasya/mr-IN"
         config["destination"]["subject_dir"] = "123_spand_rahasya/mr-IN"
         config["naming"]["language"] = "mr-IN"

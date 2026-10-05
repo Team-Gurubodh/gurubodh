@@ -6,6 +6,8 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import shutil
+import tempfile
 from contextlib import redirect_stdout, redirect_stderr
 import unittest
 from types import SimpleNamespace
@@ -13,6 +15,9 @@ from unittest.mock import patch
 
 import test_job_composition as composition_cases
 from test_job_composition import KINDS
+from synthetic_jobs import job_payload, write_catalog
+from policy_fixtures import synthetic_source_fonts
+from gurubodh.job_components import ComponentCatalog
 from test_prep_subject_checkpoints import (
     FakeProofreader, FakeR2Client, prepare_unicode, write_docx,
 )
@@ -30,7 +35,16 @@ from test_generate_chunks_pipeline import FakeSegmenter
 
 
 class ConfigurationProvenanceTests(unittest.TestCase):
-    setUp = composition_cases.CompositionTests.setUp
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        write_catalog(self.root)
+        self.catalog = ComponentCatalog(self.root, resource_root=self.root)
+        self.environ = {"GURUBODH_SOURCE_LIBRARY_ROOT": str(self.root / "source"),
+                        "GURUBODH_CMS_LIBRARY_ROOT": str(self.root / "artifacts")}
+        self.enterContext(synthetic_source_fonts())
+
     read = composition_cases.CompositionTests.read
     write = composition_cases.CompositionTests.write
     resolve = composition_cases.CompositionTests.resolve
@@ -208,24 +222,40 @@ class ConfigurationProvenanceTests(unittest.TestCase):
         }
         self.write(relative, manifest)
         job = self.resolve(manifest_id="sub123_spand_rahasya", storage_profile_id=route).job
-        path = Path(job["source"]["root_dir"]) / job["source"]["relative_path"]
+        path = (self.root / "r2-source.docx" if route == "r2" else
+                Path(job["source"]["root_dir"]) / job["source"]["relative_path"])
         path.parent.mkdir(parents=True, exist_ok=True)
         write_docx(path)
         return job
 
     def test_in_memory_composed_overwrite_resume_local_and_fake_r2(self):
-        for route in ("local", "r2-output"):
+        for route in ("local", "r2-output", "r2"):
             for composed_first in (False, True):
                 with self.subTest(route=route, composed_first=composed_first):
                     composed = self.unicode_job(route)
-                    complete = prepare_prep_subject_job(composed.to_payload())
+                    payload = job_payload("prep-subject", root=self.root, manifest_id="sub123_spand_rahasya",
+                                          storage_profile_id=route)
+                    payload["chapter_split"] = {
+                        "enabled": True, "pattern_type": "regex", "pattern": "^CHAPTER", "flags": ["MULTILINE"],
+                    }
+                    complete = prepare_prep_subject_job(payload)
                     first, resumed = (composed, complete) if composed_first else (complete, composed)
                     self.assertEqual(compatibility_record(first, "a" * 64), compatibility_record(resumed, "a" * 64))
-                    client = FakeR2Client() if route == "r2-output" else None
+                    client = FakeR2Client() if route != "local" else None
+                    if route == "r2":
+                        client.objects[composed["source"]["key"]] = (self.root / "r2-source.docx").read_bytes()
                     subject = Path(self.environ["GURUBODH_CMS_LIBRARY_ROOT"]) / composed["destination"]["subject_dir"]
                     if client is None and subject.exists():
-                        import shutil
                         shutil.rmtree(subject)
+                    sentinels = ("chapters/semantic_chunks/stale.json", "chapters/msword/stale.docx")
+                    prefix = f"cms_library/{composed['destination']['subject_dir']}/"
+                    for name in sentinels:
+                        if client:
+                            client.objects[prefix + name] = b"stale"
+                        else:
+                            path = subject / name
+                            path.parent.mkdir(parents=True, exist_ok=True)
+                            path.write_bytes(b"stale")
                     failure = ProofreadingError("api_error", "Temporary provider failure", retryable=True,
                         request_diagnostics={"raw_response": "PRIVATE provider body",
                                              "attempts": [{"attempt": 1, "http_status": 503,
@@ -235,9 +265,17 @@ class ConfigurationProvenanceTests(unittest.TestCase):
                             run_resumable_prep_job(first, "test", True, False,
                                 prepare_unicode,
                                 proofreader=FakeProofreader(["CHAPTER 1\nसही।", failure]), r2_client=client)
+                        for name in sentinels:
+                            self.assertEqual(client.objects[prefix + name] if client else (subject / name).read_bytes(), b"stale")
+                        reader = FakeProofreader(["CHAPTER 2\nसही।"])
                         run_resumable_prep_job(resumed, "test", False, True,
                             prepare_unicode,
-                            proofreader=FakeProofreader(["CHAPTER 2\nसही।"]), r2_client=client)
+                            proofreader=reader, r2_client=client)
+                    self.assertEqual(len(reader.calls), 1)
+                    self.assertIn("CHAPTER 2", reader.calls[0])
+                    self.assertNotIn("CHAPTER 1", reader.calls[0])
+                    for name in sentinels:
+                        self.assertFalse(prefix + name in client.objects if client else (subject / name).exists())
                     if client:
                         records = [json.loads(data) for key, data in client.objects.items()
                                    if "/run_reports/prep-subject/" in key and key.endswith(".json")]

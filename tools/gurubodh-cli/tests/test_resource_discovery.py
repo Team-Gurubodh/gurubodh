@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from synthetic_jobs import fixture_document, write_catalog
+
 from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.job_composition import resolve_job, resolve_lab_proofreading
@@ -26,11 +28,10 @@ class ResourceDiscoveryTests(unittest.TestCase):
         self.root = Path(temporary.name).resolve()
         self.project = self.root / "project"
         self.project.mkdir()
-        for filename in ("aps-hindi.json", "unicode-bilingual.json"):
-            document = json.loads((FIXTURES / "subjects" / filename).read_text())
-            target = self.project / "jobs/subjects" / document["manifest_id"] / "manifest.json"
-            target.parent.mkdir(parents=True)
-            target.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+        self.resources = self.root / "resources"
+        write_catalog(self.resources)
+        shutil.copytree(self.resources / "jobs", self.project / "jobs")
+        self.enterContext(patch("gurubodh.project.bundled_catalog_root", return_value=self.resources))
 
     def resolve(self, catalog, command="prep-subject", subject="sub001_aps_example"):
         return resolve_job(
@@ -46,7 +47,7 @@ class ResourceDiscoveryTests(unittest.TestCase):
     def test_manifest_only_project_uses_one_bundled_reusable_catalog(self):
         context = resolve_project_context(self.project)
         self.assertEqual(context.root, self.project)
-        self.assertEqual(context.resource_root, CLI_ROOT)
+        self.assertEqual(context.resource_root, self.resources)
         self.assertEqual(
             context.legacy_converter,
             (CLI_ROOT / "scripts/legacy_font_convert.js").resolve(),
@@ -63,9 +64,8 @@ class ResourceDiscoveryTests(unittest.TestCase):
 
     def test_manifest_only_and_checkout_catalogs_resolve_identical_jobs(self):
         complete = self.root / "complete"
-        shutil.copytree(CLI_ROOT / "config", complete / "config")
-        shutil.copytree(self.project / "jobs", complete / "jobs")
-        external_catalog = ComponentCatalog(self.project, CLI_ROOT)
+        write_catalog(complete)
+        external_catalog = ComponentCatalog(self.project, self.resources)
         checkout_catalog = ComponentCatalog(complete)
         for command in ("prep-subject", "generate-chunks", "generate-docx"):
             with self.subTest(command=command):
@@ -80,9 +80,7 @@ class ResourceDiscoveryTests(unittest.TestCase):
         project_components = self.project / "config/job-components"
         environment_dir = project_components / "environments"
         environment_dir.mkdir(parents=True)
-        environment = json.loads(
-            (CLI_ROOT / "config/job-components/environments/development.json").read_text()
-        )
+        environment = fixture_document("environments/development.json")
         environment["stores"]["r2_source_library"]["bucket"] = "selected-project-catalog"
         (environment_dir / "development.json").write_text(json.dumps(environment))
 
@@ -111,8 +109,8 @@ class ResourceDiscoveryTests(unittest.TestCase):
         self.assertEqual(loaded.origin, "config/job-components/environments/development.json")
 
     def test_missing_packaged_policy_fails_without_python_fallback(self):
-        resources = self.root / "resources"
-        shutil.copytree(CLI_ROOT / "config/job-components", resources / "config/job-components")
+        resources = self.root / "missing-policy"
+        write_catalog(resources)
         profile = resources / "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"
         profile.unlink()
         catalog = ComponentCatalog(self.project, resources)
@@ -127,10 +125,9 @@ class ResourceDiscoveryTests(unittest.TestCase):
         schema.write_text("{}", encoding="utf-8")
         # Supplying the project root directly still selects its catalog, but
         # component validation remains bound to the bundled schema registry.
-        source = CLI_ROOT / "config/job-components/environments/development.json"
         target = self.project / "config/job-components/environments/development.json"
         target.parent.mkdir(parents=True)
-        target.write_bytes(source.read_bytes())
+        target.write_text(json.dumps(fixture_document("environments/development.json")))
         loaded = ComponentCatalog(self.project).load("environment", "development")
         self.assertEqual(loaded.to_payload()["environment_id"], "development")
         target.write_text("{}", encoding="utf-8")

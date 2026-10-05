@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from jsonschema import Draft202012Validator
 
-from migration_fixtures import CASES, explicit_baseline, baseline_job
+from synthetic_jobs import job_payload
 
 from gurubodh.errors import GurubodhError
 from gurubodh.config import (
@@ -34,26 +34,30 @@ class SchemaValidationTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.temp_dir = Path(self.temporary.name)
 
-    def maintained_job(self, command):
-        return baseline_job(command)
+    def synthetic_job(self, command):
+        return job_payload(command, root=self.temp_dir)
 
-    def test_every_baseline_prepares_without_mutating_input(self):
+    def test_synthetic_matrix_prepares_without_mutating_input(self):
         preparers = {"prep-subject": prepare_prep_subject_job,
                      "generate-chunks": prepare_generate_chunks_job,
                      "generate-docx": prepare_generate_docx_job}
-        self.assertEqual(len(CASES), 26)
-        for case in CASES:
-            with self.subTest(path=case["legacy_path"]):
-                mapping = explicit_baseline(case)
-                original = copy.deepcopy(mapping)
-                prepared = preparers[case["selectors"]["command"]](mapping)
-                self.assertEqual(mapping, original)
-                self.assertEqual(prepared.to_payload(), original)
-                prepared.to_payload()["pipeline"] = "changed"
-                self.assertEqual(prepared.to_payload(), original)
+        for command, preparer in preparers.items():
+            for manifest, locale in (("sub001_aps_example", "hi-IN"),
+                                    ("sub123_spand_rahasya", "hi-IN"),
+                                    ("sub123_spand_rahasya", "mr-IN")):
+                for route in ("local", "r2-output", "r2"):
+                    with self.subTest(command=command, manifest=manifest, locale=locale, route=route):
+                        mapping = job_payload(command, root=self.temp_dir, manifest_id=manifest,
+                                              locale=locale, storage_profile_id=route)
+                        original = copy.deepcopy(mapping)
+                        prepared = preparer(mapping)
+                        self.assertEqual(mapping, original)
+                        self.assertEqual(prepared.to_payload(), original)
+                        prepared.to_payload()["pipeline"] = "changed"
+                        self.assertEqual(prepared.to_payload(), original)
 
     def test_mapping_preparation_uses_schema_validation_and_display_origin(self):
-        payload = self.maintained_job("generate-docx")
+        payload = self.synthetic_job("generate-docx")
         payload.pop("schema_version")
 
         with self.assertRaisesRegex(
@@ -63,7 +67,7 @@ class SchemaValidationTests(unittest.TestCase):
             prepare_generate_docx_job(payload, origin="composed generate-docx job")
 
     def test_job_validation_is_non_mutating_and_uses_explicit_draft_2020_12(self):
-        payload = self.maintained_job("generate-chunks")
+        payload = self.synthetic_job("generate-chunks")
         original = copy.deepcopy(payload)
 
         validate_job(payload, "generate-chunks", "jobs/example.json")
@@ -75,15 +79,15 @@ class SchemaValidationTests(unittest.TestCase):
 
     def test_unknown_properties_are_rejected_at_root_and_nested_boundaries(self):
         cases = []
-        prep = self.maintained_job("prep-subject")
+        prep = self.synthetic_job("prep-subject")
         prep["unexpected_root"] = True
         cases.append((prepare_prep_subject_job, prep, "$.unexpected_root is not allowed"))
 
-        chunks = self.maintained_job("generate-chunks")
+        chunks = self.synthetic_job("generate-chunks")
         chunks["chunking"]["unexpected_option"] = True
         cases.append((prepare_generate_chunks_job, chunks, "$.chunking.unexpected_option is not allowed"))
 
-        docx = self.maintained_job("generate-docx")
+        docx = self.synthetic_job("generate-docx")
         docx["naming"]["unexpected_name"] = "value"
         cases.append((prepare_generate_docx_job, docx, "$.naming.unexpected_name is not allowed"))
 
@@ -95,43 +99,43 @@ class SchemaValidationTests(unittest.TestCase):
     def test_schema_rules_cover_required_type_const_pattern_numeric_conditionals_and_uniqueness(self):
         cases = []
 
-        prep = self.maintained_job("prep-subject")
+        prep = self.synthetic_job("prep-subject")
         prep.pop("source")
         cases.append((prepare_prep_subject_job, prep, "$.source is required"))
 
-        prep = self.maintained_job("prep-subject")
+        prep = self.synthetic_job("prep-subject")
         prep["chapter_split"]["enabled"] = "yes"
         cases.append((prepare_prep_subject_job, prep, "$.chapter_split.enabled must be boolean; found string"))
 
-        docx = self.maintained_job("generate-docx")
+        docx = self.synthetic_job("generate-docx")
         docx["schema_version"] = "9.9.9"
         cases.append((prepare_generate_docx_job, docx, '$.schema_version must equal "1.0.0"'))
 
-        prep = self.maintained_job("prep-subject")
+        prep = self.synthetic_job("prep-subject")
         prep["naming"]["category_code"] = "category"
         cases.append((prepare_prep_subject_job, prep, "$.naming.category_code must match ^CAT[0-9]{3}$"))
 
-        prep = self.maintained_job("prep-subject")
+        prep = self.synthetic_job("prep-subject")
         prep["proofreading"].pop("request_timeout_seconds")
         cases.append((prepare_prep_subject_job, prep, "$.proofreading.request_timeout_seconds is required"))
 
-        chunks = self.maintained_job("generate-chunks")
+        chunks = self.synthetic_job("generate-chunks")
         chunks["chunking"]["threshold_percentile"] = 101
         cases.append((prepare_generate_chunks_job, chunks, "$.chunking.threshold_percentile must be at most 100"))
 
-        chunks = self.maintained_job("generate-chunks")
+        chunks = self.synthetic_job("generate-chunks")
         chunks["chunking"].pop("strategy_version")
         cases.append((prepare_generate_chunks_job, chunks, "$.chunking.strategy_version is required"))
 
-        chunks = self.maintained_job("generate-chunks")
+        chunks = self.synthetic_job("generate-chunks")
         chunks["chunking"]["strategy_version"] = "semantic-window-v2"
         cases.append((prepare_generate_chunks_job, chunks, '$.chunking.strategy_version must equal "semantic-window-v1"'))
 
-        docx = self.maintained_job("generate-docx")
+        docx = self.synthetic_job("generate-docx")
         docx["source"].pop("root_dir")
         cases.append((prepare_generate_docx_job, docx, "$.source.root_dir is required"))
 
-        chunks = self.maintained_job("generate-chunks")
+        chunks = self.synthetic_job("generate-chunks")
         chunks["chapters"] = ["001", "001"]
         cases.append((prepare_generate_chunks_job, chunks, "$.chapters must not contain duplicate items"))
 
@@ -141,7 +145,7 @@ class SchemaValidationTests(unittest.TestCase):
             self.assertIn(expected, str(raised.exception))
 
     def test_runtime_only_regex_and_subject_identity_checks_remain_enforced(self):
-        prep = self.maintained_job("prep-subject")
+        prep = self.synthetic_job("prep-subject")
         prep["chapter_split"] = {
             "enabled": True,
             "pattern_type": "regex",
@@ -151,13 +155,13 @@ class SchemaValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(GurubodhError, "not a valid regex"):
             prepare_prep_subject_job(prep)
 
-        chunks = self.maintained_job("generate-chunks")
+        chunks = self.synthetic_job("generate-chunks")
         chunks["destination"]["subject_dir"] = f"different-subject/{chunks['naming']['language']}"
         with self.assertRaisesRegex(GurubodhError, "same language-qualified root"):
             prepare_generate_chunks_job(chunks)
 
     def test_diagnostics_are_deterministic_and_do_not_echo_values(self):
-        payload = self.maintained_job("generate-docx")
+        payload = self.synthetic_job("generate-docx")
         payload.pop("schema_version")
         payload["z_unknown"] = "credential-like-secret-value"
 

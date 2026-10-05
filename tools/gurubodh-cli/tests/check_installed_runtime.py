@@ -37,7 +37,11 @@ class FixtureModel:
 
 
 def generate_content(*, contents, model, config):
-    assert model == "gemini-3.6-flash"
+    from synthetic_jobs import fixture_document
+
+    expected = fixture_document("proofreading/gemini-3.6-flash-v1.json")["proofreading"]
+    assert model == expected["model"]
+    assert config.max_output_tokens == expected["max_output_tokens"]
     assert config.response_mime_type == "application/json"
     assert contents.startswith("<source-text>\n") and contents.endswith("\n</source-text>")
     source = contents.removeprefix("<source-text>\n").removesuffix("\n</source-text>")
@@ -99,12 +103,15 @@ def verify_install(fixtures):
 
 
 def write_subject(root, fixtures, encoding, language):
-    manifest = json.loads((fixtures / "job-components/subjects/aps-hindi.json").read_text())
+    from synthetic_jobs import fixture_document, write_catalog
+
+    write_catalog(root / "project", fixture_root=fixtures / "job-components")
+    manifest = fixture_document("subjects/aps-hindi.json", fixture_root=fixtures / "job-components")
     edition = manifest["editions"]["hi-IN"]
     edition["source_document"]["font_encoding"] = encoding
     manifest["editions"] = {language: edition}
     manifest_dir = root / "project/jobs/subjects" / manifest["manifest_id"]
-    manifest_dir.mkdir(parents=True)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
     (manifest_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     source = root / "source" / edition["source_document"]["relative_path"]
     source.parent.mkdir(parents=True)
@@ -189,6 +196,11 @@ def exercise_commands(root, fixtures, encoding, language):
 def run():
     fixtures = Path(__file__).resolve().parent / "fixtures"
     verify_install(fixtures)
+    # Gurubodh ownership is verified before adding only the explicit tests path.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from policy_fixtures import synthetic_source_fonts
+    from synthetic_jobs import fixture_document
+
     # Import real dependencies before replacing only network/model entry points.
     import boto3
     from google.genai.models import Models
@@ -199,6 +211,7 @@ def run():
     with tempfile.TemporaryDirectory(prefix="gurubodh-installed-runtime-") as directory, ExitStack() as stack:
         root = Path(directory)
         stack.enter_context(chdir(root))
+        stack.enter_context(synthetic_source_fonts(fixture_root=fixtures))
         stack.enter_context(patch("socket.create_connection", side_effect=AssertionError("unexpected network")))
         stack.enter_context(patch("socket.socket.connect", side_effect=AssertionError("unexpected network")))
         gemini = stack.enter_context(patch.object(Models, "generate_content", side_effect=generate_content))
@@ -208,6 +221,12 @@ def run():
             exercise_commands(root / encoding, fixtures, encoding, language)
         assert gemini.call_count == 4, gemini.call_count
         assert embeddings.call_count == 2, embeddings.call_count
+        chunking = fixture_document("chunking/bge-m3-semantic-window-v1.json")["chunking"]
+        for call in embeddings.call_args_list:
+            assert call.args == (chunking["model"],)
+            assert call.kwargs["revision"] == chunking["model_revision"]
+            assert call.kwargs["device"] == chunking["device"]
+            assert call.kwargs["local_files_only"] == chunking["local_files_only"]
         assert tokenizer.call_count == 2, tokenizer.call_count
         # Exercise the installed console-script entry point as a subprocess too.
         for argv in (["--help"], ["prep-subject", "--help"], ["lab", "--help"]):
