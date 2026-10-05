@@ -40,6 +40,7 @@ afterward.
 - New contributor or first local run: [Getting started](docs/getting-started.md)
 - Runtime, credentials, model cache, or Docker setup: [Environment setup](docs/environment-setup.md)
 - Add a subject or language edition: [Subject setup](docs/workflows/add-a-subject.md)
+- Validate configuration and understand subject-testing responsibilities: [Automated validation and testing responsibilities](docs/workflows/add-a-subject.md#automated-validation-and-testing-responsibilities)
 - Failed/incomplete outcomes and reruns: [Recovery decisions](docs/operations/recovery.md)
 - Normal content preparation: [Prepare a subject](docs/workflows/prepare-a-subject.md)
 - Chunk generation and the pinned local model cache: [Generate chunks](docs/workflows/generate-chunks.md)
