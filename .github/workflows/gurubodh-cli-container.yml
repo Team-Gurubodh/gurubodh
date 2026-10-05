@@ -139,7 +139,7 @@ jobs:
               --environment development \
               --storage-profile r2 \
             | docker run --rm -i --entrypoint python gurubodh-cli:smoke -c \
-              "import json, sys; job=json.load(sys.stdin); assert job['pipeline']; assert job['source']['backend'] == job['destination']['backend'] == 'r2'; command='${command}'; assert command != 'prep-subject' or (job['proofreading']['model'] == 'gemini-3.6-flash' and job['proofreading']['max_output_tokens'] == 16384); assert command != 'generate-chunks' or (job['chunking']['model_revision'] == '5617a9f61b028005a4858fdac845db406aefb181' and job['chunking']['local_files_only'] is True and job['chunking']['strategy_version'] == 'semantic-window-v1')"
+              "import json, sys; from gurubodh.job_components import ComponentCatalog; from gurubodh.resource_discovery import bundled_catalog_root; from gurubodh.schema_validation import validate_job; job=json.load(sys.stdin); command='${command}'; validate_job(job, command); assert job['source']['backend'] == job['destination']['backend'] == 'r2'; catalog=ComponentCatalog(bundled_catalog_root()); profiles=catalog.load('command-definition', command).to_payload()['default_profiles']; assert all(job[kind] == catalog.load(kind + '-profile', identity).to_payload()[kind] for kind, identity in profiles.items())"
           done
       - name: Validate the complete baked configuration catalog
         run: |

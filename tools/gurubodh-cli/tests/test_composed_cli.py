@@ -5,12 +5,12 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
-import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from component_contract_cases import without_job_schemas
+from synthetic_jobs import write_catalog
 from gurubodh.cli import main
 from gurubodh.config import (
     prepare_generate_chunks_job, prepare_generate_docx_job, prepare_prep_subject_job,
@@ -34,13 +34,7 @@ class ComposedCliTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
-        shutil.copytree(CLI_ROOT / "config", self.root / "config")
-        for filename in ("aps-hindi", "unicode-bilingual"):
-            document = json.loads((FIXTURES / f"subjects/{filename}.json").read_text())
-            self.write(f"jobs/subjects/{document['manifest_id']}/manifest.json", document)
-        alternate = json.loads((self.root / KINDS["proofreading-profile"]).read_text())
-        alternate["profile_id"] = "example-proofreading-v2"
-        self.write("config/job-components/profiles/proofreading/example-proofreading-v2.json", alternate)
+        write_catalog(self.root)
         self.env = {"GURUBODH_SOURCE_LIBRARY_ROOT": str(self.root / "source"),
                     "GURUBODH_CMS_LIBRARY_ROOT": str(self.root / "artifacts")}
         self.addCleanup(patch.stopall)

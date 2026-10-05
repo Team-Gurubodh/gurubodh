@@ -18,7 +18,7 @@ def validation_suite():
         for name in unittest.defaultTestLoader.getTestCaseNames(case):
             # These two S1 cases intentionally cross the separate complete-job boundary.
             if name not in {
-                "test_fixtures_match_maintained_policies_and_validate_in_existing_jobs",
+                "test_synthetic_profiles_validate_in_complete_jobs",
                 "test_existing_error_domains_are_preserved",
             }:
                 suite.addTest(case(name))

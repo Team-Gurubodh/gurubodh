@@ -12,13 +12,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from synthetic_jobs import write_catalog
+
 from gurubodh.cli import main
 from gurubodh.job_components import ComponentCatalog
 from gurubodh.model_cache import REQUIRED_RUNTIME_FILES
 from gurubodh.model_updates import ModelUpdateCheckError, check_model_updates
 
 
-CLI_ROOT = Path(__file__).parents[1]
 PROFILE_ID = "bge-m3-semantic-window-v1"
 MODEL = "BAAI/bge-m3"
 PINNED = "5617a9f61b028005a4858fdac845db406aefb181"
@@ -52,7 +53,11 @@ def commit(commit_id, day, title):
 
 class ModelUpdateTests(unittest.TestCase):
     def setUp(self):
-        self.catalog = ComponentCatalog(CLI_ROOT)
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name) / "project"
+        write_catalog(self.root)
+        self.catalog = ComponentCatalog(self.root, self.root)
         self.base_content = {
             path: f"pinned: {path}\n".encode("utf-8") for path in REQUIRED_RUNTIME_FILES
         }
@@ -118,7 +123,7 @@ class ModelUpdateTests(unittest.TestCase):
         cache.mkdir()
         sentinel = cache / "sentinel"
         sentinel.write_text("unchanged")
-        profile_path = CLI_ROOT / f"config/job-components/profiles/chunking/{PROFILE_ID}.json"
+        profile_path = self.root / f"config/job-components/profiles/chunking/{PROFILE_ID}.json"
         original_profile = profile_path.read_bytes()
         with patch.dict(os.environ, {"GURUBODH_MODEL_CACHE_DIR": str(cache)}, clear=True), \
              patch("huggingface_hub.HfApi") as api_type, \
@@ -267,7 +272,7 @@ class ModelUpdateTests(unittest.TestCase):
                         "--profile",
                         PROFILE_ID,
                         "--project-root",
-                        str(CLI_ROOT),
+                        str(self.root),
                     ]
                 )
         self.assertNotEqual(caught.exception.code, 0)
@@ -296,7 +301,7 @@ class ModelUpdateTests(unittest.TestCase):
                         "--profile",
                         PROFILE_ID,
                         "--project-root",
-                        str(CLI_ROOT),
+                        str(self.root),
                     ]
                 )
             )

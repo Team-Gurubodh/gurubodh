@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from component_contract_cases import without_job_schemas
+from synthetic_jobs import write_catalog
 from gurubodh.contracts import GenerateChunksJob, GenerateDocxJob, PrepSubjectJob
 from gurubodh.errors import ConfigurationError
 from gurubodh.job_components import ComponentCatalog
@@ -45,14 +46,8 @@ class CompositionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
-        shutil.copytree(CLI_ROOT / "config/job-components", self.root / "config/job-components")
-        for filename in ("aps-hindi", "unicode-bilingual"):
-            document = json.loads((FIXTURES / f"subjects/{filename}.json").read_text())
-            self.write(f"jobs/subjects/{document['manifest_id']}/manifest.json", document)
-        alternate = self.read(KINDS["proofreading-profile"])
-        alternate["profile_id"] = "example-proofreading-v2"
-        self.write("config/job-components/profiles/proofreading/example-proofreading-v2.json", alternate)
-        self.catalog = ComponentCatalog(self.root)
+        write_catalog(self.root)
+        self.catalog = ComponentCatalog(self.root, self.root)
         self.environ = {"GURUBODH_SOURCE_LIBRARY_ROOT": str(self.root / "source"),
                         "GURUBODH_CMS_LIBRARY_ROOT": str(self.root / "artifacts")}
 
@@ -79,10 +74,9 @@ class CompositionTests(unittest.TestCase):
         expected.extend((kind + "-profile", identity, FIXTURES / kind / f"{identity}.json")
                         for kind, identity in (("proofreading", "gemini-3.6-flash-v1"),
                                                ("chunking", "bge-m3-semantic-window-v1")))
-        self.assertEqual(len(expected), 12)
         with without_job_schemas():
             for kind, identity, path in expected:
-                self.assertEqual(ComponentCatalog(CLI_ROOT).load(kind, identity).to_payload(),
+                self.assertEqual(self.catalog.load(kind, identity).to_payload(),
                                  json.loads(path.read_text()))
 
     def test_every_loaded_kind_validates_without_job_schema_access(self):

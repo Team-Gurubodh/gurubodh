@@ -14,6 +14,8 @@ from policy_fixtures import proofreading_settings
 
 from gurubodh.contracts import PrepSubjectJob
 from gurubodh.errors import GurubodhError, ProcessingError
+from policy_fixtures import synthetic_source_fonts
+
 from gurubodh.pipelines import legacy_docx_to_unicode, unicode_docx_ingest
 from gurubodh.prep_subject_checkpoints import (
     CHECKPOINT_CONTRACT_VERSION,
@@ -154,6 +156,9 @@ def prepare_unicode(source_path, output_path, progress):
 
 
 class PrepSubjectCheckpointTests(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(synthetic_source_fonts())
+
     def test_r2_publication_progress_on_failure_resume_and_completed_noop(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

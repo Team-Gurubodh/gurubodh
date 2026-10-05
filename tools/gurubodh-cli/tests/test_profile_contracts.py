@@ -2,7 +2,7 @@
 
 import copy
 from importlib.metadata import PathDistribution
-from migration_fixtures import CASES, explicit_baseline
+from synthetic_jobs import job_payload
 
 import json
 from pathlib import Path
@@ -220,15 +220,15 @@ class ProfileContractTests(unittest.TestCase):
                     del incomplete[kind][key]
                     self.assertFalse(standalone.is_valid(incomplete), (kind, key))
 
-    def test_fixtures_match_maintained_policies_and_validate_in_existing_jobs(self):
-        self.assertEqual(len(CASES), 26)
+    def test_synthetic_profiles_validate_in_complete_jobs(self):
         for kind, (_, command) in PROFILES.items():
-            for case in CASES:
-                if case["selectors"]["command"] != command:
-                    continue
-                job = explicit_baseline(case)
-                with self.subTest(path=case["legacy_path"]):
-                    self.assertEqual(job[kind], profile(kind)[kind])
+            for manifest, locale in (("sub001_aps_example", "hi-IN"),
+                                    ("sub123_spand_rahasya", "hi-IN"),
+                                    ("sub123_spand_rahasya", "mr-IN")):
+                with self.subTest(kind=kind, manifest=manifest, locale=locale):
+                    job = job_payload(command, root=Path("/tmp/synthetic-jobs"),
+                                      manifest_id=manifest, locale=locale)
+                    job[kind] = profile(kind)[kind]
                     validate_job(job, command)
 
     def test_existing_error_domains_are_preserved(self):

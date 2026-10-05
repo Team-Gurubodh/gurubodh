@@ -11,6 +11,9 @@ import zipfile
 
 from docx import Document
 
+from synthetic_jobs import fixture_document
+from policy_fixtures import synthetic_source_fonts
+
 from check_installed_runtime import generate_content, invoke, write_subject
 from gurubodh.errors import ConfigurationError
 from gurubodh.legacy.font_detection import (
@@ -19,7 +22,7 @@ from gurubodh.legacy.font_detection import (
     load_approved_unicode_font_families,
     validate_supported_source_fonts,
 )
-from gurubodh.resource_discovery import BundledResourceError, bundled_resource_path
+from gurubodh.resource_discovery import BundledResourceError
 from gurubodh.schema_validation import _validator, validate_component
 
 
@@ -32,7 +35,8 @@ class SourceFontPolicyTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        self.policy = json.loads(bundled_resource_path(POLICY_PATH).read_text())
+        self.enterContext(synthetic_source_fonts())
+        self.policy = fixture_document("source-fonts.json", fixture_root=CLI_ROOT / "tests/fixtures")
         self.path = self.root / "source-fonts.json"
         self.write_policy()
 
@@ -56,15 +60,10 @@ class SourceFontPolicyTests(unittest.TestCase):
         document.save(path)
         return path
 
-    def test_preserves_all_original_unicode_approvals(self):
-        original = {
-            "aparajita", "aptos", "arial", "arial unicode ms", "calibri", "cambria",
-            "hind", "kohinoor devanagari", "kokila", "lohit devanagari", "mangal",
-            "mukta", "nirmala ui", "noto sans devanagari", "noto serif devanagari",
-            "sanskrit 2003", "shobhika", "times new roman", "tiro devanagari hindi", "utsaah",
-        }
-        self.assertTrue(original.issubset(load_approved_unicode_font_families()))
-        for family in original:
+    def test_accepts_explicit_synthetic_unicode_approvals(self):
+        self.assertEqual(load_approved_unicode_font_families(),
+                         frozenset({"mangal", "nirmala ui", "noto sans devanagari"}))
+        for family in self.policy["approved_unicode_font_families"]:
             with self.subTest(family=family):
                 validate_supported_source_fonts(self.source(family))
 
@@ -169,12 +168,12 @@ class SourceFontPolicyTests(unittest.TestCase):
 
     def test_manifest_and_execution_profiles_reject_approval_overrides(self):
         for kind, relative in (
-            ("subject-manifest", "tests/fixtures/job-components/subjects/unicode-bilingual.json"),
-            ("proofreading-profile", "config/job-components/profiles/proofreading/gemini-3.6-flash-v1.json"),
-            ("chunking-profile", "config/job-components/profiles/chunking/bge-m3-semantic-window-v1.json"),
+            ("subject-manifest", "subjects/unicode-bilingual.json"),
+            ("proofreading-profile", "proofreading/gemini-3.6-flash-v1.json"),
+            ("chunking-profile", "chunking/bge-m3-semantic-window-v1.json"),
         ):
             with self.subTest(kind=kind):
-                payload = json.loads((CLI_ROOT / relative).read_text())
+                payload = fixture_document(relative)
                 payload["approved_unicode_font_families"] = ["Unapproved Family"]
                 with self.assertRaisesRegex(ConfigurationError, "approved_unicode_font_families is not allowed"):
                     validate_component(payload, kind)

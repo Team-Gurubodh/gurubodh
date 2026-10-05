@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 from gurubodh.config import prepare_generate_chunks_job
 from gurubodh.content_identity import build_content_identity
 from gurubodh.errors import GurubodhError
-from gurubodh.job_components import ComponentCatalog
+from synthetic_jobs import fixture_document
 from gurubodh.ml.semantic_chunking.models import Chunk, ChunkedDocument, text_sha256, whitespace_insensitive_sha256
 from gurubodh.naming import chapter_output_filename
 from gurubodh.pipelines.generate_chunks import run_generate_chunks_job
@@ -330,10 +330,9 @@ class GenerateChunksPipelineTests(unittest.TestCase):
         self.assertEqual(payload["chunking"]["chunking_config_key"], semantic_manifest["chunking"]["chunking_config_key"])
         self.assertEqual(payload["chunks"][0]["estimated_token_count"], 2)
 
-    def test_maintained_profile_uses_cpu_through_runtime_artifacts_and_reports(self):
+    def test_synthetic_profile_uses_cpu_through_runtime_artifacts_and_reports(self):
         config = base_config(self.temp_dir.name)
-        catalog = ComponentCatalog(Path(__file__).parents[1])
-        config["chunking"] = catalog.load("chunking-profile", "bge-m3-semantic-window-v1").to_payload()["chunking"]
+        config["chunking"] = fixture_document("chunking/bge-m3-semantic-window-v1.json")["chunking"]
         metadata = write_prepared_chapter(self.temp_dir.name, config, 1, "पहला वाक्य। दूसरा वाक्य।\n")
         write_candidate_manifest(self.temp_dir.name, config, [metadata])
         cache = Path(self.temp_dir.name) / "model-cache"
