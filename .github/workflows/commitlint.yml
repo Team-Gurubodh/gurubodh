@@ -33,8 +33,10 @@ jobs:
         run: npm ci
 
       - name: Validate pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          printf '%s\n' "${{ github.event.pull_request.title }}" | npx commitlint --verbose
+          printf '%s\n' "$PR_TITLE" | npx commitlint --verbose
 
       - name: Validate pull request commits
         run: |
