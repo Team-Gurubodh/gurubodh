@@ -27,8 +27,8 @@ high-signal before it is sent to the answer-generation API:
 This note is intentionally scoped as proposed/exploratory. The current
 architecture overview already includes a Phase 3 RAG layer, and related
 decisions remain proposed in
-[ADR-0008](../adr/README.md#adr-0008--vector-store) and
-[ADR-0009](../adr/README.md#adr-0009--embedding-and-llm-provider).
+[vector store](../adr/README.md#vector-store) and
+[embedding and LLM provider](../adr/README.md#embedding-and-llm-provider) topics.
 
 ## Decisions
 
@@ -139,6 +139,7 @@ flowchart TB
 
 - Decide whether this proposed workflow should become an ADR if it becomes the
   accepted chat RAG design.
-- Revisit [ADR-0009](../adr/README.md#adr-0009--embedding-and-llm-provider) if Sarvam
-  API and the BGE models become production provider choices instead of
-  exploratory design inputs.
+- Revisit the
+  [embedding and LLM provider topic](../adr/README.md#embedding-and-llm-provider)
+  if Sarvam API and the BGE models become production provider choices instead
+  of exploratory design inputs.

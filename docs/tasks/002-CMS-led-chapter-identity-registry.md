@@ -450,7 +450,7 @@ become a second registry or current-snapshot authority.
   [Decision-0003: Prepared Artifact Ownership and Lifecycle](../decisions/0003-prepared-artifact-ownership-and-lifecycle.md)
   explicitly deferred versioned releases and a current pointer until CMS
   ingestion required them.
-- [ADR-0013](../adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md)
+- [ADR-0006](../adr/0006-use-cloudflare-r2-for-prepared-content-artifacts.md)
   establishes R2 as durable storage for prepared artifacts. It does not make R2
   the logical identity registry, CMS content store, or finalized-manifest
   authority.

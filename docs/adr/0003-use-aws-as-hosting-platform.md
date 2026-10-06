@@ -9,7 +9,7 @@ Accepted
 AWS is the accepted hosting direction for infrastructure other than prepared
 artifact storage. Existing team familiarity and account setup favor a common
 security, networking, billing, and operational model.
-[ADR-0013](0013-use-cloudflare-r2-for-prepared-content-artifacts.md) qualifies the
+[ADR-0006](0006-use-cloudflare-r2-for-prepared-content-artifacts.md) qualifies the
 original single-provider choice: prepared artifacts use private Cloudflare R2,
 with local storage supported for development and compatibility.
 
