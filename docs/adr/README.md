@@ -2,54 +2,94 @@
 
 <record_collection>architecture_decisions</record_collection>
 
-Use this directory for durable architectural decisions that affect system boundaries, data ownership, runtime dependencies, deployment shape, or long-term technical direction.
+ADRs own consequential rationale, tradeoffs, and reconsideration triggers.
+The [architecture overview](../architecture.md) owns the system map; interface
+contracts and code own semantics and implementation details.
 
-Each ADR captures a single decision, the context that motivated it, and its consequences (including tradeoffs and alternatives considered). Use the [authoritative ADR template](./0000-template.md) for its structure and metadata.
+## Status legend
 
-The companion [architecture.md](../architecture.md) describes the stable component structure these decisions implement. ADRs explain *why*; the architecture overview explains *what* and *how things fit together*.
+- **Accepted** — explicitly decided for the stated scope; does not prove implementation or deployment.
+- **Proposed** — undecided; a recommendation grants no acceptance or implementation authorization.
+- **Superseded** — replaced by an identified later record; consult its replacement for current scope.
 
-## Status Legend
+These meanings also apply to [operational decisions](../decisions/README.md).
 
-- **Accepted** — decided and in effect.
-- **Proposed** — not yet decided; a recommended default is recorded so work can
-  proceed, but it should be revisited and confirmed (status updated to
-  Accepted) before being treated as final.
-- **Superseded** — replaced by a later ADR (the later ADR is linked).
+## Records
 
-## Index
+| Record | Status and scope |
+| --- | --- |
+| [0001 — Strapi](0001-use-strapi-as-headless-cms.md) | Accepted CMS choice; implemented |
+| [0002 — Next.js](0002-use-nextjs-for-web-frontend.md) | Accepted web framework; unimplemented |
+| [0003 — AWS](0003-use-aws-as-hosting-platform.md) | Accepted hosting direction, qualified by R2; no deployment claim |
+| [0004 — API style](0004-strapi-api-style.md) | Proposed broader policy; REST seed writes implemented |
+| [0012 — CI/CD](0012-cicd-pipeline-tool.md) | Proposed broader policy; Actions checks and CLI publication implemented |
+| [0013 — R2](0013-use-cloudflare-r2-for-prepared-content-artifacts.md) | Accepted prepared storage; implemented |
 
-| # | Title | Status |
-|---|---|---|
-| [0001](./0001-use-strapi-as-headless-cms.md) | Use Strapi as Headless CMS | Accepted |
-| [0002](./0002-use-nextjs-for-web-frontend.md) | Use Next.js for Web Frontend | Accepted |
-| [0003](./0003-use-aws-as-hosting-platform.md) | Use AWS as Hosting Platform | Accepted |
-| [0004](./0004-strapi-api-style.md) | Strapi API Style: REST vs GraphQL | Proposed |
-| [0005](./0005-cms-admin-access-control.md) | CMS Admin UI Access Control | Proposed |
-| [0006](./0006-content-preparation-orchestration.md) | Content Preparation Orchestration Approach | Proposed |
-| [0007](./0007-nextjs-hosting-model-on-aws.md) | Next.js Hosting Model on AWS | Proposed |
-| [0008](./0008-vector-database-for-rag.md) | Vector Database for RAG (Phase 3) | Proposed |
-| [0009](./0009-embedding-model-and-llm-provider.md) | Embedding Model and LLM Provider (Phase 3) | Proposed |
-| [0010](./0010-mobile-app-framework.md) | Mobile App Framework (Phase 4) | Proposed |
-| [0011](./0011-infrastructure-as-code-tool.md) | Infrastructure as Code Tool | Proposed |
-| [0012](./0012-cicd-pipeline-tool.md) | CI/CD Pipeline Tool | Proposed |
-| [0013](./0013-use-cloudflare-r2-for-prepared-content-artifacts.md) | Use Cloudflare R2 for Prepared Content Artifacts | Accepted |
+## Open choices
 
+ADRs 0005–0011 are consolidated below. No separate detailed proposal is required
+by the active issue scopes reviewed for #387. Numbers remain reserved; full original
+proposals are recoverable in [Git history at the assessed revision](https://github.com/Team-Gurubodh/gurubodh/tree/f9039b13d87ea0bdcf1bb9b746fe4a8f8f788bab/docs/adr).
+All choices here are **Proposed**. Constraints below retain proposal context and
+must be reviewed with the future implementation; they do not select a technology.
 
-## Adding a New ADR
+### ADR-0005 — CMS admin access
 
-1. Copy the [authoritative ADR template](./0000-template.md) and choose the next sequential number.
-2. Use the format: `NNNN-short-kebab-case-title.md`.
-3. Fill in the template's metadata and sections.
-4. Add a row to the Index table above.
-5. If an ADR replaces an earlier one, mark the old one **Superseded** and link
-   forward to the new ADR.
+Undecided. The original proposal adds VPN/IP restrictions to Strapi authentication
+for mutation-capable administration; editor access friction is the tradeoff.
+Choose with actual editor/network requirements.
 
-The existing [templates/adr-template.md](../templates/adr-template.md) entry point links to the same authoritative template.
+### ADR-0006 — Preparation orchestration
 
+Undecided. Native/container batch preparation is implemented. Managed retry,
+scheduling, and visibility may justify orchestration; Step Functions was proposed,
+not selected. Preserve preparation's artifact handoff and visible failures rather
+than introducing CMS writes into preparation.
 
-## When To Create An ADR
+### ADR-0007 — Web hosting
 
-- A decision changes architecture boundaries.
-- A decision affects multiple applications, tools, or environments.
-- A decision is expensive to reverse.
-- Future agents or maintainers will need to know why the choice was made.
+Undecided. Amplify was proposed; containers offer more runtime/network control
+with greater operational effort. No ECS deployment is established. Choose after
+web rendering and operational requirements are known.
+
+### ADR-0008 — Vector store
+
+Undecided; pgvector was a candidate, not an implementation. Keep retrieval data
+rebuildable from CMS content and separate from Strapi-owned tables, roles, and
+migrations. Sharing compute may let indexing/query load impair CMS reliability.
+Reconsider isolation and store choice against measured retrieval needs. See the
+[exploratory RAG task](../tasks/001-RAG-architecture.md).
+
+### ADR-0009 — Embedding and LLM provider
+
+Undecided. Bedrock/Titan/Claude were proposed. Local BGE-M3 chunk-boundary
+experiments do not select a production retrieval provider. Evaluate Hindi/Marathi
+and domain-specific retrieval/answer quality before choosing.
+
+Retain the comparability constraint: provider/model, mode, dimensions,
+normalization, index/chunking versions, and source/chunk identity must identify
+which vectors can be compared. Model-dependent calls belong behind a provider
+boundary. Changing model, mode, dimensions, or normalization requires embedding
+regeneration and affected-index rebuild, not canonical content replacement.
+Dense-first retrieval was a simplification proposal; sparse/multi-vector support
+needs separate design. See the [RAG task](../tasks/001-RAG-architecture.md).
+
+### ADR-0010 — Mobile framework
+
+Undecided. React Native/Expo was proposed for shared API/types and two-platform
+reuse; native customization may add cost. Mobile should reuse CMS/RAG APIs.
+Choose when mobile requirements are concrete.
+
+### ADR-0011 — Infrastructure as code
+
+Undecided. CDK/TypeScript was proposed for toolchain consistency; Terraform offers
+portability at the cost of another language. Establish environment reproducibility
+and ownership needs before selecting tooling.
+
+## Adding a record
+
+Use the [ADR template](0000-template.md), choose an unused sequential number,
+and update this index. Create an ADR for a boundary, ownership, dependency, or
+long-term direction change whose rationale would otherwise be lost. Mark a
+replaced record Superseded and link its successor. The
+[template entry point](../templates/adr-template.md) routes to the same template.

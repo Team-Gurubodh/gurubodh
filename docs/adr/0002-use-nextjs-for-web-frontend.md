@@ -4,35 +4,18 @@
 
 Accepted
 
-## Context
+## Decision and rationale
 
-The platform needs a modern web UI to consume and present CMS content, with
-good ***SEO - Search Engine Optimization*** and performance, and a clear path to add RAG-based Q&A features to
-the same UI in a later phase. We want a framework with a strong ecosystem and
-broadly available engineering talent.
+Use Next.js (React) for the web frontend. A content-heavy site needs search-engine
+visibility and performant rendering with static generation, revalidation, and
+server rendering where appropriate. The React ecosystem and available engineering
+experience provide a path to later retrieval/Q&A features.
 
-## Decision
+## Tradeoff and review trigger
 
-Adopt **Next.js (React)** as the web frontend framework.
+Framework conventions and release churn require maintenance. Server rendering
+and revalidation add hosting complexity beyond static files. Reconsider if those
+capabilities no longer justify that operational cost.
 
-## Consequences
-
-**Positive**
-- Built-in support for multiple rendering strategies (SSG, ISR, SSR), suited to
-  a content-heavy site where most pages are largely static but need periodic or
-  on-demand updates.
-- Large React ecosystem and broadly available engineering talent.
-- First-class hosting support on AWS (via Amplify Hosting) as well as
-  general-purpose options (ECS, containers).
-
-**Negative**
-- Adopting Next.js means adopting its framework conventions and release cadence,
-  which the team must keep up with.
-- ***SSR - Server-Side Rendering*** / ***ISR - Incremental Static Regeneration*** hosting is operationally more complex than serving plain static files.
-- React/Next.js ecosystem churn requires ongoing maintenance attention.
-
-**Alternatives Considered**
-- **Nuxt (Vue)** — comparable capability, but a smaller ecosystem and talent
-  pool relative to React.
-- **SvelteKit** — lighter-weight runtime, but a younger ecosystem with fewer
-  engineers already familiar with it.
+The [web root](../../apps/gurubodh-web/README.md) is a placeholder, not a scaffolded
+application. [Hosting](README.md#adr-0007--web-hosting) remains undecided.

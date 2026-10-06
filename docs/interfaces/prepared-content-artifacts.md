@@ -5,268 +5,125 @@
 <date>2026-07-08</date>
 <owners>Gurubodh maintainers</owners>
 
-## Purpose
+## Boundary and authority
 
-This document defines the handoff contract for artifacts produced by
-`tools/gurubodh-cli` and consumed later by content ingestion, metadata
-generation, metadata ingestion, and CMS-backed application workflows.
+Source DOCX → preparation → local/private R2 artifacts → derived commands and
+future chapter/metadata ingestion. Preparation does not publish CMS entries.
 
-## Boundary
+Canonical prepared content is the proofread versioned text/metadata pair.
+Unmodified extracted text and proofreading records are provenance. Semantic
+chunks and chapter DOCX exports are rebuildable derivatives. Retrieval
+embeddings are future retrieval data, not canonical preparation outputs.
+Source or transient Unicode DOCX is not a published canonical artifact; lab
+proofreading output is non-canonical.
 
-```text
-Source DOCX storage
--> tools/gurubodh-cli
--> prepared artifact storage
--> future ingestion and metadata workflows
-```
+Schemas in [config/artifacts](../../tools/gurubodh-cli/config/artifacts/) own
+structural fields. The [shared validator](../../tools/gurubodh-cli/gurubodh/schema_validation.py)
+validates governed payloads before serialization/publication. The
+[configuration reference](../../tools/gurubodh-cli/docs/reference/configuration.md#storage-and-library-roots)
+owns library roots, stores, and routing; credentials belong to operator setup.
 
-Preparation may use temporary local files internally. Temporary paths must not
-appear in generated metadata for R2-backed jobs.
+## Command ownership and locale roots
 
-The configured source remains DOCX. Unicode input may be read directly;
-legacy-font preparation may create a transient Unicode DOCX inside the job
-workspace for chapter detection and extraction. Neither form is a published
-prep artifact. `chapters/msword/` is a derived export boundary reserved for
-`generate-docx`, and `full_subject/` is retired.
+A release root is `cms_library/{subject-group}/{language}/`, where the final
+`subject_dir` segment matches the configured locale (`hi-IN` or `mr-IN`).
+Source/destination roots, naming, manifest, and metadata must agree on locale.
+Hindi and Marathi releases have independent state, provenance, outputs, and
+overwrite effects. Paths must be safe relative paths confined to their release.
+No command owns the entire subject root.
 
-## Storage Backends
+| Owner | Paths relative to the release root | Role |
+| --- | --- | --- |
+| `prep-subject` | `chapters/text_and_metadata/`, `chapters/chapter_content_manifest.json` | Canonical proofread text/metadata and current candidate set |
+| `prep-subject` | `chapters/unmodified_source_text/`, `chapters/proofreading/` | Exact extracted/converted proofreading input, diffs, safe provenance |
+| `prep-subject` | `run_state/prep-subject/`, `.work/prep-subject/` | Operational checkpoint and non-canonical staging |
+| `generate-chunks` | `chapters/semantic_chunks/` | Chunk-only artifacts and `semantic_chunks_manifest.json` readiness marker |
+| `generate-docx` | `chapters/msword/` | Human-readable DOCX and `docx_manifest.json` readiness marker |
+| Each command | `run_reports/<command>/` | Independently retained JSON/Markdown audits |
 
-Supported backends:
+Provenance records bind source and corrected artifacts, locale/template identity,
+and checksums without embedding full texts, prompts, credentials, or raw provider
+responses. Staging and unmodified-source paths are never canonical candidates.
+R2 references use private bucket/key addressing; local references use paths.
+URLs may be null and cannot be required for consumption. Temporary processing
+paths must not appear in generated metadata for R2-backed jobs.
 
-- `local` - development and compatibility filesystem storage.
-- `r2` - Cloudflare R2 object storage using the S3-compatible API.
+## Content identity and manifest
 
-The [CLI configuration reference](../../tools/gurubodh-cli/docs/reference/configuration.md#storage-and-library-roots)
-owns current environment stores, bucket/prefix values, library-root bindings,
-and command-specific routing. The layout below uses the maintained CMS prefix.
+`content_key` identifies normalized chapter content state within Category code,
+Subject code, and language. Normalized text edits change it; unchanged text
+reordered among chapters retains it. It is not permanent editorial chapter
+identity, a registry, or revision history. Normalization and key construction
+are defined in [content_identity.py](../../tools/gurubodh-cli/gurubodh/content_identity.py).
 
-## Artifact Layout
+`normalized_content_sha256` checks normalized text. The metadata's
+`integrity.artifacts.text` checks exact emitted UTF-8 artifact bytes. These
+checksums have different purposes and are not interchangeable. New canonical
+text has LF internal line endings, no carriage returns, and one final LF;
+identity normalization additionally handles Unicode and whitespace equivalence.
 
-Prepared artifact grouping is preserved beneath a language-specific release
-root. Initially supported locales are `hi-IN` and `mr-IN`; `{language}` is the
-final segment of a validated `subject_dir` and `{subject-group}` remains visible
-above it.
+`chapter_content_manifest.json` is the sole chapter-selection authority.
+Derived commands use only its selected metadata/text pairs, validate safe
+references, subject/locale identity, filenames, content keys, and exact text
+checksums, and bind outputs to the exact source-manifest bytes. DOCX uses the
+manifest order. Loose files and provenance do not authorize selection.
 
-```text
-cms_library/{subject-group}/{language}/chapters/text_and_metadata/
-cms_library/{subject-group}/{language}/chapters/unmodified_source_text/
-cms_library/{subject-group}/{language}/chapters/chapter_content_manifest.json
-cms_library/{subject-group}/{language}/chapters/proofreading/
-cms_library/{subject-group}/{language}/chapters/msword/
-cms_library/{subject-group}/{language}/run_state/prep-subject/job-state.json
-cms_library/{subject-group}/{language}/run_reports/generate-docx/
-cms_library/{subject-group}/{language}/.work/prep-subject/{job-id}/
-```
+## Canonical-consumption gate
 
-R2 prefixes are object-key strings, not real folders.
+Consumers must require a succeeded prep job and succeeded publication bound to
+the candidate manifest, including matching chapter membership and identities.
+Missing, malformed, incomplete, or publishing state does not authorize derived
+consumption, even if prior canonical files remain. Implemented validation is in
+[canonical_release.py](../../tools/gurubodh-cli/gurubodh/canonical_release.py) and
+[canonical_source.py](../../tools/gurubodh-cli/gurubodh/canonical_source.py).
+Both derived commands revalidate state and manifest immediately before publishing.
 
-`subject_dir` must be a safe nested POSIX-relative path: it cannot be absolute,
-contain empty segments, `.`, `..`, or backslashes, and its final segment must
-equal the configured language. Prep-subject uses
-`metadata_defaults.language`; `generate-chunks` and `generate-docx` require the
-same language in their naming, source root, destination root, prepared
-manifest, and candidate metadata. These roots are independent per-locale
-release units.
+Valid succeeded legacy releases remain consumable subject to these checks;
+current readers accept metadata versions `1.3.0` and `1.4.0` and succeeded legacy
+checkpoint version 1. Age alone does not require regeneration. Incompatible
+incomplete checkpoints require intentional replacement. Missing/invalid content
+identity or malformed canonical text, including any carriage return, requires
+repair through intentional `prep-subject --overwrite`; derived commands do not
+repair canonical artifacts. See [recovery](../../tools/gurubodh-cli/docs/operations/recovery.md).
 
-## Prep-subject operational checkpoint
+## Derived readiness
 
-`run_state/prep-subject/job-state.json` is the durable operational record for a
-preparation job, not a canonical content artifact. Its schema is
-`prep_subject_job_state.schema.json`. It records a unique job ID, lifecycle
-state, lease heartbeat, compatibility fingerprint, source checksum, bounded
-per-chapter outcomes, checksum-validated staged artifact references, canonical
-manifest binding, and immutable run-report references. It never contains API
-keys, request/response bodies, full chapter text, or unbounded provider errors.
+Chunks contain text, spans, checksums, token estimates, and chunking provenance.
+Temporary boundary-selection vectors are not persisted retrieval embeddings.
+The legacy combined chunks/embeddings path is unsupported for new ingestion.
 
-The job workspace is under `.work/prep-subject/{job-id}/`. It contains staged
-artifacts only and is never a source for ingestion or chunk generation. Local
-workspaces are retained for incomplete or publishing recovery and removed after
-successful canonical promotion. R2 stores the equivalent workspace object
-prefix; its multi-object publication remains recoverable but non-atomic.
+DOCX remains a human-readable export. Its generator validates OOXML and
+round-trips the body to canonical text before publication. Formatting and title
+details belong to [docx/export.py](../../tools/gurubodh-cli/gurubodh/docx/export.py).
+Consumers of either derived set must require and validate its readiness marker,
+source binding, selected chapter coverage, and artifact checksums.
 
-The lifecycle is `running`, `incomplete`, `ready_to_publish`, `publishing`,
-`succeeded`, or `failed`. Chapters are only `pending`, `failed`, or
-`succeeded`. A successful chapter is reusable only after its complete staged
-artifact set passes checksum validation. `generate-chunks` and `generate-docx`
-refuse any state other than `succeeded`, including before an overwrite can
-delete derived output.
+## Replacement, audit, and recovery obligations
 
-## Mandatory Canonical Gemini Proofreading
+A compatible `--resume` continues the persisted prep job; `--overwrite` starts a
+replacement. Replacement authorization persists in job state across resume;
+resume does not grant it to an ordinary job. An unfinished replacement preserves
+prior canonical and derived files, but the latest prep state still gates use.
+Only successful canonical replacement invalidates same-locale chunks and DOCX
+and removes retired `full_subject/`. Regenerate required derived outputs afterward.
 
-Every `prep-subject` job must provide a strict `proofreading` object and read
-its credential only from `GEMINI_API_KEY`. For every successfully prepared
-chapter, preparation writes these five files across three directories:
+Derived overwrite replaces only that command's output set. Staged validation and
+source revalidation precede publication. Local replacement preserves prior output
+until promotion and restores it if the directory swap fails. Chunk overwrite
+cleans legacy combined output only after successful v2 publication. Audits and
+other locales/commands remain outside output replacement.
 
-```text
-chapters/text_and_metadata/<chapter>.txt
-chapters/text_and_metadata/<chapter>.json
-chapters/unmodified_source_text/<chapter>_unmodified_source.txt
-chapters/proofreading/<chapter>.proofread.diff.txt
-chapters/proofreading/<chapter>.proofread.json
-```
+R2 multi-object publication is non-atomic. Prep publishes its canonical manifest
+last and requires succeeded, manifest-bound state. Derived overwrite removes the
+old readiness marker before replacing objects, then uploads the validated new
+marker last. A derived prefix without its marker is incomplete; readers must not
+infer readiness from object presence. Review failure audits before rerunning with
+`--overwrite`. No versioned-release/current-pointer protocol is implemented.
 
-The versioned `.txt` and `.json` under `text_and_metadata/` are the canonical
-proofread text and proofread-derived metadata. The unmodified source text is
-the exact converted/extracted input submitted to Gemini; it is provenance only
-and has no metadata JSON. The proof-reading details JSON binds the unmodified
-and canonical text artifacts with storage references, checksums, content
-identities, provider/model provenance, selected language, a stable
-instruction-template ID/version/hash, request pacing/usage, local diff summary,
-and Gemini edit explanations. It contains no full source/corrected text,
-prompts, API keys, or raw responses.
-
-Every newly published canonical `.txt` is UTF-8 bytes with no carriage-return
-byte: internal line boundaries use LF and the file has exactly one final LF.
-`integrity.artifacts.text` checks those exact emitted bytes. This byte-format
-normalization only converts CRLF and lone CR before the final-LF convention; it
-does not apply the separate content-identity normalization rules below.
-
-`chapters/proofreading/proofreading_manifest.json` remains an aggregate
-operational provenance artifact. It is not part of the five per-chapter files.
-
-`chapter_content_manifest.json` lists only the proofread versioned text and
-matching metadata. `generate-chunks` consumes those manifest-listed artifacts
-only, so it ignores both `unmodified_source_text/` and `proofreading/`.
-
-## Metadata References
-
-Chapter metadata schema `1.4.0` includes storage references for the source
-object and the canonical metadata/text pair only. It omits the former
-`files.msword_filename`, `storage.artifacts.msword`,
-`storage.artifacts.full_subject_msword`, and
-`storage.artifacts.full_subject_text` fields.
-
-R2 references use:
-
-```json
-{
-  "backend": "r2",
-  "bucket": "gurubodh-library-dev",
-  "key": "cms_library/129_spand_rahasya/hi-IN/chapters/text_and_metadata/example.json",
-  "url": null
-}
-```
-
-Local references use:
-
-```json
-{
-  "backend": "local",
-  "path": "chapters/text_and_metadata/example.json",
-  "url": null
-}
-```
-
-URL values are optional in job configuration and nullable in generated metadata.
-Consumers must treat bucket/key or local path references as canonical.
-
-## Content Identity and Manifest
-
-Every newly prepared canonical chapter metadata artifact carries `content_identity`. Its
-`content_key` is a deterministic UUID v5 for the normalized chapter text within
-the category, subject, and language. It is provenance for an exact content
-state, not a stable editorial chapter identity: a text edit changes it, while
-moving unchanged text to another generated chapter position does not.
-The immutable Gurubodh namespace for identity contract v1 is
-`7ecde8b9-3560-426a-9fd5-52bff1b6c575`.
-
-Normalization v1 applies NFC Unicode normalization, converts CRLF/lone CR to
-LF, removes trailing spaces/tabs from each line, and removes outer Unicode
-whitespace. It preserves internal whitespace, paragraph boundaries,
-punctuation, and other characters. The `normalized_content_sha256` is computed
-from the resulting UTF-8 text without an added final newline. This is distinct
-from `integrity.artifacts.text`, which checks the exact emitted `.txt` bytes.
-
-`chapters/chapter_content_manifest.json` is a deterministic list of the current generated
-chapter content keys and their metadata/text references. It does not retain
-history or create a chapter registry. Existing prepared trees must be fully
-regenerated with `gurubodh prep-subject --overwrite` before `generate-chunks`;
-the chunk command refuses metadata without valid content identity.
-An already published canonical text artifact containing a carriage return is
-malformed even if its metadata claims `line_endings: LF`; it is not repaired by
-derived commands and requires that intentional `prep-subject --overwrite`
-regeneration before either derived command can consume it.
-
-## Candidate Semantic Chunks
-
-`generate-chunks` consumes the candidate manifest as its only
-chapter-selection authority. It validates selected manifest references against
-chapter metadata and text before model initialization, then writes schema-v2
-artifacts under `chapters/semantic_chunks/`.
-
-Every chunk artifact and `semantic_chunks_manifest.json` records the SHA-256
-of the exact UTF-8 candidate manifest bytes used for the run. Chunk artifacts
-contain ordered text, spans, checksums, token estimates, and chunking
-provenance only. Temporary contextual vectors may be used to determine
-boundaries, but retrieval vectors are not preparation artifacts and are not
-stored in local artifact trees or R2.
-
-`chapters/semantic_chunks_and_embeddings/` is a legacy combined-output path.
-It is unsupported for new ingestion, and its vectors are not migrated into v2
-chunk-only artifacts. `generate-chunks` fails when the legacy output exists
-unless `--overwrite` is supplied. With overwrite, the command preserves that
-output through preflight, staged generation, staged validation, and source
-revalidation. It removes the legacy output only after successful v2 publication
-and records the cleanup in the audit. For R2, the new
-`semantic_chunks_manifest.json` is the readiness marker and is published last;
-the multi-object replacement is readiness-based rather than atomic.
-
-## Derived DOCX Exports
-
-`generate-docx` consumes `chapter_content_manifest.json` as its only chapter
-selection and ordering authority. It applies the same safe-reference,
-identity, filename, checksum, and content-key validation used by
-`generate-chunks`, accepts valid succeeded legacy metadata schema `1.3.0`, and
-revalidates prep state plus source-manifest bytes immediately before publishing.
-
-For each selected canonical text file it writes the same versioned stem with a
-`.docx` suffix under `chapters/msword/`. The first paragraph is exactly
-`<title_slug>: prabodhan <three-digit chapter number>`. Remaining Word
-paragraphs map canonical blank-line-delimited paragraphs one-for-one; single
-LFs inside a paragraph become Word line breaks. The canonical artifact's one
-final LF is excluded from the displayed body and restored during validation.
-The fixed formatting contract `1.0.0` uses one-inch margins, Noto Sans
-Devanagari, 18-point Title and 11-point Normal styles, left-to-right direction,
-1.15 line spacing, and fixed paragraph spacing for both Hindi and Marathi.
-
-Every generated package is validated as ZIP/OOXML and its body is round-tripped
-back to the exact canonical text. Only after all files pass does the command
-write `docx_manifest.json`, which binds the source manifest SHA-256, canonical
-identities/text checksums, generated titles, formatting/title contracts, and
-DOCX SHA-256 values. Consumers must require and validate this readiness marker;
-DOCX remains a rebuildable human-readable export and never becomes canonical.
-
-## Overwrite Behavior
-
-Without a flag, an incomplete checkpoint causes `prep-subject` to stop with
-instructions to use `--resume` or `--overwrite`. `--resume` requires the same
-source/configuration fingerprint and retries only pending or failed chapters;
-on a succeeded job it exits without Gemini calls. `--resume` and `--overwrite`
-are mutually exclusive. `--overwrite` archives the old state record, discards
-its staged workspace, and starts a fresh job; it does not resume.
-
-All required proofreading must succeed in staging before canonical promotion.
-An unfinished overwrite leaves the previous canonical tree and its semantic
-chunks, chapter DOCX exports, and legacy `full_subject/` intact. Only a
-successful replacement invalidates same-locale semantic output and
-`chapters/msword/` and removes same-locale legacy `full_subject/`. Cleanup is
-recorded in operational state and reports; other locales and unrelated paths
-are never included.
-There must be no concurrent writer for a subject: local jobs take an exclusive
-lock and R2 jobs use the active lease/heartbeat in job state. A stale lease is
-recoverable with `--resume`.
-
-The five-file checkpoint contract is version `2`. Earlier incomplete
-six-artifact checkpoints cannot resume and require `--overwrite`. Earlier
-succeeded releases remain valid canonical input for `generate-chunks` and
-`generate-docx`, even when their metadata retains legacy references.
-
-Without `--overwrite`, `generate-docx` refuses any existing
-`chapters/msword/`. Local overwrite validates the complete new set in staging
-before safely replacing that directory. R2 overwrite removes the old readiness
-manifest first, replaces only DOCX-owned objects, and publishes the new
-`docx_manifest.json` last; an interrupted prefix without that manifest is not
-ready and is recovered by rerunning with `--overwrite`. Reports remain
-append-only under `run_reports/generate-docx/`, and neither backend touches
-canonical artifacts, semantic chunks, `full_subject/`, other locales, or
-unrelated subject files.
+Use one writer per release; locks and R2 leases are advisory guardrails, not
+reliable distributed mutual exclusion. Audits are retained independently and
+must not be removed by output cleanup. Detailed lifecycle and operator procedures
+are owned by [prep publication](../../tools/gurubodh-cli/gurubodh/prep_publication.py),
+[derived lifecycle](../../tools/gurubodh-cli/gurubodh/derived_artifact_lifecycle.py),
+[prep recovery](../../tools/gurubodh-cli/docs/workflows/prepare-a-subject.md#resume-and-replacement),
+and [R2 recovery](../../tools/gurubodh-cli/docs/operations/r2-production-runs.md#derived-output-readiness-and-failed-retries).

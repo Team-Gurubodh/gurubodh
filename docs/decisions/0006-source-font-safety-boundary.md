@@ -5,51 +5,26 @@
 <date>2026-08-28</date>
 <owners>Gurubodh maintainers</owners>
 
-## Context
+## Decision and rationale
 
-Canonical content must not be produced from an unverified legacy-font mapping.
-The previously bundled generic ShreeLipi converter could silently generate
-incorrect Unicode text because ShreeLipi and Shree Dev variants do not share a
-universal encoding. A job declaration alone also could not establish that a
-DOCX actually used the declared source font.
+Accept centrally approved Unicode and APS source families only. An unverified
+ShreeLipi/Shree Dev mapping can silently corrupt canonical text, and a job's font
+declaration does not establish the DOCX's effective fonts. Check text-bearing
+runs before processing or checkpoint reuse; no manifest/profile override can
+approve a font.
 
-## Decision
+Unicode ingestion requires approved Unicode fonts and does not switch pipelines
+or convert APS. Legacy conversion and lab proofreading retain approved mixed
+Unicode/APS handling. Exact matching and validation belong to the
+[shared font policy](../../tools/gurubodh-cli/config/policies/source-fonts.json),
+its [schema](../../tools/gurubodh-cli/config/policies/source-fonts.schema.json), and
+[font detection](../../tools/gurubodh-cli/gurubodh/legacy/font_detection.py).
+See [source handling](../../tools/gurubodh-cli/docs/reference/legacy-docx-conversion.md#source-font-safety-boundary)
+and implementation decisions [#307](https://github.com/Team-Gurubodh/gurubodh/issues/307)
+and [#318](https://github.com/Team-Gurubodh/gurubodh/issues/318).
 
-The CLI supports centrally approved Unicode source font families and APS source
-font families only. It resolves the effective font of every text run before
-conversion, proofreading, checkpoint creation, or canonical publication.
-Unapproved families, including ShreeLipi/Sri-Lipi/Shree Dev variants, fail the
-run without a job-level override.
+## Tradeoff and review trigger
 
-`source.font_encoding: "shreelipi"` is removed from the prep-subject job
-contract. This is an intentional breaking validation change: existing
-ShreeLipi jobs fail rather than producing potentially corrupt content. The
-approved Unicode allowlist requires maintainer review for additions. Following
-[#307](https://github.com/Team-Gurubodh/gurubodh/issues/307), it is centrally
-maintained in the bundled `tools/gurubodh-cli/config/policies/source-fonts.json`
-policy, validated against its strict schema. Both `prep-subject` and
-`lab proofread` use this policy across subjects and languages; manifests and
-execution profiles cannot override it. Approvals match complete names after
-case and whitespace normalization, and cannot conflict with legacy-font
-classifications. Missing or invalid policy data fails closed.
-
-The manifest-selected pipeline narrows those shared approvals. Following
-[#318](https://github.com/Team-Gurubodh/gurubodh/issues/318),
-`unicode-docx-ingest` requires every text-bearing run to resolve exclusively to
-approved Unicode families and rejects APS, unsupported, unapproved, or
-unresolved fonts before extraction or checkpoint reuse. It never converts or
-switches pipelines. `legacy-docx-to-unicode` and `lab proofread` retain their
-mixed approved-Unicode/APS conversion behavior.
-
-## Impact
-
-Operators continue to use `source.font_encoding: "unicode"` or `"aps"`.
-When an unapproved font is detected, they must provide an approved source or
-request review of a genuinely Unicode font family; they cannot bypass the
-check in job JSON. ShreeLipi documents remain unsupported until exact
-font-specific mappings and golden fixtures exist.
-
-## Review Trigger
-
-Revisit only when verified font-specific mappings, golden fixtures, and an
-approved production-support decision are available for a new legacy family.
+Unsupported sources fail rather than producing potentially corrupt text.
+New legacy families require verified font-specific mappings, golden fixtures,
+and explicit production-support approval.

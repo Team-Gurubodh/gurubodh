@@ -16,4 +16,4 @@ Current records:
 - [prepared-content-artifacts.md](./prepared-content-artifacts.md) - content outputs in local
   storage and Cloudflare R2 for future ingestion and metadata workflows.
 - [seed-data-artifacts.md](./seed-data-artifacts.md) - external seed-data CSV files, generated JSON
-  artifacts, and future Strapi 5 ingestion.
+  artifacts, and implemented Strapi 5 REST ingestion.

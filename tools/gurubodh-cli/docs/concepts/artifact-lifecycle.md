@@ -1,6 +1,6 @@
 # Artifact lifecycle
 
-This page describes the contract shared by the maintained workflows. It is the authoritative home for artifact ownership and cross-command invalidation.
+The [prepared-content interface](../../../../docs/interfaces/prepared-content-artifacts.md) owns cross-component ownership and invalidation obligations. This guide explains their command lifecycle and operator recovery.
 
 ## Ownership and order
 

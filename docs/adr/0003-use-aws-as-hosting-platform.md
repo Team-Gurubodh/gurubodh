@@ -4,43 +4,21 @@
 
 Accepted
 
-## Context
+## Decision and rationale
 
-The platform needs a cloud provider to host the CMS, content and metadata
-tooling, databases, storage, and — in later phases — vector/RAG infrastructure.
-Standardizing on a single provider simplifies security model, networking,
-billing, and operational knowledge across the team.
+AWS is the accepted hosting direction for infrastructure other than prepared
+artifact storage. Existing team familiarity and account setup favor a common
+security, networking, billing, and operational model.
+[ADR-0013](0013-use-cloudflare-r2-for-prepared-content-artifacts.md) qualifies the
+original single-provider choice: prepared artifacts use private Cloudflare R2,
+with local storage supported for development and compatibility.
 
-## Decision
+## Tradeoff and review trigger
 
-Use **AWS** as the hosting platform for all infrastructure.
+AWS-specific services increase switching costs; cost control and AWS operational
+knowledge remain team responsibilities. R2 adds a second provider boundary.
+Reconsider when portability, cost, or operational requirements change materially.
 
-Accepted [ADR-0013](./0013-use-cloudflare-r2-for-prepared-content-artifacts.md)
-qualifies this decision: prepared content artifacts use Cloudflare R2, with
-local filesystem storage retained for development and compatibility. AWS
-remains the hosting platform for the rest of the infrastructure; the original
-single-provider rationale below records the basis for this earlier decision.
-
-## Consequences
-
-**Positive**
-- A single platform to learn and operate, with managed services that map
-  directly onto the architecture's needs: ECS/Fargate, RDS, S3, Lambda, Step
-  Functions, EventBridge, and Bedrock for the future RAG layer.
-- Mature, fine-grained IAM-based security and networking model.
-- Broad availability of AWS-experienced engineering talent.
-
-**Negative**
-- Heavy use of AWS-specific managed services (e.g., Bedrock, OpenSearch
-  Serverless) increases vendor lock-in if a multi-cloud or cloud-portable
-  strategy becomes important later.
-- Cost management requires discipline — many small managed services can add up
-  in ways that are easy to lose track of.
-- Requires the team to build and maintain AWS-specific operational knowledge.
-
-**Alternatives Considered**
-- **GCP / Azure** — comparable managed-service capability; AWS was chosen based
-  on existing team familiarity and account setup.
-- **Vercel (for web hosting only)** — excellent Next.js-specific hosting, but
-  would still require AWS (or another cloud) for backend services, splitting
-  infrastructure across two platforms rather than consolidating on one.
+This direction does not select ECS, RDS, Bedrock, or another runtime/service for
+an unimplemented component and does not establish deployment. See
+[open choices](README.md#open-choices).

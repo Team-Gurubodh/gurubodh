@@ -13,7 +13,7 @@ and seed-data tools. Reading, chat, and retrieval applications are future work.
 
 | Your goal | Essential reading, in order |
 | --- | --- |
-| Understand the project | [Purpose and goals](goals.md) → [current system map and domain vocabulary](architecture.md#3-system-context) → [limitations relevant to your work](limitations.md) |
+| Understand the project | [Purpose and goals](goals.md) → [current system map and domain vocabulary](architecture.md#system-context) → [limitations relevant to your work](limitations.md) |
 | Set up your component | Choose the [CMS local recipe](../apps/gurubodh-cms/README.md#setup), [content-preparation CLI](../tools/gurubodh-cli/docs/getting-started.md), [seed-data CLI](../tools/seed-data-cli/README.md#setup), or [PostgreSQL DBA guide](../database/postgres/gurubodh-cms/README.md). [Web](../apps/gurubodh-web/README.md) and [chat](../apps/gurubodh-chat/README.md) are placeholders, not runnable setup options. |
 | Make your first contribution | [Contributing](../CONTRIBUTING.md) → [slice workflow and activity route](development/slice-workflow.md) → [GitHub conventions](development/github-workflow.md); use the chosen component guide's verification commands ([CMS](../apps/gurubodh-cms/README.md#common-commands), [content CLI](../tools/gurubodh-cli/docs/getting-started.md), [seed data](../tools/seed-data-cli/README.md#end-to-end-checklist)). |
 
@@ -64,9 +64,12 @@ Choose the appropriate home:
 | Content | Home |
 | --- | --- |
 | High-level project navigation and common commands | Root README |
-| Architecture decisions | [ADRs](adr/README.md) |
+| Component map, connections, data ownership, implementation status | [Architecture overview](architecture.md) |
+| Rationale, tradeoffs, reconsideration triggers | [ADRs](adr/README.md) and [decisions](decisions/README.md) |
 | Operational, process, or product decisions | [Decisions](decisions/README.md) |
-| Component setup, behavior, schemas, and interfaces | Component guides and applicable technical references |
+| Cross-component semantics and consumer obligations | [Interface contracts](interfaces/README.md) |
+| Structural fields, algorithms, constants, detailed runtime behavior | Schemas and code linked from component guides |
+| Setup, commands, recovery | Component guides |
 | Current designs, acceptance, execution evidence, completion, handoffs | GitHub issue under the [slice workflow](development/slice-workflow.md#authoritative-records) |
 | Existing task history | [Task archive](tasks/README.md) |
 

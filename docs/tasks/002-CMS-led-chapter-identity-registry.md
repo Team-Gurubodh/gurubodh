@@ -447,7 +447,7 @@ become a second registry or current-snapshot authority.
   Publish, i18n, and localized versus non-localized fields. The future Chapter
   model should follow those conventions where their semantics match.
 - Local and R2 overwrite behavior does not provide an atomic versioned release.
-  [Decision-0003](../decisions/0003-prepared-artifact-ownership-and-lifecycle.md)
+  [Decision-0003: Prepared Artifact Ownership and Lifecycle](../decisions/0003-prepared-artifact-ownership-and-lifecycle.md)
   explicitly deferred versioned releases and a current pointer until CMS
   ingestion required them.
 - [ADR-0013](../adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md)

@@ -1,85 +1,31 @@
-# 0013 - Use Cloudflare R2 for Prepared Content Artifacts
+# 0013 — Use Cloudflare R2 for Prepared Content Artifacts
 
 ## Status
 
 Accepted
 
-## Context
+## Decision and rationale
 
-The content workflow produces CMS-ingestion-ready artifacts from
-source DOCX files. Local filesystem paths are useful for development, but they
-are not durable enough to become the long-term handoff contract between
-preparation, ingestion, CMS-backed applications, and future metadata workflows.
+Use private Cloudflare R2 for durable prepared-content storage, addressed by
+bucket and object key through its S3-compatible API. Public object URLs are
+optional and may be null. Local filesystem storage remains supported for
+development and compatibility.
 
-Prepared artifacts must be addressable without assuming public object URLs.
-Cloudflare R2 provides S3-compatible object storage and can keep objects
-private while exposing stable bucket/key references to trusted server-side
-workflows.
+Preparation needs a handoff that survives individual machines and temporary
+workspaces. Private bucket/key references let trusted downstream workflows
+consume artifacts without making browser-facing public URLs part of the contract.
+This qualifies the [AWS hosting direction](0003-use-aws-as-hosting-platform.md)
+for prepared storage only; it does not select a CMS media provider.
 
-## Decision
+## Tradeoff and review trigger
 
-Use Cloudflare R2 as the durable object storage backend for prepared content
-artifacts. The development bucket is `gurubodh-library-dev`.
+The CLI depends on an S3-compatible client and runtime Cloudflare credentials;
+object keys become a compatibility boundary. Multi-object writes are non-atomic.
+Reconsider if concurrent writers or stronger release recovery require versioned
+or atomic publication.
 
-Prepared content jobs may still use a local filesystem backend for development
-and backward compatibility. R2 jobs use object keys as canonical storage
-references:
-
-```text
-source_library/
-cms_library/
-```
-
-Prepared artifact keys preserve the existing local artifact grouping under each
-language-qualified subject release root. `subject_dir` keeps the subject
-grouping visible and ends in the configured locale, for example
-`123_spand_rahasya/hi-IN`:
-
-```text
-cms_library/{subject_dir}/chapters/text_and_metadata/
-cms_library/{subject_dir}/chapters/unmodified_source_text/
-cms_library/{subject_dir}/chapters/proofreading/
-cms_library/{subject_dir}/chapters/chapter_content_manifest.json
-cms_library/{subject_dir}/chapters/msword/
-cms_library/{subject_dir}/chapters/semantic_chunks/
-cms_library/{subject_dir}/run_reports/generate-docx/
-cms_library/{subject_dir}/run_reports/generate-chunks/
-```
-
-Source and transient Unicode DOCX processing is internal to `prep-subject`.
-Derived chapter DOCX exports use `chapters/msword/` and are owned by the
-separate `generate-docx` command; `full_subject/` is retired.
-Each ready DOCX set contains one version-aligned `.docx` per manifest chapter
-and a `docx_manifest.json` readiness marker uploaded after all DOCX objects.
-The manifest binds exact source-manifest bytes, canonical identities, source
-text checksums, formatting/title contracts, and generated file checksums.
-
-Derived semantic chunks follow the same readiness-based R2 publication rule.
-`semantic_chunks_manifest.json` is uploaded after all validated chunk objects.
-On overwrite, each derived command removes its old readiness manifest before
-replacement uploads and publishes the new readiness manifest last. This is not
-an atomic multi-object release; a prefix without its readiness manifest is
-incomplete.
-
-Metadata stores storage references containing backend, bucket, object key, and
-an optional nullable URL. Public object URLs are not required.
-
-## Consequences
-
-**Positive**
-- Prepared artifacts have durable bucket/key references independent of local
-  machines and temporary processing paths.
-- Future ingestion can consume private R2 objects through server-side access
-  rather than browser-facing public URLs.
-- Local filesystem jobs remain available for development and compatibility.
-
-**Negative**
-- R2 workflows require Cloudflare credentials in the runtime environment.
-- The preparation tool now depends on an S3-compatible client library.
-- Object keys become part of the handoff contract and must be changed carefully.
-
-**Alternatives Considered**
-- **Local filesystem only** - simplest for development, but not durable across
-  machines, CI, or future ingestion workers.
-- **Public R2 URLs in metadata** - convenient for browser access, but not needed
-  for private-bucket CMS ingestion and creates the wrong downstream assumption.
+The [prepared-content contract](../interfaces/prepared-content-artifacts.md)
+owns artifact ownership, locale roots, readiness, and recovery obligations.
+The [configuration reference](../../tools/gurubodh-cli/docs/reference/configuration.md#storage-and-library-roots)
+owns bucket/prefix routing; [R2 operations](../../tools/gurubodh-cli/docs/operations/r2-production-runs.md)
+owns execution procedures.
