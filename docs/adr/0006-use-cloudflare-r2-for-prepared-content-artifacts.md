@@ -1,4 +1,4 @@
-# 0013 — Use Cloudflare R2 for Prepared Content Artifacts
+# 0006 — Use Cloudflare R2 for Prepared Content Artifacts
 
 ## Status
 

@@ -1,4 +1,4 @@
-# Decision-0011: Mandatory Slice Workflow
+# Decision-0008: Mandatory Slice Workflow
 
 <record_type>decision</record_type>
 <status>accepted</status>

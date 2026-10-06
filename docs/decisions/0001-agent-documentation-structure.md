@@ -14,7 +14,7 @@ workflows, not another copy of ordinary documentation.
 
 The original scaffold and repository task-handoff guidance were replaced under
 [#357](https://github.com/Team-Gurubodh/gurubodh/issues/357) and
-[Mandatory Slice Workflow](0011-mandatory-slice-workflow.md).
+[Mandatory Slice Workflow](0008-mandatory-slice-workflow.md).
 Current routing belongs to AGENTS.md; documentation placement belongs to the
 [documentation index](../README.md#documentation-maintenance); execution records
 belong to their owning GitHub issues. Existing task files are historical.

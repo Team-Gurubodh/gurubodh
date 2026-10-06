@@ -27,7 +27,7 @@ task history, or pilot handoffs to get started.
 | What works now? | Maintained component guides, executable schemas, code/tests, and applicable [interface contracts](interfaces/README.md). If they disagree, report the command, observed behavior, and conflicting link in a GitHub issue; reconcile documentation and implementation through that issue. Prose does not override executable behavior. |
 | Why was a choice made? | [ADRs](adr/README.md) and [decisions](decisions/README.md): **Accepted** records a decision, **Proposed** remains undecided, **Superseded** points to a replacement. Acceptance alone does not prove implementation or deployment. |
 | What is authorized or delivered? | The relevant GitHub issue and discussion own scope, execution evidence, and latest delivery status. Follow the [maintained links to GitHub-only contracts](decisions/README.md#records-on-github); scoped documentation exceptions still apply. |
-| What was explored or done previously? | [Task records](tasks/README.md) and archived handoffs provide historical context, not proof of current behavior or authorization for future work. [Decision-0011](decisions/0011-mandatory-slice-workflow.md) records repository-wide adoption of the slice workflow under #355; current session handoffs live in GitHub issue comments. |
+| What was explored or done previously? | [Task records](tasks/README.md) and archived handoffs provide historical context, not proof of current behavior or authorization for future work. [Decision-0008](decisions/0008-mandatory-slice-workflow.md) records repository-wide adoption of the slice workflow under #355; current session handoffs live in GitHub issue comments. |
 
 ## Core Documents
 
@@ -52,8 +52,8 @@ task history, or pilot handoffs to get started.
 
 Use these authoritative templates when creating new records:
 
-- [ADR template](./adr/0000-template.md)
-- [Decision template](./decisions/0000-template.md)
+- [ADR template](./templates/adr-template.md)
+- [Decision template](./templates/decision-template.md)
 - [Task template](./templates/task-template.md) - reference for existing task records; do not create new records for slice-workflow work.
 
 ## Documentation Maintenance

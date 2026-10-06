@@ -113,7 +113,7 @@ exploratory proposal, not implemented identity behavior.
 [Strapi](adr/0001-use-strapi-as-headless-cms.md),
 [Next.js](adr/0002-use-nextjs-for-web-frontend.md), and
 [AWS hosting direction](adr/0003-use-aws-as-hosting-platform.md) are accepted.
-[Cloudflare R2](adr/0013-use-cloudflare-r2-for-prepared-content-artifacts.md)
+[Cloudflare R2](adr/0006-use-cloudflare-r2-for-prepared-content-artifacts.md)
 qualifies the AWS direction for prepared storage. These choices do not prove
 cloud deployment or select an AWS runtime.
 
