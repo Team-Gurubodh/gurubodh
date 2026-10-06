@@ -1,6 +1,6 @@
 # Generate semantic chunks
 
-`gurubodh generate-chunks` creates semantic chunk JSON from the canonical chapter manifest produced by a successful `prep-subject` run. It is a derived workflow: it never changes canonical chapter text or metadata, and it cannot run against incomplete or legacy prepared trees.
+`gurubodh generate-chunks` creates semantic chunk JSON from the canonical chapter manifest produced by a successful `prep-subject` run. It is a derived workflow: it never changes canonical chapter text or metadata, and it requires a valid succeeded, manifest-bound prepared release. Valid succeeded legacy releases remain consumable under the [prepared-content contract](../../../../docs/interfaces/prepared-content-artifacts.md#canonical-consumption-gate).
 
 ## Prerequisites
 

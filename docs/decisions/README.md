@@ -4,6 +4,9 @@
 
 Use this directory for decisions that matter but are not full architectural decisions. Examples include documentation conventions, naming choices, workflow decisions, process decisions, and tool placement decisions.
 
+Status meanings follow the [ADR status legend](../adr/README.md#status-legend).
+Acceptance is scoped and does not establish implementation or deployment.
+
 ## Naming
 
 Use numbered filenames:
@@ -17,22 +20,23 @@ Use numbered filenames:
 
 | # | Title | Status |
 | --- | --- | --- |
-| 0001 | [Agent Documentation Structure](./0001-agent-documentation-structure.md) | Accepted; scaffold and execution-record guidance partly superseded (see record) |
-| 0002 | [GitHub Contribution Workflow](./0002-github-contribution-workflow.md) | Accepted; Projects tracking revised under #357 (see record) |
-| 0003 | [GitHub Issue Taxonomy](./0003-github-issue-taxonomy.md) | Accepted |
+| 0001 | [Agent Documentation Structure](./0001-agent-documentation-structure.md) | Accepted entry-point rationale; current routing in AGENTS.md |
+| 0002 | [GitHub Contribution Workflow](./0002-github-contribution-workflow.md) | Accepted collaboration rationale; current policy in development guides |
 | 0003 | [Prepared Artifact Ownership and Lifecycle](./0003-prepared-artifact-ownership-and-lifecycle.md) | Accepted |
 | 0004 | [Gurubodh CLI Container Publication and Runtime](./0004-gurubodh-cli-container-publication-and-runtime.md) | Accepted |
 | 0005 | [Language-Scoped Prepared Content Release Roots](./0005-language-scoped-prepared-content-release-roots.md) | Accepted |
 | 0006 | [Source Font Safety Boundary](./0006-source-font-safety-boundary.md) | Accepted |
 | 0007 | [Executable Gurubodh CLI JSON Schema Boundaries](./0007-executable-cli-json-schema-boundaries.md) | Accepted |
-| 0008 | [Slice Development Pilot](./0008-slice-development-pilot.md) | Superseded by Decision-0011; retained as pilot history |
 | 0011 | [Mandatory Slice Workflow](./0011-mandatory-slice-workflow.md) | Accepted |
 
-The two Decision-0003 records retain their historical numbers and paths.
-Number-only references to Decision-0003 are ambiguous: cite the full title and
-link to [GitHub Issue Taxonomy](./0003-github-issue-taxonomy.md) or
-[Prepared Artifact Ownership and Lifecycle](./0003-prepared-artifact-ownership-and-lifecycle.md)
-as appropriate.
+The retired GitHub Issue Taxonomy record is recoverable in
+[pinned Git history](https://github.com/Team-Gurubodh/gurubodh/blob/f9039b13d87ea0bdcf1bb9b746fe4a8f8f788bab/docs/decisions/0003-github-issue-taxonomy.md);
+current choices are in [GitHub conventions](../development/github-workflow.md#issues)
+and [issue templates](../../.github/ISSUE_TEMPLATE/). Both historical Decision-0003
+numbers remain reserved: use full titles and links, including
+[Prepared Artifact Ownership and Lifecycle](0003-prepared-artifact-ownership-and-lifecycle.md),
+when referring to either record. Superseded pilot history is linked from
+[Mandatory Slice Workflow](0011-mandatory-slice-workflow.md), outside the normal route.
 
 ## Records On GitHub
 

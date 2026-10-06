@@ -5,53 +5,23 @@
 <date>2026-08-19</date>
 <owners>Gurubodh maintainers</owners>
 
-## Context
+## Decision and rationale
 
-The CLI needs a reproducible operational runner for R2-backed content-preparation
-jobs without replacing native Python development workflows.
+Use a CPU-only, bounded CLI batch container for operational R2 jobs while retaining
+native Python for development/debugging. Immutable source-SHA tags and digest pins
+make baked-in code reproducible. Credentials and content stay outside the image;
+non-secret build provenance remains available for audits without Git metadata.
 
-## Decision
+Publish tested amd64/arm64 images to GHCR. Under
+[#310](https://github.com/Team-Gurubodh/gurubodh/issues/310), native architecture
+and package-resource checks precede publication of the tested images without
+rebuilding. This reduces the gap between verified and distributed runtime.
+The [workflow](../../.github/workflows/gurubodh-cli-container.yml) owns exact
+checks/tags/permissions; [container operations](../../tools/gurubodh-cli/docs/operations/r2-production-runs.md)
+owns registry access, mounts, and run procedures.
 
-- Publish the CPU-only CLI image as `ghcr.io/team-gurubodh/gurubodh-cli`.
-- Support `linux/amd64` and `linux/arm64`. Intel Macs pull amd64; Apple Silicon
-  Macs pull arm64.
-- Each invocation is one bounded batch job and exits. Production flow is R2 input
-  to a temporary container workspace to R2 output.
-- Images are tagged immutably as `sha-<full-git-sha>`. A human-readable
-  `cli-v*` Git tag publishes an additional matching release tag; neither policy
-  permits moving a SHA tag. Pull by digest for the strongest deployment pin.
-- The package is linked to this repository and follows its visibility. Maintainers
-  manage package access in GHCR and grant pull access only to required users or
-  teams before production use.
-- GitHub Actions uses `contents: read` and grants `packages: write` only to the
-  publish job. `GITHUB_TOKEN` publishes images; Cloudflare credentials are never
-  present in CI or image layers.
-- OCI labels record source URL, source revision, version, and creation time.
-  The build also writes equivalent non-secret provenance into the image for audit
-  reports. Production commands run baked-in code and must not bind-mount a mutable
-  checkout over `/opt/gurubodh-cli`.
-- `/opt/gurubodh-cli` is the project root, `/work` is the writable temporary
-  workspace, and `/var/cache/gurubodh/models` is the persistent model-cache
-  mount point. The image runs as a non-root `gurubodh` user.
-- Under [#310](https://github.com/Team-Gurubodh/gurubodh/issues/310), publication
-  requires native tests on both supported architectures and package-resource
-  distribution checks. Installed command execution runs offline as the runtime
-  user, including real APS conversion. The publish job uses the tested image
-  archives without rebuilding; architecture-specific SHA tags support assembly
-  of the final multi-platform tag. See the [verification coverage and limits](../../tools/gurubodh-cli/docs/operations/r2-production-runs.md#automated-image-verification).
+## Tradeoff and review trigger
 
-## Rationale
-
-This keeps credentials and content outside the image while making source identity
-available after the repository metadata has been excluded from the runtime image.
-
-## Impact
-
-Native Python execution remains the supported development and debugging path.
-Docker Compose, GPU images, scheduling, workers, and atomic/versioned R2
-publication remain out of scope.
-
-## Review Trigger
-
-Review on a registry/access-policy change, a GPU runtime requirement, or an
-orchestrated job model.
+Container/cache maintenance adds operational work. Scheduling, workers, GPU images,
+and atomic R2 releases are outside this runtime choice. Reconsider for a registry
+policy change, GPU requirement, or orchestrated job model.

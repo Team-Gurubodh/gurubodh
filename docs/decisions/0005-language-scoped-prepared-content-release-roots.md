@@ -5,53 +5,23 @@
 <date>2026-08-26</date>
 <owners>Gurubodh maintainers</owners>
 
-## Context
+## Decision and rationale
 
-Hindi and Marathi preparation for one subject must coexist without sharing
-canonical artifacts, checkpoints, semantic chunks, overwrite effects, or audit
-history. The earlier `{subject_dir}` artifact contract did not make language a
-mandatory part of that release boundary.
+Make language the final segment of each prepared subject release root. Hindi
+and Marathi must coexist without sharing canonical files, checkpoints, provenance,
+derived outputs, or overwrite effects. Putting language above the full artifact
+tree preserves relative paths while isolating command ownership.
 
-## Decision
+Locale/template provenance affects checkpoint compatibility: a resumed job must
+not silently switch proofreading language or instructions. Safe template identity
+is recorded without retaining prompt bodies.
 
-Treat each `{subject-group}/{language}` root as an independent prepared-content
-release unit. Initially the only permitted languages are `hi-IN` and `mr-IN`.
-The language is the final segment of `subject_dir`, while the subject grouping
-remains above it:
+The [prepared contract](../interfaces/prepared-content-artifacts.md#command-ownership-and-locale-roots)
+owns release obligations; [configuration](../../tools/gurubodh-cli/docs/reference/configuration.md)
+and [preparation guidance](../../tools/gurubodh-cli/docs/workflows/prepare-a-subject.md#source-handling-and-migration)
+own routing and legacy-location handling.
 
-```text
-cms_library/{subject-group}/hi-IN/
-cms_library/{subject-group}/mr-IN/
-```
+## Review trigger
 
-Every prep-subject-owned and generate-chunks-owned path stays beneath that
-root, including canonical artifacts, manifests, semantic chunks, reports,
-checkpoints, and workspaces. A job rejects unsafe nested paths and rejects a
-language partition, prompt selection, metadata language, candidate manifest,
-or generate-chunks source/destination root that does not agree with the
-configured locale.
-
-Proofreading uses an explicit locale template selected before each Gemini
-request. Safe provenance records the locale and stable template ID, version,
-and hash; it never records the prompt body. Template provenance is
-output-affecting checkpoint compatibility data.
-
-## Rationale
-
-Putting language above the entire subject tree avoids shared canonical,
-derived-output, report, state, and workspace paths. It preserves existing artifact-relative
-contracts and lets command-scoped overwrite/invalidation safely operate only
-within one language release.
-
-## Impact
-
-Existing unqualified Hindi artifacts are legacy locations. The CLI never moves
-or deletes them automatically. Operators regenerate Hindi into `hi-IN`, verify
-the new canonical manifest and audits, regenerate chunks, and retain legacy
-artifacts until an explicit archival or deletion decision. An incomplete old
-checkpoint cannot be resumed into a language root.
-
-## Review Trigger
-
-Review when supporting another locale, introducing cross-language editorial
-relationships, or adding atomic/versioned release publication.
+Reconsider for new locales, cross-language editorial relationships, or versioned
+release publication.
